@@ -42,6 +42,8 @@ import { SchoolSisIamService } from './school-sis-iam.service';
 import { SchoolSisIamController } from './school-sis-iam.controller';
 import { SchoolSisReportsController } from './school-sis-reports.controller';
 import { SchoolSisAttendanceController } from './school-sis-attendance.controller';
+import { SchoolSisHrController } from './school-sis-hr.controller';
+import { SchoolSisHrService } from './school-sis-hr.service';
 import { SchoolSisAttendanceService } from './school-sis-attendance.service';
 import { SchoolSisReportsService } from './school-sis-reports.service';
 import { SchoolSisReportsQueryService } from './school-sis-reports-query.service';
@@ -75,6 +77,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisIamController,
     SchoolSisReportsController,
     SchoolSisAttendanceController,
+    SchoolSisHrController,
   ],
   providers: [
     SchoolSisService,
@@ -101,6 +104,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisAutomationProcessor,
     SchoolSisAccessService,
     SchoolSisAttendanceService,
+    SchoolSisHrService,
     SchoolSisIamService,
     SchoolSisReportsQueryService,
     SchoolSisReportsService,
@@ -129,6 +133,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisAutomationService,
     SchoolSisAccessService,
     SchoolSisAttendanceService,
+    SchoolSisHrService,
     SchoolSisIamService,
     SchoolSisReportsService,
     SchoolReportEngineService,

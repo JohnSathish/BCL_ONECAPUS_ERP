@@ -303,7 +303,7 @@ export class SchoolSisService {
         admission: true,
         enrollment: true,
         timetable: true,
-        attendance: false,
+        attendance: true,
         fees: true,
         exams: true,
         holidays: true,

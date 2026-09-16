@@ -17249,6 +17249,22 @@ model SchoolStaff {
   attendanceSessionsMarked  SchoolAttendanceSession[] @relation("AttendanceMarkedByStaff")
   attendanceSubstitutes     SchoolAttendanceSubstitute[] @relation("AttendanceSubStaff")
   attendanceOriginalForSubs SchoolAttendanceSubstitute[] @relation("AttendanceSubOriginal")
+  hrEmployment              SchoolHrEmployment?
+  hrBankAccounts            SchoolHrBankAccount[]
+  hrDocuments               SchoolHrDocument[]
+  hrContacts                SchoolHrEmergencyContact[]
+  hrNominees                SchoolHrNominee[]
+  hrLeaveRequests           SchoolHrLeaveRequest[]
+  hrLeaveBalances           SchoolHrLeaveBalance[]
+  hrSalaries                SchoolHrEmployeeSalary[]
+  hrRevisions               SchoolHrSalaryRevision[]
+  hrAttendance              SchoolHrAttendance[]
+  hrPayrollLines            SchoolHrPayrollLine[]
+  hrLoans                   SchoolHrLoan[]
+  hrReimbursements          SchoolHrReimbursement[]
+  hrExits                   SchoolHrExit[]
+  hrTimeline                SchoolHrTimelineEvent[]
+  departmentsHeaded         SchoolHrDepartment[] @relation("HrDeptHead")
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType, status])
@@ -21050,6 +21066,617 @@ model SchoolAttendanceSyncItem {
   @@unique([tenantId, clientRecordId])
   @@index([tenantId, deviceId, syncStatus])
   @@map("school_attendance_sync_queue")
+  @@schema("school")
+}
+
+model SchoolHrSettings {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @unique @map("tenant_id") @db.Uuid
+  employeeCodePrefix String   @default("EMP") @map("employee_code_prefix")
+  lopDivisor         String   @default("WORKING") @map("lop_divisor")
+  customDivisor      Int      @default(26) @map("custom_divisor")
+  periodMode         String   @default("FINANCIAL") @map("period_mode")
+  requireAttendance  Boolean  @default(true) @map("require_attendance")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("school_hr_settings")
+  @@schema("school")
+}
+
+model SchoolHrDepartment {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  parentId    String?   @map("parent_id") @db.Uuid
+  code        String
+  name        String
+  description String?
+  headStaffId String?   @map("head_staff_id") @db.Uuid
+  active      Boolean   @default(true)
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  parent   SchoolHrDepartment?  @relation("HrDeptTree", fields: [parentId], references: [id])
+  children SchoolHrDepartment[] @relation("HrDeptTree")
+  head     SchoolStaff?         @relation("HrDeptHead", fields: [headStaffId], references: [id], onDelete: SetNull)
+  designations SchoolHrDesignation[]
+  employments  SchoolHrEmployment[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, parentId])
+  @@map("school_hr_departments")
+  @@schema("school")
+}
+
+model SchoolHrDesignation {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  departmentId String?   @map("department_id") @db.Uuid
+  code         String
+  name         String
+  grade        String?
+  jobDescription String? @map("job_description") @db.Text
+  salaryMinPaise Int     @default(0) @map("salary_min_paise")
+  salaryMaxPaise Int     @default(0) @map("salary_max_paise")
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  department  SchoolHrDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  employments SchoolHrEmployment[]
+
+  @@unique([tenantId, code])
+  @@map("school_hr_designations")
+  @@schema("school")
+}
+
+model SchoolHrEmployeeType {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  employments SchoolHrEmployment[]
+  leavePolicies SchoolHrLeavePolicy[]
+
+  @@unique([tenantId, code])
+  @@map("school_hr_employee_types")
+  @@schema("school")
+}
+
+model SchoolHrEmployment {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  staffId            String    @unique @map("staff_id") @db.Uuid
+  employeeTypeId     String?   @map("employee_type_id") @db.Uuid
+  departmentId       String?   @map("department_id") @db.Uuid
+  designationId      String?   @map("designation_id") @db.Uuid
+  reportingStaffId   String?   @map("reporting_staff_id") @db.Uuid
+  workLocation       String?   @map("work_location")
+  shift              String?
+  category           String?
+  grade              String?
+  campus             String?
+  probationStart     DateTime? @map("probation_start") @db.Date
+  probationEnd       DateTime? @map("probation_end") @db.Date
+  confirmationDate   DateTime? @map("confirmation_date") @db.Date
+  retirementDate     DateTime? @map("retirement_date") @db.Date
+  contractStart      DateTime? @map("contract_start") @db.Date
+  contractEnd        DateTime? @map("contract_end") @db.Date
+  panMasked          String?   @map("pan_masked")
+  panFull            String?   @map("pan_full")
+  aadhaarStatus      String?   @map("aadhaar_status")
+  uan                String?
+  pfNumber           String?   @map("pf_number")
+  esiNumber          String?   @map("esi_number")
+  taxRegime          String?   @map("tax_regime")
+  extrasJson         Json      @default("{}") @map("extras_json")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  staff        SchoolStaff           @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  employeeType SchoolHrEmployeeType? @relation(fields: [employeeTypeId], references: [id], onDelete: SetNull)
+  department   SchoolHrDepartment?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  designation  SchoolHrDesignation?  @relation(fields: [designationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, departmentId])
+  @@map("school_hr_employments")
+  @@schema("school")
+}
+
+model SchoolHrBankAccount {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  staffId       String   @map("staff_id") @db.Uuid
+  holderName    String   @map("holder_name")
+  bankName      String   @map("bank_name")
+  branch        String?
+  accountLast4  String   @map("account_last4")
+  accountFull   String   @map("account_full")
+  ifsc          String
+  accountType   String   @default("SAVINGS") @map("account_type")
+  isPrimary     Boolean  @default(true) @map("is_primary")
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  staff SchoolStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, staffId])
+  @@map("school_hr_bank_accounts")
+  @@schema("school")
+}
+
+model SchoolHrDocument {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  staffId      String    @map("staff_id") @db.Uuid
+  docType      String    @map("doc_type")
+  docNumber    String?   @map("doc_number")
+  issueDate    DateTime? @map("issue_date") @db.Date
+  expiryDate   DateTime? @map("expiry_date") @db.Date
+  fileName     String    @map("file_name")
+  storageKey   String?   @map("storage_key")
+  remarks      String?
+  uploadedBy   String?   @map("uploaded_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  staff SchoolStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, staffId, expiryDate])
+  @@map("school_hr_documents")
+  @@schema("school")
+}
+
+model SchoolHrEmergencyContact {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  staffId      String  @map("staff_id") @db.Uuid
+  name         String
+  relationship String
+  mobile       String
+  altMobile    String? @map("alt_mobile")
+  address      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  staff SchoolStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, staffId])
+  @@map("school_hr_emergency_contacts")
+  @@schema("school")
+}
+
+model SchoolHrNominee {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  staffId      String   @map("staff_id") @db.Uuid
+  name         String
+  relationship String
+  dob          DateTime? @db.Date
+  percentage   Int      @default(0)
+  contact      String?
+  isNominee    Boolean  @default(true) @map("is_nominee")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  staff SchoolStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, staffId])
+  @@map("school_hr_nominees")
+  @@schema("school")
+}
+
+model SchoolHrLeaveType {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  code             String
+  name             String
+  paid             Boolean  @default(true)
+  isLop            Boolean  @default(false) @map("is_lop")
+  requiresDocument Boolean  @default(false) @map("requires_document")
+  active           Boolean  @default(true)
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  policies SchoolHrLeavePolicy[]
+  requests SchoolHrLeaveRequest[]
+  balances SchoolHrLeaveBalance[]
+
+  @@unique([tenantId, code])
+  @@map("school_hr_leave_types")
+  @@schema("school")
+}
+
+model SchoolHrLeavePolicy {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  leaveTypeId        String   @map("leave_type_id") @db.Uuid
+  employeeTypeId     String?  @map("employee_type_id") @db.Uuid
+  annualEntitlement  Decimal  @default(0) @map("annual_entitlement") @db.Decimal(6, 2)
+  monthlyAccrual     Decimal  @default(0) @map("monthly_accrual") @db.Decimal(6, 2)
+  carryForward       Boolean  @default(false) @map("carry_forward")
+  maxCarryForward    Decimal  @default(0) @map("max_carry_forward") @db.Decimal(6, 2)
+  encashmentAllowed  Boolean  @default(false) @map("encashment_allowed")
+  requiresApproval   Boolean  @default(true) @map("requires_approval")
+  applicableGender   String?  @map("applicable_gender")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  leaveType    SchoolHrLeaveType     @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  employeeType SchoolHrEmployeeType? @relation(fields: [employeeTypeId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, leaveTypeId])
+  @@map("school_hr_leave_policies")
+  @@schema("school")
+}
+
+model SchoolHrLeaveBalance {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  staffId     String  @map("staff_id") @db.Uuid
+  leaveTypeId String  @map("leave_type_id") @db.Uuid
+  year        Int
+  opening     Decimal @default(0) @db.Decimal(6, 2)
+  accrued     Decimal @default(0) @db.Decimal(6, 2)
+  taken       Decimal @default(0) @db.Decimal(6, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  staff     SchoolStaff       @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  leaveType SchoolHrLeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, leaveTypeId, year])
+  @@map("school_hr_leave_balances")
+  @@schema("school")
+}
+
+model SchoolHrLeaveRequest {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  staffId     String    @map("staff_id") @db.Uuid
+  leaveTypeId String    @map("leave_type_id") @db.Uuid
+  fromDate    DateTime  @map("from_date") @db.Date
+  toDate      DateTime  @map("to_date") @db.Date
+  days        Decimal   @db.Decimal(6, 2)
+  reason      String?   @db.Text
+  attachment  String?
+  status      String    @default("PENDING")
+  submittedBy String?   @map("submitted_by") @db.Uuid
+  reviewedBy  String?   @map("reviewed_by") @db.Uuid
+  reviewedAt  DateTime? @map("reviewed_at")
+  reviewNote  String?   @map("review_note")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  staff     SchoolStaff       @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  leaveType SchoolHrLeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, fromDate])
+  @@index([tenantId, staffId])
+  @@map("school_hr_leave_requests")
+  @@schema("school")
+}
+
+model SchoolHrAttendance {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  staffId   String   @map("staff_id") @db.Uuid
+  date      DateTime @db.Date
+  status    String
+  remark    String?
+  source    String   @default("MANUAL")
+  markedBy  String?  @map("marked_by") @db.Uuid
+  finalized Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  staff SchoolStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, date])
+  @@index([tenantId, date, status])
+  @@map("school_hr_attendance")
+  @@schema("school")
+}
+
+model SchoolHrSalaryComponent {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  code           String
+  name           String
+  kind           String
+  calcType       String   @map("calc_type")
+  formula        String?
+  defaultPaise   Int      @default(0) @map("default_paise")
+  taxable        Boolean  @default(true)
+  recurring      Boolean  @default(true)
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  structureLines SchoolHrStructureLine[]
+
+  @@unique([tenantId, code])
+  @@map("school_hr_salary_components")
+  @@schema("school")
+}
+
+model SchoolHrSalaryStructure {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  code        String
+  name        String
+  description String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  lines     SchoolHrStructureLine[]
+  salaries  SchoolHrEmployeeSalary[]
+
+  @@unique([tenantId, code])
+  @@map("school_hr_salary_structures")
+  @@schema("school")
+}
+
+model SchoolHrStructureLine {
+  id           String @id @default(uuid()) @db.Uuid
+  structureId  String @map("structure_id") @db.Uuid
+  componentId  String @map("component_id") @db.Uuid
+  formula      String?
+  amountPaise  Int    @default(0) @map("amount_paise")
+  sortOrder    Int    @default(0) @map("sort_order")
+
+  structure SchoolHrSalaryStructure  @relation(fields: [structureId], references: [id], onDelete: Cascade)
+  component SchoolHrSalaryComponent  @relation(fields: [componentId], references: [id], onDelete: Restrict)
+
+  @@unique([structureId, componentId])
+  @@map("school_hr_structure_lines")
+  @@schema("school")
+}
+
+model SchoolHrEmployeeSalary {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  staffId       String    @map("staff_id") @db.Uuid
+  structureId   String    @map("structure_id") @db.Uuid
+  basicPaise    Int       @map("basic_paise")
+  componentsJson Json     @default("[]") @map("components_json")
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  remarks       String?
+  approvedBy    String?   @map("approved_by") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  staff     SchoolStaff              @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  structure SchoolHrSalaryStructure  @relation(fields: [structureId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, staffId, effectiveFrom])
+  @@map("school_hr_employee_salaries")
+  @@schema("school")
+}
+
+model SchoolHrSalaryRevision {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  staffId         String   @map("staff_id") @db.Uuid
+  previousPaise   Int      @map("previous_paise")
+  newPaise        Int      @map("new_paise")
+  incrementPaise  Int      @map("increment_paise")
+  incrementPct    Decimal  @map("increment_pct") @db.Decimal(8, 2)
+  effectiveDate   DateTime @map("effective_date") @db.Date
+  reason          String?
+  approvedBy      String?  @map("approved_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  staff SchoolStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, staffId])
+  @@map("school_hr_salary_revisions")
+  @@schema("school")
+}
+
+model SchoolHrPayrollRun {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  periodMonth    String    @map("period_month")
+  scopeKey       String    @default("ALL") @map("scope_key")
+  departmentId   String?   @map("department_id") @db.Uuid
+  employeeTypeId String?   @map("employee_type_id") @db.Uuid
+  status         String    @default("DRAFT")
+  settingsSnap   Json      @default("{}") @map("settings_snap")
+  totalsJson     Json      @default("{}") @map("totals_json")
+  calculatedAt   DateTime? @map("calculated_at")
+  approvedAt     DateTime? @map("approved_at")
+  approvedBy     String?   @map("approved_by") @db.Uuid
+  finalizedAt    DateTime? @map("finalized_at")
+  finalizedBy    String?   @map("finalized_by") @db.Uuid
+  lockedAt       DateTime? @map("locked_at")
+  reversedAt     DateTime? @map("reversed_at")
+  reverseReason  String?   @map("reverse_reason")
+  createdBy      String?   @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  lines SchoolHrPayrollLine[]
+
+  @@unique([tenantId, periodMonth, scopeKey])
+  @@index([tenantId, status])
+  @@map("school_hr_payroll_runs")
+  @@schema("school")
+}
+
+model SchoolHrPayrollLine {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  runId            String   @map("run_id") @db.Uuid
+  staffId          String   @map("staff_id") @db.Uuid
+  earningsJson     Json     @default("[]") @map("earnings_json")
+  deductionsJson   Json     @default("[]") @map("deductions_json")
+  attendanceSnap   Json     @default("{}") @map("attendance_snap")
+  configSnap       Json     @default("{}") @map("config_snap")
+  grossPaise       Int      @map("gross_paise")
+  deductionPaise   Int      @map("deduction_paise")
+  netPaise         Int      @map("net_paise")
+  employerPaise    Int      @default(0) @map("employer_paise")
+  payStatus        String   @default("PENDING") @map("pay_status")
+  paymentMode      String?  @map("payment_mode")
+  paymentRef       String?  @map("payment_ref")
+  paidAt           DateTime? @map("paid_at")
+  paidBy           String?  @map("paid_by") @db.Uuid
+  error            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  run   SchoolHrPayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  staff SchoolStaff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  @@unique([runId, staffId])
+  @@index([tenantId, staffId])
+  @@map("school_hr_payroll_lines")
+  @@schema("school")
+}
+
+model SchoolHrLoan {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  staffId         String   @map("staff_id") @db.Uuid
+  loanType        String   @map("loan_type")
+  principalPaise  Int      @map("principal_paise")
+  interestBps     Int      @default(0) @map("interest_bps")
+  startDate       DateTime @map("start_date") @db.Date
+  tenureMonths    Int      @map("tenure_months")
+  installmentPaise Int     @map("installment_paise")
+  outstandingPaise Int     @map("outstanding_paise")
+  status          String   @default("ACTIVE")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  staff        SchoolStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  installments SchoolHrLoanInstallment[]
+
+  @@index([tenantId, staffId, status])
+  @@map("school_hr_loans")
+  @@schema("school")
+}
+
+model SchoolHrLoanInstallment {
+  id          String    @id @default(uuid()) @db.Uuid
+  loanId      String    @map("loan_id") @db.Uuid
+  periodMonth String    @map("period_month")
+  amountPaise Int       @map("amount_paise")
+  posted      Boolean   @default(false)
+  postedAt    DateTime? @map("posted_at")
+
+  loan SchoolHrLoan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@unique([loanId, periodMonth])
+  @@map("school_hr_loan_installments")
+  @@schema("school")
+}
+
+model SchoolHrReimbursement {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  staffId     String    @map("staff_id") @db.Uuid
+  category    String
+  amountPaise Int       @map("amount_paise")
+  expenseDate DateTime  @map("expense_date") @db.Date
+  description String?   @db.Text
+  receipt     String?
+  status      String    @default("SUBMITTED")
+  reviewedBy  String?   @map("reviewed_by") @db.Uuid
+  paidAt      DateTime? @map("paid_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  staff SchoolStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@map("school_hr_reimbursements")
+  @@schema("school")
+}
+
+model SchoolHrExit {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  staffId          String    @map("staff_id") @db.Uuid
+  kind             String
+  resignationDate  DateTime? @map("resignation_date") @db.Date
+  lastWorkingDate  DateTime? @map("last_working_date") @db.Date
+  reason           String?
+  noticeDays       Int       @default(0) @map("notice_days")
+  clearanceJson    Json      @default("{}") @map("clearance_json")
+  settlementJson   Json      @default("{}") @map("settlement_json")
+  status           String    @default("OPEN")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  staff SchoolStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, staffId])
+  @@map("school_hr_exits")
+  @@schema("school")
+}
+
+model SchoolHrTimelineEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  staffId   String   @map("staff_id") @db.Uuid
+  event     String
+  detail    String?  @db.Text
+  actorId   String?  @map("actor_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  staff SchoolStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, staffId, createdAt])
+  @@map("school_hr_timeline")
+  @@schema("school")
+}
+
+model SchoolHrAudit {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  staffId   String?  @map("staff_id") @db.Uuid
+  beforeJson Json?   @map("before_json")
+  afterJson  Json?   @map("after_json")
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, staffId])
+  @@map("school_hr_audit_logs")
+  @@schema("school")
+}
+
+model SchoolHrStatutoryRule {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  code          String
+  name          String
+  rateBps       Int      @default(0) @map("rate_bps")
+  ceilingPaise  Int      @default(0) @map("ceiling_paise")
+  formula       String?
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, code, effectiveFrom])
+  @@map("school_hr_statutory_rules")
   @@schema("school")
 }
 

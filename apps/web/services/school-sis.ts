@@ -2347,3 +2347,72 @@ export async function fetchSchoolStudentAttendance(studentId: string, academicYe
   });
   return data;
 }
+
+function hr(path: string, params?: Record<string, unknown>) {
+  return api.get(`/v1/school-sis/hr${path}`, { params }).then((r) => r.data);
+}
+
+function hrPost(path: string, payload?: unknown) {
+  return api.post(`/v1/school-sis/hr${path}`, payload).then((r) => r.data);
+}
+
+function hrPatch(path: string, payload?: unknown) {
+  return api.patch(`/v1/school-sis/hr${path}`, payload).then((r) => r.data);
+}
+
+export const fetchHrDashboard = (periodMonth?: string) => hr('/dashboard', { periodMonth });
+export const fetchHrSettings = () => hr('/settings');
+export const saveHrSettings = (payload: unknown) => hrPatch('/settings', payload);
+export const fetchHrDepartments = () => hr('/departments');
+export const saveHrDepartment = (payload: unknown) => hrPost('/departments', payload);
+export const fetchHrDesignations = () => hr('/designations');
+export const saveHrDesignation = (payload: unknown) => hrPost('/designations', payload);
+export const fetchHrEmployeeTypes = () => hr('/employee-types');
+export const saveHrEmployeeType = (payload: unknown) => hrPost('/employee-types', payload);
+export const fetchHrNextCode = () => hr('/employees/next-code');
+export const fetchHrEmployees = (params?: Record<string, unknown>) => hr('/employees', params);
+export const fetchHrEmployee = (id: string) => hr(`/employees/${id}`);
+export const createHrEmployee = (payload: unknown) => hrPost('/employees', payload);
+export const saveHrEmployment = (id: string, payload: unknown) =>
+  hrPatch(`/employees/${id}/employment`, payload);
+export const saveHrBank = (id: string, payload: unknown) =>
+  hrPost(`/employees/${id}/bank`, payload);
+export const importHrEmployees = (payload: unknown) => hrPost('/employees/import', payload);
+export const fetchHrComponents = () => hr('/salary/components');
+export const saveHrComponent = (payload: unknown) => hrPost('/salary/components', payload);
+export const fetchHrStructures = () => hr('/salary/structures');
+export const saveHrStructure = (payload: unknown) => hrPost('/salary/structures', payload);
+export const assignHrSalary = (payload: unknown) => hrPost('/salary/assign', payload);
+export const reviseHrSalary = (payload: unknown) => hrPost('/salary/revise', payload);
+export const fetchHrLeaveTypes = () => hr('/leave/types');
+export const saveHrLeaveType = (payload: unknown) => hrPost('/leave/types', payload);
+export const saveHrLeavePolicy = (payload: unknown) => hrPost('/leave/policies', payload);
+export const fetchHrLeaveRequests = (params?: Record<string, unknown>) =>
+  hr('/leave/requests', params);
+export const requestHrLeave = (payload: unknown) => hrPost('/leave/request', payload);
+export const reviewHrLeave = (id: string, approve: boolean) =>
+  hrPost(`/leave/${id}/${approve ? 'approve' : 'reject'}`);
+export const fetchHrStaffAttendance = (date: string) => hr('/attendance', { date });
+export const markHrStaffAttendance = (payload: unknown) => hrPost('/attendance', payload);
+export const finalizeHrAttendanceMonth = (periodMonth: string) =>
+  hrPost('/attendance/finalize', { periodMonth });
+export const calculateHrPayroll = (payload: unknown) => hrPost('/payroll/calculate', payload);
+export const fetchHrPayrollList = () => hr('/payroll');
+export const fetchHrPayroll = (id: string) => hr(`/payroll/${id}`);
+export const reviewHrPayroll = (id: string) => hrPost(`/payroll/${id}/review`);
+export const approveHrPayroll = (id: string) => hrPost(`/payroll/${id}/approve`);
+export const processHrPayroll = (id: string) => hrPost(`/payroll/${id}/process`);
+export const finalizeHrPayroll = (id: string) => hrPost(`/payroll/${id}/finalize`);
+export const reverseHrPayroll = (id: string, reason: string) =>
+  hrPost(`/payroll/${id}/reverse`, { reason });
+export const payHrPayrollLines = (payload: unknown) => hrPost('/payroll/pay', payload);
+export const fetchHrPayslipPdf = (id: string) =>
+  api.get(`/v1/school-sis/hr/payslips/${id}/pdf`, { responseType: 'blob' }).then((r) => r.data);
+export const fetchHrLoans = (staffId?: string) => hr('/loans', { staffId });
+export const createHrLoan = (payload: unknown) => hrPost('/loans', payload);
+export const fetchHrReimbursements = (staffId?: string) => hr('/reimbursements', { staffId });
+export const createHrReimbursement = (payload: unknown) => hrPost('/reimbursements', payload);
+export const approveHrReimbursement = (id: string) => hrPost(`/reimbursements/${id}/approve`);
+export const createHrExit = (payload: unknown) => hrPost('/exits', payload);
+export const saveHrStatutory = (payload: unknown) => hrPost('/statutory', payload);
+export const fetchHrMe = () => hr('/me');

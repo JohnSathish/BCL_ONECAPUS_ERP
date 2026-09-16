@@ -16,6 +16,7 @@ import {
   type ReportModule,
 } from './school-sis-reports.catalog';
 import { SchoolSisAttendanceService } from './school-sis-attendance.service';
+import { SchoolSisHrService } from './school-sis-hr.service';
 
 export type ReportFilters = {
   academicYearId?: string;
@@ -135,6 +136,7 @@ export class SchoolSisReportsQueryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly attendance: SchoolSisAttendanceService,
+    private readonly hr: SchoolSisHrService,
   ) {}
 
   catalog(roles: string[], permissions: string[]) {
@@ -823,9 +825,25 @@ export class SchoolSisReportsQueryService {
       key === 'staff_hours' ||
       key.startsWith('staff_pay') ||
       key === 'staff_salary' ||
-      key === 'staff_deduction'
+      key === 'staff_deduction' ||
+      key.startsWith('staff_')
     ) {
-      return this.empty(report, filters, page, limit);
+      const built = await this.hr.reportBundle(tenantId, key);
+      const rows = built.rows as Row[];
+      return {
+        report,
+        columns: built.columns,
+        rows,
+        kpis: built.kpis ?? [],
+        charts: [],
+        empty: rows.length === 0,
+        emptyHint:
+          rows.length === 0 ? this.emptyMessage(report, filters) : undefined,
+        total: rows.length,
+        page,
+        limit,
+        filtersApplied: filters,
+      };
     }
     if (key === 'sms_sent') return this.empty(report, filters, page, limit);
 

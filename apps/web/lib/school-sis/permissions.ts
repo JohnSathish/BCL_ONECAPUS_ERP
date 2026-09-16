@@ -26,6 +26,7 @@ const PERSONA_MODULES: Record<Exclude<SchoolSisNavPersona, 'full'>, Set<string>>
     'examination',
     'holidays',
     'attendance',
+    'hr-payroll',
     'broadcast',
     'notifications',
     'whatsapp',
@@ -41,6 +42,7 @@ const PERSONA_MODULES: Record<Exclude<SchoolSisNavPersona, 'full'>, Set<string>>
     'fees',
     'billing',
     'accounts',
+    'hr-payroll',
     'whatsapp',
     'automation',
     'reports-analytics',
@@ -85,6 +87,7 @@ export function resolveSchoolSisNavPersona(
 ): SchoolSisNavPersona {
   const roleBlob = (roles ?? []).join(' ').toLowerCase();
   if (has(permissions, MANAGE)) return 'full';
+  if (roleBlob.includes('hr') || has(permissions, 'hr.employees.manage')) return 'full';
   if (roleBlob.includes('accountant') || roleBlob.includes('accounts')) return 'accountant';
   if (roleBlob.includes('librarian')) return 'librarian';
   if (roleBlob.includes('transport')) return 'transport';
@@ -151,6 +154,8 @@ function filterChildren(
   children: SchoolErpNavLink[] | undefined,
   canManage: boolean,
   roles?: string[],
+  persona?: SchoolSisNavPersona,
+  permissions?: string[],
 ): SchoolErpNavLink[] | undefined {
   if (!children) return children;
   const roleBlob = (roles ?? []).join(' ').toLowerCase();
@@ -158,6 +163,50 @@ function filterChildren(
   let next = canManage ? children : children.filter((c) => c.id !== 'student-add');
   if (cashierOnly) {
     next = next.filter((c) => c.id !== 'fee-gateways' && c.id !== 'fee-gateway-txns');
+  }
+  const payroll = has(permissions, 'payroll.view') || has(permissions, 'payroll.calculate');
+  const hrManage = has(permissions, MANAGE) || has(permissions, 'hr.employees.manage');
+  if (persona === 'teacher' && !hrManage) {
+    next = next.filter((c) =>
+      ['hr-self', 'hr-leave-requests', 'hr-leave-balance', 'hr-attendance', 'hr-payslips'].includes(
+        c.id,
+      ),
+    );
+  } else if (persona === 'accountant' && !hrManage) {
+    next = next.filter((c) =>
+      [
+        'hr-dashboard',
+        'hr-employees',
+        'hr-payroll-dash',
+        'hr-process',
+        'hr-register',
+        'hr-payments',
+        'hr-history',
+        'hr-structures',
+        'hr-components',
+        'hr-assign',
+        'hr-payslips',
+        'hr-loans',
+        'hr-reimb',
+        'hr-reports',
+      ].includes(c.id),
+    );
+  }
+  if (!payroll && persona !== 'full' && !has(permissions, '*')) {
+    next = next.filter(
+      (c) =>
+        ![
+          'hr-payroll-dash',
+          'hr-process',
+          'hr-register',
+          'hr-payments',
+          'hr-history',
+          'hr-structures',
+          'hr-components',
+          'hr-assign',
+          'hr-revisions',
+        ].includes(c.id),
+    );
   }
   return next;
 }
@@ -181,7 +230,16 @@ export function filterSchoolSisNavGroups(
         })
         .map((item) => {
           const flagged = applyFeatureFlags(item, input.modules);
-          return { ...flagged, children: filterChildren(flagged.children, canManage, input.roles) };
+          return {
+            ...flagged,
+            children: filterChildren(
+              flagged.children,
+              canManage,
+              input.roles,
+              persona,
+              input.permissions,
+            ),
+          };
         }),
     }))
     .filter((group) => group.items.length > 0);

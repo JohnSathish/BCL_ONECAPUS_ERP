@@ -85,3 +85,29 @@ export const SIS_ATTENDANCE_PARENT = [
   'school-mobile:student',
   'attendance.view',
 ] as const;
+
+/** Employee records — not payroll. */
+export const SIS_HR_VIEW = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'hr.employees.view',
+  'hr.employees.manage',
+] as const;
+
+export const SIS_HR_SELF = ['hr.self.view', 'school-mobile:staff'] as const;
+
+/** Explicit payroll slugs — school-sis:manage alone is not enough. */
+export const SIS_PAYROLL_VIEW = [
+  'payroll.view',
+  'payroll.calculate',
+  'payroll.approve',
+  'payroll.pay',
+] as const;
+
+export const SIS_PAYROLL_CALC = [
+  'payroll.calculate',
+  'payroll.approve',
+] as const;
+
+export const SIS_PAYROLL_APPROVE = ['payroll.approve'] as const;
+
+export const SIS_PAYROLL_PAY = ['payroll.pay', 'payroll.approve'] as const;
