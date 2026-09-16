@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
 import { AuthModule } from '../auth/auth.module';
 import { TenantsModule } from '../tenants/tenants.module';
@@ -60,6 +60,12 @@ import { SchoolSisAccountsController } from './school-sis-accounts.controller';
 import { SchoolSisAccountsService } from './school-sis-accounts.service';
 import { SchoolSisAccountsPostingService } from './school-sis-accounts.posting.service';
 import { SchoolLicenseGuard } from './school-sis-license.guard';
+import { SchoolSisOpsController } from './school-sis-ops.controller';
+import { SchoolSisOpsService } from './school-sis-ops.service';
+import { SchoolSisOpsProcessor } from './school-sis-ops.processor';
+import { SchoolSisOpsMetrics } from './school-sis-ops.metrics';
+import { SchoolSisOpsInterceptor } from './school-sis-ops.interceptor';
+import { SchoolMaintenanceGuard } from './school-sis-ops.guard';
 import { SchoolSisAttendanceService } from './school-sis-attendance.service';
 import { SchoolSisReportsService } from './school-sis-reports.service';
 import { SchoolSisReportsQueryService } from './school-sis-reports-query.service';
@@ -78,6 +84,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     BullModule.registerQueue({ name: 'school-push' }),
     BullModule.registerQueue({ name: 'school-automation' }),
     BullModule.registerQueue({ name: 'school-sms' }),
+    BullModule.registerQueue({ name: 'school-ops' }),
   ],
   controllers: [
     SchoolSisController,
@@ -101,6 +108,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisAccountsController,
     SchoolSisLibraryController,
     SchoolSisSmsController,
+    SchoolSisOpsController,
   ],
   providers: [
     SchoolSisService,
@@ -136,7 +144,12 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisLibraryService,
     SchoolSisSmsService,
     SchoolSisSmsProcessor,
+    SchoolSisOpsService,
+    SchoolSisOpsProcessor,
+    SchoolSisOpsMetrics,
+    { provide: APP_INTERCEPTOR, useClass: SchoolSisOpsInterceptor },
     { provide: APP_GUARD, useClass: SchoolLicenseGuard },
+    { provide: APP_GUARD, useClass: SchoolMaintenanceGuard },
     SchoolSisIamService,
     SchoolSisReportsQueryService,
     SchoolSisReportsService,
@@ -172,6 +185,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisAccountsService,
     SchoolSisLibraryService,
     SchoolSisSmsService,
+    SchoolSisOpsService,
     SchoolSisIamService,
     SchoolSisReportsService,
     SchoolReportEngineService,

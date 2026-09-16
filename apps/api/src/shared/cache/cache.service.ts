@@ -110,4 +110,47 @@ export class CacheService implements OnModuleDestroy {
   isEnabled() {
     return this.enabled;
   }
+
+  /** Health stats only — never returns the Redis URL or credentials. */
+  async healthStats() {
+    const r = this.redis();
+    if (!r) {
+      return {
+        enabled: this.enabled,
+        connected: false,
+        keys: 0,
+        memoryBytes: 0,
+        hits: 0,
+        misses: 0,
+        hitRate: 0,
+      };
+    }
+    try {
+      const pong = await r.ping();
+      const [info, keys] = await Promise.all([r.info(), r.dbsize()]);
+      const memoryBytes = Number(/used_memory:(\d+)/.exec(info)?.[1] ?? 0);
+      const hits = Number(/keyspace_hits:(\d+)/.exec(info)?.[1] ?? 0);
+      const misses = Number(/keyspace_misses:(\d+)/.exec(info)?.[1] ?? 0);
+      const total = hits + misses;
+      return {
+        enabled: true,
+        connected: pong === 'PONG',
+        keys,
+        memoryBytes,
+        hits,
+        misses,
+        hitRate: total ? Math.round((hits / total) * 1000) / 10 : 0,
+      };
+    } catch {
+      return {
+        enabled: this.enabled,
+        connected: false,
+        keys: 0,
+        memoryBytes: 0,
+        hits: 0,
+        misses: 0,
+        hitRate: 0,
+      };
+    }
+  }
 }

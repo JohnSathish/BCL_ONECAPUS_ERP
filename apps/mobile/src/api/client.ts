@@ -70,9 +70,18 @@ async function doFetch<T>(path: string, options: FetchOptions): Promise<T> {
     });
   } catch (err) {
     if (err instanceof Error && (err.name === 'AbortError' || /aborted/i.test(err.message))) {
-      throw Object.assign(new Error('Request timed out. Check your connection and try again.'), {
-        status: 408,
-      });
+      let host = url;
+      try {
+        host = new URL(url).host;
+      } catch {
+        /* keep url */
+      }
+      throw Object.assign(
+        new Error(
+          `Could not reach ${host} in time. On an Android emulator use 10.0.2.2 instead of localhost, and confirm the school API is running.`,
+        ),
+        { status: 408 },
+      );
     }
     throw err;
   } finally {

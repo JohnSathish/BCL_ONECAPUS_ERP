@@ -234,7 +234,8 @@ export function filterSchoolSisNavGroups(
       items: group.items
         .filter((item) => {
           if (item.id === 'users' || item.id === 'account-security') return usersOk;
-          if (item.id === 'system' && !canManage) return false;
+          if (item.id === 'system' && !canManage && !has(input.permissions, 'system.view'))
+            return false;
           return !allowed || allowed.has(item.id);
         })
         .map((item) => {

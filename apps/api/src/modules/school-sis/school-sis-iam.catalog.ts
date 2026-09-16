@@ -327,6 +327,45 @@ export const SCHOOL_IAM_MODULES: IamModuleDef[] = [
       { action: 'manage', slug: 'license.manage', label: 'Manage' },
     ],
   },
+  {
+    id: 'system',
+    label: 'System',
+    actions: [
+      { action: 'view', slug: 'system.view', label: 'View' },
+      { action: 'view', slug: 'system.status', label: 'Status' },
+      { action: 'view', slug: 'system.cache', label: 'Cache' },
+      { action: 'manage', slug: 'system.cache.clear', label: 'Clear cache' },
+      { action: 'view', slug: 'system.backup.view', label: 'View backups' },
+      {
+        action: 'create',
+        slug: 'system.backup.create',
+        label: 'Create backup',
+      },
+      {
+        action: 'manage',
+        slug: 'system.backup.restore',
+        label: 'Restore backup',
+      },
+      {
+        action: 'delete',
+        slug: 'system.backup.delete',
+        label: 'Delete backup',
+      },
+      { action: 'view', slug: 'system.logs.view', label: 'View logs' },
+      { action: 'export', slug: 'system.logs.export', label: 'Export logs' },
+      { action: 'view', slug: 'system.audit.view', label: 'Security audit' },
+      { action: 'manage', slug: 'system.maintenance', label: 'Maintenance' },
+      {
+        action: 'manage',
+        slug: 'system.configuration',
+        label: 'Configuration',
+      },
+      { action: 'view', slug: 'system.jobs.view', label: 'View jobs' },
+      { action: 'manage', slug: 'system.jobs.retry', label: 'Retry jobs' },
+      { action: 'view', slug: 'system.storage.view', label: 'Storage' },
+      { action: 'view', slug: 'system.license.view', label: 'License' },
+    ],
+  },
 ];
 
 export const SCHOOL_IAM_ALL_SLUGS = [
@@ -367,7 +406,10 @@ export const SCHOOL_DEFAULT_ROLES: {
     name: 'School Administrator',
     description: 'School-wide administration except Super Admin security',
     permissions: ALL_SCHOOL.filter(
-      (s) => s !== 'users.impersonate' && s !== 'users:impersonate',
+      (s) =>
+        s !== 'users.impersonate' &&
+        s !== 'users:impersonate' &&
+        s !== 'system.backup.restore',
     ),
   },
   {
@@ -376,7 +418,10 @@ export const SCHOOL_DEFAULT_ROLES: {
     description: 'School-wide academic and operational access',
     isSystem: true,
     permissions: ALL_SCHOOL.filter(
-      (s) => s !== 'users.impersonate' && s !== 'users:impersonate',
+      (s) =>
+        s !== 'users.impersonate' &&
+        s !== 'users:impersonate' &&
+        s !== 'system.backup.restore',
     ),
   },
   {

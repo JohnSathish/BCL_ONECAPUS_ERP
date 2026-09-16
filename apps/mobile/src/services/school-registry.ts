@@ -19,7 +19,7 @@ const FALLBACK_SCHOOLS: SchoolRegistryEntry[] = [
   {
     id: 'st-lukes-tura',
     name: "St. Luke's Higher Secondary School, Tura",
-    apiUrl: process.env.EXPO_PUBLIC_API_URL?.trim() || 'https://erp.stlukestura.in/api',
+    apiUrl: 'https://erp.stlukestura.in/api',
     tenantSlug: 'st-lukes-tura',
     code: 'SLS',
     product: 'school-sis',
@@ -63,6 +63,19 @@ export async function fetchSchoolRegistry(): Promise<SchoolRegistryEntry[]> {
 
   for (const row of FALLBACK_SCHOOLS) {
     merged.set(row.id, row);
+  }
+
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    merged.set('st-lukes-local', {
+      id: 'st-lukes-local',
+      name: "St. Luke's (this computer)",
+      apiUrl: 'http://10.0.2.2:3001/api',
+      tenantSlug: 'st-lukes-tura',
+      code: 'SLS-DEV',
+      product: 'school-sis',
+      region: 'Local',
+      keywords: ['local', 'dev', 'emulator'],
+    });
   }
 
   const envJson = process.env.EXPO_PUBLIC_SCHOOL_REGISTRY_JSON?.trim();

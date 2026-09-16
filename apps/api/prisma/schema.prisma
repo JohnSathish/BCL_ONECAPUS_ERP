@@ -23279,6 +23279,106 @@ model SchoolSmsAudit {
   @@schema("school")
 }
 
+model SchoolSysSettings {
+  id                         String    @id @default(uuid()) @db.Uuid
+  tenantId                   String    @unique @map("tenant_id") @db.Uuid
+  timezone                   String    @default("Asia/Kolkata")
+  dateFormat                 String    @default("DD/MM/YYYY") @map("date_format")
+  currency                   String    @default("INR")
+  language                   String    @default("en")
+  academicYearLabel          String?   @map("academic_year_label")
+  pageSize                   Int       @default(25) @map("page_size")
+  sessionTimeoutMin          Int       @default(15) @map("session_timeout_min")
+  passwordMinLength          Int       @default(8) @map("password_min_length")
+  passwordRequireMfa         Boolean   @default(false) @map("password_require_mfa")
+  loginAttemptLimit          Int       @default(5) @map("login_attempt_limit")
+  uploadMaxMb                Int       @default(10) @map("upload_max_mb")
+  allowedFileTypes           String    @default("pdf,jpg,jpeg,png,webp,xlsx,docx") @map("allowed_file_types")
+  notifyEmail                Boolean   @default(true) @map("notify_email")
+  notifySms                  Boolean   @default(true) @map("notify_sms")
+  notifyPush                 Boolean   @default(true) @map("notify_push")
+  auditRetentionDays         Int       @default(365) @map("audit_retention_days")
+  logRetentionDays           Int       @default(90) @map("log_retention_days")
+  backupRetentionDays        Int       @default(30) @map("backup_retention_days")
+  backupKeepCount            Int       @default(14) @map("backup_keep_count")
+  backupSchedule             String    @default("DAILY") @map("backup_schedule")
+  backupHour                 Int       @default(2) @map("backup_hour")
+  backupMinute               Int       @default(0) @map("backup_minute")
+  backupDatabase             Boolean   @default(true) @map("backup_database")
+  backupUploads              Boolean   @default(true) @map("backup_uploads")
+  storageWarnPct             Int       @default(80) @map("storage_warn_pct")
+  storageCritPct             Int       @default(90) @map("storage_crit_pct")
+  maintenanceEnabled         Boolean   @default(false) @map("maintenance_enabled")
+  maintenanceMessage         String?   @map("maintenance_message") @db.Text
+  maintenanceStart           DateTime? @map("maintenance_start")
+  maintenanceEnd             DateTime? @map("maintenance_end")
+  maintenanceAllowAdminBypass Boolean  @default(true) @map("maintenance_allow_admin_bypass")
+  extrasJson                 Json      @default("{}") @map("extras_json")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+
+  @@map("school_sys_settings")
+  @@schema("school")
+}
+
+model SchoolSysBackup {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  kind       String
+  status     String    @default("PENDING")
+  fileKey    String?   @map("file_key")
+  sizeBytes  Int       @default(0) @map("size_bytes")
+  sha256     String?
+  createdBy  String    @map("created_by") @db.Uuid
+  error      String?
+  verifiedAt DateTime? @map("verified_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  finishedAt DateTime? @map("finished_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_sys_backups")
+  @@schema("school")
+}
+
+model SchoolSysLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  level     String
+  module    String
+  message   String   @db.Text
+  requestId String?  @map("request_id")
+  userId    String?  @map("user_id") @db.Uuid
+  ip        String?
+  metaJson  Json     @default("{}") @map("meta_json")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, level, module])
+  @@map("school_sys_logs")
+  @@schema("school")
+}
+
+model SchoolSysAudit {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  actorEmail String?  @map("actor_email")
+  action     String
+  module     String
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  requestId  String?  @map("request_id")
+  beforeJson Json     @default("{}") @map("before_json")
+  afterJson  Json     @default("{}") @map("after_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action])
+  @@map("school_sys_audits")
+  @@schema("school")
+}
+
 
 
 

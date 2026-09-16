@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
 import { COLLEGE_NAME } from '@/constants/release';
 import type { SchoolConfig } from '@/types/school';
@@ -5,6 +7,20 @@ import type { SchoolConfig } from '@/types/school';
 const SCHOOL_CONFIG_KEY = 'oc_school_config';
 
 let cached: SchoolConfig | null = null;
+
+function rewriteApiUrlForRuntime(url: string) {
+  try {
+    const parsed = new URL(url);
+    const androidEmulator = Platform.OS === 'android' && Device.isDevice === false;
+    if (androidEmulator && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
+      parsed.hostname = '10.0.2.2';
+      return parsed.toString().replace(/\/+$/, '');
+    }
+    return url.replace(/\/+$/, '');
+  } catch {
+    return url.replace(/\/+$/, '');
+  }
+}
 
 function normalizeApiUrl(raw: string) {
   let url = raw.trim().replace(/\/+$/, '');
@@ -74,18 +90,15 @@ export async function ensureSchoolConfigFromEnv(): Promise<SchoolConfig | null> 
 
 export async function getApiBase(): Promise<string> {
   const config = await getSchoolConfig();
-  if (config?.apiUrl) return config.apiUrl;
-  return (
-    process.env.EXPO_PUBLIC_API_URL?.trim() ||
-    // Release APKs without a selected school previously fell back to localhost and
-    // broke Secure Verification / login on physical devices.
-    'https://erp.donboscocollege.ac.in/api'
-  );
+  const raw =
+    config?.apiUrl || process.env.EXPO_PUBLIC_API_URL?.trim() || 'https://erp.stlukestura.in/api';
+  return rewriteApiUrlForRuntime(raw);
 }
 
 export function getApiBaseSync(): string {
-  if (cached?.apiUrl) return cached.apiUrl;
-  return process.env.EXPO_PUBLIC_API_URL?.trim() || 'https://erp.donboscocollege.ac.in/api';
+  const raw =
+    cached?.apiUrl || process.env.EXPO_PUBLIC_API_URL?.trim() || 'https://erp.stlukestura.in/api';
+  return rewriteApiUrlForRuntime(raw);
 }
 
 export async function getTenantSlug(): Promise<string> {

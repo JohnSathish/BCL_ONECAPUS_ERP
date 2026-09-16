@@ -15,7 +15,7 @@ export const SCHOOL_MOBILE_APP_NAME = "St. Luke's School";
 export const SCHOOL_MOBILE_LOGIN_HOST = 'erp.stlukestura.in';
 export const SCHOOL_MOBILE_TENANT_SLUG = 'st-lukes-tura';
 /** First-login password for St. Luke's students (they must change it after sign-in). */
-export const SCHOOL_MOBILE_DEFAULT_PASSWORD = 'StLuke@123';
+export const SCHOOL_MOBILE_DEFAULT_PASSWORD = 'StLuke@2026';
 
 export const SCHOOL_MOBILE_PERSONAS = [
   'student',

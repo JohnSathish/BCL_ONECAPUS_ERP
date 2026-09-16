@@ -102,7 +102,7 @@ export function SchoolLoginScreen() {
             onChangeText={setIdentifier}
             autoCapitalize="none"
             keyboardType="email-address"
-            placeholder="e.g. SLS26-0001 or student@stlukestura.in"
+            placeholder="e.g. SLS26-0001 · password StLuke@2026"
             placeholderTextColor="#94a3b8"
             style={styles.input}
             accessibilityLabel="Username"

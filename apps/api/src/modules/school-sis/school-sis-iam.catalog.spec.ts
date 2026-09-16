@@ -37,6 +37,8 @@ describe('school IAM default roles', () => {
     expect(perms('college-admin')).toContain('users.impersonate');
     expect(perms('school-admin')).not.toContain('users.impersonate');
     expect(perms('principal')).not.toContain('users:impersonate');
+    expect(perms('school-admin')).not.toContain('system.backup.restore');
+    expect(perms('college-admin')).toContain('system.backup.restore');
   });
 
   it('does not grant a student admin pages', () => {

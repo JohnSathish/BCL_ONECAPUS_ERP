@@ -160,6 +160,7 @@ export async function performLogin(input: {
     const session = await apiFetch<LoginResponse>('/v1/school-mobile/login', {
       method: 'POST',
       skipAuth: true,
+      timeoutMs: 45_000,
       body: JSON.stringify({
         identifier,
         password: input.password,

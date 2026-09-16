@@ -94,9 +94,13 @@ export class SchoolMobileAuthService {
       { ...meta, clientType: 'mobile' },
       { mustResetPassword },
     );
+    const license = await Promise.race([
+      this.licenses.publicStatus(tenantId),
+      new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
+    ]).catch(() => null);
     return {
       ...this.auth.toPublicSession(session, { includeRefreshToken: true }),
-      license: await this.licenses.publicStatus(tenantId),
+      license,
     };
   }
 
@@ -180,18 +184,18 @@ export class SchoolMobileAuthService {
     });
     if (byUsername) return byUsername.id;
 
-    const students = await this.prisma.schoolStudent.findMany({
-      where: { tenantId, deletedAt: null, status: 'ACTIVE' },
-      select: { id: true, admissionNumber: true },
-    });
-    const admissionMatch = students.find(
-      (row) => compactId(row.admissionNumber) === compact,
-    );
-    if (admissionMatch) {
+    const admissionRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM school.school_students
+      WHERE tenant_id = ${tenantId}
+        AND deleted_at IS NULL
+        AND regexp_replace(upper(admission_number), '[^A-Z0-9]', '', 'g') = ${compact}
+      LIMIT 2
+    `;
+    if (admissionRows[0]) {
       const account = await this.prisma.schoolPersonAccount.findFirst({
         where: {
           tenantId,
-          studentId: admissionMatch.id,
+          studentId: admissionRows[0].id,
           personType: 'STUDENT',
         },
         select: { userId: true },
@@ -199,19 +203,18 @@ export class SchoolMobileAuthService {
       if (account) return account.userId;
     }
 
-    const enrollments = await this.prisma.schoolEnrollment.findMany({
-      where: {
-        tenantId,
-        deletedAt: null,
-        status: 'ACTIVE',
-        rollNumber: { not: null },
-      },
-      select: { studentId: true, rollNumber: true },
-    });
-    const rollHits = enrollments.filter(
-      (row) => compactId(row.rollNumber || '') === compact,
-    );
-    const uniqueStudentIds = [...new Set(rollHits.map((row) => row.studentId))];
+    const rollHits = await this.prisma.$queryRaw<Array<{ student_id: string }>>`
+      SELECT student_id FROM school.school_enrollments
+      WHERE tenant_id = ${tenantId}
+        AND deleted_at IS NULL
+        AND status = 'ACTIVE'
+        AND roll_number IS NOT NULL
+        AND regexp_replace(upper(roll_number), '[^A-Z0-9]', '', 'g') = ${compact}
+      LIMIT 5
+    `;
+    const uniqueStudentIds = [
+      ...new Set(rollHits.map((row) => row.student_id)),
+    ];
     if (uniqueStudentIds.length === 1) {
       const account = await this.prisma.schoolPersonAccount.findFirst({
         where: {
