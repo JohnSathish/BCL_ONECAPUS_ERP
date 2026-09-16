@@ -1,8 +1,40 @@
 import { api } from './api';
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+export function normalizeSchoolIamUsers(data: unknown): {
+  total: number;
+  page: number;
+  items: Array<Record<string, unknown>>;
+} {
+  let cur: unknown = data;
+  const envelope = asObject(cur);
+  if (envelope && envelope.success === true && 'data' in envelope) cur = envelope.data;
+  if (Array.isArray(cur)) {
+    return { total: cur.length, page: 1, items: cur as Array<Record<string, unknown>> };
+  }
+  const obj = asObject(cur) ?? {};
+  const nested = asObject(obj.data) ?? obj;
+  const raw = nested.items ?? nested.rows ?? nested.users;
+  const items = Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+  return {
+    total: Number(nested.total ?? items.length) || items.length,
+    page: Number(nested.page ?? 1) || 1,
+    items,
+  };
+}
+
 export async function fetchSchoolIamDashboard() {
   const { data } = await api.get('/v1/school-sis/iam/dashboard');
-  return data;
+  const envelope = asObject(data);
+  const payload =
+    asObject(envelope?.success === true ? envelope.data : data) ?? asObject(data) ?? {};
+  const kpis = asObject(payload.kpis) ?? asObject(asObject(payload.data)?.kpis) ?? {};
+  return { ...payload, kpis };
 }
 
 export async function fetchSchoolIamCatalog() {
@@ -12,7 +44,7 @@ export async function fetchSchoolIamCatalog() {
 
 export async function fetchSchoolIamUsers(params: Record<string, string | number | undefined>) {
   const { data } = await api.get('/v1/school-sis/iam/users', { params });
-  return data as { total: number; page: number; items: Array<Record<string, unknown>> };
+  return normalizeSchoolIamUsers(data);
 }
 
 export async function fetchSchoolIamUser(id: string) {
@@ -92,7 +124,10 @@ export async function importSchoolIamUsers(rows: Record<string, string>[], confi
 
 export async function fetchSchoolIamRoles() {
   const { data } = await api.get('/v1/school-sis/iam/roles');
-  return data as Array<Record<string, unknown>>;
+  if (Array.isArray(data)) return data as Array<Record<string, unknown>>;
+  const obj = asObject(data);
+  const nested = obj?.items ?? obj?.roles ?? obj?.data;
+  return (Array.isArray(nested) ? nested : []) as Array<Record<string, unknown>>;
 }
 
 export async function seedSchoolIamRoles() {

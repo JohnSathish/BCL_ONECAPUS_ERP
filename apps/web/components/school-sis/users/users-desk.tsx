@@ -52,8 +52,31 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { GhostButton, PrimaryButton } from '../academic/academic-ui';
-import { WaCard } from '../whatsapp/whatsapp-ui';
 import { storeAdminSessionBackup } from '@/components/administration-module/impersonation-banner';
+
+function Panel({ className, children }: { className?: string; children?: React.ReactNode }) {
+  return (
+    <div className={cn('rounded-2xl border border-slate-200 bg-white p-4 shadow-sm', className)}>
+      {children}
+    </div>
+  );
+}
+
+function iamUserItems(data: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(data)) return data as Array<Record<string, unknown>>;
+  if (!data || typeof data !== 'object') return [];
+  const obj = data as Record<string, unknown>;
+  if (Array.isArray(obj.items)) return obj.items as Array<Record<string, unknown>>;
+  const nested = obj.data;
+  if (
+    nested &&
+    typeof nested === 'object' &&
+    Array.isArray((nested as { items?: unknown }).items)
+  ) {
+    return (nested as { items: Array<Record<string, unknown>> }).items;
+  }
+  return [];
+}
 
 const LINKS = [
   { href: '/admin/school-sis/users', label: 'All Users', exact: true },
@@ -197,7 +220,12 @@ export function UsersDesk() {
     enabled: ready && directoryOpen,
   });
 
-  const kpis = (dash.data as { kpis?: Record<string, number> } | undefined)?.kpis ?? {};
+  const dashPayload = (dash.data ?? {}) as {
+    kpis?: Record<string, number>;
+    data?: { kpis?: Record<string, number> };
+  };
+  const kpis = dashPayload.kpis ?? dashPayload.data?.kpis ?? {};
+  const userRows = iamUserItems(users.data);
   const modules = ((
     catalog.data as {
       modules?: Array<{
@@ -328,15 +356,15 @@ export function UsersDesk() {
           ['MFA on', kpis.mfaOn],
           ['Failed logins (24h)', kpis.failedLogins],
         ].map(([label, value]) => (
-          <WaCard key={String(label)} className="p-3">
+          <Panel key={String(label)} className="p-3">
             <p className="text-xs text-slate-500">{label}</p>
             <p className="text-xl font-semibold text-slate-900">{value ?? '—'}</p>
-          </WaCard>
+          </Panel>
         ))}
       </div>
 
       {usersListPage ? (
-        <WaCard className="overflow-hidden p-0">
+        <Panel className="overflow-auto p-0">
           <div className="flex flex-wrap gap-2 border-b border-slate-100 p-3">
             <input
               className="h-9 rounded-md border px-3 text-sm"
@@ -369,7 +397,7 @@ export function UsersDesk() {
             {manage ? (
               <GhostButton
                 onClick={() => {
-                  const rows = users.data?.items ?? [];
+                  const rows = userRows;
                   const header = 'Name,Email,Username,Status,Roles,LastLogin,MFA';
                   const body = rows
                     .map((u) =>
@@ -429,7 +457,7 @@ export function UsersDesk() {
               </tr>
             </thead>
             <tbody>
-              {(users.data?.items ?? []).map((u) => {
+              {userRows.map((u) => {
                 const id = String(u.id);
                 const rolesList = (u.roles as Array<{ name: string }>) ?? [];
                 return (
@@ -469,16 +497,16 @@ export function UsersDesk() {
             <p className="p-6 text-sm text-rose-700">{apiErrorMessage(users.error)}</p>
           ) : users.isLoading ? (
             <p className="p-6 text-sm text-slate-500">Loading users…</p>
-          ) : !users.data?.items?.length ? (
+          ) : !userRows.length ? (
             <p className="p-6 text-sm text-slate-500">No users match the current filters.</p>
           ) : null}
-        </WaCard>
+        </Panel>
       ) : null}
 
       {page.includes('roles') ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {(roles.data ?? []).map((r) => (
-            <WaCard key={String(r.id)} className="p-4">
+            <Panel key={String(r.id)} className="p-4">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-semibold">{String(r.name)}</h3>
@@ -513,13 +541,13 @@ export function UsersDesk() {
                   ) : null}
                 </div>
               ) : null}
-            </WaCard>
+            </Panel>
           ))}
         </div>
       ) : null}
 
       {page.includes('permissions') ? (
-        <WaCard className="overflow-auto p-4">
+        <Panel className="overflow-auto p-4">
           <p className="mb-3 text-sm text-slate-500">
             Fine-grained school permissions. Assign them on a role. `school-sis:manage` still grants
             everything.
@@ -549,11 +577,11 @@ export function UsersDesk() {
               ))}
             </tbody>
           </table>
-        </WaCard>
+        </Panel>
       ) : null}
 
       {page.includes('invitation') ? (
-        <WaCard className="p-4">
+        <Panel className="p-4">
           {(invites.data ?? []).map((i) => (
             <div
               key={String(i.id)}
@@ -585,11 +613,11 @@ export function UsersDesk() {
           {!invites.data?.length ? (
             <p className="text-sm text-slate-500">No pending invitations.</p>
           ) : null}
-        </WaCard>
+        </Panel>
       ) : null}
 
       {page.includes('session') ? (
-        <WaCard className="overflow-auto p-0">
+        <Panel className="overflow-auto p-0">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs">
               <tr>
@@ -625,11 +653,11 @@ export function UsersDesk() {
               ))}
             </tbody>
           </table>
-        </WaCard>
+        </Panel>
       ) : null}
 
       {page.includes('login') ? (
-        <WaCard className="p-4 text-sm">
+        <Panel className="p-4 text-sm">
           {(logins.data ?? []).map((e) => (
             <div key={String(e.id)} className="flex justify-between border-b py-2">
               <span>
@@ -641,11 +669,11 @@ export function UsersDesk() {
               </span>
             </div>
           ))}
-        </WaCard>
+        </Panel>
       ) : null}
 
       {page.includes('audit') ? (
-        <WaCard className="p-4 text-sm">
+        <Panel className="p-4 text-sm">
           {(audits.data ?? []).map((e) => (
             <div key={String(e.id)} className="border-b py-2">
               <div className="font-medium">{String(e.action)}</div>
@@ -655,12 +683,12 @@ export function UsersDesk() {
               </div>
             </div>
           ))}
-        </WaCard>
+        </Panel>
       ) : null}
 
       {page.includes('security') ? (
         <div className="grid gap-3 lg:grid-cols-2">
-          <WaCard className="p-4">
+          <Panel className="p-4">
             <h3 className="mb-3 font-semibold">Password &amp; MFA policy</h3>
             <label className="mb-2 block text-sm">
               Minimum length
@@ -683,8 +711,8 @@ export function UsersDesk() {
               />
               Require MFA for configured admin roles
             </label>
-          </WaCard>
-          <WaCard className="p-4">
+          </Panel>
+          <Panel className="p-4">
             <h3 className="mb-3 font-semibold">Security alerts</h3>
             {(alerts.data ?? []).map((a) => (
               <div key={String(a.id)} className="border-b py-2 text-sm">
@@ -692,7 +720,7 @@ export function UsersDesk() {
                 {String(a.message)}
               </div>
             ))}
-          </WaCard>
+          </Panel>
         </div>
       ) : null}
 
