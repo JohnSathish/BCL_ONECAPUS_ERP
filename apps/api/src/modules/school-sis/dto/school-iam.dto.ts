@@ -1,8 +1,11 @@
 import {
   IsArray,
   IsBoolean,
+  IsInt,
   IsOptional,
   IsString,
+  Max,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -138,6 +141,11 @@ export class SchoolIamDirectoryProvisionDto {
   @IsOptional()
   @IsString()
   password?: string;
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(80)
+  limit?: number;
 }
 
 export class SchoolIamReviewDto {

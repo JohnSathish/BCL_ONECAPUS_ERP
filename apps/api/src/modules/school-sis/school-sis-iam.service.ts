@@ -747,17 +747,52 @@ export class SchoolSisIamService implements OnModuleInit {
       includeStudents?: boolean;
       includeStaff?: boolean;
       password?: string;
+      limit?: number;
     },
   ) {
     this.access.assert(actor, 'users.create', 'users:manage');
-    await this.ensureDefaultRoles(tenantId);
+    const hasPortalRole = await this.prisma.role.findFirst({
+      where: { tenantId, slug: 'school-student', deletedAt: null },
+      select: { id: true },
+    });
+    if (!hasPortalRole) await this.ensureDefaultRoles(tenantId);
     const preview = await this.directoryPreview(tenantId);
     if (!body.confirm) return { ...preview, ready: true };
+
     const password = body.password?.trim() || SCHOOL_PORTAL_DEFAULT_PASSWORD;
+    const limit = Math.min(Math.max(body.limit ?? 40, 1), 80);
+    const passwordHash = await bcrypt.hash(password, 12);
     const created: string[] = [];
     const linked: string[] = [];
     const skipped: string[] = [];
     const failed: { name: string; error: string }[] = [];
+
+    const roles = await this.prisma.role.findMany({
+      where: { tenantId, deletedAt: null },
+      select: { id: true, slug: true },
+    });
+    const roleIdBySlug = new Map(roles.map((r) => [r.slug, r.id]));
+    const existing = await this.prisma.user.findMany({
+      where: { tenantId, deletedAt: null },
+      select: { id: true, email: true, username: true },
+    });
+    const emailToUser = new Map(
+      existing.map((u) => [u.email.toLowerCase(), u.id] as const),
+    );
+    const usedUsernames = new Set(
+      existing.map((u) => (u.username ?? '').toLowerCase()).filter(Boolean),
+    );
+
+    type WorkItem = {
+      name: string;
+      email: string;
+      username: string;
+      phone?: string | null;
+      roleSlug: string;
+      staffId?: string;
+      studentId?: string;
+    };
+    const queue: WorkItem[] = [];
 
     if (body.includeStaff !== false) {
       const staff = await this.prisma.schoolStaff.findMany({
@@ -767,6 +802,8 @@ export class SchoolSisIamService implements OnModuleInit {
           status: 'ACTIVE',
           personAccounts: { none: { personType: 'STAFF' } },
         },
+        take: limit,
+        orderBy: { fullName: 'asc' },
         select: {
           id: true,
           fullName: true,
@@ -779,29 +816,18 @@ export class SchoolSisIamService implements OnModuleInit {
         },
       });
       for (const row of staff) {
-        try {
-          const result = await this.upsertDirectoryUser(tenantId, actor, {
-            displayName: row.fullName,
-            email: this.portalEmail('staff', row.employeeCode, row.email),
-            username: row.employeeCode,
-            phone: row.phone ?? undefined,
-            roleSlugs: [this.staffPortalRole(row)],
-            password,
-            staffId: row.id,
-          });
-          if (result === 'created') created.push(row.id);
-          else if (result === 'linked') linked.push(row.id);
-          else skipped.push(row.id);
-        } catch (e) {
-          failed.push({
-            name: row.fullName,
-            error: e instanceof Error ? e.message : 'Failed',
-          });
-        }
+        queue.push({
+          name: row.fullName,
+          email: this.portalEmail('staff', row.employeeCode, row.email),
+          username: row.employeeCode,
+          phone: row.phone,
+          roleSlug: this.staffPortalRole(row),
+          staffId: row.id,
+        });
       }
     }
 
-    if (body.includeStudents !== false) {
+    if (queue.length < limit && body.includeStudents !== false) {
       const students = await this.prisma.schoolStudent.findMany({
         where: {
           tenantId,
@@ -809,6 +835,8 @@ export class SchoolSisIamService implements OnModuleInit {
           status: 'ACTIVE',
           personAccounts: { none: { personType: 'STUDENT' } },
         },
+        take: limit - queue.length,
+        orderBy: { fullName: 'asc' },
         select: {
           id: true,
           fullName: true,
@@ -818,27 +846,48 @@ export class SchoolSisIamService implements OnModuleInit {
         },
       });
       for (const row of students) {
-        try {
-          const result = await this.upsertDirectoryUser(tenantId, actor, {
-            displayName: row.fullName,
-            email: this.portalEmail('student', row.admissionNumber, row.email),
-            username: row.admissionNumber,
-            phone: row.phone ?? undefined,
-            roleSlugs: ['school-student'],
-            password,
-            studentId: row.id,
-          });
-          if (result === 'created') created.push(row.id);
-          else if (result === 'linked') linked.push(row.id);
-          else skipped.push(row.id);
-        } catch (e) {
-          failed.push({
-            name: row.fullName,
-            error: e instanceof Error ? e.message : 'Failed',
-          });
-        }
+        queue.push({
+          name: row.fullName,
+          email: this.portalEmail('student', row.admissionNumber, row.email),
+          username: row.admissionNumber,
+          phone: row.phone,
+          roleSlug: 'school-student',
+          studentId: row.id,
+        });
       }
     }
+
+    for (const row of queue) {
+      try {
+        const result = await this.createDirectoryAccountFast(tenantId, {
+          displayName: row.name,
+          email: row.email,
+          username: row.username,
+          phone: row.phone,
+          roleId:
+            roleIdBySlug.get(row.roleSlug) ??
+            roleIdBySlug.get(row.staffId ? 'office-staff' : 'school-student'),
+          passwordHash,
+          staffId: row.staffId,
+          studentId: row.studentId,
+          emailToUser,
+          usedUsernames,
+        });
+        if (result === 'created') created.push(row.email);
+        else if (result === 'linked') linked.push(row.email);
+        else skipped.push(row.email);
+      } catch (e) {
+        failed.push({
+          name: row.name,
+          error: e instanceof Error ? e.message : 'Failed',
+        });
+      }
+    }
+
+    const leftover = await this.directoryPreview(tenantId);
+    const remaining =
+      (body.includeStaff !== false ? leftover.staffMissing : 0) +
+      (body.includeStudents !== false ? leftover.studentsMissing : 0);
 
     await this.log(
       tenantId,
@@ -849,6 +898,7 @@ export class SchoolSisIamService implements OnModuleInit {
         created: created.length,
         linked: linked.length,
         failed: failed.length,
+        remaining,
       },
     );
     return {
@@ -857,8 +907,104 @@ export class SchoolSisIamService implements OnModuleInit {
       created: created.length,
       linked: linked.length,
       skipped: skipped.length,
+      remaining,
+      done: remaining === 0,
       failed,
     };
+  }
+
+  private async createDirectoryAccountFast(
+    tenantId: string,
+    input: {
+      displayName: string;
+      email: string;
+      username: string;
+      phone?: string | null;
+      roleId?: string;
+      passwordHash: string;
+      staffId?: string;
+      studentId?: string;
+      emailToUser: Map<string, string>;
+      usedUsernames: Set<string>;
+    },
+  ): Promise<'created' | 'linked' | 'skipped'> {
+    const email = input.email.trim().toLowerCase();
+    const existingId = input.emailToUser.get(email);
+    if (existingId) {
+      await this.applyLinks(tenantId, existingId, {
+        staffId: input.staffId,
+        studentId: input.studentId,
+      });
+      return 'linked';
+    }
+    if (!input.roleId) {
+      throw new BadRequestException('School portal role is missing');
+    }
+    const username = this.nextUnusedUsername(
+      input.username,
+      input.usedUsernames,
+    );
+    const now = new Date();
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          tenantId,
+          email,
+          username,
+          phone: input.phone?.trim() || null,
+          displayName: input.displayName.trim(),
+          passwordHash: input.passwordHash,
+          emailVerifiedAt: now,
+          isActive: true,
+          accountStatus: 'active',
+          passwordChangedAt: now,
+          mustResetPassword: true,
+        },
+      });
+      await tx.userRole.create({
+        data: { userId: created.id, roleId: input.roleId! },
+      });
+      await tx.passwordHistory.create({
+        data: { userId: created.id, passwordHash: input.passwordHash },
+      });
+      if (input.staffId) {
+        await tx.schoolPersonAccount.create({
+          data: {
+            tenantId,
+            userId: created.id,
+            personType: 'STAFF',
+            staffId: input.staffId,
+          },
+        });
+      }
+      if (input.studentId) {
+        await tx.schoolPersonAccount.create({
+          data: {
+            tenantId,
+            userId: created.id,
+            personType: 'STUDENT',
+            studentId: input.studentId,
+          },
+        });
+      }
+      return created;
+    });
+    input.emailToUser.set(email, user.id);
+    return 'created';
+  }
+
+  private nextUnusedUsername(preferred: string, used: Set<string>) {
+    const base =
+      preferred.replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 40) ||
+      `u${Date.now().toString(36)}`;
+    let candidate = base;
+    let n = 1;
+    while (used.has(candidate.toLowerCase())) {
+      candidate = `${base}${n}`;
+      n += 1;
+    }
+    used.add(candidate.toLowerCase());
+    return candidate;
   }
 
   private staffPortalRole(row: {

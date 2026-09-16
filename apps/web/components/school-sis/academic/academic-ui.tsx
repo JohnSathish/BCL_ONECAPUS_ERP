@@ -156,7 +156,7 @@ export function PrimaryButton(props: React.ButtonHTMLAttributes<HTMLButtonElemen
     <button
       {...props}
       className={cn(
-        'inline-flex h-10 items-center justify-center rounded-lg bg-[var(--school-erp-primary)] px-4 text-sm font-medium text-white disabled:opacity-50',
+        'inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-[var(--school-erp-primary,#1a365d)] px-4 text-sm font-medium text-white shadow-sm disabled:opacity-50',
         props.className,
       )}
     />

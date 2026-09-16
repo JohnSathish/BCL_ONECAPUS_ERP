@@ -485,6 +485,21 @@
   }
 }
 
+/* Portaled dialogs mount on document.body and would otherwise lose these tokens. */
+html:has(.school-erp-shell) {
+  --school-erp-primary: #1b4d3e;
+  --school-erp-primary-deep: #0f241c;
+  --school-erp-primary-hover: #14382d;
+  --school-erp-accent: #c5a572;
+}
+
+html:has(.school-erp-shell.is-sls) {
+  --school-erp-primary: #1a365d;
+  --school-erp-primary-deep: #12263f;
+  --school-erp-primary-hover: #163056;
+  --school-erp-accent: #0ea5e9;
+}
+
 /* St. Luke's Secondary SIS — light ERP chrome (does not affect TPS KG). */
 .school-erp-shell.is-sls {
   --school-erp-primary: #1a365d;

@@ -101,6 +101,7 @@ export function UsersDesk() {
     title: string;
     body: string;
     ok?: string;
+    okLabel?: string;
     run: () => Promise<unknown>;
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -119,6 +120,8 @@ export function UsersDesk() {
   });
   const [personQ, setPersonQ] = useState('');
   const [directoryOpen, setDirectoryOpen] = useState(false);
+  const [directoryBusy, setDirectoryBusy] = useState(false);
+  const [directoryProgress, setDirectoryProgress] = useState<string | null>(null);
   const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'teacher' });
   const [wizardStep, setWizardStep] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
@@ -1093,14 +1096,17 @@ export function UsersDesk() {
               </p>
             </div>
           ) : null}
-          <DialogFooter>
+          <DialogFooter className="gap-3 border-t border-slate-200 pt-4 sm:justify-end">
             <GhostButton
+              type="button"
               onClick={() => (wizardStep === 0 ? setWizard(false) : setWizardStep((s) => s - 1))}
             >
               {wizardStep === 0 ? 'Cancel' : 'Back'}
             </GhostButton>
             {wizardStep < 5 ? (
               <PrimaryButton
+                type="button"
+                className="min-w-[7rem] bg-slate-900 text-white hover:bg-slate-800"
                 onClick={() => {
                   if (wizardStep === 0 && !form.displayName.trim()) {
                     setNotice('Enter a full name.');
@@ -1117,6 +1123,8 @@ export function UsersDesk() {
               </PrimaryButton>
             ) : (
               <PrimaryButton
+                type="button"
+                className="min-w-[8rem] bg-slate-900 text-white hover:bg-slate-800"
                 onClick={async () => {
                   const payload = {
                     displayName: form.displayName,
@@ -1187,27 +1195,55 @@ export function UsersDesk() {
             <strong>{directory.data?.defaultPassword ?? 'StLuke@2026'}</strong>. They must change it
             on first login.
           </p>
-          <DialogFooter>
-            <GhostButton onClick={() => setDirectoryOpen(false)}>Cancel</GhostButton>
+          <DialogFooter className="gap-3 border-t border-slate-200 pt-4 sm:justify-end">
+            <GhostButton type="button" onClick={() => setDirectoryOpen(false)}>
+              Cancel
+            </GhostButton>
             <PrimaryButton
+              type="button"
+              className="min-w-[11rem] bg-slate-900 text-white hover:bg-slate-800"
               onClick={() =>
                 setConfirm({
                   title: 'Create portal accounts for everyone?',
                   body: `This will create logins for ${directory.data?.studentsMissing ?? 0} students and ${directory.data?.staffMissing ?? 0} staff using password ${directory.data?.defaultPassword ?? 'StLuke@2026'}. Existing accounts are skipped or linked.`,
                   ok: `Accounts ready. Default password: ${directory.data?.defaultPassword ?? 'StLuke@2026'} (change on first login).`,
+                  okLabel: 'Yes, create accounts',
                   run: async () => {
-                    const res = await provisionSchoolIamDirectory({
-                      confirm: true,
-                      includeStudents: true,
-                      includeStaff: true,
-                    });
+                    const totals = {
+                      created: 0,
+                      linked: 0,
+                      skipped: 0,
+                      failed: 0,
+                      defaultPassword: directory.data?.defaultPassword ?? 'StLuke@2026',
+                    };
+                    for (;;) {
+                      const batch = await provisionSchoolIamDirectory({
+                        confirm: true,
+                        includeStudents: true,
+                        includeStaff: true,
+                        limit: 40,
+                      });
+                      totals.created += batch.created;
+                      totals.linked += batch.linked;
+                      totals.skipped += batch.skipped;
+                      totals.failed += batch.failed.length;
+                      totals.defaultPassword = batch.defaultPassword;
+                      setDirectoryProgress(
+                        `Created ${totals.created}, linked ${totals.linked}. ${batch.remaining} remaining…`,
+                      );
+                      if (batch.done) break;
+                      if (batch.created + batch.linked + batch.skipped === 0) break;
+                    }
                     setDirectoryOpen(false);
-                    return res;
+                    await qc.invalidateQueries({ queryKey: ['school-iam'] });
+                    await qc.invalidateQueries({ queryKey: ['school-iam-directory'] });
+                    await qc.invalidateQueries({ queryKey: ['school-iam-users'] });
+                    return totals;
                   },
                 })
               }
             >
-              Create all accounts
+              Next: create accounts
             </PrimaryButton>
           </DialogFooter>
         </DialogContent>
@@ -1392,33 +1428,52 @@ export function UsersDesk() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!confirm} onOpenChange={() => setConfirm(null)}>
+      <Dialog open={!!confirm} onOpenChange={() => (!directoryBusy ? setConfirm(null) : null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{confirm?.title}</DialogTitle>
             <DialogDescription>{confirm?.body}</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <GhostButton onClick={() => setConfirm(null)}>Cancel</GhostButton>
+          {directoryProgress ? (
+            <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
+              {directoryProgress}
+            </p>
+          ) : null}
+          <DialogFooter className="gap-3 border-t border-slate-200 pt-4 sm:justify-end">
+            <GhostButton type="button" disabled={directoryBusy} onClick={() => setConfirm(null)}>
+              Cancel
+            </GhostButton>
             <PrimaryButton
+              type="button"
+              disabled={directoryBusy}
+              className="min-w-[12rem] bg-slate-900 text-white hover:bg-slate-800"
               onClick={async () => {
-                if (confirm) {
-                  const res = (await run(confirm.run, confirm.ok ?? 'Saved')) as {
+                if (!confirm) return;
+                setDirectoryBusy(true);
+                setDirectoryProgress('Starting…');
+                try {
+                  const res = (await confirm.run()) as {
                     created?: number;
                     linked?: number;
-                    failed?: unknown[];
+                    failed?: number | unknown[];
                     defaultPassword?: string;
                   };
-                  if (typeof res?.created === 'number') {
-                    setNotice(
-                      `Created ${res.created}, linked ${res.linked ?? 0}. Default password: ${res.defaultPassword ?? 'StLuke@2026'}. Failed: ${Array.isArray(res.failed) ? res.failed.length : 0}.`,
-                    );
-                  }
+                  setNotice(
+                    typeof res?.created === 'number'
+                      ? `Created ${res.created}, linked ${res.linked ?? 0}. Default password: ${res.defaultPassword ?? 'StLuke@2026'}. Failed: ${typeof res.failed === 'number' ? res.failed : Array.isArray(res.failed) ? res.failed.length : 0}.`
+                      : (confirm.ok ?? 'Saved'),
+                  );
+                  await qc.invalidateQueries({ queryKey: ['school-iam'] });
+                } catch (e) {
+                  setNotice(apiErrorMessage(e));
+                } finally {
+                  setDirectoryBusy(false);
+                  setDirectoryProgress(null);
+                  setConfirm(null);
                 }
-                setConfirm(null);
               }}
             >
-              Confirm
+              {directoryBusy ? 'Working…' : (confirm?.okLabel ?? 'Confirm')}
             </PrimaryButton>
           </DialogFooter>
         </DialogContent>

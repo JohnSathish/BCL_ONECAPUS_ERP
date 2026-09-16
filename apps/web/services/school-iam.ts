@@ -186,13 +186,17 @@ export async function fetchSchoolIamDirectoryPreview() {
 }
 
 export async function provisionSchoolIamDirectory(payload: Record<string, unknown>) {
-  const { data } = await api.post('/v1/school-sis/iam/directory-provision', payload);
+  const { data } = await api.post('/v1/school-sis/iam/directory-provision', payload, {
+    timeout: 120_000,
+  });
   return data as {
     ok: boolean;
     defaultPassword: string;
     created: number;
     linked: number;
     skipped: number;
+    remaining: number;
+    done: boolean;
     failed: Array<{ name: string; error: string }>;
   };
 }
