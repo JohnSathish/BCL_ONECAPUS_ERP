@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { AuthModule } from '../auth/auth.module';
 import { TenantsModule } from '../tenants/tenants.module';
+import { AdministrationModule } from '../administration/administration.module';
+import { PermissionsModule } from '../../common/permissions/permissions.module';
 import { SchoolSisAdmissionService } from './school-sis-admission.service';
 import { SchoolSisController } from './school-sis.controller';
 import { SchoolSisPublicController } from './school-sis-public.controller';
@@ -35,11 +37,23 @@ import { SchoolSisEventBus } from './school-sis-event-bus.service';
 import { SchoolSisAutomationService } from './school-sis-automation.service';
 import { SchoolSisAutomationController } from './school-sis-automation.controller';
 import { SchoolSisAutomationProcessor } from './school-sis-automation.processor';
+import { SchoolSisAccessService } from './school-sis-access.service';
+import { SchoolSisIamService } from './school-sis-iam.service';
+import { SchoolSisIamController } from './school-sis-iam.controller';
+import { SchoolSisReportsController } from './school-sis-reports.controller';
+import { SchoolSisReportsService } from './school-sis-reports.service';
+import { SchoolSisReportsQueryService } from './school-sis-reports-query.service';
+import { SchoolReportEngineService } from './report-engine/report-engine.service';
+import { SchoolReportBrandingService } from './report-engine/report-branding.service';
+import { SchoolReportPdfService } from './report-engine/report-pdf.service';
+import { SchoolReportExcelService } from './report-engine/report-excel.service';
 
 @Module({
   imports: [
     AuthModule,
     TenantsModule,
+    AdministrationModule,
+    PermissionsModule,
     BullModule.registerQueue({ name: 'school-whatsapp' }),
     BullModule.registerQueue({ name: 'school-push' }),
     BullModule.registerQueue({ name: 'school-automation' }),
@@ -56,6 +70,8 @@ import { SchoolSisAutomationProcessor } from './school-sis-automation.processor'
     SchoolSisWhatsappController,
     SchoolSisPushController,
     SchoolSisAutomationController,
+    SchoolSisIamController,
+    SchoolSisReportsController,
   ],
   providers: [
     SchoolSisService,
@@ -80,6 +96,14 @@ import { SchoolSisAutomationProcessor } from './school-sis-automation.processor'
     SchoolSisEventBus,
     SchoolSisAutomationService,
     SchoolSisAutomationProcessor,
+    SchoolSisAccessService,
+    SchoolSisIamService,
+    SchoolSisReportsQueryService,
+    SchoolSisReportsService,
+    SchoolReportBrandingService,
+    SchoolReportPdfService,
+    SchoolReportExcelService,
+    SchoolReportEngineService,
   ],
   exports: [
     SchoolSisService,
@@ -99,6 +123,11 @@ import { SchoolSisAutomationProcessor } from './school-sis-automation.processor'
     SchoolSisPushService,
     SchoolSisEventBus,
     SchoolSisAutomationService,
+    SchoolSisAccessService,
+    SchoolSisIamService,
+    SchoolSisReportsService,
+    SchoolReportEngineService,
+    SchoolReportBrandingService,
   ],
 })
 export class SchoolSisModule {}

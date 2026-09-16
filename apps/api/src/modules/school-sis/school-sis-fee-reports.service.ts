@@ -5,9 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import ExcelJS from 'exceljs';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
+import { SchoolReportEngineService } from './report-engine/report-engine.service';
+import type {
+  ReportDocument,
+  ReportFormat,
+} from './report-engine/report-types';
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const CASH_MODE = 'CASH';
@@ -86,6 +90,7 @@ export class SchoolSisFeeReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sis: SchoolSisService,
+    private readonly reportEngine: SchoolReportEngineService,
   ) {}
 
   async userWiseCollection(
@@ -741,59 +746,81 @@ export class SchoolSisFeeReportsService {
     tenantId: string,
     query: UserWiseQuery,
     actor: { userId?: string; canViewAll: boolean; canClose: boolean },
+    opts?: {
+      format?: ReportFormat;
+      orientation?: 'portrait' | 'landscape';
+      generatedBy?: string;
+      userId?: string;
+      ip?: string;
+    },
   ) {
     const report = await this.userWiseCollection(
       tenantId,
-      { ...query, page: 1, limit: 100 },
+      { ...query, page: 1, limit: 500 },
       actor,
     );
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('User Wise Collection');
-    ws.addRow(['User Wise Collection Report']);
-    ws.addRow([`Date: ${report.date}`]);
-    ws.addRow([
-      `Total Collection: ${report.summary.totalCollection}`,
-      `Cash: ${report.summary.totalCash}`,
-      `Online: ${report.summary.totalOnline}`,
-      `Receipts: ${report.summary.totalTransactions}`,
-    ]);
-    ws.addRow([]);
-    ws.addRow([
-      '#',
-      'User Name',
-      'Role',
-      'Cash Collection',
-      'Online Collection',
-      'Total Collection',
-      'No. of Receipts',
-      'First Collection Time',
-      'Last Collection Time',
-    ]);
-    report.users.forEach((u, i) => {
-      ws.addRow([
-        i + 1,
-        u.userName,
-        u.role,
-        u.cashCollection,
-        u.onlineCollection,
-        u.totalCollection,
-        u.receiptCount,
-        u.firstCollectionTime,
-        u.lastCollectionTime,
-      ]);
+    const document: ReportDocument = {
+      key: 'fee_user_wise',
+      title: 'User-wise Collection Report',
+      subtitle: `Date: ${report.date}`,
+      filters: {
+        date: report.date,
+        paymentMode: query.paymentMode,
+        classId: query.classId,
+        sectionId: query.sectionId,
+      },
+      kpis: [
+        { label: 'Total cashiers', value: report.users.length },
+        {
+          label: 'Total transactions',
+          value: report.summary.totalTransactions,
+        },
+        { label: 'Cash collection', value: report.summary.totalCash },
+        { label: 'Online collection', value: report.summary.totalOnline },
+        { label: 'Grand total', value: report.summary.totalCollection },
+      ],
+      columns: [
+        { key: 'userName', label: 'Cashier', kind: 'text' },
+        { key: 'role', label: 'Role', kind: 'text' },
+        { key: 'receiptCount', label: 'Transactions', kind: 'number' },
+        { key: 'cashCollection', label: 'Cash', kind: 'currency' },
+        { key: 'onlineCollection', label: 'Online', kind: 'currency' },
+        { key: 'totalCollection', label: 'Total', kind: 'currency' },
+        { key: 'firstCollectionTime', label: 'First collection', kind: 'text' },
+        { key: 'lastCollectionTime', label: 'Last collection', kind: 'text' },
+      ],
+      rows: report.users.map((u) => ({
+        userName: u.userName,
+        role: u.role,
+        receiptCount: u.receiptCount,
+        cashCollection: u.cashCollection,
+        onlineCollection: u.onlineCollection,
+        totalCollection: u.totalCollection,
+        firstCollectionTime: u.firstCollectionTime,
+        lastCollectionTime: u.lastCollectionTime,
+      })),
+      totals: {
+        receiptCount: report.summary.totalTransactions,
+        cashCollection: report.summary.totalCash,
+        onlineCollection: report.summary.totalOnline,
+        totalCollection: report.summary.totalCollection,
+      },
+      official: true,
+      signatures: [
+        { role: 'Cashier' },
+        { role: 'Accountant' },
+        { role: 'Principal' },
+      ],
+      orientation: opts?.orientation,
+      generatedBy: opts?.generatedBy,
+    };
+    const file = await this.reportEngine.generate({
+      tenantId,
+      format: opts?.format ?? 'xlsx',
+      document,
+      userId: opts?.userId,
+      ip: opts?.ip,
     });
-    ws.addRow([
-      '',
-      'Total',
-      '',
-      report.summary.totalCash,
-      report.summary.totalOnline,
-      report.summary.totalCollection,
-      report.summary.totalTransactions,
-      '',
-      '',
-    ]);
-    const buf = await wb.xlsx.writeBuffer();
-    return Buffer.from(buf);
+    return file;
   }
 }

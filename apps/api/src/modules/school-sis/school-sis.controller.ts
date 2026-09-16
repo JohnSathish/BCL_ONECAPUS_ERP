@@ -25,6 +25,12 @@ import {
   SCHOOL_SIS_PERMISSION_MANAGE,
   SCHOOL_SIS_PERMISSION_READ,
 } from './school-sis.constants';
+import { SchoolSisAccessService } from './school-sis-access.service';
+import {
+  SIS_STUDENTS_CREATE,
+  SIS_STUDENTS_UPDATE,
+  SIS_STUDENTS_VIEW,
+} from './school-sis-iam.perms';
 import {
   AddPreviousSchoolDto,
   AddStudentDocumentDto,
@@ -71,6 +77,7 @@ export class SchoolSisController {
     private readonly master: SchoolSisStudentMasterService,
     private readonly timetable: SchoolSisTimetableService,
     private readonly fees: SchoolSisFeesService,
+    private readonly access: SchoolSisAccessService,
   ) {}
 
   private canManageMedical(user: JwtUser) {
@@ -173,18 +180,26 @@ export class SchoolSisController {
   }
 
   @Get('students')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
-  students(
+  @RequireAnyPermission(...SIS_STUDENTS_VIEW)
+  async students(
     @CurrentUser() user: JwtUser,
     @Query('q') q?: string,
     @Query('gradeId') gradeId?: string,
     @Query('sectionId') sectionId?: string,
     @Query('status') status?: string,
   ) {
-    return this.sis.listStudents(user.tid, q, gradeId, sectionId, status);
+    if (sectionId) {
+      await this.access.assertSectionAccess(user.tid, user, sectionId);
+    }
+    const allowed = await this.access.sectionIdsForUser(user.tid, user.sub);
+    return this.sis.listStudents(
+      user.tid,
+      q,
+      gradeId,
+      sectionId,
+      status,
+      allowed,
+    );
   }
 
   @Post('students/master')
@@ -212,16 +227,26 @@ export class SchoolSisController {
   }
 
   @Get('students/:id')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
-  student(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.master.getMaster(user.tid, id, this.canManageMedical(user));
+  @RequireAnyPermission(...SIS_STUDENTS_VIEW)
+  async student(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    const master = await this.master.getMaster(
+      user.tid,
+      id,
+      this.canManageMedical(user),
+    );
+    const sectionId =
+      master.enrollments?.find(
+        (row: { status?: string; sectionId?: string }) =>
+          row.status === 'ACTIVE',
+      )?.sectionId ?? master.enrollments?.[0]?.sectionId;
+    if (sectionId) {
+      await this.access.assertSectionAccess(user.tid, user, sectionId);
+    }
+    return master;
   }
 
   @Post('students')
-  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @RequireAnyPermission(...SIS_STUDENTS_CREATE)
   createStudent(
     @CurrentUser() user: JwtUser,
     @Body() dto: CreateSchoolStudentDto,
@@ -230,7 +255,7 @@ export class SchoolSisController {
   }
 
   @Patch('students/:id')
-  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @RequireAnyPermission(...SIS_STUDENTS_UPDATE)
   patchStudent(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,

@@ -45,6 +45,7 @@ const ADMIN_PERMISSIONS = [
   SCHOOL_WEB_PERMISSION_ENQUIRIES,
   'users:read',
   'users:manage',
+  'rbac:manage',
   'org:read',
   'org:manage',
   'lookups:read',
@@ -232,11 +233,11 @@ export async function seedStLukesSecondarySchool(
     return role;
   };
 
-  const adminRole = await upsertRole(
-    'college-admin',
-    'School Admin',
-    ADMIN_PERMISSIONS,
-  );
+  const adminRole = await upsertRole('college-admin', 'School Admin', [
+    ...ADMIN_PERMISSIONS,
+    'users:impersonate',
+    'users.impersonate',
+  ]);
   await upsertRole('principal', 'Principal', ADMIN_PERMISSIONS);
   const teacherRole = await upsertRole('teacher', 'Teacher', [
     SCHOOL_SIS_PERMISSION_READ,

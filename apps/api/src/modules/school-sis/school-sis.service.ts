@@ -387,8 +387,10 @@ export class SchoolSisService {
     gradeId?: string,
     sectionId?: string,
     status?: string,
+    allowedSectionIds?: string[] | null,
   ) {
     await this.assertSecondarySisTenant(tenantId);
+    if (allowedSectionIds && allowedSectionIds.length === 0) return [];
     const year = await this.currentYear(tenantId);
     const query = q?.trim();
     const rows = await this.prisma.schoolStudent.findMany({
@@ -448,13 +450,16 @@ export class SchoolSisService {
               ],
             }
           : {}),
-        ...(gradeId || sectionId
+        ...(gradeId || sectionId || allowedSectionIds
           ? {
               enrollments: {
                 some: {
                   academicYearId: year.id,
                   deletedAt: null,
                   ...(sectionId ? { sectionId } : {}),
+                  ...(allowedSectionIds
+                    ? { sectionId: { in: allowedSectionIds } }
+                    : {}),
                   ...(gradeId ? { section: { gradeId } } : {}),
                 },
               },

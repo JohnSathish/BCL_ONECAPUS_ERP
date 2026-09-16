@@ -4,12 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import ExcelJS from 'exceljs';
 import puppeteer from 'puppeteer';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
 import { SchoolSisEventBus } from './school-sis-event-bus.service';
+import { SchoolReportEngineService } from './report-engine/report-engine.service';
+import type {
+  ReportDocument,
+  ReportFormat,
+} from './report-engine/report-types';
 import type {
   CollectSchoolFeeDto,
   SaveSchoolFeeSettingsDto,
@@ -99,6 +103,7 @@ export class SchoolSisMonthlyFeesService {
     private readonly prisma: PrismaService,
     private readonly sis: SchoolSisService,
     private readonly events: SchoolSisEventBus,
+    private readonly reportEngine: SchoolReportEngineService,
   ) {}
 
   async ensureSetup(tenantId: string) {
@@ -1278,7 +1283,7 @@ export class SchoolSisMonthlyFeesService {
         },
       },
       orderBy: { paidAt: 'desc' },
-      take: 500,
+      take: 10_000,
     });
     const sections = await this.prisma.schoolSection.findMany({
       where: { tenantId, academicYearId: year.id, deletedAt: null },
@@ -1660,43 +1665,77 @@ export class SchoolSisMonthlyFeesService {
   async exportRegister(
     tenantId: string,
     query: Parameters<SchoolSisMonthlyFeesService['register']>[1],
+    opts?: {
+      format?: ReportFormat;
+      orientation?: 'portrait' | 'landscape';
+      generatedBy?: string;
+      userId?: string;
+      ip?: string;
+    },
   ) {
     const data = await this.register(tenantId, query);
-    const wb = new ExcelJS.Workbook();
-    const sheet = wb.addWorksheet('Monthly fees');
-    sheet.columns = [
-      { header: 'Student', key: 'student', width: 28 },
-      { header: 'Admission', key: 'adm', width: 16 },
-      { header: 'Class', key: 'klass', width: 16 },
-      { header: 'Month', key: 'month', width: 14 },
-      { header: 'Tuition', key: 'tuition', width: 12 },
-      { header: 'Late fee', key: 'late', width: 12 },
-      { header: 'Total', key: 'total', width: 12 },
-      { header: 'Mode', key: 'mode', width: 12 },
-      { header: 'Receipt', key: 'receipt', width: 18 },
-      { header: 'Date', key: 'date', width: 20 },
-      { header: 'Status', key: 'status', width: 12 },
-    ];
-    for (const row of data.rows) {
-      sheet.addRow({
-        student: row.student.fullName,
-        adm: row.student.admissionNumber,
-        klass: `${row.className} ${row.sectionName}`,
-        month: row.monthLabel,
-        tuition: row.tuitionAmount,
-        late: row.lateFeeAmount,
-        total: row.totalAmount,
-        mode: row.paymentMode,
-        receipt: row.receiptNumber,
-        date: row.paidAt,
-        status: row.status,
-      });
-    }
-    const buffer = Buffer.from(await wb.xlsx.writeBuffer());
-    return {
-      buffer,
-      filename: `monthly-fees-${data.academicYear.code}.xlsx`,
+    const rupees = (n: number) => Number((n / 100).toFixed(2));
+    const rows = data.rows.map((row) => ({
+      student: row.student.fullName,
+      adm: row.student.admissionNumber,
+      klass: `${row.className} ${row.sectionName}`,
+      month: row.monthLabel,
+      tuition: rupees(row.tuitionAmount),
+      late: rupees(row.lateFeeAmount),
+      total: rupees(row.totalAmount),
+      mode: row.paymentMode,
+      receipt: row.receiptNumber,
+      date: row.paidAt,
+      status: row.status,
+    }));
+    const document: ReportDocument = {
+      key: 'fee_register',
+      title: 'Fee Collection Register',
+      subtitle: query.month ? monthLabel(query.month) : undefined,
+      academicYear: data.academicYear.name,
+      filters: {
+        month: query.month,
+        gradeId: query.gradeId,
+        status: query.status,
+        paymentMode: query.paymentMode,
+      },
+      kpis: [
+        { label: 'Receipts', value: rows.length },
+        {
+          label: 'Total collected',
+          value: rows.reduce((s, r) => s + r.total, 0),
+        },
+      ],
+      columns: [
+        { key: 'student', label: 'Student', kind: 'text' },
+        { key: 'adm', label: 'Admission No', kind: 'text' },
+        { key: 'klass', label: 'Class', kind: 'text' },
+        { key: 'month', label: 'Month', kind: 'text' },
+        { key: 'tuition', label: 'Tuition', kind: 'currency' },
+        { key: 'late', label: 'Late fee', kind: 'currency' },
+        { key: 'total', label: 'Total', kind: 'currency' },
+        { key: 'mode', label: 'Payment mode', kind: 'text' },
+        { key: 'receipt', label: 'Receipt', kind: 'text' },
+        { key: 'date', label: 'Date', kind: 'date' },
+        { key: 'status', label: 'Status', kind: 'text' },
+      ],
+      rows,
+      totals: {
+        tuition: rows.reduce((s, r) => s + r.tuition, 0),
+        late: rows.reduce((s, r) => s + r.late, 0),
+        total: rows.reduce((s, r) => s + r.total, 0),
+      },
+      official: true,
+      orientation: opts?.orientation ?? 'landscape',
+      generatedBy: opts?.generatedBy,
     };
+    return this.reportEngine.generate({
+      tenantId,
+      format: opts?.format ?? 'xlsx',
+      document,
+      userId: opts?.userId,
+      ip: opts?.ip,
+    });
   }
 
   private toReceiptPayload(

@@ -7,19 +7,19 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import {
   CurrentUser,
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
-import {
-  SCHOOL_SIS_PERMISSION_MANAGE,
-  SCHOOL_SIS_PERMISSION_READ,
-} from './school-sis.constants';
+import { extractClientIp } from '../../common/utils/request-host';
+import { SCHOOL_SIS_PERMISSION_MANAGE } from './school-sis.constants';
+import { SIS_FEES_COLLECT, SIS_FEES_VIEW } from './school-sis-iam.perms';
 import {
   CollectSchoolFeeDto,
   CloseSchoolFeeCashDto,
@@ -56,10 +56,7 @@ export class SchoolSisMonthlyFeesController {
   ) {}
 
   @Get('config')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   config(@CurrentUser() user: JwtUser) {
     return this.fees.getConfig(user.tid);
   }
@@ -89,10 +86,7 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Get('quote')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   quote(
     @CurrentUser() user: JwtUser,
     @Query('studentId') studentId: string,
@@ -102,7 +96,7 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Post('collect')
-  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @RequireAnyPermission(...SIS_FEES_COLLECT)
   async collect(
     @CurrentUser() user: JwtUser,
     @Body() dto: CollectSchoolFeeDto,
@@ -135,19 +129,13 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Get('dashboard')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   dashboard(@CurrentUser() user: JwtUser) {
     return this.fees.dashboard(user.tid);
   }
 
   @Get('register')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   register(
     @CurrentUser() user: JwtUser,
     @Query('month') month?: string,
@@ -172,26 +160,29 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Get('register-export')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   async exportRegister(
     @CurrentUser() user: JwtUser,
+    @Req() req: Request,
     @Res() res: Response,
     @Query('month') month?: string,
     @Query('gradeId') gradeId?: string,
     @Query('status') status?: string,
+    @Query('format') format?: 'pdf' | 'xlsx' | 'html' | 'csv',
+    @Query('orientation') orientation?: 'portrait' | 'landscape',
   ) {
-    const file = await this.fees.exportRegister(user.tid, {
-      month,
-      gradeId,
-      status,
-    });
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    const file = await this.fees.exportRegister(
+      user.tid,
+      { month, gradeId, status },
+      {
+        format: format ?? 'xlsx',
+        orientation,
+        generatedBy: user.email,
+        userId: user.sub,
+        ip: extractClientIp(req),
+      },
     );
+    res.setHeader('Content-Type', file.contentType);
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="${file.filename}"`,
@@ -200,10 +191,7 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Get('reports/user-wise-collection')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   userWiseCollection(
     @CurrentUser() user: JwtUser,
     @Query('date') date?: string,
@@ -238,12 +226,10 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Get('reports/user-wise-collection/export')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   async userWiseExport(
     @CurrentUser() user: JwtUser,
+    @Req() req: Request,
     @Res() res: Response,
     @Query('date') date?: string,
     @Query('academicYearId') academicYearId?: string,
@@ -254,8 +240,10 @@ export class SchoolSisMonthlyFeesController {
     @Query('search') search?: string,
     @Query('sortBy') sortBy?: UserWiseSort,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    @Query('format') format?: 'pdf' | 'xlsx' | 'html' | 'csv',
+    @Query('orientation') orientation?: 'portrait' | 'landscape',
   ) {
-    const buffer = await this.reports.userWiseExcel(
+    const file = await this.reports.userWiseExcel(
       user.tid,
       {
         date,
@@ -269,23 +257,24 @@ export class SchoolSisMonthlyFeesController {
         sortOrder,
       },
       reportActor(user),
+      {
+        format: format ?? 'xlsx',
+        orientation,
+        generatedBy: user.email,
+        userId: user.sub,
+        ip: extractClientIp(req),
+      },
     );
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
+    res.setHeader('Content-Type', file.contentType);
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="user-wise-collection-${date || 'today'}.xlsx"`,
+      `attachment; filename="${file.filename}"`,
     );
-    res.send(buffer);
+    res.send(file.buffer);
   }
 
   @Get('reports/user-wise-collection/users/:userId')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   userWiseReceipts(
     @CurrentUser() user: JwtUser,
     @Param('userId') collectorUserId: string,
@@ -314,10 +303,7 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Get('reports/cash-close')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   cashClose(
     @CurrentUser() user: JwtUser,
     @Query('userId') userId: string,
@@ -347,19 +333,13 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Get('pending')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   pending(@CurrentUser() user: JwtUser, @Query('month') month?: string) {
     return this.fees.pending(user.tid, month);
   }
 
   @Get('ledger')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   ledger(@CurrentUser() user: JwtUser, @Query('studentId') studentId: string) {
     return this.fees.ledger(user.tid, studentId);
   }
@@ -371,10 +351,7 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Get('payments/:id')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   payment(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.fees.getPayment(user.tid, id);
   }
@@ -397,10 +374,7 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Get('payments/:id/receipt')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   async receiptHtml(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -412,10 +386,7 @@ export class SchoolSisMonthlyFeesController {
   }
 
   @Get('payments/:id/pdf')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_FEES_VIEW)
   async receiptPdf(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,

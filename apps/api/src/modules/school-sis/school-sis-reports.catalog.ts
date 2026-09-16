@@ -585,10 +585,20 @@ export const REPORT_CATALOG: ReportDef[] = [
   ),
 
   r('fees', 'fee_daily', 'Daily Collection', 'Receipts for a day.', F_FEE),
-  r('fees', 'fee_monthly', 'Monthly Collection', 'Receipts in a month.', [
-    ...F_FEE,
-    'month',
-  ]),
+  r(
+    'fees',
+    'fee_monthly',
+    'Monthly Fee Collection Report',
+    'Receipts in a month.',
+    [...F_FEE, 'month'],
+  ),
+  r(
+    'fees',
+    'fee_structure',
+    'Fee Structure',
+    'Class-wise monthly tuition, late fee and other charges.',
+    ['academicYearId', 'gradeId'],
+  ),
   r(
     'fees',
     'fee_range',
@@ -599,7 +609,7 @@ export const REPORT_CATALOG: ReportDef[] = [
   r(
     'fees',
     'fee_user_wise',
-    'User-wise Collection',
+    'User-wise Collection Report',
     'Cashier / counter collection by mode.',
     F_FEE,
   ),
@@ -643,7 +653,7 @@ export const REPORT_CATALOG: ReportDef[] = [
   r('fees', 'fee_bank', 'Bank Collection', 'BANK receipts.', F_FEE),
   r('fees', 'fee_cheque', 'Cheque Collection', 'CHEQUE receipts.', F_FEE),
   r('fees', 'fee_card', 'Card Collection', 'CARD receipts.', F_FEE),
-  r('fees', 'fee_outstanding', 'Outstanding Fees', 'Due month accounts.', [
+  r('fees', 'fee_outstanding', 'Pending Fee Report', 'Due month accounts.', [
     'academicYearId',
     'gradeId',
     'sectionId',
@@ -779,7 +789,7 @@ export const REPORT_CATALOG: ReportDef[] = [
   r(
     'fees',
     'fee_register',
-    'Receipt Register',
+    'Fee Collection Register',
     'All receipts in range.',
     F_FEE,
   ),

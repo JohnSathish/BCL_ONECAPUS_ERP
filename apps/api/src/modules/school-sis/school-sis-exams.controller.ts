@@ -14,10 +14,14 @@ import {
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
+import { SCHOOL_SIS_PERMISSION_MANAGE } from './school-sis.constants';
 import {
-  SCHOOL_SIS_PERMISSION_MANAGE,
-  SCHOOL_SIS_PERMISSION_READ,
-} from './school-sis.constants';
+  SIS_EXAMS_CREATE,
+  SIS_EXAMS_MARKS,
+  SIS_EXAMS_PUBLISH,
+  SIS_EXAMS_VIEW,
+} from './school-sis-iam.perms';
+import { SchoolSisAccessService } from './school-sis-access.service';
 import {
   GenerateResultsDto,
   PublishResultDto,
@@ -39,13 +43,17 @@ import {
 function actor(user: JwtUser): ExamActor {
   const perms = user.permissions ?? [];
   const manage =
-    perms.includes(SCHOOL_SIS_PERMISSION_MANAGE) || perms.includes('*');
-  const roleBlob = (user.roles ?? []).join(' ').toLowerCase();
+    perms.includes(SCHOOL_SIS_PERMISSION_MANAGE) ||
+    perms.includes('*') ||
+    perms.includes('exams.results.publish');
   return {
     userId: user.sub,
     email: user.email,
     manage,
-    teacher: /teacher/.test(roleBlob) && !manage,
+    teacher:
+      (perms.includes('exams.marks.enter') ||
+        /teacher/.test((user.roles ?? []).join(' '))) &&
+      !manage,
   };
 }
 
@@ -53,13 +61,13 @@ function actor(user: JwtUser): ExamActor {
 @ApiTags('school-sis-exams')
 @Controller({ path: 'school-sis/exams', version: '1' })
 export class SchoolSisExamsController {
-  constructor(private readonly exams: SchoolSisExamsService) {}
+  constructor(
+    private readonly exams: SchoolSisExamsService,
+    private readonly access: SchoolSisAccessService,
+  ) {}
 
   @Get('settings')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   settings(@CurrentUser() user: JwtUser) {
     return this.exams.getSettings(user.tid);
   }
@@ -74,25 +82,19 @@ export class SchoolSisExamsController {
   }
 
   @Get('dashboard')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   dashboard(@CurrentUser() user: JwtUser) {
     return this.exams.dashboard(user.tid);
   }
 
   @Get('types')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   types(@CurrentUser() user: JwtUser) {
     return this.exams.listTypes(user.tid);
   }
 
   @Post('types')
-  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @RequireAnyPermission(...SIS_EXAMS_CREATE)
   createType(@CurrentUser() user: JwtUser, @Body() dto: SaveSchoolExamTypeDto) {
     return this.exams.saveType(user.tid, dto, actor(user));
   }
@@ -108,10 +110,7 @@ export class SchoolSisExamsController {
   }
 
   @Get('grade-systems')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   grades(@CurrentUser() user: JwtUser) {
     return this.exams.listGradeSystems(user.tid);
   }
@@ -133,10 +132,7 @@ export class SchoolSisExamsController {
   }
 
   @Get('schedules')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   schedules(@CurrentUser() user: JwtUser, @Query('examId') examId?: string) {
     return this.exams.listSchedules(user.tid, examId);
   }
@@ -148,16 +144,16 @@ export class SchoolSisExamsController {
   }
 
   @Get('marks/roster')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
-  roster(
+  @RequireAnyPermission(...SIS_EXAMS_MARKS)
+  async roster(
     @CurrentUser() user: JwtUser,
     @Query('examId') examId: string,
     @Query('sectionId') sectionId: string,
     @Query('componentId') componentId: string,
   ) {
+    if (sectionId) {
+      await this.access.assertSectionAccess(user.tid, user, sectionId);
+    }
     return this.exams.marksRoster(
       user.tid,
       examId,
@@ -168,10 +164,7 @@ export class SchoolSisExamsController {
   }
 
   @Post('marks')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_MARKS)
   saveMarks(@CurrentUser() user: JwtUser, @Body() dto: SaveExamMarksDto) {
     return this.exams.saveMarks(user.tid, dto, actor(user));
   }
@@ -189,7 +182,7 @@ export class SchoolSisExamsController {
   }
 
   @Post('results/publish')
-  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @RequireAnyPermission(...SIS_EXAMS_PUBLISH)
   publish(@CurrentUser() user: JwtUser, @Body() dto: PublishResultDto) {
     return this.exams.publish(user.tid, dto, actor(user), true);
   }
@@ -201,10 +194,7 @@ export class SchoolSisExamsController {
   }
 
   @Get('results')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   results(
     @CurrentUser() user: JwtUser,
     @Query('examId') examId: string,
@@ -214,10 +204,7 @@ export class SchoolSisExamsController {
   }
 
   @Get('report-card')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   card(
     @CurrentUser() user: JwtUser,
     @Query('examId') examId: string,
@@ -227,19 +214,13 @@ export class SchoolSisExamsController {
   }
 
   @Get('reports')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   reports(@CurrentUser() user: JwtUser, @Query('examId') examId: string) {
     return this.exams.reports(user.tid, examId);
   }
 
   @Get('students/:studentId/published')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   studentPublished(
     @CurrentUser() user: JwtUser,
     @Param('studentId') studentId: string,
@@ -248,31 +229,25 @@ export class SchoolSisExamsController {
   }
 
   @Get()
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   list(@CurrentUser() user: JwtUser) {
     return this.exams.listExams(user.tid);
   }
 
   @Post()
-  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @RequireAnyPermission(...SIS_EXAMS_CREATE)
   create(@CurrentUser() user: JwtUser, @Body() dto: SaveSchoolExamDto) {
     return this.exams.saveExam(user.tid, dto, actor(user));
   }
 
   @Get(':id')
-  @RequireAnyPermission(
-    SCHOOL_SIS_PERMISSION_READ,
-    SCHOOL_SIS_PERMISSION_MANAGE,
-  )
+  @RequireAnyPermission(...SIS_EXAMS_VIEW)
   one(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.exams.getExam(user.tid, id);
   }
 
   @Patch(':id')
-  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  @RequireAnyPermission(...SIS_EXAMS_CREATE)
   update(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,

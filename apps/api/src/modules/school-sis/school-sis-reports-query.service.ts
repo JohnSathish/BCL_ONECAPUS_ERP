@@ -37,6 +37,7 @@ export type ReportFilters = {
   status?: string;
   page?: number;
   limit?: number;
+  exportMode?: boolean;
   drillGradeId?: string;
   drillSectionId?: string;
 };
@@ -769,7 +770,9 @@ export class SchoolSisReportsQueryService {
   ): Promise<ReportResult> {
     const report = this.assertReport(key, roles, permissions);
     const page = Math.max(1, filters.page ?? 1);
-    const limit = Math.min(200, Math.max(10, filters.limit ?? 50));
+    const limit = filters.exportMode
+      ? Math.min(20_000, Math.max(1, filters.limit ?? 20_000))
+      : Math.min(200, Math.max(10, filters.limit ?? 50));
     const skip = (page - 1) * limit;
     const year = await this.resolveYear(tenantId, filters.academicYearId);
     const settings = await this.settings(tenantId);
@@ -1166,8 +1169,6 @@ export class SchoolSisReportsQueryService {
       enrollWhere.createdAt = { gte: date.start, lte: date.end };
     }
 
-    const includeGuardians =
-      key === 'student_guardians' || key === 'student_contacts';
     const [total, list] = await Promise.all([
       this.prisma.schoolEnrollment.count({
         where: { ...enrollWhere, student: studentWhere },
@@ -1179,9 +1180,10 @@ export class SchoolSisReportsQueryService {
         orderBy: { createdAt: 'desc' },
         include: {
           student: {
-            include: includeGuardians
-              ? { guardians: { include: { guardian: true } } }
-              : { documents: true },
+            include: {
+              guardians: { include: { guardian: true } },
+              documents: true,
+            },
           },
           section: { include: { grade: true } },
         },
@@ -1354,6 +1356,40 @@ export class SchoolSisReportsQueryService {
 
   private async fees(key: string, ctx: QueryCtx): Promise<Built> {
     const { tenantId, filters, yearId, skip, limit } = ctx;
+    if (key === 'fee_structure') {
+      const plans = await this.prisma.schoolMonthlyFeePlan.findMany({
+        where: {
+          tenantId,
+          active: true,
+          ...(yearId ? { academicYearId: yearId } : {}),
+          ...(filters.gradeId ? { gradeId: filters.gradeId } : {}),
+        },
+        include: { grade: true, academicYear: true },
+        orderBy: { grade: { sortOrder: 'asc' } },
+      });
+      return {
+        columns: [
+          { key: 'className', label: 'Class' },
+          { key: 'year', label: 'Academic Year' },
+          { key: 'tuition', label: 'Tuition ₹' },
+          { key: 'lateFee', label: 'Late fee ₹' },
+          { key: 'other', label: 'Other ₹' },
+          { key: 'total', label: 'Monthly total ₹' },
+        ],
+        rows: plans.map((p) => ({
+          className: p.grade.name,
+          year: p.academicYear.name,
+          tuition: rupees(p.tuitionAmount),
+          lateFee: rupees(p.lateFeeAmount ?? 0),
+          other: rupees(p.otherAmount),
+          total: rupees(
+            p.tuitionAmount + (p.lateFeeAmount ?? 0) + p.otherAmount,
+          ),
+        })),
+        total: plans.length,
+        kpis: [{ key: 'n', label: 'Classes', value: plans.length }],
+      };
+    }
     if (
       key === 'fee_outstanding' ||
       key === 'fee_defaulters' ||
@@ -2634,7 +2670,10 @@ export class SchoolSisReportsQueryService {
           { key: 'id', label: 'Return' },
           { key: 'status', label: 'Status' },
         ],
-        rows: list.map((r) => ({ id: r.id.slice(0, 8), status: r.status })),
+        rows: list.map((r) => ({
+          id: r.id.slice(0, 8),
+          status: r.reason ?? 'RETURNED',
+        })),
         total: list.length,
       };
     }

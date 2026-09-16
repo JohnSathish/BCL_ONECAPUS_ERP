@@ -17184,14 +17184,17 @@ model SchoolPersonAccount {
   personType String    @map("person_type")
   studentId  String?   @map("student_id") @db.Uuid
   guardianId String?   @map("guardian_id") @db.Uuid
+  staffId    String?   @map("staff_id") @db.Uuid
   createdAt  DateTime  @default(now()) @map("created_at")
 
   student  SchoolStudent?  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   guardian SchoolGuardian? @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  staff    SchoolStaff?    @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, userId, personType])
   @@index([tenantId, studentId])
   @@index([tenantId, guardianId])
+  @@index([tenantId, staffId])
   @@map("school_person_accounts")
   @@schema("school")
 }
@@ -17235,6 +17238,7 @@ model SchoolStaff {
   calendarEvents            SchoolCalendarEvent[]
   transportPersonnel        SchoolTransportPersonnel[]
   whatsappContacts          SchoolWhatsappContact[]
+  personAccounts            SchoolPersonAccount[]
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType, status])
@@ -20843,6 +20847,102 @@ model SchoolMisAudit {
 
   @@index([tenantId, createdAt])
   @@map("school_mis_audit")
+  @@schema("school")
+}
+
+model SchoolUserScope {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  academicYearId String?   @map("academic_year_id") @db.Uuid
+  gradeId        String?   @map("grade_id") @db.Uuid
+  sectionId      String?   @map("section_id") @db.Uuid
+  kind           String    @default("ASSIGNED_CLASS")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, userId])
+  @@index([tenantId, sectionId])
+  @@map("school_user_scopes")
+  @@schema("school")
+}
+
+model SchoolIamInvitation {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  email       String
+  roleSlug    String?   @map("role_slug")
+  tokenHash   String    @unique @map("token_hash")
+  status      String    @default("PENDING")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, userId])
+  @@map("school_iam_invitations")
+  @@schema("school")
+}
+
+model SchoolIamAlert {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  userId      String?   @map("user_id") @db.Uuid
+  severity    String    @default("INFO")
+  kind        String
+  message     String
+  metadataJson Json     @default("{}") @map("metadata_json")
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_iam_alerts")
+  @@schema("school")
+}
+
+model SchoolIamAccessReview {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  decision    String
+  note        String?
+  reviewedBy  String    @map("reviewed_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_iam_access_reviews")
+  @@schema("school")
+}
+
+model SchoolReportDesign {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @unique @map("tenant_id") @db.Uuid
+  settingsJson Json     @default("{}") @map("settings_json")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("school_report_design")
+  @@schema("school")
+}
+
+model SchoolReportExportAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  reportKey   String   @map("report_key")
+  format      String
+  title       String
+  filtersJson Json     @default("{}") @map("filters_json")
+  recordCount Int      @default(0) @map("record_count")
+  ip          String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, reportKey])
+  @@map("school_report_export_audit")
   @@schema("school")
 }
 

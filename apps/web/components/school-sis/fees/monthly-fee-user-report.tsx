@@ -25,11 +25,12 @@ import { cn } from '@/utils/cn';
 import { apiErrorMessage } from '@/utils/api-error';
 import {
   closeSchoolFeeCashCounter,
-  downloadUserWiseCollectionXlsx,
   fetchUserWiseCollection,
   fetchUserWiseReceipts,
   reopenSchoolFeeCashCounter,
 } from '@/services/school-sis';
+import { downloadUserWiseReport, kindToSchoolReportExport } from '@/services/school-reports';
+import { ReportExportButtons } from '../reports/export-buttons';
 import { MonthlyFeeSubnav, rs } from './monthly-fee-ui';
 
 const AVATAR = [
@@ -241,20 +242,10 @@ export function MonthlyFeeUserReport() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 print:hidden">
-          <button
-            type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-            onClick={() => window.print()}
-          >
-            <Printer className="h-4 w-4" />
-            Print / PDF
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-emerald-50 px-4 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100 hover:bg-emerald-100"
-            onClick={() =>
-              downloadUserWiseCollectionXlsx({
+        <ReportExportButtons
+          onExport={async (kind) => {
+            await downloadUserWiseReport(
+              {
                 date: applied.date,
                 academicYearId: applied.academicYearId || undefined,
                 classId: applied.classId || undefined,
@@ -264,13 +255,12 @@ export function MonthlyFeeUserReport() {
                 search: search.trim() || undefined,
                 sortBy,
                 sortOrder,
-              }).catch((err) => setError(apiErrorMessage(err)))
-            }
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Export Excel
-          </button>
-        </div>
+              },
+              kindToSchoolReportExport(kind).format,
+              kindToSchoolReportExport(kind).orientation,
+            );
+          }}
+        />
       </div>
 
       <section className="hidden print:block rounded-2xl bg-white p-4 text-sm">

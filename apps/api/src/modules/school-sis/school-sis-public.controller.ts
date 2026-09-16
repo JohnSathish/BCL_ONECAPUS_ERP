@@ -20,6 +20,8 @@ import { SchoolSisService } from './school-sis.service';
 import { SchoolSisWhatsappWebhookService } from './school-sis-whatsapp-webhook.service';
 import { SchoolSisAutomationService } from './school-sis-automation.service';
 import { IncomingAutomationEventDto } from './dto/school-automation.dto';
+import { SchoolSisIamService } from './school-sis-iam.service';
+import { SchoolIamAcceptInviteDto } from './dto/school-iam.dto';
 
 @ApiTags('school-sis-public')
 @Controller({ path: 'school-sis/public', version: '1' })
@@ -31,6 +33,7 @@ export class SchoolSisPublicController {
     private readonly gateways: SchoolSisPaymentGatewaysService,
     private readonly whatsappWebhooks: SchoolSisWhatsappWebhookService,
     private readonly automation: SchoolSisAutomationService,
+    private readonly iam: SchoolSisIamService,
   ) {}
 
   private async tenantId(host?: string) {
@@ -117,5 +120,18 @@ export class SchoolSisPublicController {
       },
       ip,
     );
+  }
+
+  @Public()
+  @Post('iam/accept-invite')
+  async acceptInvite(
+    @Headers('x-login-host') loginHost?: string,
+    @Headers('x-forwarded-host') forwarded?: string,
+    @Body() dto?: SchoolIamAcceptInviteDto,
+  ) {
+    const tenantId = await this.tenantId(loginHost || forwarded);
+    if (!dto?.token || !dto.password)
+      throw new BadRequestException('Token and password required');
+    return this.iam.acceptInvite(tenantId, dto.token, dto.password);
   }
 }

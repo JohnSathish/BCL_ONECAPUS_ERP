@@ -97,6 +97,23 @@ export function canManageSchoolSis(permissions?: string[]) {
   return has(permissions, MANAGE);
 }
 
+export function canManageSchoolUsers(permissions?: string[]) {
+  return (
+    has(permissions, MANAGE) ||
+    has(permissions, 'users:manage') ||
+    has(permissions, 'users.create') ||
+    has(permissions, 'users.update')
+  );
+}
+
+export function canViewSchoolUsers(permissions?: string[]) {
+  return (
+    canManageSchoolUsers(permissions) ||
+    has(permissions, 'users.view') ||
+    has(permissions, 'users:read')
+  );
+}
+
 export function canConfigureSchoolPaymentGateways(permissions?: string[], roles?: string[]) {
   if (!canManageSchoolSis(permissions)) return false;
   const roleBlob = (roles ?? []).join(' ').toLowerCase();
@@ -152,12 +169,16 @@ export function filterSchoolSisNavGroups(
   const persona = resolveSchoolSisNavPersona(input.permissions, input.roles);
   const canManage = canManageSchoolSis(input.permissions);
   const allowed = persona === 'full' ? null : PERSONA_MODULES[persona];
+  const usersOk = canViewSchoolUsers(input.permissions);
 
   return groups
     .map((group) => ({
       ...group,
       items: group.items
-        .filter((item) => !allowed || allowed.has(item.id))
+        .filter((item) => {
+          if (item.id === 'users' || item.id === 'account-security') return usersOk;
+          return !allowed || allowed.has(item.id);
+        })
         .map((item) => {
           const flagged = applyFeatureFlags(item, input.modules);
           return { ...flagged, children: filterChildren(flagged.children, canManage, input.roles) };

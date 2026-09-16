@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
 import { useBranding } from '@/hooks/use-branding';
+import { ImpersonationBanner } from '@/components/administration-module/impersonation-banner';
 import { useAuthStore } from '@/store/auth-store';
 import { isSecondarySchoolSisSession } from '@/lib/school-erp/product';
 import { cn } from '@/utils/cn';
@@ -45,6 +46,7 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
   const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(false);
   const { branding } = useBranding();
   const tenantSlug = useAuthStore((s) => s.session?.user.tenantSlug);
+  const impersonating = useAuthStore((s) => Boolean(s.session?.user.isImpersonating));
   const sis = isSecondarySchoolSisSession({
     tenantSlug,
     hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
@@ -98,7 +100,14 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
 
         <div className="school-erp-main-column">
           <main className="school-erp-main-scroll">
-            <div className="school-erp-main-inner">{children}</div>
+            <div className="school-erp-main-inner">
+              {impersonating ? (
+                <div className="mb-3 px-4 pt-3">
+                  <ImpersonationBanner />
+                </div>
+              ) : null}
+              {children}
+            </div>
             <footer className="school-erp-page-footer">
               <SchoolErpFooterLine />
             </footer>

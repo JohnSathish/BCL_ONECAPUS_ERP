@@ -24,7 +24,7 @@ function esc(value: string | null | undefined) {
     .replace(/>/g, '&gt;');
 }
 
-function schoolLogoDataUri() {
+export function schoolLogoDataUri() {
   const candidates = [
     join(process.cwd(), 'apps/web/public/school-sis/st-lukes-logo.png'),
     join(process.cwd(), '../web/public/school-sis/st-lukes-logo.png'),

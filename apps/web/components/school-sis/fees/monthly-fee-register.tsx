@@ -25,11 +25,12 @@ import { studentInitials } from '@/lib/school-sis/student-profile';
 import { cn } from '@/utils/cn';
 import { apiErrorMessage } from '@/utils/api-error';
 import {
-  downloadMonthlyFeeRegisterXlsx,
   fetchMonthlyFeeConfig,
   fetchMonthlyFeeRegister,
   voidMonthlyFee,
 } from '@/services/school-sis';
+import { downloadFeeRegisterReport, kindToSchoolReportExport } from '@/services/school-reports';
+import { ReportExportButtons } from '../reports/export-buttons';
 import { MonthlyFeeSubnav, currentFeeMonth, rs } from './monthly-fee-ui';
 
 const AVATAR = [
@@ -203,26 +204,15 @@ export function MonthlyFeeRegister() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 print:hidden">
-          <button
-            type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-            onClick={() => window.print()}
-          >
-            <Printer className="h-4 w-4" />
-            Print / PDF
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-emerald-50 px-4 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100 hover:bg-emerald-100"
-            onClick={() =>
-              downloadMonthlyFeeRegisterXlsx(params).catch((err) => setError(apiErrorMessage(err)))
-            }
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Export Excel
-          </button>
-        </div>
+        <ReportExportButtons
+          onExport={async (kind) => {
+            await downloadFeeRegisterReport(
+              params,
+              kindToSchoolReportExport(kind).format,
+              kindToSchoolReportExport(kind).orientation,
+            );
+          }}
+        />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
