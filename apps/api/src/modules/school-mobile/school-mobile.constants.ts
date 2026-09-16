@@ -22,6 +22,9 @@ export const SCHOOL_MOBILE_PERSONAS = [
   'parent',
   'teacher',
   'admin',
+  'accountant',
+  'librarian',
+  'transport',
 ] as const;
 
 export type SchoolMobilePersona = (typeof SCHOOL_MOBILE_PERSONAS)[number];

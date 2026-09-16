@@ -5,6 +5,8 @@ import { Alert, Linking, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { apiFetch } from '@/api/client';
 import { getDeviceId } from '@/auth/device';
+import { getSchoolConfig } from '@/auth/school-config';
+import { isSchoolSisConfig } from '@/auth/school-product';
 import { getAccessToken, getStoredAppType, getUserSnapshot } from '@/auth/session';
 import {
   resolveMobileDeepLink,
@@ -137,13 +139,16 @@ export async function registerDeviceWithPush(appType: 'STUDENT' | 'STAFF') {
   const deviceId = await getDeviceId();
   const meta = await collectDeviceMeta();
   const pushToken = await getNativePushToken();
-  await apiFetch('/v1/mobile-app/devices/register', {
+  const school = await getSchoolConfig();
+  const path = isSchoolSisConfig(school)
+    ? '/v1/school-mobile/devices/register'
+    : '/v1/mobile-app/devices/register';
+  await apiFetch(path, {
     method: 'POST',
     body: JSON.stringify({
       deviceId,
-      appType,
+      ...(isSchoolSisConfig(school) ? {} : { appType }),
       platform: Platform.OS === 'ios' ? 'ios' : 'android',
-      // Only send when present so we never wipe a good token with undefined→null quirks.
       ...(pushToken ? { pushToken } : {}),
       ...meta,
     }),

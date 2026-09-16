@@ -12,8 +12,19 @@ const FALLBACK_SCHOOLS: SchoolRegistryEntry[] = [
     apiUrl: 'https://erp.donboscocollege.ac.in/api',
     tenantSlug: 'demo',
     code: 'DBCT',
+    product: 'college',
     region: 'Meghalaya',
     keywords: ['don bosco', 'dbc', 'tura', 'dbct'],
+  },
+  {
+    id: 'st-lukes-tura',
+    name: "St. Luke's Secondary School, Tura",
+    apiUrl: process.env.EXPO_PUBLIC_API_URL?.trim() || 'https://erp.stlukestura.in/api',
+    tenantSlug: 'st-lukes-tura',
+    code: 'SLS',
+    product: 'school-sis',
+    region: 'Meghalaya',
+    keywords: ['st luke', 'st lukes', 'sls', 'tura', 'school'],
   },
 ];
 
@@ -95,21 +106,31 @@ export function filterSchools(schools: SchoolRegistryEntry[], query: string) {
 }
 
 export async function probeSchoolConnection(config: SchoolConfig): Promise<void> {
-  const url = `${config.apiUrl.replace(/\/+$/, '')}/v1/mobile-app/bootstrap?appType=student`;
-  const res = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-      'X-Tenant-Slug': config.tenantSlug,
-      'X-Client-Type': 'mobile',
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(
-      body.includes('tenant')
-        ? 'Could not reach this institution. Check tenant code and API URL.'
-        : `Server responded with ${res.status}. Check the API URL.`,
-    );
+  const base = config.apiUrl.replace(/\/+$/, '');
+  const headers = {
+    Accept: 'application/json',
+    'X-Tenant-Slug': config.tenantSlug,
+    'X-Client-Type': 'mobile',
+  };
+  const schoolUrl = `${base}/v1/school-mobile/bootstrap`;
+  const collegeUrl = `${base}/v1/mobile-app/bootstrap?appType=student`;
+  const first = config.product === 'school-sis' ? schoolUrl : collegeUrl;
+  const second = first === schoolUrl ? collegeUrl : schoolUrl;
+  const tryUrl = async (url: string) => {
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(
+        body.includes('tenant')
+          ? 'Could not reach this institution. Check tenant code and API URL.'
+          : `Server responded with ${res.status}. Check the API URL.`,
+      );
+    }
+  };
+  try {
+    await tryUrl(first);
+  } catch {
+    await tryUrl(second);
   }
 }
 

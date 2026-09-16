@@ -179,6 +179,10 @@ export class SchoolMobileLoginDto {
   @IsString()
   @MaxLength(120)
   deviceId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  rememberMe?: boolean;
 }
 
 export class SchoolMobileChangePasswordDto {

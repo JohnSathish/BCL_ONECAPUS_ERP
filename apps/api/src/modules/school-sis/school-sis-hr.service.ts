@@ -1486,7 +1486,7 @@ export class SchoolSisHrService {
       const gross = lines.reduce((s, l) => s + l.grossPaise, 0);
       const net = lines.reduce((s, l) => s + l.netPaise, 0);
       const ded = lines.reduce((s, l) => s + l.deductionPaise, 0);
-      const empCost = lines.reduce((s, l) => s + l.employerPaise, 0);
+      const empCost = lines.reduce((s, l) => s + (l.employerPaise ?? 0), 0);
       await tx.schoolHrPayrollRun.update({
         where: { id: run.id },
         data: {
@@ -1659,10 +1659,15 @@ export class SchoolSisHrService {
       paise: number;
     }>;
     const doc: ReportDocument = {
+      key: 'hr-payslip',
       title: 'Payslip',
       subtitle: line.run.periodMonth,
       academicYear: line.run.periodMonth,
       generatedBy: 'School ERP',
+      filters: {
+        Employee: `${line.staff.fullName} · ${line.staff.employeeCode}`,
+        Note: 'This is a system-generated payslip.',
+      },
       columns: [
         { key: 'label', label: 'Particulars' },
         { key: 'amount', label: 'Amount (₹)' },
@@ -1678,10 +1683,6 @@ export class SchoolSisHrService {
           amount: paiseToRupees(e.paise),
         })),
         { label: 'Net salary', amount: paiseToRupees(line.netPaise) },
-      ],
-      notes: [
-        `${line.staff.fullName} · ${line.staff.employeeCode}`,
-        'This is a system-generated payslip.',
       ],
     };
     return this.pdf.render(doc, brand);

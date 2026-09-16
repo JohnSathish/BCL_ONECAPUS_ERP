@@ -68,8 +68,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
   slug: 'onecampus-mobile',
-  version: '1.0.21',
-  scheme: 'onecampus',
+  version: '1.0.22',
+  scheme: ['onecampus', 'schoolerp'],
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
@@ -77,7 +77,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   splash: {
     image: './assets/icon.png',
     resizeMode: 'contain',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#261265',
   },
   ios: {
     supportsTablet: true,
@@ -102,11 +102,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 41,
+    versionCode: 42,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: '#261265',
     },
     permissions: [
       'INTERNET',
@@ -177,7 +177,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-splash-screen',
       {
         image: './assets/icon.png',
-        backgroundColor: '#ffffff',
+        backgroundColor: '#261265',
         imageWidth: 220,
         resizeMode: 'contain',
       },

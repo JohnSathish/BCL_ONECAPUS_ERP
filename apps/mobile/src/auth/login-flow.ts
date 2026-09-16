@@ -4,6 +4,8 @@ import { apiFetch, setAppType } from '@/api/client';
 import { getDeviceId } from '@/auth/device';
 import { getInstalledAppVersion } from '@/utils/app-version';
 import { canAccessMobile, resolveMobileRoute } from '@/auth/role-router';
+import { getSchoolConfig } from '@/auth/school-config';
+import { isSchoolSisConfig } from '@/auth/school-product';
 import {
   saveAppType,
   saveLastLoginAt,
@@ -147,11 +149,37 @@ export async function completeSessionFromTokens(input: SessionTokensInput): Prom
 export async function performLogin(input: {
   identifier: string;
   password: string;
-  challenge: Challenge;
-  challengeAnswer: number;
+  challenge?: Challenge | null;
+  challengeAnswer?: number;
   rememberMe?: boolean;
 }) {
   const identifier = normalizeLoginIdentifier(input.identifier);
+  const school = await getSchoolConfig();
+  if (isSchoolSisConfig(school)) {
+    const deviceId = await getDeviceId();
+    const session = await apiFetch<LoginResponse>('/v1/school-mobile/login', {
+      method: 'POST',
+      skipAuth: true,
+      body: JSON.stringify({
+        identifier,
+        password: input.password,
+        rememberMe: input.rememberMe ?? false,
+        deviceId,
+      }),
+    });
+    if (session.mfaRequired) {
+      throw new Error(
+        'Multi-factor authentication is required. Please sign in on the web portal for now.',
+      );
+    }
+    return completeSessionFromTokens({
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      user: session.user,
+      rememberMe: input.rememberMe ?? false,
+    });
+  }
+
   const deviceMeta = await collectDeviceMeta();
   const session = await apiFetch<LoginResponse>('/v1/auth/login', {
     method: 'POST',
@@ -159,7 +187,7 @@ export async function performLogin(input: {
     body: JSON.stringify({
       ...(identifier.includes('@') ? { email: identifier } : { identifier }),
       password: input.password,
-      challengeToken: input.challenge.token,
+      challengeToken: input.challenge?.token,
       challengeAnswer: input.challengeAnswer,
       rememberMe: input.rememberMe ?? false,
       ...deviceMeta,

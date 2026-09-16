@@ -7,7 +7,14 @@ export type MobilePersona =
   | 'shift-admin'
   | 'admin'
   | 'library'
-  | 'finance';
+  | 'finance'
+  | 'school-student'
+  | 'school-parent'
+  | 'school-teacher'
+  | 'school-admin'
+  | 'school-accountant'
+  | 'school-librarian'
+  | 'school-transport';
 
 export type MobileRouteDecision = {
   persona: MobilePersona;
@@ -29,13 +36,100 @@ const FACULTY_ROLES = new Set(['faculty', 'staff']);
 const LIBRARY_ROLES = new Set(['librarian', 'library-operator']);
 const FINANCE_ROLES = new Set(['accountant']);
 
+export function hasSchoolMobileAccess(user: SessionUser) {
+  const perms = user.permissions ?? [];
+  return (
+    perms.includes('school-mobile:student') ||
+    perms.includes('school-mobile:parent') ||
+    perms.includes('school-mobile:staff') ||
+    perms.includes('school-mobile:manage') ||
+    perms.includes('school-sis:read') ||
+    perms.includes('school-sis:manage')
+  );
+}
+
+export function resolveSchoolMobileRoute(user: SessionUser): MobileRouteDecision | null {
+  if (!hasSchoolMobileAccess(user)) return null;
+  const perms = user.permissions ?? [];
+  const roles = (user.roles ?? []).join(' ').toLowerCase();
+  const href = '/(school)/(tabs)' as Href;
+  if (perms.includes('school-mobile:parent') || /\bparent\b/.test(roles)) {
+    return {
+      persona: 'school-parent',
+      href,
+      appType: 'student',
+      title: 'Parent Dashboard',
+      subtitle: 'Children, attendance, fees & notices',
+    };
+  }
+  if (perms.includes('school-mobile:student') && !perms.includes('school-sis:read')) {
+    return {
+      persona: 'school-student',
+      href,
+      appType: 'student',
+      title: 'Student Dashboard',
+      subtitle: 'Attendance, timetable, fees & exams',
+    };
+  }
+  if (perms.includes('fees.collection.view') || /\baccountant|accounts\b/.test(roles)) {
+    return {
+      persona: 'school-accountant',
+      href,
+      appType: 'staff',
+      title: 'Accounts Desk',
+      subtitle: 'Fees, collections and receipts',
+    };
+  }
+  if (perms.includes('library.issue') || /\blibrarian\b/.test(roles)) {
+    return {
+      persona: 'school-librarian',
+      href,
+      appType: 'staff',
+      title: 'Library Desk',
+      subtitle: 'Catalogue and issued books',
+    };
+  }
+  if (perms.includes('transport.routes.view') || /\btransport\b/.test(roles)) {
+    return {
+      persona: 'school-transport',
+      href,
+      appType: 'staff',
+      title: 'Transport Desk',
+      subtitle: 'Routes, vehicles and trips',
+    };
+  }
+  if (
+    perms.includes('school-mobile:manage') ||
+    perms.includes('school-sis:manage') ||
+    perms.includes('*') ||
+    /\bprincipal|school-admin|college-admin\b/.test(roles)
+  ) {
+    return {
+      persona: 'school-admin',
+      href,
+      appType: 'staff',
+      title: 'School Administration',
+      subtitle: 'Students, attendance, fees and reports',
+    };
+  }
+  return {
+    persona: 'school-teacher',
+    href,
+    appType: 'staff',
+    title: 'Staff Dashboard',
+    subtitle: "Today's classes, attendance and leave",
+  };
+}
+
 export function resolveMobileRoute(user: SessionUser): MobileRouteDecision {
+  const school = resolveSchoolMobileRoute(user);
+  if (school) return school;
+
   const perms = user.permissions ?? [];
   const roles = user.roles ?? [];
 
   const isStudent = perms.includes('student:portal:self');
   const isStaff = perms.includes('staff:portal:self');
-  /** Principal Mobile Command Center — principal role permission only (not VP/admin). */
   const isPrincipalMobile = perms.includes('principal-mobile:access');
   const isShiftAdmin = roles.some((r) => SHIFT_ADMIN_ROLES.has(r));
   const isFaculty = roles.some((r) => FACULTY_ROLES.has(r));
@@ -138,6 +232,7 @@ export function canAccessMobile(user: SessionUser): boolean {
   return (
     perms.includes('student:portal:self') ||
     perms.includes('staff:portal:self') ||
-    perms.includes('principal-mobile:access')
+    perms.includes('principal-mobile:access') ||
+    hasSchoolMobileAccess(user)
   );
 }

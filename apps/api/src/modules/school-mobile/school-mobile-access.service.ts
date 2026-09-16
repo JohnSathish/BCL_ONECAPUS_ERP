@@ -27,20 +27,46 @@ export class SchoolMobileAccessService {
 
   persona(user: JwtUser): SchoolMobilePersona {
     const perms = user.permissions ?? [];
-    const roles = user.roles ?? [];
+    const roles = (user.roles ?? []).join(' ').toLowerCase();
     if (
       perms.includes(SCHOOL_MOBILE_PERMISSION_MANAGE) ||
-      roles.includes('principal') ||
-      roles.includes('college-admin')
+      perms.includes('school-sis:manage') ||
+      perms.includes('*') ||
+      /\b(principal|college-admin|school-admin)\b/.test(roles)
     ) {
       return 'admin';
     }
-    if (perms.includes(SCHOOL_MOBILE_PERMISSION_PARENT)) return 'parent';
-    if (perms.includes(SCHOOL_MOBILE_PERMISSION_STUDENT)) return 'student';
+    if (
+      perms.includes(SCHOOL_MOBILE_PERMISSION_PARENT) ||
+      /\bparent\b/.test(roles)
+    ) {
+      return 'parent';
+    }
+    if (
+      perms.includes(SCHOOL_MOBILE_PERMISSION_STUDENT) ||
+      /\bstudent\b/.test(roles)
+    ) {
+      return 'student';
+    }
+    if (
+      perms.includes('fees.collection.view') ||
+      /\baccountant|accounts\b/.test(roles)
+    ) {
+      return 'accountant';
+    }
+    if (perms.includes('library.issue') || /\blibrarian\b/.test(roles)) {
+      return 'librarian';
+    }
+    if (
+      perms.includes('transport.routes.view') ||
+      /\btransport\b/.test(roles)
+    ) {
+      return 'transport';
+    }
     if (
       perms.includes(SCHOOL_MOBILE_PERMISSION_STAFF) ||
       perms.includes('school-sis:read') ||
-      roles.includes('teacher')
+      /\bteacher|staff|hr-manager\b/.test(roles)
     ) {
       return 'teacher';
     }

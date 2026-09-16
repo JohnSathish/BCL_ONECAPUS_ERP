@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
+import { SchoolSisAttendanceService } from '../school-sis/school-sis-attendance.service';
+import { SchoolSisExamsService } from '../school-sis/school-sis-exams.service';
 import { SchoolSisFeesService } from '../school-sis/school-sis-fees.service';
 import { SchoolSisTimetableService } from '../school-sis/school-sis-timetable.service';
 import { SchoolWebGalleryService } from '../school-web/school-web-gallery.service';
@@ -25,6 +27,8 @@ export class SchoolMobileHomeService {
     private readonly gallery: SchoolWebGalleryService,
     private readonly timetable: SchoolSisTimetableService,
     private readonly fees: SchoolSisFeesService,
+    private readonly attendanceSvc: SchoolSisAttendanceService,
+    private readonly exams: SchoolSisExamsService,
     private readonly prayer: SchoolMobilePrayerService,
     private readonly inbox: SchoolMobileInboxService,
   ) {}
@@ -106,9 +110,14 @@ export class SchoolMobileHomeService {
     );
     let timetable: unknown = null;
     let fees: unknown = null;
-    let attendance = {
-      status: 'unavailable' as const,
-      message: 'Class attendance will appear here once the school enables it.',
+    let exams: unknown = null;
+    let attendance: Record<string, unknown> = {
+      status: 'unavailable',
+      percent: null,
+      present: 0,
+      absent: 0,
+      late: 0,
+      leave: 0,
     };
     if (me.activeStudentId) {
       try {
@@ -124,7 +133,34 @@ export class SchoolMobileHomeService {
       } catch {
         fees = null;
       }
-    } else if (me.persona === 'teacher') {
+      try {
+        const profile = await this.attendanceSvc.studentProfile(
+          user.tid,
+          me.activeStudentId,
+        );
+        const month = profile.month as
+          | { present?: number; absent?: number; late?: number; leave?: number }
+          | undefined;
+        attendance = {
+          status: 'ok',
+          percent: profile.percent,
+          present: month?.present ?? 0,
+          absent: month?.absent ?? 0,
+          late: month?.late ?? 0,
+          leave: month?.leave ?? 0,
+          calendar: profile.calendar,
+          workingDays: profile.workingDays,
+          band: profile.band,
+        };
+      } catch {
+        attendance = { status: 'unavailable', percent: null };
+      }
+      try {
+        exams = await this.exams.studentPublished(user.tid, me.activeStudentId);
+      } catch {
+        exams = null;
+      }
+    } else if (me.persona === 'teacher' || me.persona === 'admin') {
       const staffId = await this.access.staffIdForUser(user.tid, user);
       if (staffId) {
         try {
@@ -165,6 +201,7 @@ export class SchoolMobileHomeService {
       attendance,
       timetable,
       fees,
+      exams,
       quickLinks: this.quickLinks(me.persona),
     };
   }
@@ -189,7 +226,28 @@ export class SchoolMobileHomeService {
     if (persona === 'teacher') {
       return [
         { key: 'timetable', label: 'Timetable', href: '/timetable' },
-        { key: 'attendance', label: 'Attendance', href: '/attendance' },
+        { key: 'attendance', label: 'Take attendance', href: '/attendance' },
+        { key: 'leave', label: 'Leave', href: '/leave' },
+        { key: 'hr', label: 'My HR', href: '/hr' },
+        ...shared,
+      ];
+    }
+    if (persona === 'accountant') {
+      return [
+        { key: 'fees', label: 'Fees', href: '/fees' },
+        { key: 'reports', label: 'Reports', href: '/reports' },
+        ...shared,
+      ];
+    }
+    if (persona === 'librarian') {
+      return [
+        { key: 'library', label: 'Library', href: '/library' },
+        ...shared,
+      ];
+    }
+    if (persona === 'transport') {
+      return [
+        { key: 'transport', label: 'Transport', href: '/transport' },
         ...shared,
       ];
     }

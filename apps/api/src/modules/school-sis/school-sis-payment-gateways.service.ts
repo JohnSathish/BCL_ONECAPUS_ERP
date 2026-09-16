@@ -130,6 +130,33 @@ export class SchoolSisPaymentGatewaysService {
     };
   }
 
+  /** Mobile checkout — no secrets. Only the active default gateway. */
+  async activePublic(tenantId: string) {
+    await this.sis.assertSecondarySisTenant(tenantId);
+    const row = await this.prisma.schoolPaymentGateway.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        isActive: true,
+        isDefault: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        provider: true,
+        isActive: true,
+        isDefault: true,
+        connectionStatus: true,
+      },
+    });
+    return {
+      provider: row?.provider ?? null,
+      name: row?.name ?? null,
+      available: Boolean(row && row.connectionStatus === 'OK'),
+      connectionStatus: row?.connectionStatus ?? null,
+    };
+  }
+
   async getOne(
     tenantId: string,
     id: string,

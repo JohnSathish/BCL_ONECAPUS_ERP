@@ -30,6 +30,8 @@ import {
   useIdentifierHint,
 } from '@/auth/identifier-hint';
 import { completeSessionFromTokens, performLogin } from '@/auth/login-flow';
+import { isSchoolSisConfig } from '@/auth/school-product';
+import { useSchoolConfig } from '@/hooks/use-school-config';
 import { getUserSnapshot } from '@/auth/session';
 import { refreshAccessToken } from '@/auth/token-refresh';
 import { authColors } from '@/components/auth/auth-theme';
@@ -74,6 +76,8 @@ export default function LoginScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = authColors(scheme);
   const { config, error: bootstrapError } = useBootstrap();
+  const { school } = useSchoolConfig();
+  const schoolSis = isSchoolSisConfig(school);
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -292,7 +296,7 @@ export default function LoginScreen() {
   }, [methodsReady, unlockParam, unlockMode, offline, onBiometricUnlock, finishLogin]);
 
   async function onLogin() {
-    if (!challenge) {
+    if (!schoolSis && !challenge) {
       setError('Complete the security check first.');
       return;
     }
@@ -486,12 +490,14 @@ export default function LoginScreen() {
                   </Pressable>
                 </View>
 
-                <CaptchaWidget
-                  scheme={scheme}
-                  answer={captchaAnswer}
-                  onAnswerChange={setCaptchaAnswer}
-                  onChallenge={setChallenge}
-                />
+                {!schoolSis ? (
+                  <CaptchaWidget
+                    scheme={scheme}
+                    answer={captchaAnswer}
+                    onAnswerChange={setCaptchaAnswer}
+                    onChallenge={setChallenge}
+                  />
+                ) : null}
 
                 <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                   <Pressable

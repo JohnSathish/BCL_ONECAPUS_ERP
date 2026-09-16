@@ -1,4 +1,6 @@
 /** Institution entry for universal OneCampus mobile (runtime, not build-time). */
+export type SchoolProduct = 'college' | 'school-sis';
+
 export type SchoolConfig = {
   id: string;
   name: string;
@@ -7,6 +9,7 @@ export type SchoolConfig = {
   tenantSlug: string;
   /** Short campus code shown in the picker (falls back to tenantSlug). */
   code?: string;
+  product?: SchoolProduct;
   privacyPolicyUrl?: string;
   supportEmail?: string;
   logoUrl?: string;

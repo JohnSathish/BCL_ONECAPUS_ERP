@@ -6,6 +6,9 @@ function normalizePath(link: string): string {
   if (path.startsWith('onecampus://')) {
     path = path.replace('onecampus://', '/');
   }
+  if (path.startsWith('schoolerp://')) {
+    path = path.replace('schoolerp://', '/');
+  }
   try {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       const url = new URL(path);
@@ -158,6 +161,21 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   }
   if (lower.includes('/staff') || lower.includes('faculty')) {
     return '/(staff)/(tabs)' as Href;
+  }
+
+  if (
+    lower.includes('/(school)') ||
+    lower.startsWith('/school') ||
+    lower.startsWith('/fees') ||
+    lower.startsWith('/attendance') ||
+    lower.startsWith('/exam') ||
+    lower.startsWith('/notification')
+  ) {
+    if (lower.includes('fee')) return '/(school)/(tabs)/fees' as Href;
+    if (lower.includes('attendance')) return '/(school)/attendance' as Href;
+    if (lower.includes('exam')) return '/(school)/exams' as Href;
+    if (lower.includes('notification')) return '/(school)/(tabs)/notifications' as Href;
+    return '/(school)/(tabs)' as Href;
   }
 
   return null;

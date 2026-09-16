@@ -106,11 +106,13 @@ export function evaluateFormulaPaise(expr: string, vars: FormulaVars): bigint {
 
   function parseMul(): { n: bigint; d: bigint } {
     let left = parsePrimary();
-    while (peek()?.t === 'op' && (peek().v === '*' || peek().v === '/')) {
-      const op = eat().v;
+    for (;;) {
+      const tok = peek();
+      if (!tok || tok.t !== 'op' || (tok.v !== '*' && tok.v !== '/')) break;
+      eat();
       const right = parsePrimary();
       left =
-        op === '*'
+        tok.v === '*'
           ? rat(left.n * right.n, left.d * right.d)
           : rat(left.n * right.d, left.d * right.n);
     }
@@ -119,12 +121,14 @@ export function evaluateFormulaPaise(expr: string, vars: FormulaVars): bigint {
 
   function parseExpr(): { n: bigint; d: bigint } {
     let left = parseMul();
-    while (peek()?.t === 'op' && (peek().v === '+' || peek().v === '-')) {
-      const op = eat().v;
+    for (;;) {
+      const tok = peek();
+      if (!tok || tok.t !== 'op' || (tok.v !== '+' && tok.v !== '-')) break;
+      eat();
       const right = parseMul();
       const d = left.d * right.d;
       const n =
-        op === '+'
+        tok.v === '+'
           ? left.n * right.d + right.n * left.d
           : left.n * right.d - right.n * left.d;
       left = rat(n, d);

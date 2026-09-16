@@ -111,6 +111,17 @@ export class SchoolMobileSettingsService {
       maintenanceMessage: settings.maintenanceMessage,
       privacyPolicyUrl: 'https://stlukestura.in/privacy',
       supportEmail: 'admin@stlukestura.in',
+      product: 'school-sis',
+      features: {
+        transport: true,
+        library: true,
+        onlineFees: true,
+        homework: true,
+        chat: false,
+        gpsTracking: false,
+        hr: true,
+        payroll: true,
+      },
     };
   }
 }

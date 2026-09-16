@@ -25,9 +25,22 @@ import { SchoolWebGalleryService } from '../school-web/school-web-gallery.servic
 import { SchoolWebService } from '../school-web/school-web.service';
 import { SchoolSisFeesService } from '../school-sis/school-sis-fees.service';
 import { SchoolSisTimetableService } from '../school-sis/school-sis-timetable.service';
+import { SchoolSisAttendanceService } from '../school-sis/school-sis-attendance.service';
+import { SchoolSisExamsService } from '../school-sis/school-sis-exams.service';
+import { SchoolSisHrService } from '../school-sis/school-sis-hr.service';
+import { SchoolSisAccessService } from '../school-sis/school-sis-access.service';
+import { SchoolSisCalendarService } from '../school-sis/school-sis-calendar.service';
+import { SchoolSisPaymentGatewaysService } from '../school-sis/school-sis-payment-gateways.service';
+import { SubmitAttendanceDto } from '../school-sis/dto/school-attendance.dto';
+import { SCHOOL_SIS_PERMISSION_MANAGE } from '../school-sis/school-sis.constants';
+import {
+  SIS_ATTENDANCE_MARK,
+  SIS_ATTENDANCE_VIEW,
+} from '../school-sis/school-sis-iam.perms';
 import {
   SCHOOL_MOBILE_ACCESS_PERMISSIONS,
   SCHOOL_MOBILE_PERMISSION_MANAGE,
+  SCHOOL_MOBILE_PERMISSION_STAFF,
   SCHOOL_MOBILE_TENANT_SLUG,
 } from './school-mobile.constants';
 import {
@@ -68,6 +81,12 @@ export class SchoolMobileController {
     private readonly gallery: SchoolWebGalleryService,
     private readonly timetable: SchoolSisTimetableService,
     private readonly fees: SchoolSisFeesService,
+    private readonly attendance: SchoolSisAttendanceService,
+    private readonly exams: SchoolSisExamsService,
+    private readonly hr: SchoolSisHrService,
+    private readonly sisAccess: SchoolSisAccessService,
+    private readonly calendar: SchoolSisCalendarService,
+    private readonly gateways: SchoolSisPaymentGatewaysService,
   ) {}
 
   private async tenantFromHost(
@@ -298,6 +317,154 @@ export class SchoolMobileController {
     );
     if (!studentId) return { structure: null, structures: [] };
     return this.fees.forStudent(user.tid, studentId);
+  }
+
+  @Get('attendance')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  async attendanceNow(
+    @CurrentUser() user: JwtUser,
+    @Query('childId') childId?: string,
+  ) {
+    const studentId = await this.access.resolveStudentId(
+      user.tid,
+      user,
+      childId,
+    );
+    if (!studentId) return { percent: null, calendar: [] };
+    return this.attendance.studentProfile(user.tid, studentId);
+  }
+
+  @Get('exams')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  async examsNow(
+    @CurrentUser() user: JwtUser,
+    @Query('childId') childId?: string,
+  ) {
+    const studentId = await this.access.resolveStudentId(
+      user.tid,
+      user,
+      childId,
+    );
+    if (!studentId) return [];
+    return this.exams.studentPublished(user.tid, studentId);
+  }
+
+  @Get('teacher/today')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS, 'attendance.view', 'attendance.create')
+  teacherToday(@CurrentUser() user: JwtUser, @Query('date') date?: string) {
+    return this.attendance.teacherToday(user.tid, user.sub, date);
+  }
+
+  @Get('hr/me')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS, 'hr.self.view')
+  async hrMe(@CurrentUser() user: JwtUser) {
+    const id = await this.hr.ownStaffId(user.tid, user.sub);
+    if (!id) return { staff: null };
+    return this.hr.employee(user.tid, id, {
+      userId: user.sub,
+      manageHr: false,
+      payrollView: true,
+      payrollCalc: false,
+      payrollApprove: false,
+      payrollPay: false,
+      revealBank: false,
+    });
+  }
+
+  @Get('payment-gateways/active')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  paymentGatewayActive(@CurrentUser() user: JwtUser) {
+    return this.gateways.activePublic(user.tid);
+  }
+
+  @Get('calendar')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  calendarMonth(
+    @CurrentUser() user: JwtUser,
+    @Query('year') year?: string,
+    @Query('month') month?: string,
+  ) {
+    const now = new Date();
+    return this.calendar.monthGrid(
+      user.tid,
+      Number(year) || now.getFullYear(),
+      Number(month) || now.getMonth() + 1,
+    );
+  }
+
+  @Get('attendance/roster')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:read',
+    'school-sis:manage',
+    ...SIS_ATTENDANCE_VIEW,
+  )
+  async attendanceRoster(
+    @CurrentUser() user: JwtUser,
+    @Query('date') date: string,
+    @Query('sectionId') sectionId: string,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('mode') mode?: string,
+    @Query('periodKey') periodKey?: string,
+  ) {
+    await this.sisAccess.assertSectionAccess(user.tid, user, sectionId);
+    const perms = user.permissions ?? [];
+    const manage =
+      perms.includes(SCHOOL_SIS_PERMISSION_MANAGE) || perms.includes('*');
+    return this.attendance.roster(
+      user.tid,
+      { date, sectionId, academicYearId, mode, periodKey },
+      {
+        userId: user.sub,
+        email: user.email,
+        manage,
+        canApprove: manage,
+        canLock: manage,
+      },
+    );
+  }
+
+  @Post('attendance/submit')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:manage',
+    ...SIS_ATTENDANCE_MARK,
+  )
+  async attendanceSubmit(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SubmitAttendanceDto,
+    @Req() req: Request,
+  ) {
+    await this.sisAccess.assertSectionAccess(user.tid, user, dto.sectionId);
+    const perms = user.permissions ?? [];
+    const manage =
+      perms.includes(SCHOOL_SIS_PERMISSION_MANAGE) || perms.includes('*');
+    return this.attendance.saveRoster(
+      user.tid,
+      dto,
+      {
+        userId: user.sub,
+        email: user.email,
+        manage,
+        canApprove: manage,
+        canLock: manage,
+        ip:
+          (req.headers['x-forwarded-for'] as string | undefined)
+            ?.split(',')[0]
+            ?.trim() || req.ip,
+      },
+      dto.asDraft ?? false,
+    );
   }
 
   @Post('devices/register')

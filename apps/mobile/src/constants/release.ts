@@ -5,7 +5,7 @@ export const COLLEGE_NAME = 'Don Bosco College, Tura';
  * Do not treat this as the platform identity for other tenants.
  */
 export const PRODUCT_NAME = 'Bosco Connect';
-export const APP_VERSION = '1.0.21';
+export const APP_VERSION = '1.0.22';
 export const DEVELOPER_NAME = 'BaseCode Labs Pvt. Ltd.';
 export const DEVELOPER_TAGLINE = 'Your Technology Growth Partner';
 /** Shown under college name on welcome/login (client-facing) */
@@ -203,8 +203,8 @@ export const LOGIN_TRUST_BADGES = [
 
 export const APP_DISPLAY_NAME = process.env.EXPO_PUBLIC_APP_NAME ?? COLLEGE_NAME;
 
-export const POWERED_BY = 'Powered by BaseCode Labs';
-export const BASECODE_WEBSITE_URL = 'https://www.basecodelabs.com';
+export const POWERED_BY = 'Powered by BaseCode Labs Pvt. Ltd.';
+export const BASECODE_WEBSITE_URL = 'https://basecodelabs.com';
 
 /** Cards implemented in mobile v1 — hide backend-enabled stubs until built. */
 export const MVP_STUDENT_CARDS = [
