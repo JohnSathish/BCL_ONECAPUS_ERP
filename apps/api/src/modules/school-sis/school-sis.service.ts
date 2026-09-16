@@ -13,6 +13,10 @@ import { PrismaService } from '../../database/prisma.service';
 import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import { SchoolSisLicenseService } from './school-sis-license.service';
 import {
+  SCHOOL_ADMISSION_NUMBER_PREFIX,
+  SCHOOL_SIS_PRODUCT,
+} from './school-sis.constants';
+import {
   isSchoolRollNumber,
   resolveSchoolEnrollmentRollNumber,
 } from './school-sis-roll-number';
@@ -307,7 +311,8 @@ export class SchoolSisService {
         fees: true,
         exams: true,
         holidays: true,
-        library: false,
+        library: true,
+        sms: true,
         stationery: true,
         transport: true,
         whatsapp: true,

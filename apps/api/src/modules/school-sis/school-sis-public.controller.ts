@@ -21,6 +21,7 @@ import { SchoolSisWhatsappWebhookService } from './school-sis-whatsapp-webhook.s
 import { SchoolSisAutomationService } from './school-sis-automation.service';
 import { IncomingAutomationEventDto } from './dto/school-automation.dto';
 import { SchoolSisIamService } from './school-sis-iam.service';
+import { SchoolSisSmsService } from './school-sis-sms.service';
 import { SchoolIamAcceptInviteDto } from './dto/school-iam.dto';
 
 @ApiTags('school-sis-public')
@@ -34,6 +35,7 @@ export class SchoolSisPublicController {
     private readonly whatsappWebhooks: SchoolSisWhatsappWebhookService,
     private readonly automation: SchoolSisAutomationService,
     private readonly iam: SchoolSisIamService,
+    private readonly sms: SchoolSisSmsService,
   ) {}
 
   private async tenantId(host?: string) {
@@ -100,6 +102,17 @@ export class SchoolSisPublicController {
   ) {
     const raw = req.rawBody?.toString('utf8') ?? JSON.stringify(req.body ?? {});
     return this.whatsappWebhooks.handle(raw, signature);
+  }
+
+  @Public()
+  @Post('sms/webhooks/:provider')
+  smsWebhook(
+    @Param('provider') provider: string,
+    @Req() req: Request & { rawBody?: Buffer },
+    @Headers() headers: Record<string, string | undefined>,
+  ) {
+    const raw = req.rawBody?.toString('utf8') ?? JSON.stringify(req.body ?? {});
+    return this.sms.handleWebhook(provider, raw, headers);
   }
 
   @Public()

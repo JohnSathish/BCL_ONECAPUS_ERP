@@ -465,7 +465,11 @@ export function UsersDesk() {
               })}
             </tbody>
           </table>
-          {!users.data?.items?.length ? (
+          {users.isError ? (
+            <p className="p-6 text-sm text-rose-700">{apiErrorMessage(users.error)}</p>
+          ) : users.isLoading ? (
+            <p className="p-6 text-sm text-slate-500">Loading users…</p>
+          ) : !users.data?.items?.length ? (
             <p className="p-6 text-sm text-slate-500">No users match the current filters.</p>
           ) : null}
         </WaCard>

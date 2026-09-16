@@ -5,22 +5,12 @@ import { createHttpClient } from '@/lib/http/create-client';
 import { withApiStartupRetry, isApiStartupError } from '@/lib/http/wait-for-api';
 import { useAuthStore } from '@/store/auth-store';
 import type { AuthSession } from '@/types/auth';
+import { isBrowserAuthColdPath } from '@/lib/auth/auth-cold-path';
 import { pingActivity } from './session-activity';
 import { broadcastSessionMessage } from './session-broadcast';
 import { processRefreshQueue, type RefreshQueueEntry } from './refresh-request-queue';
 
 const refreshClient = createHttpClient({ attachAuth: false });
-
-function isBrowserAuthColdPath() {
-  if (typeof window === 'undefined') return false;
-  const pathname = window.location.pathname;
-  return (
-    pathname === '/login' ||
-    pathname === '/forgot-password' ||
-    pathname.endsWith('/login') ||
-    pathname.endsWith('/register')
-  );
-}
 
 function httpStatus(error: unknown): number | undefined {
   if (axios.isAxiosError(error)) return error.response?.status;
@@ -60,6 +50,9 @@ class TokenRefreshManager {
   }
 
   async refreshSession(options?: { maxWaitMs?: number }): Promise<AuthSession> {
+    if (isBrowserAuthColdPath()) {
+      throw new Error('Session refresh is disabled on login screens.');
+    }
     if (this.refreshPromise) return this.refreshPromise;
     if (this.lastRefreshFailureAt > 0 && Date.now() - this.lastRefreshFailureAt < 30_000) {
       throw new Error('Refresh temporarily paused after a recent failure.');

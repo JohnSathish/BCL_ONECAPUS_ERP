@@ -21,9 +21,7 @@ export const metadata: Metadata = {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
       { url: '/favicon.png', type: 'image/png', sizes: '512x512' },
-      { url: '/branding/basecode-labs-logo.png', type: 'image/png' },
     ],
-    apple: [{ url: '/branding/basecode-labs-logo.png', type: 'image/png' }],
     shortcut: '/favicon.ico',
   },
 };

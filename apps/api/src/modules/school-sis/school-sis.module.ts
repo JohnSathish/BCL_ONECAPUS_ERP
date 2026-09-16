@@ -47,10 +47,18 @@ import { SchoolSisHrController } from './school-sis-hr.controller';
 import { SchoolSisHrService } from './school-sis-hr.service';
 import { SchoolSisTransportController } from './school-sis-transport.controller';
 import { SchoolSisTransportService } from './school-sis-transport.service';
+import { SchoolSisLibraryController } from './school-sis-library.controller';
+import { SchoolSisLibraryService } from './school-sis-library.service';
+import { SchoolSisSmsController } from './school-sis-sms.controller';
+import { SchoolSisSmsService } from './school-sis-sms.service';
+import { SchoolSisSmsProcessor } from './school-sis-sms.processor';
 import { SchoolSisLicenseService } from './school-sis-license.service';
 import { SchoolSaasLicenseIssuerService } from './school-saas-license-issuer.service';
 import { SchoolSisLicenseController } from './school-sis-license.controller';
 import { SchoolSaasLicenseIssuerController } from './school-saas-license-issuer.controller';
+import { SchoolSisAccountsController } from './school-sis-accounts.controller';
+import { SchoolSisAccountsService } from './school-sis-accounts.service';
+import { SchoolSisAccountsPostingService } from './school-sis-accounts.posting.service';
 import { SchoolLicenseGuard } from './school-sis-license.guard';
 import { SchoolSisAttendanceService } from './school-sis-attendance.service';
 import { SchoolSisReportsService } from './school-sis-reports.service';
@@ -69,6 +77,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     BullModule.registerQueue({ name: 'school-whatsapp' }),
     BullModule.registerQueue({ name: 'school-push' }),
     BullModule.registerQueue({ name: 'school-automation' }),
+    BullModule.registerQueue({ name: 'school-sms' }),
   ],
   controllers: [
     SchoolSisController,
@@ -89,6 +98,9 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisTransportController,
     SchoolSisLicenseController,
     SchoolSaasLicenseIssuerController,
+    SchoolSisAccountsController,
+    SchoolSisLibraryController,
+    SchoolSisSmsController,
   ],
   providers: [
     SchoolSisService,
@@ -119,6 +131,11 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisTransportService,
     SchoolSisLicenseService,
     SchoolSaasLicenseIssuerService,
+    SchoolSisAccountsPostingService,
+    SchoolSisAccountsService,
+    SchoolSisLibraryService,
+    SchoolSisSmsService,
+    SchoolSisSmsProcessor,
     { provide: APP_GUARD, useClass: SchoolLicenseGuard },
     SchoolSisIamService,
     SchoolSisReportsQueryService,
@@ -151,6 +168,10 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisHrService,
     SchoolSisTransportService,
     SchoolSisLicenseService,
+    SchoolSisAccountsPostingService,
+    SchoolSisAccountsService,
+    SchoolSisLibraryService,
+    SchoolSisSmsService,
     SchoolSisIamService,
     SchoolSisReportsService,
     SchoolReportEngineService,

@@ -12,6 +12,7 @@ import {
 } from '@/lib/auth/session-activity';
 import { broadcastSessionMessage, subscribeSessionBroadcast } from '@/lib/auth/session-broadcast';
 import { confirmGlobalUnsavedDiscard } from '@/lib/auth/unsaved-changes-registry';
+import { isAuthColdPath } from '@/lib/auth/auth-cold-path';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { logout as logoutApi, bootstrapSession } from '@/services/auth';
 import { useAuthStore } from '@/store/auth-store';
@@ -22,20 +23,6 @@ const IDLE_LOGOUT_MS = 15 * 60 * 1000;
 const TICK_MS = 15_000;
 /** Continue Session should fail fast — do not wait for API cold-start. */
 const CONTINUE_REFRESH_MAX_WAIT_MS = 8_000;
-
-function isAuthColdPath(pathname: string) {
-  return (
-    pathname === '/login' ||
-    pathname === '/forgot-password' ||
-    pathname === '/library-desk/login' ||
-    pathname === '/fee-collection-portal/login' ||
-    pathname === '/fee-collection-portal/register' ||
-    pathname === '/admissions-portal/login' ||
-    pathname === '/admissions-portal/register' ||
-    pathname === '/school-admissions-portal/login' ||
-    pathname === '/school-admissions-portal/register'
-  );
-}
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -214,7 +201,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [clear, pathname, router, setBootstrapping, setSession]);
 
   useEffect(() => {
-    if (!session) {
+    if (!session || isAuthColdPath(pathname)) {
       setWarningOpen(false);
       warningShownRef.current = false;
       return;
@@ -237,7 +224,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }, TICK_MS);
 
     return () => clearInterval(interval);
-  }, [session, performLogout]);
+  }, [session, performLogout, pathname]);
 
   useEffect(() => {
     return subscribeActivity(() => {

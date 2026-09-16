@@ -110,16 +110,21 @@ export function WaCard({
   label,
   value,
   hint,
+  className,
+  children,
 }: {
-  label: string;
-  value: string | number;
+  label?: string;
+  value?: string | number;
   hint?: string;
+  className?: string;
+  children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-[#1e3a8a]">{value}</p>
+    <div className={cn('rounded-2xl border border-slate-200 bg-white p-4 shadow-sm', className)}>
+      {label != null ? <p className="text-xs font-medium text-slate-500">{label}</p> : null}
+      {value != null ? <p className="mt-1 text-2xl font-semibold text-[#1e3a8a]">{value}</p> : null}
       {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
+      {children}
     </div>
   );
 }

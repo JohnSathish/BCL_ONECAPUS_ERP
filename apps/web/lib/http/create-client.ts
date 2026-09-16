@@ -14,6 +14,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { getWorkspaceShiftHeader } from '@/store/workspace-store';
 import { shouldAttachWorkspaceShiftHeader } from '@/lib/shared-modules';
 import { waitForAuthBootstrap } from '@/lib/auth/wait-for-auth-bootstrap';
+import { isBrowserAuthColdPath } from '@/lib/auth/auth-cold-path';
 
 type CreateClientOptions = {
   baseURL?: string;
@@ -58,7 +59,7 @@ export function createHttpClient(options: CreateClientOptions = {}): AxiosInstan
 
   client.interceptors.request.use(async (config) => {
     config.headers = config.headers ?? {};
-    if (options.attachAuth !== false) {
+    if (options.attachAuth !== false && !isBrowserAuthColdPath()) {
       try {
         await waitForAuthBootstrap();
       } catch {

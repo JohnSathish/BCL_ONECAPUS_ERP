@@ -1231,8 +1231,7 @@ export const REPORT_CATALOG: ReportDef[] = [
     'Outbound SMS (when wired).',
     ['dateFrom', 'dateTo'],
     {
-      emptyHint:
-        'SMS is not a live school channel yet. WhatsApp and push are available below.',
+      emptyHint: 'No SMS have been queued yet.',
     },
   ),
   r(

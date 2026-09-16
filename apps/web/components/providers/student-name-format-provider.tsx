@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { fetchStudentDisplaySettings } from '@/services/student-display-settings';
 import { useAuth } from '@/hooks/use-auth';
+import { isAuthColdPath } from '@/lib/auth/auth-cold-path';
 import { shouldSkipCollegeWorkspaceApis } from '@/lib/school-admissions-branding';
 import { usePathname } from 'next/navigation';
 import {
@@ -38,6 +39,7 @@ export function StudentNameFormatProvider({ children }: { children: React.ReactN
     enabled:
       isReady &&
       Boolean(session?.accessToken) &&
+      !isAuthColdPath(pathname) &&
       !pathname?.startsWith('/library-desk') &&
       pathname !== '/change-password' &&
       !shouldSkipCollegeWorkspaceApis(pathname, session?.user),

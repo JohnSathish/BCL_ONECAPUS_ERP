@@ -34,8 +34,9 @@ export function BrandingLogoImage({
     unoptimized ??
     (effectiveSrc.startsWith('http') ||
       effectiveSrc.startsWith('/uploads') ||
-      effectiveSrc.startsWith('/school-sis/'));
-  const shouldPriority = priority ?? effectiveSrc === DEFAULT_LOGIN_LOGO;
+      effectiveSrc.startsWith('/school-sis/') ||
+      effectiveSrc.startsWith('/branding/'));
+  const shouldPriority = priority === true;
 
   return (
     <div

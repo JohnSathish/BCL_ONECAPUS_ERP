@@ -16959,6 +16959,7 @@ model SchoolStudent {
   transportFeeAssignments SchoolTransportFeeAssignment[]
   transportRequests      SchoolTransportRequest[]
   whatsappContacts       SchoolWhatsappContact[]
+  libraryMembers         SchoolLibMember[]
 
   @@unique([tenantId, admissionNumber])
   @@index([tenantId, status])
@@ -17266,6 +17267,7 @@ model SchoolStaff {
   hrExits                   SchoolHrExit[]
   hrTimeline                SchoolHrTimelineEvent[]
   departmentsHeaded         SchoolHrDepartment[] @relation("HrDeptHead")
+  libraryMembers            SchoolLibMember[]
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType, status])
@@ -22079,6 +22081,1201 @@ model SchoolLicenseValidation {
 
   @@index([tenantId, createdAt])
   @@map("school_license_validations")
+  @@schema("school")
+}
+
+/// Double-entry school accounts (St. Luke’s SIS). Independent of college finance.
+model SchoolFinYear {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  startsOn  DateTime  @map("starts_on") @db.Date
+  endsOn    DateTime  @map("ends_on") @db.Date
+  status    String    @default("OPEN")
+  lockedAt  DateTime? @map("locked_at")
+  lockedBy  String?   @map("locked_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  periods  SchoolAcctPeriod[]
+  vouchers SchoolAcctVoucher[]
+  budgets  SchoolAcctBudget[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@map("school_fin_years")
+  @@schema("school")
+}
+
+model SchoolAcctPeriod {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  financialYearId String @map("financial_year_id") @db.Uuid
+  code         String
+  name         String
+  startsOn     DateTime  @map("starts_on") @db.Date
+  endsOn       DateTime  @map("ends_on") @db.Date
+  status       String    @default("OPEN")
+  lockedAt     DateTime? @map("locked_at")
+  lockedBy     String?   @map("locked_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  financialYear SchoolFinYear @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, financialYearId, code])
+  @@index([tenantId, status, startsOn])
+  @@map("school_acct_periods")
+  @@schema("school")
+}
+
+model SchoolAcctAccount {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  code            String
+  name            String
+  type            String
+  parentId        String?   @map("parent_id") @db.Uuid
+  systemKey       String?   @map("system_key")
+  moduleKey       String?   @map("module_key")
+  isGroup         Boolean   @default(false) @map("is_group")
+  isSystem        Boolean   @default(false) @map("is_system")
+  active          Boolean   @default(true)
+  openingBalance  Decimal   @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  openingSide     String    @default("DEBIT") @map("opening_side")
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  parent   SchoolAcctAccount?  @relation("AcctTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children SchoolAcctAccount[] @relation("AcctTree")
+  lines    SchoolAcctVoucherLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, systemKey])
+  @@index([tenantId, type, active])
+  @@map("school_acct_accounts")
+  @@schema("school")
+}
+
+model SchoolAcctCostCentre {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  code      String
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, code])
+  @@map("school_acct_cost_centres")
+  @@schema("school")
+}
+
+model SchoolAcctBankAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  ledgerId       String   @map("ledger_id") @db.Uuid
+  name           String
+  bankName       String   @map("bank_name")
+  branch         String?
+  accountNumber  String   @map("account_number")
+  ifsc           String?
+  openingBalance Decimal  @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  statements SchoolAcctBankStatement[]
+
+  @@index([tenantId, active])
+  @@map("school_acct_bank_accounts")
+  @@schema("school")
+}
+
+model SchoolAcctVendor {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  code          String
+  name          String
+  contact       String?
+  address       String?
+  pan           String?
+  gstin         String?
+  bankName      String?   @map("bank_name")
+  accountNumber String?   @map("account_number")
+  ifsc          String?
+  category      String?
+  tdsConfigId   String?   @map("tds_config_id") @db.Uuid
+  paymentTerms  String?   @map("payment_terms")
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  bills SchoolAcctVendorBill[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, name])
+  @@map("school_acct_vendors")
+  @@schema("school")
+}
+
+model SchoolAcctSequence {
+  id              String @id @default(uuid()) @db.Uuid
+  tenantId        String @map("tenant_id") @db.Uuid
+  financialYearId String @map("financial_year_id") @db.Uuid
+  kind            String
+  lastValue       Int    @default(0) @map("last_value")
+
+  @@unique([tenantId, financialYearId, kind])
+  @@map("school_acct_sequences")
+  @@schema("school")
+}
+
+model SchoolAcctVoucher {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  financialYearId  String    @map("financial_year_id") @db.Uuid
+  academicYearId   String?   @map("academic_year_id") @db.Uuid
+  periodId         String?   @map("period_id") @db.Uuid
+  voucherNo        String    @map("voucher_no")
+  voucherType      String    @map("voucher_type")
+  status           String    @default("DRAFT")
+  voucherDate      DateTime  @map("voucher_date") @db.Date
+  narration        String
+  payerName        String?   @map("payer_name")
+  payeeName        String?   @map("payee_name")
+  studentId        String?   @map("student_id") @db.Uuid
+  vendorId         String?   @map("vendor_id") @db.Uuid
+  costCentreId     String?   @map("cost_centre_id") @db.Uuid
+  paymentMode      String?   @map("payment_mode")
+  bankAccountId    String?   @map("bank_account_id") @db.Uuid
+  referenceNo      String?   @map("reference_no")
+  chequeNo         String?   @map("cheque_no")
+  idempotencyKey   String?   @map("idempotency_key")
+  sourceModule     String?   @map("source_module")
+  sourceId         String?   @map("source_id")
+  reversalOfId     String?   @map("reversal_of_id") @db.Uuid
+  totalDebit       Decimal   @map("total_debit") @db.Decimal(18, 2)
+  totalCredit      Decimal   @map("total_credit") @db.Decimal(18, 2)
+  createdBy        String    @map("created_by") @db.Uuid
+  createdIp        String?   @map("created_ip")
+  submittedAt      DateTime? @map("submitted_at")
+  approvedBy       String?   @map("approved_by") @db.Uuid
+  approvedAt       DateTime? @map("approved_at")
+  postedBy         String?   @map("posted_by") @db.Uuid
+  postedAt         DateTime? @map("posted_at")
+  cancelledAt      DateTime? @map("cancelled_at")
+  cancelledBy      String?   @map("cancelled_by") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  financialYear SchoolFinYear          @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+  lines         SchoolAcctVoucherLine[]
+  attachments   SchoolAcctAttachment[]
+  reversalOf    SchoolAcctVoucher?     @relation("AcctReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversals     SchoolAcctVoucher[]    @relation("AcctReversal")
+  approvals     SchoolAcctApprovalAction[]
+
+  @@unique([tenantId, voucherNo])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, voucherType, voucherDate])
+  @@index([tenantId, status, voucherDate])
+  @@index([tenantId, sourceModule, sourceId])
+  @@index([tenantId, createdBy, voucherDate])
+  @@map("school_acct_vouchers")
+  @@schema("school")
+}
+
+model SchoolAcctVoucherLine {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  voucherId     String  @map("voucher_id") @db.Uuid
+  lineNo        Int     @map("line_no")
+  accountId     String  @map("account_id") @db.Uuid
+  debit         Decimal @default(0) @db.Decimal(18, 2)
+  credit        Decimal @default(0) @db.Decimal(18, 2)
+  particulars   String?
+  costCentreId  String? @map("cost_centre_id") @db.Uuid
+
+  voucher SchoolAcctVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  account SchoolAcctAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, accountId])
+  @@index([voucherId, lineNo])
+  @@map("school_acct_voucher_lines")
+  @@schema("school")
+}
+
+model SchoolAcctApprovalRule {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  voucherType  String  @default("*") @map("voucher_type")
+  minAmount    Decimal @default(0) @map("min_amount") @db.Decimal(18, 2)
+  maxAmount    Decimal? @map("max_amount") @db.Decimal(18, 2)
+  approverRole String  @map("approver_role")
+  sortOrder    Int     @default(0) @map("sort_order")
+  active       Boolean @default(true)
+
+  @@index([tenantId, voucherType, active])
+  @@map("school_acct_approval_rules")
+  @@schema("school")
+}
+
+model SchoolAcctApprovalAction {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  voucherId  String   @map("voucher_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  decision   String
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  voucher SchoolAcctVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, voucherId])
+  @@map("school_acct_approval_actions")
+  @@schema("school")
+}
+
+model SchoolAcctBudget {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  financialYearId String   @map("financial_year_id") @db.Uuid
+  name            String
+  status          String   @default("DRAFT")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  financialYear SchoolFinYear         @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+  lines         SchoolAcctBudgetLine[]
+
+  @@index([tenantId, financialYearId])
+  @@map("school_acct_budgets")
+  @@schema("school")
+}
+
+model SchoolAcctBudgetLine {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  budgetId     String  @map("budget_id") @db.Uuid
+  accountId    String  @map("account_id") @db.Uuid
+  costCentreId String? @map("cost_centre_id") @db.Uuid
+  monthKey     String? @map("month_key")
+  amount       Decimal @db.Decimal(18, 2)
+
+  budget SchoolAcctBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, accountId])
+  @@map("school_acct_budget_lines")
+  @@schema("school")
+}
+
+model SchoolAcctVendorBill {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  vendorId    String    @map("vendor_id") @db.Uuid
+  billNo      String    @map("bill_no")
+  billDate    DateTime  @map("bill_date") @db.Date
+  dueDate     DateTime? @map("due_date") @db.Date
+  status      String    @default("CREATED")
+  subtotal    Decimal   @db.Decimal(18, 2)
+  taxAmount   Decimal   @default(0) @map("tax_amount") @db.Decimal(18, 2)
+  tdsAmount   Decimal   @default(0) @map("tds_amount") @db.Decimal(18, 2)
+  total       Decimal   @db.Decimal(18, 2)
+  paidTotal   Decimal   @default(0) @map("paid_total") @db.Decimal(18, 2)
+  voucherId   String?   @map("voucher_id") @db.Uuid
+  notes       String?
+  createdBy   String    @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  vendor SchoolAcctVendor           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  lines  SchoolAcctVendorBillLine[]
+
+  @@unique([tenantId, billNo])
+  @@index([tenantId, vendorId, status])
+  @@map("school_acct_vendor_bills")
+  @@schema("school")
+}
+
+model SchoolAcctVendorBillLine {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  billId      String  @map("bill_id") @db.Uuid
+  accountId   String  @map("account_id") @db.Uuid
+  description String
+  amount      Decimal @db.Decimal(18, 2)
+
+  bill SchoolAcctVendorBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@map("school_acct_vendor_bill_lines")
+  @@schema("school")
+}
+
+model SchoolAcctBankStatement {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  bankAccountId String   @map("bank_account_id") @db.Uuid
+  importedAt    DateTime @default(now()) @map("imported_at")
+  fileName      String?  @map("file_name")
+  createdBy     String   @map("created_by") @db.Uuid
+
+  bank  SchoolAcctBankAccount    @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  lines SchoolAcctBankStmtLine[]
+
+  @@index([tenantId, bankAccountId])
+  @@map("school_acct_bank_statements")
+  @@schema("school")
+}
+
+model SchoolAcctBankStmtLine {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  statementId  String    @map("statement_id") @db.Uuid
+  txnDate      DateTime  @map("txn_date") @db.Date
+  amount       Decimal   @db.Decimal(18, 2)
+  side         String
+  reference    String?
+  utr          String?
+  chequeNo     String?   @map("cheque_no")
+  narration    String?
+  status       String    @default("UNMATCHED")
+  voucherId    String?   @map("voucher_id") @db.Uuid
+
+  statement SchoolAcctBankStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, txnDate])
+  @@map("school_acct_bank_stmt_lines")
+  @@schema("school")
+}
+
+model SchoolAcctAsset {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  assetCode        String    @map("asset_code")
+  name             String
+  category         String
+  purchaseDate     DateTime  @map("purchase_date") @db.Date
+  purchaseValue    Decimal   @map("purchase_value") @db.Decimal(18, 2)
+  vendorId         String?   @map("vendor_id") @db.Uuid
+  invoiceNo        String?   @map("invoice_no")
+  location         String?
+  department       String?
+  usefulLifeMonths Int       @map("useful_life_months")
+  method           String    @default("SLM")
+  currentValue     Decimal   @map("current_value") @db.Decimal(18, 2)
+  disposedAt       DateTime? @map("disposed_at") @db.Date
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  depreciations SchoolAcctDepreciation[]
+
+  @@unique([tenantId, assetCode])
+  @@index([tenantId, category])
+  @@map("school_acct_assets")
+  @@schema("school")
+}
+
+model SchoolAcctDepreciation {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  assetId    String   @map("asset_id") @db.Uuid
+  periodCode String   @map("period_code")
+  amount     Decimal  @db.Decimal(18, 2)
+  voucherId  String?  @map("voucher_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  asset SchoolAcctAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, periodCode])
+  @@map("school_acct_depreciations")
+  @@schema("school")
+}
+
+model SchoolAcctTaxConfig {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  taxKind        String    @map("tax_kind")
+  name           String
+  lawRef         String?   @map("law_ref")
+  sectionRef     String?   @map("section_ref")
+  rateBps        Int       @map("rate_bps")
+  threshold      Decimal   @default(0) @db.Decimal(18, 2)
+  effectiveFrom  DateTime  @map("effective_from") @db.Date
+  effectiveTo    DateTime? @map("effective_to") @db.Date
+  appliesTo      String    @default("VENDOR") @map("applies_to")
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, taxKind, active])
+  @@map("school_acct_tax_configs")
+  @@schema("school")
+}
+
+model SchoolAcctTaxTxn {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  configId    String   @map("config_id") @db.Uuid
+  voucherId   String?  @map("voucher_id") @db.Uuid
+  vendorId    String?  @map("vendor_id") @db.Uuid
+  taxable     Decimal  @db.Decimal(18, 2)
+  taxAmount   Decimal  @map("tax_amount") @db.Decimal(18, 2)
+  challanRef  String?  @map("challan_ref")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_acct_tax_txns")
+  @@schema("school")
+}
+
+model SchoolAcctCashClose {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  closeDate     DateTime  @map("close_date") @db.Date
+  cashierUserId String    @map("cashier_user_id") @db.Uuid
+  expectedCash  Decimal   @map("expected_cash") @db.Decimal(18, 2)
+  actualCash    Decimal   @map("actual_cash") @db.Decimal(18, 2)
+  difference    Decimal   @db.Decimal(18, 2)
+  explanation   String?
+  status        String    @default("OPEN")
+  approvedBy    String?   @map("approved_by") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@unique([tenantId, closeDate, cashierUserId])
+  @@map("school_acct_cash_closes")
+  @@schema("school")
+}
+
+model SchoolAcctAudit {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  voucherId  String?  @map("voucher_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  action     String
+  ip         String?
+  beforeJson Json     @default("{}") @map("before_json")
+  afterJson  Json     @default("{}") @map("after_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, voucherId])
+  @@map("school_acct_audits")
+  @@schema("school")
+}
+
+model SchoolAcctAttachment {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  voucherId  String?  @map("voucher_id") @db.Uuid
+  fileName   String   @map("file_name")
+  mimeType   String   @map("mime_type")
+  storageKey String   @map("storage_key")
+  createdBy  String   @map("created_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  voucher SchoolAcctVoucher? @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, voucherId])
+  @@map("school_acct_attachments")
+  @@schema("school")
+}
+
+model SchoolLibSettings {
+  id                   String   @id @default(uuid()) @db.Uuid
+  tenantId             String   @unique @map("tenant_id") @db.Uuid
+  libraryName          String   @default("Library") @map("library_name")
+  libraryCode          String   @default("STL-LIB") @map("library_code")
+  email                String?
+  phone                String?
+  barcodePrefix        String   @default("STL-LIB-") @map("barcode_prefix")
+  accessionPrefix      String   @default("ACC") @map("accession_prefix")
+  qrEnabled            Boolean  @default(true) @map("qr_enabled")
+  graceDays            Int      @default(0) @map("grace_days")
+  maxFine              Decimal  @default(0) @map("max_fine") @db.Decimal(18, 2)
+  lostPenalty          Decimal  @default(0) @map("lost_penalty") @db.Decimal(18, 2)
+  damagePenalty        Decimal  @default(0) @map("damage_penalty") @db.Decimal(18, 2)
+  reservationHoldDays  Int      @default(2) @map("reservation_hold_days")
+  skipWeekends         Boolean  @default(false) @map("skip_weekends")
+  skipHolidays         Boolean  @default(false) @map("skip_holidays")
+  blockOnOverdue       Boolean  @default(true) @map("block_on_overdue")
+  blockOnUnpaidFine    Boolean  @default(true) @map("block_on_unpaid_fine")
+  requireClearance     Boolean  @default(true) @map("require_clearance")
+  notifyDue            Boolean  @default(true) @map("notify_due")
+  notifyOverdue        Boolean  @default(true) @map("notify_overdue")
+  notifyFine           Boolean  @default(true) @map("notify_fine")
+  notifyReservation    Boolean  @default(true) @map("notify_reservation")
+  extrasJson           Json     @default("{}") @map("extras_json")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("school_lib_settings")
+  @@schema("school")
+}
+
+model SchoolLibCirculationRule {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  memberKind   String  @map("member_kind")
+  gradePattern String? @map("grade_pattern")
+  maxBooks     Int     @map("max_books")
+  loanDays     Int     @map("loan_days")
+  maxRenewals  Int     @default(1) @map("max_renewals")
+  finePerDay   Decimal @map("fine_per_day") @db.Decimal(18, 2)
+  graceDays    Int     @default(0) @map("grace_days")
+  active       Boolean @default(true)
+
+  @@index([tenantId, memberKind, active])
+  @@map("school_lib_circulation_rules")
+  @@schema("school")
+}
+
+model SchoolLibCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  books     SchoolLibBook[]
+
+  @@unique([tenantId, name])
+  @@map("school_lib_categories")
+  @@schema("school")
+}
+
+model SchoolLibAuthor {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  name        String
+  biography   String?  @db.Text
+  nationality String?
+  books       SchoolLibBook[]
+
+  @@unique([tenantId, name])
+  @@map("school_lib_authors")
+  @@schema("school")
+}
+
+model SchoolLibPublisher {
+  id      String  @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  name    String
+  address String?
+  phone   String?
+  email   String?
+  gstin   String?
+  books   SchoolLibBook[]
+
+  @@unique([tenantId, name])
+  @@map("school_lib_publishers")
+  @@schema("school")
+}
+
+model SchoolLibSubject {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  name     String
+  books    SchoolLibBook[]
+
+  @@unique([tenantId, name])
+  @@map("school_lib_subjects")
+  @@schema("school")
+}
+
+model SchoolLibLocation {
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
+  building  String  @default("Library")
+  floor     String?
+  room      String?
+  section   String?
+  rack      String?
+  shelf     String?
+  label     String
+  copies    SchoolLibCopy[]
+
+  @@index([tenantId, label])
+  @@map("school_lib_locations")
+  @@schema("school")
+}
+
+model SchoolLibBook {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  title           String
+  subtitle        String?
+  isbn            String?
+  language        String    @default("English")
+  bookType        String    @default("General") @map("book_type")
+  edition         String?
+  publicationYear Int?      @map("publication_year")
+  pages           Int?
+  volume          String?
+  series          String?
+  description     String?   @db.Text
+  price           Decimal   @default(0) @db.Decimal(18, 2)
+  coverUrl        String?   @map("cover_url")
+  categoryId      String?   @map("category_id") @db.Uuid
+  authorId        String?   @map("author_id") @db.Uuid
+  coAuthor        String?   @map("co_author")
+  publisherId     String?   @map("publisher_id") @db.Uuid
+  subjectId       String?   @map("subject_id") @db.Uuid
+  keywords        String?
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  category   SchoolLibCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author     SchoolLibAuthor?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  publisher  SchoolLibPublisher? @relation(fields: [publisherId], references: [id], onDelete: SetNull)
+  subject    SchoolLibSubject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  copies     SchoolLibCopy[]
+  reservations SchoolLibReservation[]
+
+  @@index([tenantId, title])
+  @@index([tenantId, isbn])
+  @@map("school_lib_books")
+  @@schema("school")
+}
+
+model SchoolLibCopy {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  bookId          String    @map("book_id") @db.Uuid
+  copyCode        String    @map("copy_code")
+  accessionNo     String    @map("accession_no")
+  barcode         String
+  condition       String    @default("GOOD")
+  status          String    @default("AVAILABLE")
+  purchasePrice   Decimal   @default(0) @map("purchase_price") @db.Decimal(18, 2)
+  purchaseDate    DateTime? @map("purchase_date") @db.Date
+  vendorId        String?   @map("vendor_id") @db.Uuid
+  locationId      String?   @map("location_id") @db.Uuid
+  rowVersion      Int       @default(0) @map("row_version")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  book     SchoolLibBook      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  location SchoolLibLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  vendor   SchoolLibVendor?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  loans    SchoolLibLoan[]
+  lost     SchoolLibLost[]
+  damaged  SchoolLibDamaged[]
+
+  @@unique([tenantId, copyCode])
+  @@unique([tenantId, accessionNo])
+  @@unique([tenantId, barcode])
+  @@index([tenantId, status])
+  @@map("school_lib_copies")
+  @@schema("school")
+}
+
+model SchoolLibMember {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  libraryCode   String    @map("library_code")
+  memberKind    String    @map("member_kind")
+  studentId     String?   @map("student_id") @db.Uuid
+  staffId       String?   @map("staff_id") @db.Uuid
+  userId        String?   @map("user_id") @db.Uuid
+  status        String    @default("ACTIVE")
+  blockedReason String?   @map("blocked_reason")
+  validUntil    DateTime? @map("valid_until") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  student SchoolStudent? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  staff   SchoolStaff?   @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  loans   SchoolLibLoan[]
+  reservations SchoolLibReservation[]
+  fines   SchoolLibFine[]
+
+  @@unique([tenantId, libraryCode])
+  @@index([tenantId, studentId])
+  @@index([tenantId, staffId])
+  @@index([tenantId, status])
+  @@map("school_lib_members")
+  @@schema("school")
+}
+
+model SchoolLibLoan {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  memberId      String    @map("member_id") @db.Uuid
+  copyId        String    @map("copy_id") @db.Uuid
+  issuedAt      DateTime  @default(now()) @map("issued_at")
+  dueAt         DateTime  @map("due_at")
+  returnedAt    DateTime? @map("returned_at")
+  renewals      Int       @default(0)
+  status        String    @default("ISSUED")
+  issuedBy      String    @map("issued_by") @db.Uuid
+  returnedBy    String?   @map("returned_by") @db.Uuid
+  returnCondition String? @map("return_condition")
+  returnNotes   String?   @map("return_notes") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  member SchoolLibMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  copy   SchoolLibCopy   @relation(fields: [copyId], references: [id], onDelete: Restrict)
+  fines  SchoolLibFine[]
+
+  @@index([tenantId, status, dueAt])
+  @@index([tenantId, memberId, status])
+  @@index([tenantId, copyId, status])
+  @@map("school_lib_loans")
+  @@schema("school")
+}
+
+model SchoolLibReservation {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  bookId     String    @map("book_id") @db.Uuid
+  memberId   String    @map("member_id") @db.Uuid
+  status     String    @default("WAITING")
+  queueNo    Int       @map("queue_no")
+  holdUntil  DateTime? @map("hold_until")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  notifiedAt DateTime? @map("notified_at")
+
+  book   SchoolLibBook   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  member SchoolLibMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, bookId, status])
+  @@map("school_lib_reservations")
+  @@schema("school")
+}
+
+model SchoolLibFine {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  memberId    String    @map("member_id") @db.Uuid
+  loanId      String?   @map("loan_id") @db.Uuid
+  kind        String    @default("OVERDUE")
+  amount      Decimal   @db.Decimal(18, 2)
+  paidAmount  Decimal   @default(0) @map("paid_amount") @db.Decimal(18, 2)
+  status      String    @default("PENDING")
+  waivedReason String?  @map("waived_reason")
+  receiptNo   String?   @map("receipt_no")
+  voucherId   String?   @map("voucher_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  member   SchoolLibMember        @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  loan     SchoolLibLoan?         @relation(fields: [loanId], references: [id], onDelete: SetNull)
+  payments SchoolLibFinePayment[]
+
+  @@index([tenantId, status])
+  @@map("school_lib_fines")
+  @@schema("school")
+}
+
+model SchoolLibFinePayment {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  fineId      String   @map("fine_id") @db.Uuid
+  amount      Decimal  @db.Decimal(18, 2)
+  mode        String
+  collectedBy String   @map("collected_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  fine SchoolLibFine @relation(fields: [fineId], references: [id], onDelete: Cascade)
+
+  @@map("school_lib_fine_payments")
+  @@schema("school")
+}
+
+model SchoolLibLost {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  copyId        String   @map("copy_id") @db.Uuid
+  memberId      String?  @map("member_id") @db.Uuid
+  recovery      Decimal  @db.Decimal(18, 2)
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  copy SchoolLibCopy @relation(fields: [copyId], references: [id], onDelete: Cascade)
+
+  @@map("school_lib_lost")
+  @@schema("school")
+}
+
+model SchoolLibDamaged {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  copyId        String   @map("copy_id") @db.Uuid
+  memberId      String?  @map("member_id") @db.Uuid
+  damageType    String   @map("damage_type")
+  notes         String?
+  photoUrl      String?  @map("photo_url")
+  recovery      Decimal  @default(0) @db.Decimal(18, 2)
+  decision      String   @default("REPAIR")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  copy SchoolLibCopy @relation(fields: [copyId], references: [id], onDelete: Cascade)
+
+  @@map("school_lib_damaged")
+  @@schema("school")
+}
+
+model SchoolLibVendor {
+  id      String  @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  name    String
+  contact String?
+  phone   String?
+  email   String?
+  gstin   String?
+  address String?
+  copies  SchoolLibCopy[]
+  orders  SchoolLibPurchase[]
+
+  @@index([tenantId, name])
+  @@map("school_lib_vendors")
+  @@schema("school")
+}
+
+model SchoolLibPurchase {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  vendorId    String?  @map("vendor_id") @db.Uuid
+  kind        String   @default("REQUEST")
+  status      String   @default("DRAFT")
+  title       String
+  notes       String?
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  vendor SchoolLibVendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  items  SchoolLibPurchaseItem[]
+
+  @@index([tenantId, status])
+  @@map("school_lib_purchases")
+  @@schema("school")
+}
+
+model SchoolLibPurchaseItem {
+  id         String  @id @default(uuid()) @db.Uuid
+  tenantId   String  @map("tenant_id") @db.Uuid
+  purchaseId String  @map("purchase_id") @db.Uuid
+  title      String
+  qty        Int
+  unitPrice  Decimal @default(0) @map("unit_price") @db.Decimal(18, 2)
+
+  purchase SchoolLibPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@map("school_lib_purchase_items")
+  @@schema("school")
+}
+
+model SchoolLibStockCheck {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  status      String   @default("OPEN")
+  expected    Int      @default(0)
+  scanned     Int      @default(0)
+  missing     Int      @default(0)
+  extra       Int      @default(0)
+  damaged     Int      @default(0)
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  closedAt    DateTime? @map("closed_at")
+
+  items SchoolLibStockItem[]
+
+  @@index([tenantId, createdAt])
+  @@map("school_lib_stock_checks")
+  @@schema("school")
+}
+
+model SchoolLibStockItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
+  checkId   String  @map("check_id") @db.Uuid
+  barcode   String
+  copyId    String? @map("copy_id") @db.Uuid
+  result    String  @default("SCANNED")
+
+  check SchoolLibStockCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+
+  @@unique([checkId, barcode])
+  @@map("school_lib_stock_items")
+  @@schema("school")
+}
+
+model SchoolLibAudit {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  ip         String?
+  beforeJson Json     @default("{}") @map("before_json")
+  afterJson  Json     @default("{}") @map("after_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_lib_audits")
+  @@schema("school")
+}
+
+model SchoolSmsSettings {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @unique @map("tenant_id") @db.Uuid
+  defaultSenderId        String?  @map("default_sender_id")
+  enforceDlt             Boolean  @default(true) @map("enforce_dlt")
+  enforceDltOnService    Boolean  @default(false) @map("enforce_dlt_on_service")
+  failoverEnabled        Boolean  @default(false) @map("failover_enabled")
+  maxPerMinute           Int      @default(60) @map("max_per_minute")
+  maxCampaignSize        Int      @default(5000) @map("max_campaign_size")
+  retryAttempts          Int      @default(3) @map("retry_attempts")
+  otpExpiryMinutes       Int      @default(5) @map("otp_expiry_minutes")
+  otpMaxAttempts         Int      @default(5) @map("otp_max_attempts")
+  unitCost               Decimal  @default(1) @map("unit_cost") @db.Decimal(18, 4)
+  currency               String   @default("INR")
+  manualBalance          Int      @default(0) @map("manual_balance")
+  entityId               String?  @map("entity_id")
+  entityName             String?  @map("entity_name")
+  extrasJson             Json     @default("{}") @map("extras_json")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("school_sms_settings")
+  @@schema("school")
+}
+
+model SchoolSmsGateway {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  name             String
+  provider         String
+  apiUrl           String?   @map("api_url")
+  senderId         String?   @map("sender_id")
+  dltEntityId      String?   @map("dlt_entity_id")
+  dltHeader        String?   @map("dlt_header")
+  environment      String    @default("LIVE")
+  status           String    @default("INACTIVE")
+  isDefault        Boolean   @default(false) @map("is_default")
+  failoverRank     Int       @default(0) @map("failover_rank")
+  credentialsEnc   String?   @map("credentials_enc") @db.Text
+  lastError        String?   @map("last_error")
+  lastSuccessAt    DateTime? @map("last_success_at")
+  health           String    @default("UNKNOWN")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  messages         SchoolSmsMessage[]
+
+  @@index([tenantId, isDefault])
+  @@map("school_sms_gateways")
+  @@schema("school")
+}
+
+model SchoolSmsHeader {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  header      String
+  description String?
+  provider    String?
+  status      String   @default("DRAFT")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, header])
+  @@map("school_sms_headers")
+  @@schema("school")
+}
+
+model SchoolSmsDltTemplate {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  name          String
+  dltTemplateId String   @map("dlt_template_id")
+  category      String
+  templateText  String   @map("template_text") @db.Text
+  variablesJson Json     @default("[]") @map("variables_json")
+  status        String   @default("DRAFT")
+  approvedAt    DateTime? @map("approved_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@unique([tenantId, dltTemplateId])
+  @@map("school_sms_dlt_templates")
+  @@schema("school")
+}
+
+model SchoolSmsTemplate {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  name          String
+  key           String
+  category      String
+  smsKind       String   @default("SERVICE") @map("sms_kind")
+  dltTemplateId String?  @map("dlt_template_id")
+  headerId      String?  @map("header_id") @db.Uuid
+  body          String   @db.Text
+  variablesJson Json     @default("[]") @map("variables_json")
+  status        String   @default("ACTIVE")
+  createdBy     String?  @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, key])
+  @@index([tenantId, category])
+  @@map("school_sms_templates")
+  @@schema("school")
+}
+
+model SchoolSmsCampaign {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  name           String
+  category       String    @default("GENERAL")
+  smsKind        String    @default("SERVICE") @map("sms_kind")
+  audienceJson   Json      @default("{}") @map("audience_json")
+  templateId     String?   @map("template_id") @db.Uuid
+  gatewayId      String?   @map("gateway_id") @db.Uuid
+  body           String    @db.Text
+  status         String    @default("DRAFT")
+  scheduledAt    DateTime? @map("scheduled_at")
+  recurrence     String?
+  recipientCount Int       @default(0) @map("recipient_count")
+  sentCount      Int       @default(0) @map("sent_count")
+  deliveredCount Int       @default(0) @map("delivered_count")
+  failedCount    Int       @default(0) @map("failed_count")
+  createdBy      String    @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  messages       SchoolSmsMessage[]
+
+  @@index([tenantId, status, scheduledAt])
+  @@map("school_sms_campaigns")
+  @@schema("school")
+}
+
+model SchoolSmsMessage {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  campaignId         String?   @map("campaign_id") @db.Uuid
+  studentId          String?   @map("student_id") @db.Uuid
+  staffId            String?   @map("staff_id") @db.Uuid
+  recipientName      String?   @map("recipient_name")
+  recipientType      String    @map("recipient_type")
+  mobile             String
+  body               String    @db.Text
+  templateId         String?   @map("template_id") @db.Uuid
+  gatewayId          String?   @map("gateway_id") @db.Uuid
+  senderId           String?   @map("sender_id")
+  providerMessageId  String?   @map("provider_message_id")
+  status             String    @default("QUEUED")
+  errorCode          String?   @map("error_code")
+  errorMessage       String?   @map("error_message")
+  errorClass         String?   @map("error_class")
+  segments           Int       @default(1)
+  unitCost           Decimal   @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  totalCost          Decimal   @default(0) @map("total_cost") @db.Decimal(18, 4)
+  idempotencyKey     String?   @map("idempotency_key")
+  failoverUsed       Boolean   @default(false) @map("failover_used")
+  attempts           Int       @default(0)
+  queuedAt           DateTime  @default(now()) @map("queued_at")
+  submittedAt        DateTime? @map("submitted_at")
+  sentAt             DateTime? @map("sent_at")
+  deliveredAt        DateTime? @map("delivered_at")
+  failedAt           DateTime? @map("failed_at")
+  createdBy          String?   @map("created_by") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  campaign SchoolSmsCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  gateway  SchoolSmsGateway?  @relation(fields: [gatewayId], references: [id], onDelete: SetNull)
+  events   SchoolSmsMessageEvent[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, mobile])
+  @@index([tenantId, providerMessageId])
+  @@map("school_sms_messages")
+  @@schema("school")
+}
+
+model SchoolSmsMessageEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  status    String
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message SchoolSmsMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId, createdAt])
+  @@map("school_sms_message_events")
+  @@schema("school")
+}
+
+model SchoolSmsWebhookEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String?  @map("tenant_id") @db.Uuid
+  provider     String
+  providerEventId String? @map("provider_event_id")
+  payloadJson  Json     @map("payload_json")
+  processed    Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([provider, providerEventId])
+  @@index([tenantId, createdAt])
+  @@map("school_sms_webhook_events")
+  @@schema("school")
+}
+
+model SchoolSmsCreditTxn {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  kind      String
+  amount    Int
+  note      String?
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_sms_credit_txns")
+  @@schema("school")
+}
+
+model SchoolSmsConsent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  studentId  String?  @map("student_id") @db.Uuid
+  staffId    String?  @map("staff_id") @db.Uuid
+  mobile     String?
+  smsEnabled Boolean  @default(true) @map("sms_enabled")
+  feeSms     Boolean  @default(true) @map("fee_sms")
+  attendanceSms Boolean @default(true) @map("attendance_sms")
+  examSms    Boolean  @default(true) @map("exam_sms")
+  transportSms Boolean @default(true) @map("transport_sms")
+  generalSms Boolean  @default(true) @map("general_sms")
+  promotionalSms Boolean @default(false) @map("promotional_sms")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, studentId])
+  @@map("school_sms_consents")
+  @@schema("school")
+}
+
+model SchoolSmsOtp {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  purpose    String
+  mobile     String
+  codeHash   String    @map("code_hash")
+  expiresAt  DateTime  @map("expires_at")
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, mobile, purpose])
+  @@map("school_sms_otps")
+  @@schema("school")
+}
+
+model SchoolSmsAudit {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  action     String
+  ip         String?
+  detailJson Json     @default("{}") @map("detail_json")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("school_sms_audits")
   @@schema("school")
 }
 

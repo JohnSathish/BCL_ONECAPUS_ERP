@@ -12,6 +12,7 @@ import { SchoolSisCalendarService } from './school-sis-calendar.service';
 import { SchoolSisEventBus } from './school-sis-event-bus.service';
 import { SchoolReportBrandingService } from './report-engine/report-branding.service';
 import { SchoolReportPdfService } from './report-engine/report-pdf.service';
+import { SchoolSisAccountsPostingService } from './school-sis-accounts.posting.service';
 import {
   evaluateFormulaPaise,
   formatInrPaise,
@@ -206,6 +207,7 @@ export class SchoolSisHrService {
     private readonly events: SchoolSisEventBus,
     private readonly branding: SchoolReportBrandingService,
     private readonly pdf: SchoolReportPdfService,
+    private readonly accounts: SchoolSisAccountsPostingService,
   ) {}
 
   async ensureSetup(tenantId: string) {
@@ -1609,6 +1611,15 @@ export class SchoolSisHrService {
       entityId: id,
       after: { reason },
     });
+    if (to === 'PROCESSED') {
+      const full = await this.payrollRun(tenantId, id, actor);
+      const gross = full.lines.reduce((s, l) => s + l.grossPaise, 0);
+      await this.accounts.postPayrollAccrual(tenantId, {
+        runId: id,
+        grossPaise: gross,
+        actorUserId: actor.userId,
+      });
+    }
     return this.payrollRun(tenantId, id, actor);
   }
 
@@ -1624,6 +1635,16 @@ export class SchoolSisHrService {
         paidAt: new Date(),
         paidBy: actor.userId,
       },
+    });
+    const paid = await this.prisma.schoolHrPayrollLine.findMany({
+      where: { tenantId, id: { in: dto.lineIds } },
+    });
+    const net = paid.reduce((s, l) => s + l.netPaise, 0);
+    await this.accounts.postPayrollPayment(tenantId, {
+      runId: paid[0]?.runId ?? dto.lineIds[0],
+      netPaise: net,
+      mode: (dto.paymentMode || 'BANK').toUpperCase(),
+      actorUserId: actor.userId,
     });
     await this.audit(tenantId, actor, 'PAID', {
       entity: 'salary_payment',

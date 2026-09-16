@@ -1,4 +1,4 @@
-import { api } from '@/lib/http/client';
+import { api } from './api';
 
 export type SchoolLicenseSnapshot = {
   tone: string;

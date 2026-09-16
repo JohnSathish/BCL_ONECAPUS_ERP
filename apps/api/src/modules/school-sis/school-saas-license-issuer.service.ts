@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { allSchoolLicenseModuleIds } from './school-sis-license.catalog';
 import {
@@ -291,7 +292,7 @@ export class SchoolSaasLicenseIssuerService {
         tenantId: tenantId ?? undefined,
         actorId,
         event,
-        metaJson: meta,
+        metaJson: meta as Prisma.InputJsonValue,
       },
     });
   }

@@ -816,7 +816,87 @@ export class SchoolSisReportsQueryService {
       key.startsWith('lib_') ||
       key === 'mis_library'
     ) {
-      return this.empty(report, filters, page, limit);
+      const copies = await this.prisma.schoolLibCopy.findMany({
+        where: { tenantId },
+        include: { book: true },
+        take: 2000,
+      });
+      const loans = await this.prisma.schoolLibLoan.findMany({
+        where: { tenantId },
+        include: {
+          copy: { include: { book: true } },
+          member: { include: { student: true, staff: true } },
+        },
+        take: 2000,
+      });
+      const fines = await this.prisma.schoolLibFine.findMany({
+        where: { tenantId },
+        take: 2000,
+      });
+      let rows: Row[] = [];
+      if (key === 'lib_inventory' || key === 'lib_available') {
+        rows = copies
+          .filter((c) => key !== 'lib_available' || c.status === 'AVAILABLE')
+          .map((c) => ({
+            barcode: c.barcode,
+            title: c.book.title,
+            status: c.status,
+          }));
+      } else if (key === 'lib_issued' || key === 'lib_overdue') {
+        rows = loans
+          .filter((l) =>
+            key === 'lib_overdue'
+              ? l.status === 'ISSUED' && l.dueAt < new Date()
+              : l.status === 'ISSUED',
+          )
+          .map((l) => ({
+            member:
+              l.member.student?.fullName ?? l.member.staff?.fullName ?? '',
+            title: l.copy.book.title,
+            dueAt: l.dueAt.toISOString().slice(0, 10),
+            status: l.status,
+          }));
+      } else if (key === 'lib_fine') {
+        rows = fines.map((f) => ({
+          amount: Number(f.amount),
+          status: f.status,
+          kind: f.kind,
+        }));
+      } else if (key === 'lib_lost' || key === 'lib_damaged') {
+        rows = copies
+          .filter((c) => c.status === (key === 'lib_lost' ? 'LOST' : 'DAMAGED'))
+          .map((c) => ({ barcode: c.barcode, title: c.book.title }));
+      } else {
+        rows = loans.map((l) => ({
+          member: l.member.student?.fullName ?? l.member.staff?.fullName ?? '',
+          title: l.copy.book.title,
+          status: l.status,
+        }));
+      }
+      return {
+        report,
+        columns:
+          rows[0] && 'barcode' in rows[0]
+            ? [
+                { key: 'barcode', label: 'Barcode' },
+                { key: 'title', label: 'Title' },
+                { key: 'status', label: 'Status' },
+              ]
+            : [
+                { key: 'member', label: 'Member' },
+                { key: 'title', label: 'Book' },
+                { key: 'status', label: 'Status' },
+              ],
+        rows,
+        kpis: [],
+        charts: [],
+        empty: rows.length === 0,
+        emptyHint: rows.length === 0 ? 'No library rows yet.' : undefined,
+        total: rows.length,
+        page,
+        limit,
+        filtersApplied: filters,
+      };
     }
     if (
       key.startsWith('staff_attendance') ||
@@ -845,7 +925,35 @@ export class SchoolSisReportsQueryService {
         filtersApplied: filters,
       };
     }
-    if (key === 'sms_sent') return this.empty(report, filters, page, limit);
+    if (key === 'sms_sent') {
+      const rows = await this.prisma.schoolSmsMessage.findMany({
+        where: { tenantId },
+        take: 2000,
+        orderBy: { createdAt: 'desc' },
+      });
+      return {
+        report,
+        columns: [
+          { key: 'createdAt', label: 'Date' },
+          { key: 'status', label: 'Status' },
+          { key: 'recipientType', label: 'Type' },
+        ],
+        rows: rows.map((r) => ({
+          createdAt: r.createdAt.toISOString().slice(0, 16),
+          status: r.status,
+          recipientType: r.recipientType,
+        })),
+        kpis: [],
+        charts: [],
+        empty: rows.length === 0,
+        emptyHint:
+          rows.length === 0 ? this.emptyMessage(report, filters) : undefined,
+        total: rows.length,
+        page,
+        limit,
+        filtersApplied: filters,
+      };
+    }
 
     const ctx = {
       tenantId,

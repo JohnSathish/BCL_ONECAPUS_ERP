@@ -8,6 +8,7 @@ import ExcelJS from 'exceljs';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
+import { SchoolSisAccountsPostingService } from './school-sis-accounts.posting.service';
 import {
   STATIONERY_CATEGORY_SEED,
   STATIONERY_STARTER_PRICES,
@@ -73,6 +74,7 @@ export class SchoolSisStationeryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sis: SchoolSisService,
+    private readonly accounts: SchoolSisAccountsPostingService,
   ) {}
 
   private async year(tenantId: string) {
@@ -1149,6 +1151,16 @@ export class SchoolSisStationeryService {
       }
       return created;
     });
+
+    if (!dto.draft && amountPaid > 0) {
+      await this.accounts.postStationerySale(tenantId, {
+        saleId: sale.id,
+        invoiceNo,
+        amount: amountPaid,
+        mode: (payments[0]?.method || 'CASH').toUpperCase(),
+        actorUserId: actor.userId,
+      });
+    }
 
     await this.audit(
       tenantId,

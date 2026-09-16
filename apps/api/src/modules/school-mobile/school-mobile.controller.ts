@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -30,6 +31,7 @@ import { SchoolSisExamsService } from '../school-sis/school-sis-exams.service';
 import { SchoolSisHrService } from '../school-sis/school-sis-hr.service';
 import { SchoolSisTransportService } from '../school-sis/school-sis-transport.service';
 import { SchoolSisAccessService } from '../school-sis/school-sis-access.service';
+import { SchoolSisLibraryService } from '../school-sis/school-sis-library.service';
 import { SchoolSisCalendarService } from '../school-sis/school-sis-calendar.service';
 import { SchoolSisPaymentGatewaysService } from '../school-sis/school-sis-payment-gateways.service';
 import { SubmitAttendanceDto } from '../school-sis/dto/school-attendance.dto';
@@ -94,6 +96,7 @@ export class SchoolMobileController {
     private readonly sisAccess: SchoolSisAccessService,
     private readonly calendar: SchoolSisCalendarService,
     private readonly gateways: SchoolSisPaymentGatewaysService,
+    private readonly library: SchoolSisLibraryService,
   ) {}
 
   private async tenantFromHost(
@@ -690,5 +693,43 @@ export class SchoolMobileController {
     @Body() dto: SchoolMobileBroadcastDto,
   ) {
     return this.inbox.broadcast(user, dto);
+  }
+
+  @Get('library/me')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  myLibrary(
+    @CurrentUser() user: JwtUser,
+    @Query('studentId') studentId?: string,
+  ) {
+    return this.library.mine(user.tid, user.sub, studentId);
+  }
+
+  @Get('library/search')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  searchLibrary(@CurrentUser() user: JwtUser, @Query('q') q?: string) {
+    return this.library.books(user.tid, { search: q });
+  }
+
+  @Post('library/reserve')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  async reserveBook(
+    @CurrentUser() user: JwtUser,
+    @Body() body: { bookId: string; memberId?: string },
+  ) {
+    const me = await this.library.mine(user.tid, user.sub);
+    const memberId = body.memberId || me?.id;
+    if (!memberId)
+      throw new BadRequestException('Library membership not found');
+    return this.library.reserve(user.tid, body.bookId, memberId);
+  }
+
+  @Post('library/renew/:id')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  renewMine(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.library.renew(user.tid, id, user.sub);
   }
 }

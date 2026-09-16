@@ -10,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
 import { SchoolSisEventBus } from './school-sis-event-bus.service';
+import { SchoolSisAccountsPostingService } from './school-sis-accounts.posting.service';
 import type {
   CollectSchoolFeeDto,
   SaveSchoolFeeSettingsDto,
@@ -99,6 +100,7 @@ export class SchoolSisMonthlyFeesService {
     private readonly prisma: PrismaService,
     private readonly sis: SchoolSisService,
     private readonly events: SchoolSisEventBus,
+    private readonly accounts: SchoolSisAccountsPostingService,
   ) {}
 
   async ensureSetup(tenantId: string) {
@@ -1002,6 +1004,20 @@ export class SchoolSisMonthlyFeesService {
             },
           });
         }
+        await this.accounts.postFeeCollection(
+          tenantId,
+          {
+            paymentId: payment.id,
+            receiptNumber,
+            amount: amountPaying,
+            discount,
+            lateFee: lateFeeAmount,
+            mode: (dto.paymentMode || 'CASH').toUpperCase(),
+            studentId: dto.studentId,
+            actorUserId,
+          },
+          tx,
+        );
         return {
           payment: {
             id: payment.id,
@@ -1106,6 +1122,15 @@ export class SchoolSisMonthlyFeesService {
           afterJson: { status: 'VOIDED' },
         },
       });
+      if (actorUserId) {
+        await this.accounts.reverseFromSource(
+          tenantId,
+          'fees',
+          id,
+          actorUserId,
+          tx,
+        );
+      }
       return next;
     });
     return updated;

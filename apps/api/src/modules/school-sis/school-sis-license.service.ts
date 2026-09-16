@@ -9,6 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SCHOOL_SIS_PRODUCT } from './school-sis.constants';
 import {
@@ -689,7 +690,7 @@ export class SchoolSisLicenseService {
         event,
         ip: meta?.ip,
         userAgent: meta?.userAgent,
-        metaJson: extra,
+        metaJson: extra as Prisma.InputJsonValue,
       },
     });
   }

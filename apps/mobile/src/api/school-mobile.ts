@@ -124,6 +124,27 @@ export async function fetchSchoolParentTransport(childId?: string | null) {
   return apiFetch<unknown[]>(`/v1/school-mobile/transport/parent${q(childId)}`);
 }
 
+export async function fetchSchoolLibrary(childId?: string | null) {
+  return apiFetch<Record<string, unknown>>(
+    `/v1/school-mobile/library/me${childId ? `?studentId=${encodeURIComponent(childId)}` : ''}`,
+  );
+}
+
+export async function searchSchoolLibrary(q: string) {
+  return apiFetch<unknown[]>(`/v1/school-mobile/library/search?q=${encodeURIComponent(q)}`);
+}
+
+export async function reserveSchoolLibrary(bookId: string) {
+  return apiFetch('/v1/school-mobile/library/reserve', {
+    method: 'POST',
+    body: JSON.stringify({ bookId }),
+  });
+}
+
+export async function renewSchoolLibrary(loanId: string) {
+  return apiFetch(`/v1/school-mobile/library/renew/${loanId}`, { method: 'POST' });
+}
+
 export async function fetchSchoolBootstrap() {
   return apiFetch<Record<string, unknown>>('/v1/school-mobile/bootstrap', { skipAuth: true });
 }

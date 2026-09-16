@@ -19,6 +19,7 @@ import { getPreset, resolvePresetId } from './default-themes';
 import { ThemeContext, type ThemeContextValue } from './theme-context';
 import { useThemeStore } from './theme-store';
 import { useInstitutionBranding } from '@/hooks/use-institution-branding';
+import { isAuthColdPath } from '@/lib/auth/auth-cold-path';
 import { shouldSkipCollegeWorkspaceApis } from '@/lib/school-admissions-branding';
 import {
   applyThemePreset,
@@ -145,7 +146,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     queryKey: ['theme-settings', tenantId],
     queryFn: fetchThemeSettings,
     enabled:
-      Boolean(session?.accessToken) && !shouldSkipCollegeWorkspaceApis(pathname, session?.user),
+      Boolean(session?.accessToken) &&
+      !isAuthColdPath(pathname) &&
+      !shouldSkipCollegeWorkspaceApis(pathname, session?.user),
     staleTime: 5 * 60_000,
   });
 
@@ -153,7 +156,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     queryKey: ['user-preferences', session?.user.id],
     queryFn: fetchUserPreferences,
     enabled:
-      Boolean(session?.accessToken) && !shouldSkipCollegeWorkspaceApis(pathname, session?.user),
+      Boolean(session?.accessToken) &&
+      !isAuthColdPath(pathname) &&
+      !shouldSkipCollegeWorkspaceApis(pathname, session?.user),
     staleTime: 5 * 60_000,
   });
 

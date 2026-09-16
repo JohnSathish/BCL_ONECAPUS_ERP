@@ -14,6 +14,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
 import { SchoolSisPushService } from './school-sis-push.service';
 import { SchoolSisWhatsappService } from './school-sis-whatsapp.service';
+import { SchoolSisSmsService } from './school-sis-sms.service';
 import type { SchoolErpEvent } from './school-sis-event-bus.service';
 import {
   AUTO_ACTIONS,
@@ -54,6 +55,7 @@ export class SchoolSisAutomationService implements OnModuleInit {
     private readonly sis: SchoolSisService,
     private readonly push: SchoolSisPushService,
     private readonly wa: SchoolSisWhatsappService,
+    private readonly sms: SchoolSisSmsService,
     @InjectQueue('school-automation') private readonly queue: Queue,
   ) {}
 
@@ -781,7 +783,16 @@ export class SchoolSisAutomationService implements OnModuleInit {
           },
         );
       } else if (type === 'SEND_SMS') {
-        throw new Error('SMS is not configured');
+        const phone = String(ctx.mobile_number || '');
+        await this.sms.sendTemplate(tenantId, {
+          templateKey: String(node.data.templateKey || 'EMERGENCY'),
+          studentId: ctx.studentId ? String(ctx.studentId) : undefined,
+          mobile: phone || undefined,
+          variables: Object.fromEntries(
+            Object.entries(ctx).map(([k, v]) => [k, String(v ?? '')]),
+          ),
+          idempotencyKey: `auto:${executionId}:${node.id}:${ctx.studentId || phone || 'na'}`,
+        });
       } else if (type === 'SEND_EMAIL') {
         throw new Error('Email is not configured');
       } else if (type === 'CALL_WEBHOOK' || node.type === 'WEBHOOK') {
