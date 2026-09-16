@@ -34,8 +34,6 @@ import {
 } from '@/services/school-sis';
 import { MonthlyFeeSubnav } from './monthly-fee-ui';
 import { formatInr } from '@/components/school-sis/school-sis-fee-structure-card';
-import { downloadSchoolReport, kindToSchoolReportExport } from '@/services/school-reports';
-import { ReportExportButtons } from '../reports/export-buttons';
 
 const HEAD_HINT: Record<string, string> = {
   ADM: 'One time admission fee',
@@ -91,6 +89,19 @@ function compactClassRange(names: string[]) {
   return `${names[0]} – ${names[names.length - 1]}`;
 }
 
+function downloadCsv(filename: string, rows: string[][]) {
+  const csv = rows
+    .map((r) => r.map((c) => `"${String(c).replaceAll('"', '""')}"`).join(','))
+    .join('\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
 export function SchoolSisFeeStructureDesk() {
   const enabled = useAuthQueryEnabled();
   const canManage = canManageSchoolSis(useAuthStore((s) => s.session?.user)?.permissions);
@@ -135,12 +146,23 @@ export function SchoolSisFeeStructureDesk() {
     },
   ];
 
-  async function exportEngine(kind: 'pdf-portrait' | 'pdf-landscape' | 'xlsx' | 'print') {
-    await downloadSchoolReport({
-      key: 'fee_structure',
-      ...kindToSchoolReportExport(kind),
-      filters: selected?.grade?.id ? { gradeId: selected.grade.id } : {},
-    });
+  function exportExcel() {
+    if (!selected) return;
+    const rows: string[][] = [
+      ["St. Luke's Hr. Secondary School, Walbakgre"],
+      [selected.name],
+      [`Academic Year ${selected.academicYear.name}`],
+      [],
+      ['#', 'Fee head', 'Description', 'Amount'],
+      ...selected.lines.map((l, i) => [
+        String(i + 1),
+        l.label,
+        hintFor(l),
+        l.unspecified ? 'Not specified' : String(l.amount ?? 0),
+      ]),
+      ['', 'Total', '', String(selected.totals.printedGrandTotal)],
+    ];
+    downloadCsv(`fee-structure-${selected.grade.code}-${selected.code}.csv`, rows);
   }
 
   return (
@@ -160,7 +182,25 @@ export function SchoolSisFeeStructureDesk() {
             </p>
           </div>
         </div>
-        <ReportExportButtons onExport={exportEngine} />
+        <div className="flex flex-wrap gap-2 print:hidden">
+          <button
+            type="button"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+            onClick={() => window.print()}
+          >
+            <Printer className="h-4 w-4" />
+            Print / PDF
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-emerald-50 px-4 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100 hover:bg-emerald-100"
+            onClick={exportExcel}
+            disabled={!selected}
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Export Excel
+          </button>
+        </div>
       </div>
 
       {query.isLoading ? <p className="text-sm text-slate-500">Loading fee structure…</p> : null}
@@ -246,7 +286,7 @@ export function SchoolSisFeeStructureDesk() {
           canManage={canManage}
           schoolName={config.data?.settings.schoolName}
           logoUrl={config.data?.settings.logoUrl}
-          onExport={() => void exportEngine('xlsx')}
+          onExport={exportExcel}
         />
       ) : null}
 

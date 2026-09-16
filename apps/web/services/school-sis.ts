@@ -2226,3 +2226,124 @@ export async function fetchSchoolCalendarReports(kind?: string, academicYearId?:
   });
   return data;
 }
+
+export async function fetchSchoolAttendanceDashboard(params?: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/attendance/dashboard', { params });
+  return data;
+}
+
+export async function fetchSchoolAttendanceSettings(academicYearId?: string) {
+  const { data } = await api.get('/v1/school-sis/attendance/settings', {
+    params: { academicYearId },
+  });
+  return data;
+}
+
+export async function saveSchoolAttendanceSettings(
+  payload: Record<string, unknown>,
+  academicYearId?: string,
+) {
+  const { data } = await api.patch('/v1/school-sis/attendance/settings', payload, {
+    params: { academicYearId },
+  });
+  return data;
+}
+
+export async function fetchSchoolAttendanceRoster(params: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/attendance/roster', { params });
+  return data;
+}
+
+export async function saveSchoolAttendanceDraft(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/attendance/draft', payload);
+  return data;
+}
+
+export async function submitSchoolAttendance(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/attendance/submit', payload);
+  return data;
+}
+
+export async function fetchSchoolAttendanceAbsentees(params?: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/attendance/absentees', { params });
+  return data;
+}
+
+export async function fetchSchoolAttendanceLow(params?: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/attendance/low', { params });
+  return data;
+}
+
+export async function fetchSchoolAttendanceMonthly(params: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/attendance/monthly', { params });
+  return data;
+}
+
+export async function fetchSchoolAttendanceLeave(params?: Record<string, string | undefined>) {
+  const { data } = await api.get('/v1/school-sis/attendance/leave', { params });
+  return data;
+}
+
+export async function createSchoolAttendanceLeave(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/attendance/leave', payload);
+  return data;
+}
+
+export async function reviewSchoolAttendanceLeave(id: string, approve: boolean, note?: string) {
+  const { data } = await api.post(
+    `/v1/school-sis/attendance/leave/${id}/${approve ? 'approve' : 'reject'}`,
+    { note },
+  );
+  return data;
+}
+
+export async function fetchSchoolAttendanceCorrections(status?: string) {
+  const { data } = await api.get('/v1/school-sis/attendance/corrections', { params: { status } });
+  return data;
+}
+
+export async function createSchoolAttendanceCorrection(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/attendance/corrections', payload);
+  return data;
+}
+
+export async function reviewSchoolAttendanceCorrection(
+  id: string,
+  approve: boolean,
+  note?: string,
+) {
+  const { data } = await api.post(
+    `/v1/school-sis/attendance/corrections/${id}/${approve ? 'approve' : 'reject'}`,
+    { note },
+  );
+  return data;
+}
+
+export async function fetchSchoolTeacherAttendanceToday(date?: string) {
+  const { data } = await api.get('/v1/school-sis/attendance/teacher/today', { params: { date } });
+  return data;
+}
+
+export async function searchSchoolAttendanceStudents(q: string, academicYearId?: string) {
+  const { data } = await api.get('/v1/school-sis/attendance/search', {
+    params: { q, academicYearId },
+  });
+  return data;
+}
+
+export async function notifySchoolAttendance(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/attendance/notify', payload);
+  return data;
+}
+
+export async function syncSchoolAttendance(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/attendance/sync', payload);
+  return data;
+}
+
+export async function fetchSchoolStudentAttendance(studentId: string, academicYearId?: string) {
+  const { data } = await api.get(`/v1/school-sis/attendance/students/${studentId}`, {
+    params: { academicYearId },
+  });
+  return data;
+}

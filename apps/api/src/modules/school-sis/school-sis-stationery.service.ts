@@ -116,7 +116,44 @@ export class SchoolSisStationeryService {
       `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "opening_stock" DECIMAL(14,3) NOT NULL DEFAULT 0`,
       `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "min_stock" DECIMAL(14,3) NOT NULL DEFAULT 0`,
       `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "qty_on_hand" DECIMAL(14,3) NOT NULL DEFAULT 0`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "purchase_price" INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "selling_price" INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "tax_applicable" BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "tax_percent" DECIMAL(6,2) NOT NULL DEFAULT 0`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "discount_allowed" BOOLEAN NOT NULL DEFAULT true`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "brand" TEXT`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "description" TEXT`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "barcode" TEXT`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "image_url" TEXT`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "remarks" TEXT`,
+      `ALTER TABLE "school"."school_stationery_products" ADD COLUMN IF NOT EXISTS "deleted_at" TIMESTAMP(3)`,
+      `CREATE TABLE IF NOT EXISTS "school"."school_stationery_product_variants" (
+        "id" UUID NOT NULL,
+        "tenant_id" UUID NOT NULL,
+        "product_id" UUID NOT NULL,
+        "sku" TEXT NOT NULL,
+        "barcode" TEXT,
+        "label" TEXT NOT NULL,
+        "size" TEXT,
+        "gender" TEXT,
+        "colour" TEXT,
+        "house" TEXT,
+        "academic_year" TEXT,
+        "purchase_price" INTEGER,
+        "selling_price" INTEGER,
+        "qty_on_hand" DECIMAL(14,3) NOT NULL DEFAULT 0,
+        "min_stock" DECIMAL(14,3) NOT NULL DEFAULT 0,
+        "active" BOOLEAN NOT NULL DEFAULT true,
+        "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "deleted_at" TIMESTAMP(3),
+        CONSTRAINT "school_stationery_product_variants_pkey" PRIMARY KEY ("id")
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "school_stationery_product_variants_tenant_id_sku_key" ON "school"."school_stationery_product_variants"("tenant_id", "sku")`,
+      `CREATE INDEX IF NOT EXISTS "school_stationery_product_variants_tenant_id_product_id_idx" ON "school"."school_stationery_product_variants"("tenant_id", "product_id")`,
       `ALTER TABLE "school"."school_stationery_product_variants" ADD COLUMN IF NOT EXISTS "deleted_at" TIMESTAMP(3)`,
+      `ALTER TABLE "school"."school_stationery_product_variants" ADD COLUMN IF NOT EXISTS "purchase_price" INTEGER`,
+      `ALTER TABLE "school"."school_stationery_product_variants" ADD COLUMN IF NOT EXISTS "selling_price" INTEGER`,
     ];
     for (const sql of statements) {
       try {
@@ -126,6 +163,35 @@ export class SchoolSisStationeryService {
       }
     }
     this.schemaPatched = true;
+  }
+
+  private async productsForSale(tenantId: string, productIds: string[]) {
+    type WithVariants = Prisma.SchoolStationeryProductGetPayload<{
+      include: { variants: true };
+    }>;
+    const load = (withVariants: boolean) =>
+      this.prisma.schoolStationeryProduct.findMany({
+        where: { tenantId, id: { in: productIds }, deletedAt: null },
+        include: withVariants ? { variants: true } : undefined,
+      });
+    try {
+      return (await load(true)) as WithVariants[];
+    } catch (err) {
+      if (
+        !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+        (err.code !== 'P2022' && err.code !== 'P2021')
+      ) {
+        throw err;
+      }
+      this.schemaPatched = false;
+      await this.patchMissingColumns();
+      try {
+        return (await load(true)) as WithVariants[];
+      } catch {
+        const rows = await load(false);
+        return rows.map((p) => ({ ...p, variants: [] })) as WithVariants[];
+      }
+    }
   }
 
   async ensureSetup(tenantId: string) {
@@ -847,6 +913,7 @@ export class SchoolSisStationeryService {
     dto: CompleteStationerySaleDto,
     actor: StationeryActor,
   ) {
+    await this.ensureSetup(tenantId);
     const settings = await this.getSettings(tenantId);
     if (!settings.enabled)
       throw new BadRequestException('Stationery module is disabled');
@@ -869,13 +936,11 @@ export class SchoolSisStationeryService {
       });
       if (existing) return this.getSale(tenantId, existing.id);
     }
+    await this.ensureSetup(tenantId);
     const year = await this.year(tenantId);
     const cap = this.maxDiscountPct(settings, actor);
     const productIds = [...new Set(dto.items.map((i) => i.productId))];
-    const products = await this.prisma.schoolStationeryProduct.findMany({
-      where: { tenantId, id: { in: productIds }, deletedAt: null },
-      include: { variants: true },
-    });
+    const products = await this.productsForSale(tenantId, productIds);
     const byId = new Map(products.map((p) => [p.id, p]));
 
     const computed = dto.items.map((line) => {

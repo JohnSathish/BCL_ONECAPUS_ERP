@@ -81,6 +81,19 @@ export class SchoolSisAccessService {
         select: { sectionId: true },
       });
       fromScope.push(...assigned.map((a) => a.sectionId));
+      const subjects =
+        await this.prisma.schoolSubjectTeacherAssignment.findMany({
+          where: { tenantId, staffId: staff.staffId, deletedAt: null },
+          select: { sectionId: true },
+        });
+      fromScope.push(...subjects.map((a) => a.sectionId));
+      const since = new Date();
+      since.setUTCDate(since.getUTCDate() - 1);
+      const subs = await this.prisma.schoolAttendanceSubstitute.findMany({
+        where: { tenantId, staffId: staff.staffId, date: { gte: since } },
+        select: { sectionId: true },
+      });
+      fromScope.push(...subs.map((a) => a.sectionId));
     }
     return [...new Set(fromScope)];
   }
@@ -98,5 +111,42 @@ export class SchoolSisAccessService {
         'This record is outside your assigned classes',
       );
     }
+  }
+
+  async assertStudentAttendanceAccess(
+    tenantId: string,
+    user: JwtUser,
+    studentId: string,
+  ) {
+    if (this.has(user, SCHOOL_SIS_PERMISSION_MANAGE) || this.isSuper(user))
+      return;
+    const perms = user.permissions ?? [];
+    if (
+      perms.includes('school-mobile:parent') ||
+      perms.includes('school-mobile:student')
+    ) {
+      const account = await this.prisma.schoolPersonAccount.findFirst({
+        where: {
+          tenantId,
+          userId: user.sub,
+          personType: { in: ['GUARDIAN', 'STUDENT'] },
+        },
+      });
+      if (account?.personType === 'STUDENT' && account.studentId === studentId)
+        return;
+      if (account?.guardianId) {
+        const link = await this.prisma.schoolStudentGuardian.findFirst({
+          where: { guardianId: account.guardianId, studentId },
+        });
+        if (link) return;
+      }
+      throw new ForbiddenException('You can only view your own attendance');
+    }
+    const enroll = await this.prisma.schoolEnrollment.findFirst({
+      where: { tenantId, studentId, status: 'ACTIVE', deletedAt: null },
+      select: { sectionId: true },
+    });
+    if (!enroll) throw new ForbiddenException('Student is not enrolled');
+    await this.assertSectionAccess(tenantId, user, enroll.sectionId);
   }
 }

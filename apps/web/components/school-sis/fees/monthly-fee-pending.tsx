@@ -25,6 +25,8 @@ import { canManageSchoolSis } from '@/lib/school-sis/permissions';
 import { studentInitials } from '@/lib/school-sis/student-profile';
 import { cn } from '@/utils/cn';
 import { fetchMonthlyFeePending } from '@/services/school-sis';
+import { downloadSchoolReport, kindToSchoolReportExport } from '@/services/school-reports';
+import { ReportExportButtons } from '../reports/export-buttons';
 import { CollectFeeDialog, type CollectFeeStudent } from './collect-fee-dialog';
 import { MonthlyFeeSubnav, currentFeeMonth, rs } from './monthly-fee-ui';
 
@@ -302,14 +304,24 @@ export function MonthlyFeePending() {
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-            onClick={exportCsv}
-          >
-            <Download className="h-4 w-4" />
-            Export
-          </button>
+          <ReportExportButtons
+            onExport={async (kind) => {
+              setError(null);
+              const mapped = kindToSchoolReportExport(kind);
+              await downloadSchoolReport({
+                key: 'fee_pending',
+                format: mapped.format,
+                orientation: mapped.orientation || 'landscape',
+                filters: {
+                  month,
+                  gradeId: gradeId === 'all' ? '' : gradeId,
+                  sectionId: sectionId === 'all' ? '' : sectionId,
+                  status: status === 'all' ? '' : status.toUpperCase(),
+                },
+                summaryOnly: mapped.summaryOnly,
+              });
+            }}
+          />
         </div>
       </div>
 

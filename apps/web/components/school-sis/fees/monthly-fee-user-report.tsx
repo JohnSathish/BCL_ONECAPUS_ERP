@@ -9,10 +9,8 @@ import {
   CreditCard,
   Eye,
   FileBarChart2,
-  FileSpreadsheet,
   IndianRupee,
   Info,
-  Printer,
   Receipt,
   RotateCcw,
   Search,
@@ -29,7 +27,11 @@ import {
   fetchUserWiseReceipts,
   reopenSchoolFeeCashCounter,
 } from '@/services/school-sis';
-import { downloadUserWiseReport, kindToSchoolReportExport } from '@/services/school-reports';
+import {
+  downloadSchoolReport,
+  fetchSchoolReportHtml,
+  kindToSchoolReportExport,
+} from '@/services/school-reports';
 import { ReportExportButtons } from '../reports/export-buttons';
 import { MonthlyFeeSubnav, rs } from './monthly-fee-ui';
 
@@ -244,21 +246,42 @@ export function MonthlyFeeUserReport() {
         </div>
         <ReportExportButtons
           onExport={async (kind) => {
-            await downloadUserWiseReport(
-              {
-                date: applied.date,
-                academicYearId: applied.academicYearId || undefined,
-                classId: applied.classId || undefined,
-                sectionId: applied.sectionId || undefined,
-                paymentMode: applied.paymentMode || undefined,
-                userId: applied.userId || undefined,
-                search: search.trim() || undefined,
-                sortBy,
-                sortOrder,
-              },
-              kindToSchoolReportExport(kind).format,
-              kindToSchoolReportExport(kind).orientation,
-            );
+            setError(null);
+            const filters = {
+              date: applied.date,
+              dateFrom: applied.date,
+              dateTo: applied.date,
+              academicYearId: applied.academicYearId || '',
+              gradeId: applied.classId || '',
+              sectionId: applied.sectionId || '',
+              paymentMode: applied.paymentMode || '',
+              collectedById: applied.userId || '',
+            };
+            try {
+              if (kind === 'preview') {
+                const html = await fetchSchoolReportHtml({
+                  key: 'fee_user_wise',
+                  filters,
+                });
+                const w = window.open('', '_blank');
+                if (w) {
+                  w.document.write(html);
+                  w.document.close();
+                }
+                return;
+              }
+              const mapped = kindToSchoolReportExport(kind);
+              await downloadSchoolReport({
+                key: 'fee_user_wise',
+                format: mapped.format,
+                orientation: mapped.orientation,
+                filters,
+                summaryOnly: mapped.summaryOnly,
+              });
+            } catch (err) {
+              setError(apiErrorMessage(err));
+              throw err;
+            }
           }}
         />
       </div>

@@ -9,7 +9,7 @@ import { SchoolSisService } from './school-sis.service';
 import { SchoolSisReportsQueryService } from './school-sis-reports-query.service';
 import { SchoolReportEngineService } from './report-engine/report-engine.service';
 import { SchoolReportBrandingService } from './report-engine/report-branding.service';
-import type { ReportDocument } from './report-engine/report-types';
+import { guessKind, type ReportDocument } from './report-engine/report-types';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import {
   SCHOOL_SIS_PERMISSION_MANAGE,
@@ -55,6 +55,7 @@ export class SchoolSisReportsService {
       format: 'pdf' | 'xlsx' | 'html' | 'csv';
       filters?: Record<string, string>;
       orientation?: 'portrait' | 'landscape';
+      summaryOnly?: boolean;
       ip?: string;
     },
   ) {
@@ -77,7 +78,11 @@ export class SchoolSisReportsService {
         (result.filtersApplied as { academicYearId?: string }).academicYearId ||
         '',
     );
-    const columns = result.columns.map((c) => ({ key: c.key, label: c.label }));
+    const columns = result.columns.map((c) => ({
+      key: c.key,
+      label: c.label,
+      kind: guessKind({ key: c.key, label: c.label }),
+    }));
     const totals: Record<string, number> = {};
     for (const col of columns) {
       const label = col.label.toLowerCase();
@@ -101,11 +106,12 @@ export class SchoolSisReportsService {
       filters: Object.fromEntries(Object.entries(filters).filter(([, v]) => v)),
       kpis: result.kpis.map((k) => ({ label: k.label, value: k.value })),
       columns,
-      rows: result.rows,
+      rows: body.summaryOnly ? [] : result.rows,
       totals: Object.keys(totals).length ? totals : undefined,
       official: result.report.module === 'fees',
       confidential: Boolean(result.report.sensitive),
-      orientation: body.orientation,
+      orientation:
+        body.orientation || (columns.length >= 9 ? 'landscape' : 'portrait'),
       generatedBy: user.email,
     };
     try {

@@ -1,14 +1,22 @@
 import { api } from './api';
 
-export type SchoolReportExportKind = 'pdf-portrait' | 'pdf-landscape' | 'xlsx' | 'print';
+export type SchoolReportExportKind =
+  | 'pdf-portrait'
+  | 'pdf-landscape'
+  | 'xlsx'
+  | 'xlsx-summary'
+  | 'print'
+  | 'preview';
 
 export function kindToSchoolReportExport(kind: SchoolReportExportKind) {
   return {
-    format: (kind === 'xlsx' ? 'xlsx' : kind === 'print' ? 'html' : 'pdf') as
-      | 'xlsx'
-      | 'pdf'
-      | 'html',
+    format: (kind === 'xlsx' || kind === 'xlsx-summary'
+      ? 'xlsx'
+      : kind === 'print' || kind === 'preview'
+        ? 'html'
+        : 'pdf') as 'xlsx' | 'pdf' | 'html',
     orientation: (kind === 'pdf-landscape' ? 'landscape' : 'portrait') as 'portrait' | 'landscape',
+    summaryOnly: kind === 'xlsx-summary',
   };
 }
 
@@ -16,7 +24,13 @@ export async function fetchSchoolReportCatalog() {
   const { data } = await api.get('/v1/school-sis/reports/catalog');
   return data as {
     modules: Array<{ id: string; label: string }>;
-    reports: Array<{ key: string; title: string; description: string; module: string }>;
+    reports: Array<{
+      key: string;
+      title: string;
+      description: string;
+      module: string;
+      filters?: string[];
+    }>;
   };
 }
 
@@ -57,7 +71,8 @@ export async function downloadSchoolReport(payload: {
   format: 'pdf' | 'xlsx' | 'html' | 'csv';
   filters?: Record<string, string>;
   orientation?: 'portrait' | 'landscape';
-}) {
+  summaryOnly?: boolean;
+}): Promise<string | void> {
   const res = await api.post('/v1/school-sis/reports/export', payload, { responseType: 'blob' });
   const blob = res.data as Blob;
   const name = filenameFromDisposition(
@@ -76,6 +91,19 @@ export async function downloadSchoolReport(payload: {
   a.download = name;
   a.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+export async function fetchSchoolReportHtml(payload: {
+  key: string;
+  filters?: Record<string, string>;
+  orientation?: 'portrait' | 'landscape';
+}) {
+  const res = await api.post(
+    '/v1/school-sis/reports/export',
+    { ...payload, format: 'html' },
+    { responseType: 'blob' },
+  );
+  return (res.data as Blob).text();
 }
 
 export async function downloadFeeRegisterReport(

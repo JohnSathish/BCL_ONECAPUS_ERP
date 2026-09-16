@@ -16616,6 +16616,8 @@ model SchoolAcademicYear {
   transportFeePlans    SchoolTransportFeePlan[]
   transportDuties      SchoolTransportDutyAssignment[]
   transportCalendar    SchoolTransportCalendarEvent[]
+  attendanceSessions   SchoolAttendanceSession[]
+  attendanceSettings   SchoolAttendanceSettings[]
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
@@ -16683,6 +16685,8 @@ model SchoolSection {
   subjectTeachers    SchoolSubjectTeacherAssignment[]
   timetableSlots     SchoolTimetableSlot[]
   examSchedules      SchoolExamSchedule[]
+  attendanceSessions SchoolAttendanceSession[]
+  attendanceSubs     SchoolAttendanceSubstitute[]
 
   @@unique([tenantId, academicYearId, gradeId, name])
   @@index([tenantId, academicYearId])
@@ -16947,6 +16951,9 @@ model SchoolStudent {
   stationerySales  SchoolStationerySale[]
   examMarks        SchoolExamMark[]
   examResults      SchoolExamResult[]
+  attendanceRecords      SchoolAttendanceRecord[]
+  attendanceLeaves       SchoolAttendanceLeave[]
+  attendanceCorrections  SchoolAttendanceCorrection[]
   transportAllocations   SchoolTransportStudentAllocation[]
   transportBoarding      SchoolTransportBoardingEvent[]
   transportFeeAssignments SchoolTransportFeeAssignment[]
@@ -17239,6 +17246,9 @@ model SchoolStaff {
   transportPersonnel        SchoolTransportPersonnel[]
   whatsappContacts          SchoolWhatsappContact[]
   personAccounts            SchoolPersonAccount[]
+  attendanceSessionsMarked  SchoolAttendanceSession[] @relation("AttendanceMarkedByStaff")
+  attendanceSubstitutes     SchoolAttendanceSubstitute[] @relation("AttendanceSubStaff")
+  attendanceOriginalForSubs SchoolAttendanceSubstitute[] @relation("AttendanceSubOriginal")
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType, status])
@@ -20756,6 +20766,293 @@ model SchoolAutomationWebhook {
   @@schema("school")
 }
 
+model SchoolAttendanceSettings {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @map("tenant_id") @db.Uuid
+  academicYearId         String   @map("academic_year_id") @db.Uuid
+  mode                   String   @default("DAILY")
+  defaultStatus          String   @default("PRESENT") @map("default_status")
+  defaultMarking         String   @default("ALL_PRESENT") @map("default_marking")
+  lockEnabled            Boolean  @default(true) @map("lock_enabled")
+  lockAfterHours         Int      @default(24) @map("lock_after_hours")
+  correctionRequired     Boolean  @default(true) @map("correction_required")
+  minPercent             Int      @default(75) @map("min_percent")
+  warnPercent            Int      @default(85) @map("warn_percent")
+  lateCountsPresent      Boolean  @default(true) @map("late_counts_present")
+  halfDayValue           Decimal  @default(0.5) @map("half_day_value") @db.Decimal(4, 2)
+  leaveCountsPresent     Boolean  @default(false) @map("leave_counts_present")
+  excusedCountsPresent   Boolean  @default(true) @map("excused_counts_present")
+  absentNotify           Boolean  @default(true) @map("absent_notify")
+  lateNotify             Boolean  @default(false) @map("late_notify")
+  lowAttendanceNotify    Boolean  @default(true) @map("low_attendance_notify")
+  consecutiveAbsentAlert Int      @default(3) @map("consecutive_absent_alert")
+  reminderHour           Int      @default(10) @map("reminder_hour")
+  reminderMinute         Int      @default(0) @map("reminder_minute")
+  escalateClassTeacherMin Int     @default(30) @map("escalate_class_teacher_min")
+  escalateAdminMin       Int      @default(60) @map("escalate_admin_min")
+  lateThresholdMin       Int      @default(10) @map("late_threshold_min")
+  gracePeriodMin         Int      @default(10) @map("grace_period_min")
+  qrEnabled              Boolean  @default(false) @map("qr_enabled")
+  geoEnabled             Boolean  @default(false) @map("geo_enabled")
+  geoRadiusM             Int      @default(100) @map("geo_radius_m")
+  geoLat                 Decimal? @map("geo_lat") @db.Decimal(10, 7)
+  geoLng                 Decimal? @map("geo_lng") @db.Decimal(10, 7)
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, academicYearId])
+  @@map("school_attendance_settings")
+  @@schema("school")
+}
+
+model SchoolAttendanceStatus {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  code               String
+  name               String
+  description        String?
+  countsPresent      Boolean  @default(false) @map("counts_present")
+  countsAbsent       Boolean  @default(false) @map("counts_absent")
+  countsTowardPct    Boolean  @default(true) @map("counts_toward_pct")
+  attendanceValue    Decimal  @default(0) @map("attendance_value") @db.Decimal(4, 2)
+  requiresApproval   Boolean  @default(false) @map("requires_approval")
+  requiresRemark     Boolean  @default(false) @map("requires_remark")
+  isSystem           Boolean  @default(false) @map("is_system")
+  active             Boolean  @default(true)
+  sortOrder          Int      @default(0) @map("sort_order")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId, active])
+  @@map("school_attendance_statuses")
+  @@schema("school")
+}
+
+model SchoolAttendanceLeaveType {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  code               String
+  name               String
+  countsAsPresent    Boolean  @default(false) @map("counts_as_present")
+  requiresDocument   Boolean  @default(false) @map("requires_document")
+  active             Boolean  @default(true)
+  sortOrder          Int      @default(0) @map("sort_order")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  leaves SchoolAttendanceLeave[]
+
+  @@unique([tenantId, code])
+  @@map("school_attendance_leave_types")
+  @@schema("school")
+}
+
+model SchoolAttendanceSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  date           DateTime  @db.Date
+  sectionId      String    @map("section_id") @db.Uuid
+  mode           String    @default("DAILY")
+  periodKey      String    @default("DAILY") @map("period_key")
+  subjectId      String?   @map("subject_id") @db.Uuid
+  staffId        String?   @map("staff_id") @db.Uuid
+  status         String    @default("DRAFT")
+  source         String    @default("MANUAL")
+  version        Int       @default(1)
+  submittedAt    DateTime? @map("submitted_at")
+  submittedBy    String?   @map("submitted_by") @db.Uuid
+  lockedAt       DateTime? @map("locked_at")
+  lockedBy       String?   @map("locked_by") @db.Uuid
+  unlockedAt     DateTime? @map("unlocked_at")
+  unlockedBy     String?   @map("unlocked_by") @db.Uuid
+  unlockReason   String?   @map("unlock_reason")
+  clientSessionId String?  @map("client_session_id")
+  qrToken        String?   @map("qr_token")
+  qrExpiresAt    DateTime? @map("qr_expires_at")
+  geoLat         Decimal?  @map("geo_lat") @db.Decimal(10, 7)
+  geoLng         Decimal?  @map("geo_lng") @db.Decimal(10, 7)
+  deviceId       String?   @map("device_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  section      SchoolSection      @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  staff        SchoolStaff?       @relation("AttendanceMarkedByStaff", fields: [staffId], references: [id], onDelete: SetNull)
+  records      SchoolAttendanceRecord[]
+  corrections  SchoolAttendanceCorrection[]
+
+  @@unique([tenantId, academicYearId, date, sectionId, mode, periodKey])
+  @@unique([tenantId, clientSessionId])
+  @@index([tenantId, date, status])
+  @@index([tenantId, sectionId, date])
+  @@map("school_attendance_sessions")
+  @@schema("school")
+}
+
+model SchoolAttendanceRecord {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  sessionId       String    @map("session_id") @db.Uuid
+  studentId       String    @map("student_id") @db.Uuid
+  statusCode      String    @map("status_code")
+  markedAt        DateTime? @map("marked_at")
+  markedBy        String?   @map("marked_by") @db.Uuid
+  remark          String?
+  source          String    @default("MANUAL")
+  deviceId        String?   @map("device_id")
+  clientRecordId  String?   @map("client_record_id")
+  version         Int       @default(1)
+  voided          Boolean   @default(false)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  session SchoolAttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student SchoolStudent           @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  audits  SchoolAttendanceAudit[]
+  corrections SchoolAttendanceCorrection[]
+
+  @@unique([sessionId, studentId])
+  @@unique([tenantId, clientRecordId])
+  @@index([tenantId, studentId, statusCode])
+  @@map("school_attendance_records")
+  @@schema("school")
+}
+
+model SchoolAttendanceAudit {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  recordId   String?  @map("record_id") @db.Uuid
+  sessionId  String?  @map("session_id") @db.Uuid
+  studentId  String?  @map("student_id") @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String
+  oldStatus  String?  @map("old_status")
+  newStatus  String?  @map("new_status")
+  reason     String?
+  ipAddress  String?  @map("ip_address")
+  deviceId   String?  @map("device_id")
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  record SchoolAttendanceRecord? @relation(fields: [recordId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, studentId, createdAt])
+  @@map("school_attendance_audit_logs")
+  @@schema("school")
+}
+
+model SchoolAttendanceLeave {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  studentId    String    @map("student_id") @db.Uuid
+  leaveTypeId  String    @map("leave_type_id") @db.Uuid
+  fromDate     DateTime  @map("from_date") @db.Date
+  toDate       DateTime  @map("to_date") @db.Date
+  reason       String?   @db.Text
+  documentUrl  String?   @map("document_url")
+  status       String    @default("PENDING")
+  submittedBy  String?   @map("submitted_by") @db.Uuid
+  approvedBy   String?   @map("approved_by") @db.Uuid
+  approvedAt   DateTime? @map("approved_at")
+  rejectReason String?   @map("reject_reason")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  student   SchoolStudent              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  leaveType SchoolAttendanceLeaveType  @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, studentId, fromDate, toDate])
+  @@index([tenantId, status])
+  @@map("school_attendance_leaves")
+  @@schema("school")
+}
+
+model SchoolAttendanceCorrection {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  sessionId   String    @map("session_id") @db.Uuid
+  recordId    String    @map("record_id") @db.Uuid
+  studentId   String    @map("student_id") @db.Uuid
+  fromStatus  String    @map("from_status")
+  toStatus    String    @map("to_status")
+  reason      String    @db.Text
+  status      String    @default("PENDING")
+  submittedBy String    @map("submitted_by") @db.Uuid
+  reviewedBy  String?   @map("reviewed_by") @db.Uuid
+  reviewedAt  DateTime? @map("reviewed_at")
+  reviewNote  String?   @map("review_note")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  session SchoolAttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  record  SchoolAttendanceRecord  @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  student SchoolStudent           @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status])
+  @@map("school_attendance_corrections")
+  @@schema("school")
+}
+
+model SchoolAttendanceNotifyEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  eventKey   String   @map("event_key")
+  eventType  String   @map("event_type")
+  studentId  String?  @map("student_id") @db.Uuid
+  sessionId  String?  @map("session_id") @db.Uuid
+  superseded Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, eventKey])
+  @@index([tenantId, studentId, eventType])
+  @@map("school_attendance_notify_events")
+  @@schema("school")
+}
+
+model SchoolAttendanceSubstitute {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  sectionId       String   @map("section_id") @db.Uuid
+  date            DateTime @db.Date
+  staffId         String   @map("staff_id") @db.Uuid
+  originalStaffId String?  @map("original_staff_id") @db.Uuid
+  reason          String?
+  createdBy       String?  @map("created_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  section      SchoolSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  staff        SchoolStaff   @relation("AttendanceSubStaff", fields: [staffId], references: [id], onDelete: Restrict)
+  originalStaff SchoolStaff? @relation("AttendanceSubOriginal", fields: [originalStaffId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, sectionId, date, staffId])
+  @@index([tenantId, staffId, date])
+  @@map("school_attendance_substitutes")
+  @@schema("school")
+}
+
+model SchoolAttendanceSyncItem {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  deviceId        String    @map("device_id")
+  clientRecordId  String    @map("client_record_id")
+  serverRecordId  String?   @map("server_record_id") @db.Uuid
+  serverSessionId String?   @map("server_session_id") @db.Uuid
+  syncStatus      String    @default("PENDING") @map("sync_status")
+  conflictJson    Json?     @map("conflict_json")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  syncedAt        DateTime? @map("synced_at")
+
+  @@unique([tenantId, clientRecordId])
+  @@index([tenantId, deviceId, syncStatus])
+  @@map("school_attendance_sync_queue")
+  @@schema("school")
+}
+
 model SchoolMisSettings {
   id                    String   @id @default(uuid()) @db.Uuid
   tenantId              String   @unique @map("tenant_id") @db.Uuid
@@ -20770,6 +21067,36 @@ model SchoolMisSettings {
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("school_mis_settings")
+  @@schema("school")
+}
+
+model SchoolReportDesign {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @unique @map("tenant_id") @db.Uuid
+  settingsJson Json     @default("{}") @map("settings_json")
+  updatedBy    String?  @map("updated_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("school_report_design")
+  @@schema("school")
+}
+
+model SchoolReportExportAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  reportKey   String   @map("report_key")
+  format      String
+  title       String
+  filtersJson Json     @default("{}") @map("filters_json")
+  recordCount Int      @default(0) @map("record_count")
+  ip          String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, reportKey])
+  @@map("school_report_export_audit")
   @@schema("school")
 }
 
@@ -20913,36 +21240,6 @@ model SchoolIamAccessReview {
 
   @@index([tenantId, createdAt])
   @@map("school_iam_access_reviews")
-  @@schema("school")
-}
-
-model SchoolReportDesign {
-  id           String   @id @default(uuid()) @db.Uuid
-  tenantId     String   @unique @map("tenant_id") @db.Uuid
-  settingsJson Json     @default("{}") @map("settings_json")
-  updatedBy    String?  @map("updated_by") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  @@map("school_report_design")
-  @@schema("school")
-}
-
-model SchoolReportExportAudit {
-  id          String   @id @default(uuid()) @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
-  userId      String?  @map("user_id") @db.Uuid
-  reportKey   String   @map("report_key")
-  format      String
-  title       String
-  filtersJson Json     @default("{}") @map("filters_json")
-  recordCount Int      @default(0) @map("record_count")
-  ip          String?
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  @@index([tenantId, createdAt])
-  @@index([tenantId, reportKey])
-  @@map("school_report_export_audit")
   @@schema("school")
 }
 

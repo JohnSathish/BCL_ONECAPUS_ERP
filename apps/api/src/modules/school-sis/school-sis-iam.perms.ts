@@ -56,3 +56,32 @@ export const SIS_FEES_COLLECT = [
   SCHOOL_SIS_PERMISSION_MANAGE,
   'fees.collection.collect',
 ] as const;
+
+export const SIS_ATTENDANCE_VIEW = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'attendance.view',
+] as const;
+
+export const SIS_ATTENDANCE_MARK = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'attendance.create',
+  'attendance.update',
+] as const;
+
+export const SIS_ATTENDANCE_APPROVE = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'attendance.approve',
+  'attendance.lock',
+] as const;
+
+export const SIS_ATTENDANCE_SETTINGS = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'attendance.settings.manage',
+] as const;
+
+export const SIS_ATTENDANCE_PARENT = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'school-mobile:parent',
+  'school-mobile:student',
+  'attendance.view',
+] as const;

@@ -65,6 +65,13 @@ export class SchoolReportBrandingService {
           DEFAULT_REPORT_DESIGN.footerText,
       ),
       logoDataUri: schoolLogoDataUri(),
+      showGeneratedBy: Boolean(merged.showGeneratedBy ?? true),
+      showGeneratedAt: Boolean(merged.showGeneratedAt ?? true),
+      showPageNumber: Boolean(merged.showPageNumber ?? true),
+      showAcademicYear: Boolean(merged.showAcademicYear ?? true),
+      showFilters: Boolean(merged.showFilters ?? true),
+      showSignature: Boolean(merged.showSignature ?? false),
+      showConfidential: Boolean(merged.showConfidential ?? false),
     };
   }
 

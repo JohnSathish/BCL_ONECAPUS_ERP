@@ -9,8 +9,15 @@ import {
   type ReportDocument,
 } from './report-types';
 
-function argb(hex: string, fallback = 'FF163A63') {
+function hexArgb(hex: string, fallback = 'FF163A63') {
   const h = hex.replace('#', '').trim();
+  if (h.length === 3) {
+    return `FF${h
+      .split('')
+      .map((c) => c + c)
+      .join('')
+      .toUpperCase()}`;
+  }
   if (h.length === 6) return `FF${h.toUpperCase()}`;
   if (h.length === 8) return h.toUpperCase();
   return fallback;
@@ -50,7 +57,7 @@ export class SchoolReportExcelService {
     titleRow.font = {
       bold: true,
       size: 16,
-      color: { argb: argb(branding.primaryColor) },
+      color: { argb: hexArgb(branding.primaryColor) },
     };
     titleRow.alignment = { horizontal: 'center' };
     ws.mergeCells(row, 1, row, colCount);
@@ -69,7 +76,7 @@ export class SchoolReportExcelService {
     reportTitle.font = {
       bold: true,
       size: 12,
-      color: { argb: argb(branding.primaryColor) },
+      color: { argb: hexArgb(branding.primaryColor) },
     };
     reportTitle.alignment = { horizontal: 'center' };
     ws.mergeCells(row, 1, row, colCount);
@@ -125,7 +132,7 @@ export class SchoolReportExcelService {
       cell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: argb(branding.primaryColor) },
+        fgColor: { argb: hexArgb(branding.primaryColor) },
       };
       cell.border = {
         top: { style: 'thin', color: { argb: 'FFD9E2EC' } },
@@ -147,7 +154,7 @@ export class SchoolReportExcelService {
         if (kind === 'currency') {
           const n = Number(raw);
           cell.value = Number.isFinite(n) ? n : 0;
-          cell.numFmt = '"₹"#,##0.00';
+          cell.numFmt = '"₹"#,##,##0.00';
           cell.alignment = { horizontal: 'right' };
         } else if (kind === 'number') {
           cell.value = Number(raw) || 0;
@@ -159,7 +166,7 @@ export class SchoolReportExcelService {
           cell.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: argb(branding.secondaryColor, 'FFEAF2F8') },
+            fgColor: { argb: hexArgb(branding.secondaryColor, 'FFEAF2F8') },
           };
         }
         cell.border = {
@@ -189,7 +196,7 @@ export class SchoolReportExcelService {
           cell.value = {
             formula: `SUM(${colLetter}${dataStart}:${colLetter}${row - 1})`,
           };
-          if (kind === 'currency') cell.numFmt = '"₹"#,##0.00';
+          if (kind === 'currency') cell.numFmt = '"₹"#,##,##0.00';
         } else if (doc.totals?.[c.key] != null) {
           cell.value = doc.totals[c.key] as string | number;
         }

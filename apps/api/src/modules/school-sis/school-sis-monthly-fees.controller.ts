@@ -17,7 +17,6 @@ import {
   type JwtUser,
 } from '../../common/decorators/current-user.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
-import { extractClientIp } from '../../common/utils/request-host';
 import { SCHOOL_SIS_PERMISSION_MANAGE } from './school-sis.constants';
 import { SIS_FEES_COLLECT, SIS_FEES_VIEW } from './school-sis-iam.perms';
 import {
@@ -29,12 +28,14 @@ import {
   SchoolOnlineVerifyDto,
   VoidSchoolFeeDto,
 } from './dto/school-sis.dto';
+import { extractClientIp } from '../../common/utils/request-host';
 import { SchoolSisMonthlyFeesService } from './school-sis-monthly-fees.service';
 import { SchoolSisPaymentGatewaysService } from './school-sis-payment-gateways.service';
 import {
   SchoolSisFeeReportsService,
   type UserWiseSort,
 } from './school-sis-fee-reports.service';
+import { SchoolSisReportsService } from './school-sis-reports.service';
 
 function reportActor(user: JwtUser) {
   const perms = user.permissions ?? [];
@@ -52,6 +53,7 @@ export class SchoolSisMonthlyFeesController {
   constructor(
     private readonly fees: SchoolSisMonthlyFeesService,
     private readonly reports: SchoolSisFeeReportsService,
+    private readonly engineReports: SchoolSisReportsService,
     private readonly gateways: SchoolSisPaymentGatewaysService,
   ) {}
 
@@ -163,25 +165,58 @@ export class SchoolSisMonthlyFeesController {
   @RequireAnyPermission(...SIS_FEES_VIEW)
   async exportRegister(
     @CurrentUser() user: JwtUser,
-    @Req() req: Request,
     @Res() res: Response,
+    @Req() req: Request,
     @Query('month') month?: string,
     @Query('gradeId') gradeId?: string,
     @Query('status') status?: string,
     @Query('format') format?: 'pdf' | 'xlsx' | 'html' | 'csv',
     @Query('orientation') orientation?: 'portrait' | 'landscape',
   ) {
-    const file = await this.fees.exportRegister(
-      user.tid,
-      { month, gradeId, status },
-      {
-        format: format ?? 'xlsx',
-        orientation,
-        generatedBy: user.email,
-        userId: user.sub,
-        ip: extractClientIp(req),
+    const file = await this.engineReports.export(user.tid, user, {
+      key: 'fee_register',
+      format: format || 'xlsx',
+      orientation: orientation || 'landscape',
+      filters: {
+        month: month ?? '',
+        gradeId: gradeId ?? '',
+        status: status ?? '',
       },
+      ip: extractClientIp(req),
+    });
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
     );
+    res.send(file.buffer);
+  }
+
+  @Get('pending-export')
+  @RequireAnyPermission(...SIS_FEES_VIEW)
+  async exportPending(
+    @CurrentUser() user: JwtUser,
+    @Res() res: Response,
+    @Req() req: Request,
+    @Query('month') month?: string,
+    @Query('gradeId') gradeId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('status') status?: string,
+    @Query('format') format?: 'pdf' | 'xlsx' | 'html' | 'csv',
+    @Query('orientation') orientation?: 'portrait' | 'landscape',
+  ) {
+    const file = await this.engineReports.export(user.tid, user, {
+      key: 'fee_pending',
+      format: format || 'xlsx',
+      orientation: orientation || 'landscape',
+      filters: {
+        month: month ?? '',
+        gradeId: gradeId && gradeId !== 'all' ? gradeId : '',
+        sectionId: sectionId && sectionId !== 'all' ? sectionId : '',
+        status: status && status !== 'all' ? status : '',
+      },
+      ip: extractClientIp(req),
+    });
     res.setHeader('Content-Type', file.contentType);
     res.setHeader(
       'Content-Disposition',
@@ -229,8 +264,8 @@ export class SchoolSisMonthlyFeesController {
   @RequireAnyPermission(...SIS_FEES_VIEW)
   async userWiseExport(
     @CurrentUser() user: JwtUser,
-    @Req() req: Request,
     @Res() res: Response,
+    @Req() req: Request,
     @Query('date') date?: string,
     @Query('academicYearId') academicYearId?: string,
     @Query('classId') classId?: string,
@@ -238,33 +273,25 @@ export class SchoolSisMonthlyFeesController {
     @Query('paymentMode') paymentMode?: string,
     @Query('userId') userId?: string,
     @Query('search') search?: string,
-    @Query('sortBy') sortBy?: UserWiseSort,
-    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
     @Query('format') format?: 'pdf' | 'xlsx' | 'html' | 'csv',
     @Query('orientation') orientation?: 'portrait' | 'landscape',
   ) {
-    const file = await this.reports.userWiseExcel(
-      user.tid,
-      {
-        date,
-        academicYearId,
-        classId,
-        sectionId,
-        paymentMode,
-        userId,
-        search,
-        sortBy,
-        sortOrder,
+    const file = await this.engineReports.export(user.tid, user, {
+      key: 'fee_user_wise',
+      format: format || 'xlsx',
+      orientation,
+      filters: {
+        date: date ?? '',
+        dateFrom: date ?? '',
+        dateTo: date ?? '',
+        academicYearId: academicYearId ?? '',
+        gradeId: classId ?? '',
+        sectionId: sectionId ?? '',
+        paymentMode: paymentMode ?? '',
+        collectedById: userId ?? '',
       },
-      reportActor(user),
-      {
-        format: format ?? 'xlsx',
-        orientation,
-        generatedBy: user.email,
-        userId: user.sub,
-        ip: extractClientIp(req),
-      },
-    );
+      ip: extractClientIp(req),
+    });
     res.setHeader('Content-Type', file.contentType);
     res.setHeader(
       'Content-Disposition',

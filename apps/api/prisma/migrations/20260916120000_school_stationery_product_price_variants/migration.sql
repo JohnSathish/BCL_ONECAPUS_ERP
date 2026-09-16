@@ -1,25 +1,14 @@
--- Catch-up for stationery POS when earlier deploys created tables without later columns.
-
-ALTER TABLE "school"."school_stationery_sales"
-  ADD COLUMN IF NOT EXISTS "cash_received" INTEGER,
-  ADD COLUMN IF NOT EXISTS "change_returned" INTEGER,
-  ADD COLUMN IF NOT EXISTS "idempotency_key" TEXT;
-
-CREATE UNIQUE INDEX IF NOT EXISTS "school_stationery_sales_tenant_id_idempotency_key_key"
-  ON "school"."school_stationery_sales"("tenant_id", "idempotency_key");
+-- POS checkout requires product purchase/selling price and the variants table.
 
 ALTER TABLE "school"."school_stationery_products"
-  ADD COLUMN IF NOT EXISTS "subcategory_id" UUID,
-  ADD COLUMN IF NOT EXISTS "grade_id" UUID,
-  ADD COLUMN IF NOT EXISTS "academic_year_id" UUID,
-  ADD COLUMN IF NOT EXISTS "opening_stock" DECIMAL(14,3) NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS "min_stock" DECIMAL(14,3) NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS "qty_on_hand" DECIMAL(14,3) NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS "purchase_price" INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS "selling_price" INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS "tax_applicable" BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS "tax_percent" DECIMAL(6,2) NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS "discount_allowed" BOOLEAN NOT NULL DEFAULT true;
+  ADD COLUMN IF NOT EXISTS "discount_allowed" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS "opening_stock" DECIMAL(14,3) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "min_stock" DECIMAL(14,3) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "qty_on_hand" DECIMAL(14,3) NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS "school"."school_stationery_product_variants" (
     "id" UUID NOT NULL,
@@ -48,6 +37,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS "school_stationery_product_variants_tenant_id_
   ON "school"."school_stationery_product_variants"("tenant_id", "sku");
 CREATE INDEX IF NOT EXISTS "school_stationery_product_variants_tenant_id_product_id_idx"
   ON "school"."school_stationery_product_variants"("tenant_id", "product_id");
-
-ALTER TABLE "school"."school_stationery_product_variants"
-  ADD COLUMN IF NOT EXISTS "deleted_at" TIMESTAMP(3);

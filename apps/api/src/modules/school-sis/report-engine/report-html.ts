@@ -121,7 +121,7 @@ export function renderReportHtml(
   @page { size: ${doc.pageSize || 'A4'} ${doc.orientation === 'landscape' ? 'landscape' : 'portrait'}; margin: 14mm 12mm 18mm; }
   * { box-sizing: border-box; }
   body { margin: 0; color: ${branding.textColor}; font-family: ${branding.fontFamily}; font-size: 11px; }
-  .wrap { padding: 0 4px; position: relative; z-index: 1; }
+  .wrap { padding: 0 4px; }
   header { text-align: center; border-bottom: 2px solid ${branding.primaryColor}; padding-bottom: 10px; margin-bottom: 12px; }
   header img { height: 64px; width: auto; object-fit: contain; display: block; margin: 0 auto 6px; }
   .school { font-size: 16px; font-weight: 700; letter-spacing: .04em; color: ${branding.primaryColor}; text-transform: uppercase; }
@@ -151,6 +151,7 @@ export function renderReportHtml(
   .muted { color: #6b7c8d; font-size: 10px; }
   footer.page { display: none; }
   .watermark { position: fixed; inset: 18% 0 0; text-align: center; font-size: 64px; font-weight: 700; letter-spacing: .2em; color: ${branding.primaryColor}; opacity: .06; transform: rotate(-24deg); pointer-events: none; z-index: 0; }
+  .wrap { position: relative; z-index: 1; }
 </style>
 </head>
 <body>

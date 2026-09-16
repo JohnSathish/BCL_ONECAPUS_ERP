@@ -15,6 +15,7 @@ import {
   type ReportDef,
   type ReportModule,
 } from './school-sis-reports.catalog';
+import { SchoolSisAttendanceService } from './school-sis-attendance.service';
 
 export type ReportFilters = {
   academicYearId?: string;
@@ -131,7 +132,10 @@ function personaFrom(
 
 @Injectable()
 export class SchoolSisReportsQueryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly attendance: SchoolSisAttendanceService,
+  ) {}
 
   catalog(roles: string[], permissions: string[]) {
     const persona = personaFrom(roles, permissions);
@@ -771,7 +775,7 @@ export class SchoolSisReportsQueryService {
     const report = this.assertReport(key, roles, permissions);
     const page = Math.max(1, filters.page ?? 1);
     const limit = filters.exportMode
-      ? Math.min(20_000, Math.max(1, filters.limit ?? 20_000))
+      ? Math.min(50_000, Math.max(1, filters.limit ?? 20_000))
       : Math.min(200, Math.max(10, filters.limit ?? 50));
     const skip = (page - 1) * limit;
     const year = await this.resolveYear(tenantId, filters.academicYearId);
@@ -784,12 +788,26 @@ export class SchoolSisReportsQueryService {
       settings.attendanceMinPercent,
     );
 
-    if (
-      report.module === 'attendance' ||
-      key === 'mis_att_trend' ||
-      key === 'mis_staff_att'
-    ) {
+    if (key === 'mis_staff_att' || key === 'attendance_staff') {
       return emptyAtt;
+    }
+    if (report.module === 'attendance' || key === 'mis_att_trend') {
+      const built = await this.attendance.reportBundle(tenantId, key, filters);
+      const rows = built.rows as Row[];
+      return {
+        report,
+        columns: built.columns,
+        rows,
+        kpis: built.kpis ?? [],
+        charts: built.charts ?? [],
+        empty: rows.length === 0,
+        emptyHint:
+          rows.length === 0 ? this.emptyMessage(report, filters) : undefined,
+        total: rows.length,
+        page,
+        limit,
+        filtersApplied: filters,
+      };
     }
     if (
       report.module === 'library' ||
@@ -1356,42 +1374,9 @@ export class SchoolSisReportsQueryService {
 
   private async fees(key: string, ctx: QueryCtx): Promise<Built> {
     const { tenantId, filters, yearId, skip, limit } = ctx;
-    if (key === 'fee_structure') {
-      const plans = await this.prisma.schoolMonthlyFeePlan.findMany({
-        where: {
-          tenantId,
-          active: true,
-          ...(yearId ? { academicYearId: yearId } : {}),
-          ...(filters.gradeId ? { gradeId: filters.gradeId } : {}),
-        },
-        include: { grade: true, academicYear: true },
-        orderBy: { grade: { sortOrder: 'asc' } },
-      });
-      return {
-        columns: [
-          { key: 'className', label: 'Class' },
-          { key: 'year', label: 'Academic Year' },
-          { key: 'tuition', label: 'Tuition ₹' },
-          { key: 'lateFee', label: 'Late fee ₹' },
-          { key: 'other', label: 'Other ₹' },
-          { key: 'total', label: 'Monthly total ₹' },
-        ],
-        rows: plans.map((p) => ({
-          className: p.grade.name,
-          year: p.academicYear.name,
-          tuition: rupees(p.tuitionAmount),
-          lateFee: rupees(p.lateFeeAmount ?? 0),
-          other: rupees(p.otherAmount),
-          total: rupees(
-            p.tuitionAmount + (p.lateFeeAmount ?? 0) + p.otherAmount,
-          ),
-        })),
-        total: plans.length,
-        kpis: [{ key: 'n', label: 'Classes', value: plans.length }],
-      };
-    }
     if (
       key === 'fee_outstanding' ||
+      key === 'fee_pending' ||
       key === 'fee_defaulters' ||
       key === 'fee_overdue' ||
       key === 'fee_aging' ||
@@ -1827,22 +1812,58 @@ export class SchoolSisReportsQueryService {
         _sum: { totalAmount: true, discountAmount: true, lateFeeAmount: true },
       }),
     ]);
+    const sectionIds = [...new Set(list.map((p) => p.sectionId))];
+    const sections = sectionIds.length
+      ? await this.prisma.schoolSection.findMany({
+          where: { id: { in: sectionIds } },
+          include: { grade: true },
+        })
+      : [];
+    const classOf = new Map(
+      sections.map((s) => [s.id, `${s.grade.name} ${s.name}`.trim()]),
+    );
+    const registerLike =
+      key === 'fee_register' ||
+      key === 'fee_collection' ||
+      key === 'fee_monthly' ||
+      key === 'fee_daily' ||
+      key === 'fee_range';
     return {
-      columns: [
-        { key: 'receiptNumber', label: 'Receipt No' },
-        { key: 'fullName', label: 'Student' },
-        { key: 'feeMonth', label: 'Month' },
-        { key: 'paymentMode', label: 'Mode' },
-        { key: 'totalAmount', label: 'Amount ₹' },
-        { key: 'paidAt', label: 'Paid at' },
-        { key: 'status', label: 'Status' },
-      ],
+      columns: registerLike
+        ? [
+            { key: 'fullName', label: 'Student' },
+            { key: 'admissionNumber', label: 'Admission No' },
+            { key: 'className', label: 'Class' },
+            { key: 'feeMonth', label: 'Month' },
+            { key: 'tuitionAmount', label: 'Tuition ₹' },
+            { key: 'otherAmount', label: 'Other ₹' },
+            { key: 'lateFeeAmount', label: 'Late Fee ₹' },
+            { key: 'totalAmount', label: 'Total ₹' },
+            { key: 'paymentMode', label: 'Payment Mode' },
+            { key: 'receiptNumber', label: 'Receipt' },
+            { key: 'paidAt', label: 'Date' },
+            { key: 'status', label: 'Status' },
+          ]
+        : [
+            { key: 'receiptNumber', label: 'Receipt No' },
+            { key: 'fullName', label: 'Student' },
+            { key: 'feeMonth', label: 'Month' },
+            { key: 'paymentMode', label: 'Mode' },
+            { key: 'totalAmount', label: 'Amount ₹' },
+            { key: 'paidAt', label: 'Paid at' },
+            { key: 'status', label: 'Status' },
+          ],
       rows: list.map((p) => ({
         receiptNumber: p.receiptNumber,
         fullName: p.student.fullName,
         studentName: p.student.fullName,
+        admissionNumber: p.student.admissionNumber,
+        className: classOf.get(p.sectionId) ?? '',
         feeMonth: p.feeMonth,
         paymentMode: p.paymentMode,
+        tuitionAmount: rupees(p.tuitionAmount),
+        otherAmount: rupees(p.otherAmount),
+        lateFeeAmount: rupees(p.lateFeeAmount),
         totalAmount: rupees(p.totalAmount),
         paidAt: p.paidAt.toISOString().slice(0, 16),
         status: p.voidedAt ? 'VOID' : p.status,
@@ -1856,6 +1877,11 @@ export class SchoolSisReportsQueryService {
           value: inr(sum._sum.totalAmount ?? 0),
         },
         { key: 'n', label: 'Receipts', value: total },
+        {
+          key: 'late',
+          label: 'Late fees',
+          value: inr(sum._sum.lateFeeAmount ?? 0),
+        },
         {
           key: 'disc',
           label: 'Concessions',
@@ -2638,24 +2664,52 @@ export class SchoolSisReportsQueryService {
       };
     }
     if (key === 'inv_issue') {
-      const list = await this.prisma.schoolStationerySale.findMany({
-        where: { tenantId, deletedAt: null, status: 'COMPLETED' },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      });
+      const date = dayBounds(filters.dateFrom, filters.dateTo);
+      const [total, list] = await Promise.all([
+        this.prisma.schoolStationerySale.count({
+          where: {
+            tenantId,
+            deletedAt: null,
+            status: 'COMPLETED',
+            ...(date ? { createdAt: { gte: date.start, lte: date.end } } : {}),
+          },
+        }),
+        this.prisma.schoolStationerySale.findMany({
+          where: {
+            tenantId,
+            deletedAt: null,
+            status: 'COMPLETED',
+            ...(date ? { createdAt: { gte: date.start, lte: date.end } } : {}),
+          },
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: { student: true },
+        }),
+      ]);
+      const paid = list.reduce((s, r) => s + r.amountPaid, 0);
       return {
         columns: [
           { key: 'invoiceNo', label: 'Invoice' },
+          { key: 'customer', label: 'Customer' },
           { key: 'grandTotal', label: 'Total ₹' },
+          { key: 'amountPaid', label: 'Paid ₹' },
+          { key: 'status', label: 'Status' },
           { key: 'cashierName', label: 'Cashier' },
         ],
         rows: list.map((s) => ({
           invoiceNo: s.invoiceNo,
+          customer: s.student?.fullName || s.walkInName || s.customerType,
           grandTotal: rupees(s.grandTotal),
+          amountPaid: rupees(s.amountPaid),
+          status: s.status,
           cashierName: s.cashierName,
         })),
-        total: list.length,
+        total,
+        kpis: [
+          { key: 'n', label: 'Bills', value: total },
+          { key: 'paid', label: 'Collected', value: inr(paid) },
+        ],
       };
     }
     if (key === 'inv_return') {

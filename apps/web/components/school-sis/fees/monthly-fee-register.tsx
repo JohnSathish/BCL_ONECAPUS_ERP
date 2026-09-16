@@ -9,10 +9,8 @@ import {
   ChevronRight,
   ClipboardList,
   Eye,
-  FileSpreadsheet,
   IndianRupee,
   Info,
-  Printer,
   RotateCcw,
   Search,
   Users,
@@ -29,7 +27,11 @@ import {
   fetchMonthlyFeeRegister,
   voidMonthlyFee,
 } from '@/services/school-sis';
-import { downloadFeeRegisterReport, kindToSchoolReportExport } from '@/services/school-reports';
+import {
+  downloadSchoolReport,
+  fetchSchoolReportHtml,
+  kindToSchoolReportExport,
+} from '@/services/school-reports';
 import { ReportExportButtons } from '../reports/export-buttons';
 import { MonthlyFeeSubnav, currentFeeMonth, rs } from './monthly-fee-ui';
 
@@ -206,11 +208,41 @@ export function MonthlyFeeRegister() {
         </div>
         <ReportExportButtons
           onExport={async (kind) => {
-            await downloadFeeRegisterReport(
-              params,
-              kindToSchoolReportExport(kind).format,
-              kindToSchoolReportExport(kind).orientation,
-            );
+            setError(null);
+            const filters = {
+              month,
+              gradeId: gradeId || '',
+              status: status || '',
+              paymentMode: mode || '',
+              dateFrom: from || '',
+              dateTo: to || '',
+            };
+            try {
+              if (kind === 'preview') {
+                const html = await fetchSchoolReportHtml({
+                  key: 'fee_register',
+                  filters,
+                  orientation: 'landscape',
+                });
+                const w = window.open('', '_blank');
+                if (w) {
+                  w.document.write(html);
+                  w.document.close();
+                }
+                return;
+              }
+              const mapped = kindToSchoolReportExport(kind);
+              await downloadSchoolReport({
+                key: 'fee_register',
+                format: mapped.format,
+                orientation: mapped.orientation || 'landscape',
+                filters,
+                summaryOnly: mapped.summaryOnly,
+              });
+            } catch (err) {
+              setError(apiErrorMessage(err));
+              throw err;
+            }
           }}
         />
       </div>

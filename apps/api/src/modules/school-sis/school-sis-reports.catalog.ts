@@ -282,10 +282,6 @@ export const REPORT_CATALOG: ReportDef[] = [
     'Daily Attendance',
     'Daily present / absent / leave / late.',
     F_ATT,
-    {
-      emptyHint:
-        'Daily attendance capture is not live in this school yet. Thresholds are still configurable.',
-    },
   ),
   r(
     'attendance',
@@ -587,18 +583,22 @@ export const REPORT_CATALOG: ReportDef[] = [
   r('fees', 'fee_daily', 'Daily Collection', 'Receipts for a day.', F_FEE),
   r(
     'fees',
-    'fee_monthly',
+    'fee_collection',
     'Monthly Fee Collection Report',
-    'Receipts in a month.',
+    'School-branded monthly collection register.',
     [...F_FEE, 'month'],
   ),
   r(
     'fees',
-    'fee_structure',
-    'Fee Structure',
-    'Class-wise monthly tuition, late fee and other charges.',
-    ['academicYearId', 'gradeId'],
+    'fee_pending',
+    'Pending Fee Report',
+    'Outstanding and overdue month accounts.',
+    ['academicYearId', 'gradeId', 'sectionId', 'status', 'month'],
   ),
+  r('fees', 'fee_monthly', 'Monthly Collection', 'Receipts in a month.', [
+    ...F_FEE,
+    'month',
+  ]),
   r(
     'fees',
     'fee_range',
@@ -609,7 +609,7 @@ export const REPORT_CATALOG: ReportDef[] = [
   r(
     'fees',
     'fee_user_wise',
-    'User-wise Collection Report',
+    'User-wise Collection',
     'Cashier / counter collection by mode.',
     F_FEE,
   ),
@@ -653,7 +653,7 @@ export const REPORT_CATALOG: ReportDef[] = [
   r('fees', 'fee_bank', 'Bank Collection', 'BANK receipts.', F_FEE),
   r('fees', 'fee_cheque', 'Cheque Collection', 'CHEQUE receipts.', F_FEE),
   r('fees', 'fee_card', 'Card Collection', 'CARD receipts.', F_FEE),
-  r('fees', 'fee_outstanding', 'Pending Fee Report', 'Due month accounts.', [
+  r('fees', 'fee_outstanding', 'Outstanding Fees', 'Due month accounts.', [
     'academicYearId',
     'gradeId',
     'sectionId',
@@ -789,7 +789,7 @@ export const REPORT_CATALOG: ReportDef[] = [
   r(
     'fees',
     'fee_register',
-    'Fee Collection Register',
+    'Receipt Register',
     'All receipts in range.',
     F_FEE,
   ),

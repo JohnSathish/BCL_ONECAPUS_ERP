@@ -34,6 +34,8 @@ import {
   stockBadge,
   inputClass,
 } from './stationery-ui';
+import { ReportExportButtons } from '../reports/export-buttons';
+import { downloadSchoolReport, kindToSchoolReportExport } from '@/services/school-reports';
 
 const UNITS = [
   'PIECE',
@@ -923,26 +925,6 @@ export function StationeryReportsDesk() {
     enabled: ready,
   });
   const rows = q.data?.rows ?? [];
-  const csv = useMemo(() => {
-    const header = 'Invoice,Date,Customer,Class,Total,Paid,Balance,Status,Cashier,Methods';
-    const body = rows
-      .map((r: any) =>
-        [
-          r.invoiceNo,
-          r.date,
-          r.customer,
-          r.className,
-          r.grandTotal,
-          r.paid,
-          r.balance,
-          r.status,
-          r.cashier,
-          r.methods,
-        ].join(','),
-      )
-      .join('\n');
-    return `${header}\n${body}`;
-  }, [rows]);
   return (
     <StationeryShell title="Stationery Reports">
       <div className="mb-3 flex flex-wrap gap-2">
@@ -968,19 +950,22 @@ export function StationeryReportsDesk() {
             <option key={m}>{m}</option>
           ))}
         </select>
-        <button
-          type="button"
-          className="h-10 rounded-xl border px-3 text-sm"
-          onClick={() => {
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'stationery-sales.csv';
-            a.click();
+        <ReportExportButtons
+          onExport={async (kind) => {
+            const mapped = kindToSchoolReportExport(kind);
+            await downloadSchoolReport({
+              key: 'inv_issue',
+              format: mapped.format,
+              orientation: mapped.orientation,
+              filters: {
+                dateFrom: from,
+                dateTo: to,
+                paymentMode: paymentMethod,
+              },
+              summaryOnly: mapped.summaryOnly,
+            });
           }}
-        >
-          Export CSV
-        </button>
+        />
       </div>
       <div className="rounded-2xl border bg-white p-4">
         <p className="mb-2 text-sm">
