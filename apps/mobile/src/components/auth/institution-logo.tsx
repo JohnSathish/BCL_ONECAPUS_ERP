@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Image, type ImageStyle, StyleSheet, View, type StyleProp } from 'react-native';
 import { useSchoolConfig } from '@/hooks/use-school-config';
+import { isSchoolSisConfig } from '@/auth/school-product';
+import { SCHOOL_LOGO } from '@/constants/school-branding';
 import { resolveCollegeLogoUri } from '@/utils/upload-asset-url';
 
 const DEFAULT_LOGO = require('../../../assets/college-logo-default.png');
@@ -20,6 +22,10 @@ export function InstitutionLogo({ branding, size = 46, style }: Props) {
   const [useBundled, setUseBundled] = useState(!remoteUri);
 
   const dimension = { width: size, height: size, borderRadius: size / 2 };
+
+  if (isSchoolSisConfig(school)) {
+    return <Image source={SCHOOL_LOGO} style={[dimension, style]} resizeMode="contain" />;
+  }
 
   if (useBundled || !remoteUri) {
     return <Image source={DEFAULT_LOGO} style={[dimension, style]} resizeMode="contain" />;

@@ -111,3 +111,54 @@ export const SIS_PAYROLL_CALC = [
 export const SIS_PAYROLL_APPROVE = ['payroll.approve'] as const;
 
 export const SIS_PAYROLL_PAY = ['payroll.pay', 'payroll.approve'] as const;
+
+export const SIS_TRANSPORT_VIEW = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  SCHOOL_SIS_PERMISSION_READ,
+  'transport.view',
+  'transport.routes.view',
+  'transport.vehicle.view',
+  'transport.tracking.view',
+  'transport.report.view',
+] as const;
+
+export const SIS_TRANSPORT_MANAGE = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'transport.create',
+  'transport.update',
+  'transport.delete',
+  'transport.routes.manage',
+  'transport.vehicle.manage',
+  'transport.stop.manage',
+  'transport.driver.manage',
+  'transport.allocation.manage',
+  'transport.trip.manage',
+  'transport.incident.manage',
+] as const;
+
+export const SIS_TRANSPORT_ATTENDANCE = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'transport.attendance.manage',
+  'transport.trip.manage',
+  'school-mobile:staff',
+] as const;
+
+export const SIS_TRANSPORT_TRACKING = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'transport.tracking.view',
+  'transport.routes.view',
+  'school-mobile:parent',
+  'school-mobile:staff',
+] as const;
+
+export const SIS_TRANSPORT_FEE = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'transport.fee.view',
+  'transport.fee.manage',
+  'fees.collection.view',
+] as const;
+
+export const SIS_TRANSPORT_SETTINGS = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'transport.settings.manage',
+] as const;

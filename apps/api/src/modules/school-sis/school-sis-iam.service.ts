@@ -21,6 +21,7 @@ import {
   SCHOOL_IAM_MODULES,
   SUPER_ROLE_SLUGS,
 } from './school-sis-iam.catalog';
+import { SCHOOL_PORTAL_DEFAULT_PASSWORD } from './school-sis.constants';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 
 function sha(token: string) {
@@ -390,6 +391,7 @@ export class SchoolSisIamService implements OnModuleInit {
   ) {
     await this.sis.assertSecondarySisTenant(tenantId);
     this.access.assert(actor, 'users.create', 'users:manage', 'users.invite');
+    await this.ensureDefaultRoles(tenantId);
     const created = await this.provisioning.provisionUser({
       tenantId,
       email: body.email,
@@ -699,6 +701,246 @@ export class SchoolSisIamService implements OnModuleInit {
       );
     }
     return { ok: errors.length === 0, created: created.length, errors };
+  }
+
+  async directoryPreview(tenantId: string) {
+    await this.sis.assertSecondarySisTenant(tenantId);
+    const [studentsTotal, studentsMissing, staffTotal, staffMissing] =
+      await Promise.all([
+        this.prisma.schoolStudent.count({
+          where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+        }),
+        this.prisma.schoolStudent.count({
+          where: {
+            tenantId,
+            deletedAt: null,
+            status: 'ACTIVE',
+            personAccounts: { none: { personType: 'STUDENT' } },
+          },
+        }),
+        this.prisma.schoolStaff.count({
+          where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+        }),
+        this.prisma.schoolStaff.count({
+          where: {
+            tenantId,
+            deletedAt: null,
+            status: 'ACTIVE',
+            personAccounts: { none: { personType: 'STAFF' } },
+          },
+        }),
+      ]);
+    return {
+      defaultPassword: SCHOOL_PORTAL_DEFAULT_PASSWORD,
+      studentsTotal,
+      studentsMissing,
+      staffTotal,
+      staffMissing,
+    };
+  }
+
+  async provisionDirectory(
+    tenantId: string,
+    actor: JwtUser,
+    body: {
+      confirm?: boolean;
+      includeStudents?: boolean;
+      includeStaff?: boolean;
+      password?: string;
+    },
+  ) {
+    this.access.assert(actor, 'users.create', 'users:manage');
+    await this.ensureDefaultRoles(tenantId);
+    const preview = await this.directoryPreview(tenantId);
+    if (!body.confirm) return { ...preview, ready: true };
+    const password = body.password?.trim() || SCHOOL_PORTAL_DEFAULT_PASSWORD;
+    const created: string[] = [];
+    const linked: string[] = [];
+    const skipped: string[] = [];
+    const failed: { name: string; error: string }[] = [];
+
+    if (body.includeStaff !== false) {
+      const staff = await this.prisma.schoolStaff.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          status: 'ACTIVE',
+          personAccounts: { none: { personType: 'STAFF' } },
+        },
+        select: {
+          id: true,
+          fullName: true,
+          employeeCode: true,
+          email: true,
+          phone: true,
+          staffType: true,
+          designation: true,
+          department: true,
+        },
+      });
+      for (const row of staff) {
+        try {
+          const result = await this.upsertDirectoryUser(tenantId, actor, {
+            displayName: row.fullName,
+            email: this.portalEmail('staff', row.employeeCode, row.email),
+            username: row.employeeCode,
+            phone: row.phone ?? undefined,
+            roleSlugs: [this.staffPortalRole(row)],
+            password,
+            staffId: row.id,
+          });
+          if (result === 'created') created.push(row.id);
+          else if (result === 'linked') linked.push(row.id);
+          else skipped.push(row.id);
+        } catch (e) {
+          failed.push({
+            name: row.fullName,
+            error: e instanceof Error ? e.message : 'Failed',
+          });
+        }
+      }
+    }
+
+    if (body.includeStudents !== false) {
+      const students = await this.prisma.schoolStudent.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          status: 'ACTIVE',
+          personAccounts: { none: { personType: 'STUDENT' } },
+        },
+        select: {
+          id: true,
+          fullName: true,
+          admissionNumber: true,
+          email: true,
+          phone: true,
+        },
+      });
+      for (const row of students) {
+        try {
+          const result = await this.upsertDirectoryUser(tenantId, actor, {
+            displayName: row.fullName,
+            email: this.portalEmail('student', row.admissionNumber, row.email),
+            username: row.admissionNumber,
+            phone: row.phone ?? undefined,
+            roleSlugs: ['school-student'],
+            password,
+            studentId: row.id,
+          });
+          if (result === 'created') created.push(row.id);
+          else if (result === 'linked') linked.push(row.id);
+          else skipped.push(row.id);
+        } catch (e) {
+          failed.push({
+            name: row.fullName,
+            error: e instanceof Error ? e.message : 'Failed',
+          });
+        }
+      }
+    }
+
+    await this.log(
+      tenantId,
+      actor.sub,
+      'users.directory_provisioned',
+      actor.sub,
+      {
+        created: created.length,
+        linked: linked.length,
+        failed: failed.length,
+      },
+    );
+    return {
+      ok: failed.length === 0,
+      defaultPassword: password,
+      created: created.length,
+      linked: linked.length,
+      skipped: skipped.length,
+      failed,
+    };
+  }
+
+  private staffPortalRole(row: {
+    staffType: string;
+    designation: string | null;
+    department: string | null;
+  }) {
+    const blob =
+      `${row.designation ?? ''} ${row.department ?? ''}`.toLowerCase();
+    if (/librar/.test(blob)) return 'librarian';
+    if (/account|cashier/.test(blob)) return 'accountant';
+    if (/transport/.test(blob)) return 'transport-manager';
+    if (/hr|human resource/.test(blob)) return 'hr-manager';
+    if (row.staffType === 'TEACHING') return 'teacher';
+    return 'office-staff';
+  }
+
+  private portalEmail(kind: string, code: string, email?: string | null) {
+    const real = email?.trim().toLowerCase();
+    if (real && real.includes('@')) return real;
+    const slug = code.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || kind;
+    return `${kind}.${slug}@portal.stlukestura.in`;
+  }
+
+  private async uniqueUsername(tenantId: string, preferred: string) {
+    const base =
+      preferred.replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 40) ||
+      `u${Date.now().toString(36)}`;
+    let candidate = base;
+    let n = 1;
+    while (
+      await this.prisma.user.findFirst({
+        where: { tenantId, username: candidate, deletedAt: null },
+        select: { id: true },
+      })
+    ) {
+      candidate = `${base}${n}`;
+      n += 1;
+    }
+    return candidate;
+  }
+
+  private async upsertDirectoryUser(
+    tenantId: string,
+    actor: JwtUser,
+    input: {
+      displayName: string;
+      email: string;
+      username: string;
+      phone?: string;
+      roleSlugs: string[];
+      password: string;
+      staffId?: string;
+      studentId?: string;
+    },
+  ): Promise<'created' | 'linked' | 'skipped'> {
+    const email = input.email.trim().toLowerCase();
+    const existing = await this.prisma.user.findFirst({
+      where: { tenantId, email, deletedAt: null },
+    });
+    if (existing) {
+      await this.applyLinks(tenantId, existing.id, {
+        staffId: input.staffId,
+        studentId: input.studentId,
+      });
+      return 'linked';
+    }
+    const username = await this.uniqueUsername(tenantId, input.username);
+    await this.createUser(tenantId, actor, {
+      email,
+      displayName: input.displayName,
+      username,
+      phone: input.phone,
+      roleSlugs: input.roleSlugs,
+      password: input.password,
+      accountStatus: 'active',
+      mustResetPassword: true,
+      invite: false,
+      staffId: input.staffId,
+      studentId: input.studentId,
+    });
+    return 'created';
   }
 
   async listRoles(tenantId: string) {
@@ -1064,7 +1306,14 @@ export class SchoolSisIamService implements OnModuleInit {
           ],
         },
         take: 15,
-        select: { id: true, fullName: true, employeeCode: true, email: true },
+        select: {
+          id: true,
+          fullName: true,
+          employeeCode: true,
+          email: true,
+          phone: true,
+          staffType: true,
+        },
       }),
       this.prisma.schoolStudent.findMany({
         where: {
@@ -1076,7 +1325,13 @@ export class SchoolSisIamService implements OnModuleInit {
           ],
         },
         take: 15,
-        select: { id: true, fullName: true, admissionNumber: true },
+        select: {
+          id: true,
+          fullName: true,
+          admissionNumber: true,
+          email: true,
+          phone: true,
+        },
       }),
       this.prisma.schoolGuardian.findMany({
         where: {

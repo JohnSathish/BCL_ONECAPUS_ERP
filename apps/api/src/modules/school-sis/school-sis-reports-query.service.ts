@@ -2597,6 +2597,112 @@ export class SchoolSisReportsQueryService {
         total: list.length,
       };
     }
+    if (key === 'tr_incidents' || key === 'tr_emergency') {
+      const list = await this.prisma.schoolTransportIncident.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          ...(key === 'tr_emergency' ? { sos: true } : {}),
+        },
+        include: { vehicle: true, route: true },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      });
+      return {
+        columns: [
+          { key: 'incidentNo', label: 'No' },
+          { key: 'kind', label: 'Type' },
+          { key: 'severity', label: 'Severity' },
+          { key: 'status', label: 'Status' },
+          { key: 'vehicle', label: 'Vehicle' },
+        ],
+        rows: list.map((i) => ({
+          incidentNo: i.incidentNo,
+          kind: i.kind,
+          severity: i.severity,
+          status: i.status,
+          vehicle: i.vehicle?.registrationNumber ?? '',
+        })),
+        total: list.length,
+      };
+    }
+    if (key === 'tr_trips' || key === 'tr_history') {
+      const list = await this.prisma.schoolTransportTrip.findMany({
+        where: {
+          tenantId,
+          ...(filters.status ? { status: filters.status } : {}),
+        },
+        include: { route: true, vehicle: true },
+        skip,
+        take: limit,
+        orderBy: { date: 'desc' },
+      });
+      return {
+        columns: [
+          { key: 'date', label: 'Date' },
+          { key: 'route', label: 'Route' },
+          { key: 'tripType', label: 'Trip' },
+          { key: 'status', label: 'Status' },
+        ],
+        rows: list.map((t) => ({
+          date: t.date.toISOString().slice(0, 10),
+          route: t.route.name,
+          tripType: t.tripType,
+          status: t.status,
+        })),
+        total: list.length,
+      };
+    }
+    if (key === 'tr_gps') {
+      const list = await this.prisma.schoolTransportGpsLocation.findMany({
+        where: { tenantId },
+        include: { vehicle: true },
+        skip,
+        take: limit,
+        orderBy: { recordedAt: 'desc' },
+      });
+      return {
+        columns: [
+          { key: 'vehicle', label: 'Vehicle' },
+          { key: 'latitude', label: 'Lat' },
+          { key: 'longitude', label: 'Lng' },
+          { key: 'recordedAt', label: 'Time' },
+        ],
+        rows: list.map((g) => ({
+          vehicle: g.vehicle.registrationNumber,
+          latitude: String(g.latitude),
+          longitude: String(g.longitude),
+          recordedAt: g.recordedAt.toISOString(),
+        })),
+        total: list.length,
+      };
+    }
+    if (key === 'tr_requests') {
+      const list = await this.prisma.schoolTransportRequest.findMany({
+        where: {
+          tenantId,
+          ...(filters.status ? { status: filters.status } : {}),
+        },
+        include: { student: true },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      });
+      return {
+        columns: [
+          { key: 'student', label: 'Student' },
+          { key: 'kind', label: 'Request' },
+          { key: 'status', label: 'Status' },
+        ],
+        rows: list.map((r) => ({
+          student: r.student.fullName,
+          kind: r.kind,
+          status: r.status,
+        })),
+        total: list.length,
+      };
+    }
     const list = await this.prisma.schoolTransportStudentAllocation.findMany({
       where: {
         tenantId,

@@ -16957,6 +16957,7 @@ model SchoolStudent {
   transportAllocations   SchoolTransportStudentAllocation[]
   transportBoarding      SchoolTransportBoardingEvent[]
   transportFeeAssignments SchoolTransportFeeAssignment[]
+  transportRequests      SchoolTransportRequest[]
   whatsappContacts       SchoolWhatsappContact[]
 
   @@unique([tenantId, admissionNumber])
@@ -19198,6 +19199,7 @@ model SchoolTransportSettings {
   blockDispatchOnFail      Boolean  @default(true) @map("block_dispatch_on_fail")
   allowSafetyOverride      Boolean  @default(true) @map("allow_safety_override")
   approachingStopMeters    Int      @default(250) @map("approaching_stop_meters")
+  policyJson               Json     @default("{}") @map("policy_json")
   createdAt                DateTime @default(now()) @map("created_at")
   updatedAt                DateTime @updatedAt @map("updated_at")
 
@@ -19225,8 +19227,10 @@ model SchoolTransportVehicle {
   gpsDeviceId        String?   @map("gps_device_id")
   insuranceNumber    String?   @map("insurance_number")
   status             String    @default("ACTIVE")
+  fleetRole          String    @default("PRIMARY") @map("fleet_role")
   photoUrl           String?   @map("photo_url")
   remarks            String?   @db.Text
+  detailsJson        Json      @default("{}") @map("details_json")
   createdBy          String?   @map("created_by") @db.Uuid
   updatedBy          String?   @map("updated_by") @db.Uuid
   createdAt          DateTime  @default(now()) @map("created_at")
@@ -19314,6 +19318,7 @@ model SchoolTransportStop {
   afternoonDrop    String?   @map("afternoon_drop")
   maxStudents      Int       @default(0) @map("max_students")
   status           String    @default("ACTIVE")
+  safetyJson       Json      @default("{}") @map("safety_json")
   createdBy        String?   @map("created_by") @db.Uuid
   updatedBy        String?   @map("updated_by") @db.Uuid
   createdAt        DateTime  @default(now()) @map("created_at")
@@ -19344,6 +19349,10 @@ model SchoolTransportRoute {
   expectedCompletionTime  String?   @map("expected_completion_time")
   distanceKm              Decimal?  @map("distance_km") @db.Decimal(8, 2)
   estimatedMinutes        Int?      @map("estimated_minutes")
+  routeType               String    @default("BOTH") @map("route_type")
+  startPoint              String?   @map("start_point")
+  endPoint                String?   @map("end_point")
+  maxCapacity             Int?      @map("max_capacity")
   vehicleId               String?   @map("vehicle_id") @db.Uuid
   driverId                String?   @map("driver_id") @db.Uuid
   attendantId             String?   @map("attendant_id") @db.Uuid
@@ -19556,6 +19565,9 @@ model SchoolTransportStudentAllocation {
   siblingSameRoute Boolean  @default(false) @map("sibling_same_route")
   capacityOverride Boolean  @default(false) @map("capacity_override")
   overrideReason  String?   @map("override_reason")
+  tripMode        String    @default("BOTH") @map("trip_mode")
+  isTemporary     Boolean   @default(false) @map("is_temporary")
+  temporaryReason String?   @map("temporary_reason")
   remarks         String?
   qrToken         String?   @unique @map("qr_token")
   createdBy       String?   @map("created_by") @db.Uuid
@@ -20039,6 +20051,54 @@ model SchoolTransportAuditLog {
 
   @@index([tenantId, createdAt])
   @@map("school_transport_audit_logs")
+  @@schema("school")
+}
+
+model SchoolTransportGeofence {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  kind        String
+  name        String
+  latitude    Decimal   @db.Decimal(10, 7)
+  longitude   Decimal   @db.Decimal(10, 7)
+  radiusMeters Int      @default(100) @map("radius_meters")
+  stopId      String?   @map("stop_id") @db.Uuid
+  active      Boolean   @default(true)
+  createdBy   String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  @@index([tenantId, kind, active])
+  @@map("school_transport_geofences")
+  @@schema("school")
+}
+
+model SchoolTransportRequest {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String?   @map("academic_year_id") @db.Uuid
+  studentId      String    @map("student_id") @db.Uuid
+  kind           String
+  status         String    @default("PENDING")
+  routeId        String?   @map("route_id") @db.Uuid
+  stopId         String?   @map("stop_id") @db.Uuid
+  vehicleId      String?   @map("vehicle_id") @db.Uuid
+  validFrom      DateTime? @map("valid_from") @db.Date
+  validUntil     DateTime? @map("valid_until") @db.Date
+  reason         String?   @db.Text
+  remarks        String?   @db.Text
+  reviewedBy     String?   @map("reviewed_by") @db.Uuid
+  reviewedAt     DateTime? @map("reviewed_at")
+  createdBy      String?   @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  student SchoolStudent @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, studentId])
+  @@map("school_transport_requests")
   @@schema("school")
 }
 

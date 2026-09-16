@@ -96,6 +96,34 @@ export async function fetchSchoolCalendar(year: number, month: number) {
   );
 }
 
+export async function fetchSchoolTransportMyTrip() {
+  return apiFetch<Record<string, unknown>>('/v1/school-mobile/transport/my-trip');
+}
+
+export async function fetchSchoolTransportRoster(tripId: string) {
+  return apiFetch<Record<string, unknown>>(
+    `/v1/school-mobile/transport/students?tripId=${encodeURIComponent(tripId)}`,
+  );
+}
+
+export async function postSchoolTransportBoarding(body: Record<string, unknown>) {
+  return apiFetch('/v1/school-mobile/transport/boarding', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function postSchoolTransportSos(body: Record<string, unknown>) {
+  return apiFetch('/v1/school-mobile/transport/sos', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchSchoolParentTransport(childId?: string | null) {
+  return apiFetch<unknown[]>(`/v1/school-mobile/transport/parent${q(childId)}`);
+}
+
 export async function fetchSchoolBootstrap() {
   return apiFetch<Record<string, unknown>>('/v1/school-mobile/bootstrap', { skipAuth: true });
 }

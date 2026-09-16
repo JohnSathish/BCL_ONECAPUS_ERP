@@ -2,6 +2,9 @@ import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { ensureDeviceId, hydrateAppType } from '@/api/config';
 import { PremiumSplashScreen } from '@/components/auth/premium-splash-screen';
+import { SchoolSplashScreen } from '@/components/school-sis/school-splash-screen';
+import { isSchoolSisConfig } from '@/auth/school-product';
+import { useSchoolConfig } from '@/hooks/use-school-config';
 import { bootstrapSession } from '@/auth/bootstrap-session';
 import { SPLASH_DURATION_MS } from '@/constants/release';
 import { consumeInitialPushResponse } from '@/services/push-notifications';
@@ -12,6 +15,8 @@ ExpoSplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function AuthSplashScreen() {
   const router = useRouter();
+  const { school } = useSchoolConfig();
+  const schoolSis = isSchoolSisConfig(school);
 
   useEffect(() => {
     void ExpoSplashScreen.hideAsync().catch(() => undefined);
@@ -31,7 +36,8 @@ export default function AuthSplashScreen() {
           const canOpenPush =
             href.startsWith('/(staff)') ||
             href.startsWith('/(student)') ||
-            href.startsWith('/(principal)');
+            href.startsWith('/(principal)') ||
+            href.startsWith('/(school)');
           // After session is ready: only honor a *fresh* notification tap.
           // Stale responses are ignored so normal opens land on Home with tabs.
           const openedFromPush = canOpenPush && (await consumeInitialPushResponse());
@@ -55,7 +61,7 @@ export default function AuthSplashScreen() {
   return (
     <>
       <StatusBar style="light" />
-      <PremiumSplashScreen />
+      {schoolSis ? <SchoolSplashScreen /> : <PremiumSplashScreen />}
     </>
   );
 }

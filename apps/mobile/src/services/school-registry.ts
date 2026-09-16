@@ -18,7 +18,7 @@ const FALLBACK_SCHOOLS: SchoolRegistryEntry[] = [
   },
   {
     id: 'st-lukes-tura',
-    name: "St. Luke's Secondary School, Tura",
+    name: "St. Luke's Higher Secondary School, Tura",
     apiUrl: process.env.EXPO_PUBLIC_API_URL?.trim() || 'https://erp.stlukestura.in/api',
     tenantSlug: 'st-lukes-tura',
     code: 'SLS',

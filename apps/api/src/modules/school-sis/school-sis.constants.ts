@@ -38,4 +38,6 @@ export const SCHOOL_SIS_STATIONERY_PAY_METHODS = [
   'OTHER',
 ] as const;
 export const SCHOOL_ADMISSION_NUMBER_PREFIX = 'SLS';
+/** First-login portal password for bulk student/staff accounts. Users must change it. */
+export const SCHOOL_PORTAL_DEFAULT_PASSWORD = 'StLuke@2026';
 export const SCHOOL_APPLICATION_NUMBER_PREFIX = 'APP';

@@ -163,8 +163,36 @@ export async function saveSchoolIamSecurity(payload: Record<string, unknown>) {
 export async function fetchSchoolIamLinkOptions(q: string) {
   const { data } = await api.get('/v1/school-sis/iam/link-options', { params: { q } });
   return data as {
-    staff: Array<{ id: string; fullName: string; employeeCode: string }>;
-    students: Array<{ id: string; fullName: string; admissionNumber: string }>;
+    staff: Array<{ id: string; fullName: string; employeeCode: string; email?: string }>;
+    students: Array<{
+      id: string;
+      fullName: string;
+      admissionNumber: string;
+      email?: string;
+    }>;
     guardians: Array<{ id: string; fullName: string; phone: string | null }>;
+  };
+}
+
+export async function fetchSchoolIamDirectoryPreview() {
+  const { data } = await api.get('/v1/school-sis/iam/directory-provision');
+  return data as {
+    defaultPassword: string;
+    studentsTotal: number;
+    studentsMissing: number;
+    staffTotal: number;
+    staffMissing: number;
+  };
+}
+
+export async function provisionSchoolIamDirectory(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/iam/directory-provision', payload);
+  return data as {
+    ok: boolean;
+    defaultPassword: string;
+    created: number;
+    linked: number;
+    skipped: number;
+    failed: Array<{ name: string; error: string }>;
   };
 }

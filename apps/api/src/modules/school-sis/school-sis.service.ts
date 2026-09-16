@@ -309,7 +309,7 @@ export class SchoolSisService {
         holidays: true,
         library: false,
         stationery: true,
-        transport: false,
+        transport: true,
         whatsapp: true,
         website: true,
         academicConfig: true,

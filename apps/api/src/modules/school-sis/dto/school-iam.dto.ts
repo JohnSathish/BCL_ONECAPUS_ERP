@@ -125,6 +125,21 @@ export class SchoolIamImpersonateDto {
   reason!: string;
 }
 
+export class SchoolIamDirectoryProvisionDto {
+  @IsOptional()
+  @IsBoolean()
+  confirm?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  includeStudents?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  includeStaff?: boolean;
+  @IsOptional()
+  @IsString()
+  password?: string;
+}
+
 export class SchoolIamReviewDto {
   @IsString()
   decision!: string;

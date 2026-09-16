@@ -1,7 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { switchInstitution } from '@/auth/switch-institution';
+import { isSchoolSisConfig } from '@/auth/school-product';
 import { COLLEGE_NAME, PRODUCT_NAME } from '@/constants/release';
+import { SCHOOL_BRAND } from '@/constants/school-branding';
 import { useBootstrap } from '@/hooks/useBootstrap';
 import { useSchoolConfig } from '@/hooks/use-school-config';
 
@@ -34,7 +36,9 @@ export function SchoolInstitutionChip({
 
   if (!school) return null;
 
-  const label = institutionLabel(config?.branding?.displayName, school.name);
+  const label = isSchoolSisConfig(school)
+    ? SCHOOL_BRAND.shortName
+    : institutionLabel(config?.branding?.displayName, school.name);
 
   return (
     <View style={[styles.wrap, light && styles.wrapLight]}>

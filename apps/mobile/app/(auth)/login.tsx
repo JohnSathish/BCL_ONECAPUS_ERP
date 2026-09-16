@@ -50,6 +50,7 @@ import {
 } from '@/constants/release';
 import { useBootstrap } from '@/hooks/useBootstrap';
 import { InstitutionLogo } from '@/components/auth/institution-logo';
+import { SchoolLoginScreen } from '@/components/school-sis/school-login-screen';
 
 const NEWS_ICONS = ['📢', '🎓', '📅', '💰', '🏆', '📝'] as const;
 
@@ -319,6 +320,10 @@ export default function LoginScreen() {
   }
 
   const currentNews = newsItems[newsIndex % newsItems.length];
+
+  if (schoolSis) {
+    return <SchoolLoginScreen />;
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: pageBg }]}>

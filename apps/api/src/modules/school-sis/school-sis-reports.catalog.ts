@@ -1081,6 +1081,30 @@ export const REPORT_CATALOG: ReportDef[] = [
     'dateFrom',
     'dateTo',
   ]),
+  r('transport', 'tr_incidents', 'Incident Report', 'Transport incidents.', [
+    'status',
+  ]),
+  r(
+    'transport',
+    'tr_emergency',
+    'Emergency Report',
+    'SOS and critical incidents.',
+    [],
+  ),
+  r('transport', 'tr_trips', 'Trip History', 'Morning and afternoon trips.', [
+    'status',
+  ]),
+  r('transport', 'tr_history', 'Student Transport History', 'Trip history.', [
+    'academicYearId',
+  ]),
+  r('transport', 'tr_gps', 'GPS Tracking Report', 'Stored location pings.', []),
+  r(
+    'transport',
+    'tr_requests',
+    'Parent Transport Requests',
+    'Change requests.',
+    ['status'],
+  ),
 
   r(
     'library',

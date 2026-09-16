@@ -26,6 +26,7 @@ import {
   SchoolIamBulkDto,
   SchoolIamCreateUserDto,
   SchoolIamDirectPermsDto,
+  SchoolIamDirectoryProvisionDto,
   SchoolIamImpersonateDto,
   SchoolIamImportDto,
   SchoolIamInviteDto,
@@ -338,5 +339,20 @@ export class SchoolSisIamController {
   @RequireAnyPermission(...VIEW)
   links(@CurrentUser() user: JwtUser, @Query('q') q?: string) {
     return this.iam.linkOptions(user.tid, q ?? '');
+  }
+
+  @Get('directory-provision')
+  @RequireAnyPermission(...MANAGE)
+  directoryPreview(@CurrentUser() user: JwtUser) {
+    return this.iam.directoryPreview(user.tid);
+  }
+
+  @Post('directory-provision')
+  @RequireAnyPermission(...MANAGE)
+  directoryProvision(
+    @CurrentUser() user: JwtUser,
+    @Body() body: SchoolIamDirectoryProvisionDto,
+  ) {
+    return this.iam.provisionDirectory(user.tid, user, body);
   }
 }

@@ -34,7 +34,9 @@ import {
 } from '@/constants/release';
 import { useBootstrap } from '@/hooks/useBootstrap';
 import { useSchoolConfig } from '@/hooks/use-school-config';
+import { isSchoolSisConfig } from '@/auth/school-product';
 import { InstitutionLogo } from '@/components/auth/institution-logo';
+import { SchoolWelcomeScreen } from '@/components/school-sis/school-welcome-screen';
 import { getInstalledAppVersion, isVersionBelow } from '@/utils/app-version';
 
 const STICKY_BAR_HEIGHT = 72;
@@ -79,7 +81,8 @@ export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const { config } = useBootstrap();
-  const { school } = useSchoolConfig();
+  const { school, loading: schoolLoading } = useSchoolConfig();
+  const schoolSis = isSchoolSisConfig(school);
 
   const heroOpacity = useRef(new Animated.Value(0)).current;
   const heroSlide = useRef(new Animated.Value(24)).current;
@@ -166,6 +169,13 @@ export default function WelcomeScreen() {
 
   function goToLogin() {
     router.push('/(auth)/login');
+  }
+
+  if (schoolLoading) {
+    return <View style={{ flex: 1, backgroundColor: '#0b1640' }} />;
+  }
+  if (schoolSis) {
+    return <SchoolWelcomeScreen />;
   }
 
   function onQuickAccess(item: (typeof WELCOME_QUICK_ACCESS)[number]) {

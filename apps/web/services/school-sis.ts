@@ -2416,3 +2416,69 @@ export const approveHrReimbursement = (id: string) => hrPost(`/reimbursements/${
 export const createHrExit = (payload: unknown) => hrPost('/exits', payload);
 export const saveHrStatutory = (payload: unknown) => hrPost('/statutory', payload);
 export const fetchHrMe = () => hr('/me');
+
+function tr(path: string, params?: Record<string, unknown>) {
+  return api.get(`/v1/school-sis/transport${path}`, { params }).then((r) => r.data);
+}
+function trPost(path: string, payload?: unknown) {
+  return api.post(`/v1/school-sis/transport${path}`, payload).then((r) => r.data);
+}
+function trPatch(path: string, payload?: unknown) {
+  return api.patch(`/v1/school-sis/transport${path}`, payload).then((r) => r.data);
+}
+
+export const fetchTransportDashboard = () => tr('/dashboard');
+export const fetchTransportSettings = () => tr('/settings');
+export const saveTransportSettings = (payload: unknown) => trPatch('/settings', payload);
+export const fetchTransportVehicles = (params?: Record<string, unknown>) => tr('/vehicles', params);
+export const saveTransportVehicle = (payload: unknown, id?: string) =>
+  id ? trPatch(`/vehicles/${id}`, payload) : trPost('/vehicles', payload);
+export const saveTransportVehicleDocument = (id: string, payload: unknown) =>
+  trPost(`/vehicles/${id}/documents`, payload);
+export const fetchTransportPersonnel = (kind: string, params?: Record<string, unknown>) =>
+  tr('/personnel', { ...params, kind });
+export const saveTransportPersonnel = (payload: unknown, id?: string) =>
+  id ? trPatch(`/personnel/${id}`, payload) : trPost('/personnel', payload);
+export const fetchTransportStops = (params?: Record<string, unknown>) => tr('/stops', params);
+export const saveTransportStop = (payload: unknown, id?: string) =>
+  id ? trPatch(`/stops/${id}`, payload) : trPost('/stops', payload);
+export const fetchTransportRoutes = (params?: Record<string, unknown>) => tr('/routes', params);
+export const saveTransportRoute = (payload: unknown, id?: string) =>
+  id ? trPatch(`/routes/${id}`, payload) : trPost('/routes', payload);
+export const searchTransportStudents = (q: string) => tr('/students/search', { q });
+export const fetchTransportAllocations = (params?: Record<string, unknown>) =>
+  tr('/allocations', params);
+export const saveTransportAllocation = (payload: unknown) => trPost('/allocations', payload);
+export const bulkTransportAllocation = (payload: unknown) => trPost('/allocations/bulk', payload);
+export const endTransportAllocation = (id: string, reason?: string) =>
+  trPost(`/allocations/${id}/end`, { reason });
+export const fetchTransportTrips = (params?: Record<string, unknown>) => tr('/trips', params);
+export const generateTransportTrips = (payload: unknown) => trPost('/trips/generate', payload);
+export const fetchTransportRoster = (id: string) => tr(`/trips/${id}/roster`);
+export const transportTripAction = (id: string, action: string, payload?: unknown) =>
+  trPost(`/trips/${id}/${action}`, payload ?? {});
+export const transportBoarding = (id: string, payload: unknown) =>
+  trPost(`/trips/${id}/boarding`, payload);
+export const transportBulkAttendance = (id: string, payload: unknown) =>
+  trPost(`/trips/${id}/bulk-attendance`, payload);
+export const fetchTransportMaintenance = (vehicleId?: string) => tr('/maintenance', { vehicleId });
+export const saveTransportMaintenance = (payload: unknown) => trPost('/maintenance', payload);
+export const fetchTransportFuel = (vehicleId?: string) => tr('/fuel', { vehicleId });
+export const saveTransportFuel = (payload: unknown) => trPost('/fuel', payload);
+export const fetchTransportIncidents = () => tr('/incidents');
+export const saveTransportIncident = (payload: unknown) => trPost('/incidents', payload);
+export const resolveTransportIncident = (id: string, actionTaken?: string) =>
+  trPost(`/incidents/${id}/resolve`, { actionTaken });
+export const reportTransportBreakdown = (payload: unknown) => trPost('/breakdown', payload);
+export const fetchTransportTracking = () => tr('/tracking');
+export const fetchTransportGeofences = () => tr('/geofences');
+export const saveTransportGeofence = (payload: unknown) => trPost('/geofences', payload);
+export const fetchTransportFeePlans = () => tr('/fees/plans');
+export const saveTransportFeePlan = (payload: unknown) => trPost('/fees/plans', payload);
+export const saveTransportConcession = (payload: unknown) => trPost('/fees/concessions', payload);
+export const fetchTransportRequests = (status?: string) => tr('/requests', { status });
+export const saveTransportRequest = (payload: unknown) => trPost('/requests', payload);
+export const reviewTransportRequest = (id: string, payload: unknown) =>
+  trPost(`/requests/${id}/review`, payload);
+export const fetchTransportAudit = () => tr('/audit');
+export const importTransportRows = (payload: unknown) => trPost('/import', payload);

@@ -150,8 +150,57 @@ export const SCHOOL_IAM_MODULES: IamModuleDef[] = [
     id: 'transport',
     label: 'Transport',
     actions: [
-      { action: 'view', slug: 'transport.routes.view', label: 'View' },
-      { action: 'manage', slug: 'transport.routes.manage', label: 'Manage' },
+      { action: 'view', slug: 'transport.view', label: 'View' },
+      { action: 'view', slug: 'transport.routes.view', label: 'Routes' },
+      { action: 'view', slug: 'transport.vehicle.view', label: 'Vehicles' },
+      { action: 'view', slug: 'transport.tracking.view', label: 'Tracking' },
+      { action: 'view', slug: 'transport.fee.view', label: 'Fees' },
+      { action: 'view', slug: 'transport.report.view', label: 'Reports' },
+      { action: 'create', slug: 'transport.create', label: 'Create' },
+      { action: 'edit', slug: 'transport.update', label: 'Update' },
+      { action: 'delete', slug: 'transport.delete', label: 'Delete' },
+      {
+        action: 'manage',
+        slug: 'transport.routes.manage',
+        label: 'Manage routes',
+      },
+      {
+        action: 'manage',
+        slug: 'transport.vehicle.manage',
+        label: 'Manage vehicles',
+      },
+      {
+        action: 'manage',
+        slug: 'transport.stop.manage',
+        label: 'Manage stops',
+      },
+      {
+        action: 'manage',
+        slug: 'transport.driver.manage',
+        label: 'Manage drivers',
+      },
+      {
+        action: 'manage',
+        slug: 'transport.allocation.manage',
+        label: 'Allocations',
+      },
+      { action: 'manage', slug: 'transport.trip.manage', label: 'Trips' },
+      {
+        action: 'manage',
+        slug: 'transport.attendance.manage',
+        label: 'Attendance',
+      },
+      {
+        action: 'manage',
+        slug: 'transport.incident.manage',
+        label: 'Incidents',
+      },
+      { action: 'manage', slug: 'transport.fee.manage', label: 'Manage fees' },
+      {
+        action: 'manage',
+        slug: 'transport.settings.manage',
+        label: 'Settings',
+      },
     ],
   },
   {
@@ -381,8 +430,21 @@ export const SCHOOL_DEFAULT_ROLES: {
     permissions: [
       'school-sis:read',
       'students.view',
+      'transport.view',
       'transport.routes.view',
       'transport.routes.manage',
+      'transport.vehicle.view',
+      'transport.vehicle.manage',
+      'transport.stop.manage',
+      'transport.driver.manage',
+      'transport.allocation.manage',
+      'transport.trip.manage',
+      'transport.attendance.manage',
+      'transport.tracking.view',
+      'transport.incident.manage',
+      'transport.fee.view',
+      'transport.report.view',
+      'transport.settings.manage',
     ],
   },
   {
@@ -403,6 +465,7 @@ export const SCHOOL_DEFAULT_ROLES: {
     description: 'General office',
     permissions: [
       'school-sis:read',
+      'school-mobile:staff',
       'students.view',
       'attendance.view',
       'attendance.create',
@@ -425,7 +488,12 @@ export const SCHOOL_DEFAULT_ROLES: {
     slug: 'driver',
     name: 'Driver',
     description: 'Transport operations',
-    permissions: ['transport.routes.view', 'school-mobile:staff'],
+    permissions: [
+      'transport.routes.view',
+      'transport.tracking.view',
+      'transport.attendance.manage',
+      'school-mobile:staff',
+    ],
   },
 ];
 

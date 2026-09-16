@@ -28,10 +28,16 @@ import { SchoolSisTimetableService } from '../school-sis/school-sis-timetable.se
 import { SchoolSisAttendanceService } from '../school-sis/school-sis-attendance.service';
 import { SchoolSisExamsService } from '../school-sis/school-sis-exams.service';
 import { SchoolSisHrService } from '../school-sis/school-sis-hr.service';
+import { SchoolSisTransportService } from '../school-sis/school-sis-transport.service';
 import { SchoolSisAccessService } from '../school-sis/school-sis-access.service';
 import { SchoolSisCalendarService } from '../school-sis/school-sis-calendar.service';
 import { SchoolSisPaymentGatewaysService } from '../school-sis/school-sis-payment-gateways.service';
 import { SubmitAttendanceDto } from '../school-sis/dto/school-attendance.dto';
+import {
+  GpsPingDto,
+  MobileBoardingDto,
+  MobileSosDto,
+} from '../school-sis/dto/school-transport.dto';
 import { SCHOOL_SIS_PERMISSION_MANAGE } from '../school-sis/school-sis.constants';
 import {
   SIS_ATTENDANCE_MARK,
@@ -84,6 +90,7 @@ export class SchoolMobileController {
     private readonly attendance: SchoolSisAttendanceService,
     private readonly exams: SchoolSisExamsService,
     private readonly hr: SchoolSisHrService,
+    private readonly transport: SchoolSisTransportService,
     private readonly sisAccess: SchoolSisAccessService,
     private readonly calendar: SchoolSisCalendarService,
     private readonly gateways: SchoolSisPaymentGatewaysService,
@@ -535,6 +542,103 @@ export class SchoolMobileController {
     @Body() dto: PatchSchoolMobileInboxDto,
   ) {
     return this.inbox.patch(user, id, dto);
+  }
+
+  @Get('transport/my-trip')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS, 'transport.routes.view')
+  async myTrip(@CurrentUser() user: JwtUser) {
+    const staffId = await this.access.staffIdForUser(user.tid, user);
+    return this.transport.mobileMyTrip(user.tid, staffId);
+  }
+
+  @Get('transport/students')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS, 'transport.attendance.manage')
+  async tripStudents(
+    @CurrentUser() user: JwtUser,
+    @Query('tripId') tripId: string,
+  ) {
+    const staffId = await this.access.staffIdForUser(user.tid, user);
+    await this.transport.assertTripStaff(user.tid, tripId, staffId);
+    return this.transport.tripRoster(user.tid, tripId);
+  }
+
+  @Post('transport/boarding')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS, 'transport.attendance.manage')
+  async board(@CurrentUser() user: JwtUser, @Body() dto: MobileBoardingDto) {
+    const staffId = await this.access.staffIdForUser(user.tid, user);
+    await this.transport.assertTripStaff(user.tid, dto.tripId, staffId);
+    return this.transport.recordBoarding(
+      user.tid,
+      { userId: user.sub, manage: false, canOverride: false },
+      dto.tripId,
+      dto,
+    );
+  }
+
+  @Post('transport/location')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS, 'transport.attendance.manage')
+  async loc(@CurrentUser() user: JwtUser, @Body() dto: GpsPingDto) {
+    const staffId = await this.access.staffIdForUser(user.tid, user);
+    if (dto.tripId) {
+      await this.transport.assertTripStaff(user.tid, dto.tripId, staffId);
+    }
+    return this.transport.pingGps(
+      user.tid,
+      { userId: user.sub, manage: false, canOverride: false },
+      dto,
+    );
+  }
+
+  @Post('transport/sos')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    ...ACCESS,
+    'transport.incident.manage',
+    'transport.attendance.manage',
+  )
+  async sos(@CurrentUser() user: JwtUser, @Body() dto: MobileSosDto) {
+    return this.transport.saveIncident(
+      user.tid,
+      { userId: user.sub, manage: true, canOverride: false },
+      {
+        kind: 'SOS',
+        severity: 'CRITICAL',
+        sos: true,
+        tripId: dto.tripId,
+        vehicleId: dto.vehicleId,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        description:
+          dto.description || 'Emergency SOS from driver/attendant app',
+      },
+    );
+  }
+
+  @Get('transport/parent')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    ...ACCESS,
+    'school-mobile:parent',
+    'school-mobile:student',
+  )
+  async parentTransport(
+    @CurrentUser() user: JwtUser,
+    @Query('childId') childId?: string,
+  ) {
+    const persona = this.access.persona(user);
+    if (persona === 'parent' || persona === 'student') {
+      const id = await this.access.resolveStudentId(user.tid, user, childId);
+      return this.transport.parentCard(user.tid, id ? [id] : []);
+    }
+    const children = await this.access.childrenForUser(user.tid, user.sub);
+    return this.transport.parentCard(
+      user.tid,
+      children.map((c) => c.studentId),
+    );
   }
 
   @Get('admin/settings')
