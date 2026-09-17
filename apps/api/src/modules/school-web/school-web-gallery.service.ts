@@ -728,6 +728,11 @@ export class SchoolWebGalleryService {
           category: true,
           tags: { include: { tag: true } },
           coverAsset: true,
+          items: {
+            orderBy: { sortOrder: 'asc' },
+            include: { asset: true },
+            take: 8,
+          },
           _count: { select: { items: true } },
         },
       }),
@@ -856,6 +861,11 @@ export class SchoolWebGalleryService {
       category: album.category,
       tags: (album.tags ?? []).map((row) => row.tag),
       cover,
+      photos: (album.items ?? []).slice(0, 8).map((item) => ({
+        id: item.id,
+        urls: publicAssetUrl(item.asset.storageKey, item.asset.variants),
+        caption: item.caption,
+      })),
       items: withItems
         ? (album.items ?? []).map((item) => ({
             id: item.id,

@@ -63,17 +63,12 @@ function Panel({ className, children }: { className?: string; children?: React.R
   );
 }
 
-const SCHOOL_DEFAULT_PASSWORD = 'StLuke@2026';
-const USERS_PAGE_SIZE = 50;
-
 function revealPassword(res: {
   temporaryPassword?: string;
   generatedPassword?: string;
   plainPassword?: string;
 }) {
-  return (
-    res.temporaryPassword || res.generatedPassword || res.plainPassword || SCHOOL_DEFAULT_PASSWORD
-  );
+  return res.temporaryPassword || res.generatedPassword || res.plainPassword || '';
 }
 
 function iamUserItems(data: unknown): Array<Record<string, unknown>> {
@@ -91,6 +86,8 @@ function iamUserItems(data: unknown): Array<Record<string, unknown>> {
   }
   return [];
 }
+
+const USERS_PAGE_SIZE = 20;
 
 const LINKS = [
   { href: '/admin/school-sis/users', label: 'All Users', exact: true },
@@ -161,7 +158,7 @@ export function UsersDesk() {
     roleSlugs: ['teacher'] as string[],
     invite: false,
     passwordMode: 'default' as 'default' | 'invite' | 'custom',
-    password: 'StLuke@2026',
+    password: '',
     staffId: '',
     studentId: '',
   });
@@ -332,7 +329,7 @@ export function UsersDesk() {
     const name = String(u.displayName || u.email || 'this user');
     setConfirm({
       title: `Reset password for ${name}?`,
-      body: `This signs them out of every session and sets a temporary password. They must change it on the next login. Default school password is ${SCHOOL_DEFAULT_PASSWORD}.`,
+      body: 'This signs them out of every session and sets a unique temporary password. Copy it once. There is no shared school password.',
       ok: 'Password reset',
       okLabel: 'Reset password',
       run: async () => {
@@ -406,7 +403,7 @@ export function UsersDesk() {
                   roleSlugs: ['teacher'],
                   invite: false,
                   passwordMode: 'default',
-                  password: 'StLuke@2026',
+                  password: '',
                   staffId: '',
                   studentId: '',
                 });
@@ -541,7 +538,7 @@ export function UsersDesk() {
                   onClick={() =>
                     setConfirm({
                       title: `Reset ${selected.length} passwords?`,
-                      body: `Selected accounts will be signed out and set to ${SCHOOL_DEFAULT_PASSWORD}. They must change the password on next login.`,
+                      body: 'Selected accounts will be signed out. Unique temporary passwords are generated. There is no shared school password.',
                       ok: 'Passwords reset',
                       okLabel: 'Reset selected',
                       run: () => bulkSchoolIam(selected, 'reset-password'),
@@ -956,7 +953,7 @@ export function UsersDesk() {
                   </p>
                   <input
                     className="mt-2 w-full rounded-md border bg-white px-2 py-1.5 text-sm"
-                    placeholder={`Custom password (optional, else ${SCHOOL_DEFAULT_PASSWORD})`}
+                    placeholder="Custom password (optional — otherwise a unique password is generated)"
                     value={customReset}
                     onChange={(e) => setCustomReset(e.target.value)}
                   />
@@ -965,7 +962,7 @@ export function UsersDesk() {
                       onClick={() =>
                         setConfirm({
                           title: 'Reset to school default?',
-                          body: `Password will become ${SCHOOL_DEFAULT_PASSWORD}. All sessions end.`,
+                          body: 'A unique temporary password will be generated. All sessions end. Copy it once.',
                           ok: 'Password reset',
                           okLabel: 'Use school default',
                           run: async () => {
@@ -983,7 +980,7 @@ export function UsersDesk() {
                         })
                       }
                     >
-                      Reset to {SCHOOL_DEFAULT_PASSWORD}
+                      Generate unique password
                     </PrimaryButton>
                     <GhostButton
                       onClick={() =>
@@ -1352,8 +1349,8 @@ export function UsersDesk() {
               {[
                 {
                   id: 'default' as const,
-                  title: 'School default password',
-                  body: 'StLuke@2026 — user must change it on first login.',
+                  title: 'Unique generated password',
+                  body: 'A one-time password is created. Students should use Activate Your Account in the app instead.',
                 },
                 {
                   id: 'invite' as const,
@@ -1405,7 +1402,7 @@ export function UsersDesk() {
               <p>
                 {form.passwordMode === 'invite'
                   ? 'An invitation will be issued.'
-                  : `Password: ${form.passwordMode === 'default' ? 'StLuke@2026' : form.password} (must change on first login)`}
+                  : `Password: ${form.passwordMode === 'default' ? 'unique generated (shown once)' : form.password} (must change on first login)`}
               </p>
             </div>
           ) : null}
@@ -1451,7 +1448,7 @@ export function UsersDesk() {
                       form.passwordMode === 'invite'
                         ? undefined
                         : form.passwordMode === 'default'
-                          ? 'StLuke@2026'
+                          ? undefined
                           : form.password,
                     staffId: form.staffId || undefined,
                     studentId: form.studentId || undefined,
@@ -1503,10 +1500,9 @@ export function UsersDesk() {
               <p className="text-xs text-slate-500">without a login</p>
             </div>
           </div>
-          <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-            Default password for every new account:{' '}
-            <strong>{directory.data?.defaultPassword ?? 'StLuke@2026'}</strong>. They must change it
-            on first login.
+          <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
+            New student logins are <strong>not given a shared password</strong>. Students activate
+            the app with OTP or a one-time school activation code from Account Security.
           </p>
           <DialogFooter className="gap-3 border-t border-slate-200 pt-4 sm:justify-end">
             <GhostButton type="button" onClick={() => setDirectoryOpen(false)}>
@@ -1518,8 +1514,8 @@ export function UsersDesk() {
               onClick={() =>
                 setConfirm({
                   title: 'Create portal accounts for everyone?',
-                  body: `This will create logins for ${directory.data?.studentsMissing ?? 0} students and ${directory.data?.staffMissing ?? 0} staff using password ${directory.data?.defaultPassword ?? 'StLuke@2026'}. Existing accounts are skipped or linked.`,
-                  ok: `Accounts ready. Default password: ${directory.data?.defaultPassword ?? 'StLuke@2026'} (change on first login).`,
+                  body: `This will create logins for ${directory.data?.studentsMissing ?? 0} students and ${directory.data?.staffMissing ?? 0} staff. Students must activate in the school app. No shared default password is created.`,
+                  ok: 'Accounts ready. Students use Activate Your Account in the app.',
                   okLabel: 'Yes, create accounts',
                   run: async () => {
                     const totals = {
@@ -1527,7 +1523,7 @@ export function UsersDesk() {
                       linked: 0,
                       skipped: 0,
                       failed: 0,
-                      defaultPassword: directory.data?.defaultPassword ?? 'StLuke@2026',
+                      defaultPassword: null as string | null,
                     };
                     for (;;) {
                       const batch = await provisionSchoolIamDirectory({
@@ -1834,7 +1830,7 @@ export function UsersDesk() {
                   };
                   setNotice(
                     typeof res?.created === 'number'
-                      ? `Created ${res.created}, linked ${res.linked ?? 0}. Default password: ${res.defaultPassword ?? 'StLuke@2026'}. Failed: ${typeof res.failed === 'number' ? res.failed : Array.isArray(res.failed) ? res.failed.length : 0}.`
+                      ? `Created ${res.created}, linked ${res.linked ?? 0}. Students activate in the app. Failed: ${typeof res.failed === 'number' ? res.failed : Array.isArray(res.failed) ? res.failed.length : 0}.`
                       : (confirm.ok ?? 'Saved'),
                   );
                   await qc.invalidateQueries({ queryKey: ['school-iam'] });

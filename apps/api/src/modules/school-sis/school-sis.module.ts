@@ -40,7 +40,9 @@ import { SchoolSisAutomationController } from './school-sis-automation.controlle
 import { SchoolSisAutomationProcessor } from './school-sis-automation.processor';
 import { SchoolSisAccessService } from './school-sis-access.service';
 import { SchoolSisIamService } from './school-sis-iam.service';
+import { SchoolSisAccountSecurityService } from './school-sis-account-security.service';
 import { SchoolSisIamController } from './school-sis-iam.controller';
+import { SchoolSisAccountSecurityController } from './school-sis-account-security.controller';
 import { SchoolSisReportsController } from './school-sis-reports.controller';
 import { SchoolSisAttendanceController } from './school-sis-attendance.controller';
 import { SchoolSisHrController } from './school-sis-hr.controller';
@@ -99,6 +101,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisPushController,
     SchoolSisAutomationController,
     SchoolSisIamController,
+    SchoolSisAccountSecurityController,
     SchoolSisReportsController,
     SchoolSisAttendanceController,
     SchoolSisHrController,
@@ -151,6 +154,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     { provide: APP_GUARD, useClass: SchoolLicenseGuard },
     { provide: APP_GUARD, useClass: SchoolMaintenanceGuard },
     SchoolSisIamService,
+    SchoolSisAccountSecurityService,
     SchoolSisReportsQueryService,
     SchoolSisReportsService,
     SchoolReportBrandingService,
@@ -187,6 +191,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisSmsService,
     SchoolSisOpsService,
     SchoolSisIamService,
+    SchoolSisAccountSecurityService,
     SchoolSisReportsService,
     SchoolReportEngineService,
   ],

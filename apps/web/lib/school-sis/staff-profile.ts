@@ -1,6 +1,9 @@
 import type { SchoolSisStaff } from '@/services/school-sis';
 
 export type StaffExtras = {
+  subjectsTaught?: string[];
+  emergencyPhone?: string;
+  emergencyName?: string;
   payroll?: {
     epfNo?: string;
     basicSalary?: string;
@@ -65,7 +68,17 @@ export function isoDateInput(value?: string | Date | null) {
 
 export function asStaffExtras(raw: unknown): StaffExtras {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  return raw as StaffExtras;
+  const row = raw as StaffExtras & { subjectsTaught?: unknown };
+  const subjects = row.subjectsTaught;
+  const subjectsTaught = Array.isArray(subjects)
+    ? subjects.map((s) => String(s).trim()).filter(Boolean)
+    : typeof subjects === 'string'
+      ? subjects
+          .split(/[,;|/]+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined;
+  return { ...row, subjectsTaught };
 }
 
 function filled(obj?: Record<string, unknown> | null) {
@@ -85,6 +98,12 @@ export function compactStaffExtras(extras: StaffExtras): Record<string, unknown>
       if (filled(value as Record<string, unknown> | undefined)) out[key] = value;
     },
   );
+  const subjects = (extras.subjectsTaught ?? []).map((s) => s.trim()).filter(Boolean);
+  if (subjects.length) out.subjectsTaught = subjects;
+  const emergencyPhone = extras.emergencyPhone?.trim();
+  const emergencyName = extras.emergencyName?.trim();
+  if (emergencyPhone) out.emergencyPhone = emergencyPhone;
+  if (emergencyName) out.emergencyName = emergencyName;
   return out;
 }
 

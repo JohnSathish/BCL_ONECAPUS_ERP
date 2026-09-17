@@ -8,6 +8,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../shared/storage/storage.service';
 import { SchoolSisService } from './school-sis.service';
@@ -39,6 +40,7 @@ export class SchoolSisPushService {
     private readonly sis: SchoolSisService,
     private readonly fcm: SchoolSisFcmProvider,
     private readonly storage: StorageService,
+    private readonly config: ConfigService,
     @InjectQueue('school-push') private readonly queue: Queue,
   ) {}
 
@@ -156,9 +158,55 @@ export class SchoolSisPushService {
     };
   }
 
-  async previewAudience(tenantId: string, audience: PushAudienceDto) {
+  async sendTest(tenantId: string, actor: PushActor) {
+    this.assert(actor, true);
+    const devices = await this.prisma.schoolMobileDevice.findMany({
+      where: {
+        tenantId,
+        userId: actor.userId,
+        revokedAt: null,
+        pushToken: { not: null },
+      },
+    });
+    if (!devices.length) {
+      throw new BadRequestException(
+        'No registered app on this account. Open the St. Luke’s School app while signed in.',
+      );
+    }
+    const result = await this.fcm.send({
+      tokens: devices.map((d) => d.pushToken!).filter(Boolean),
+      title: "St. Luke's School",
+      body: 'Test notification from the school office.',
+      category: 'GENERAL',
+      priority: 'HIGH',
+      data: { type: 'SYSTEM', deepLink: '/(tabs)', notificationId: 'test' },
+    });
+    if (result.invalidTokens.length) {
+      await this.prisma.schoolMobileDevice.updateMany({
+        where: { tenantId, pushToken: { in: result.invalidTokens } },
+        data: { pushToken: null },
+      });
+    }
+    await this.audit(tenantId, actor, 'NOTIFICATION_TEST', {
+      successCount: result.successCount,
+      failureCount: result.failureCount,
+    });
+    return {
+      ok: result.ok,
+      devices: devices.length,
+      successCount: result.successCount,
+      failureCount: result.failureCount,
+      engine: this.fcm.connectionStatus().engine,
+    };
+  }
+
+  async previewAudience(
+    tenantId: string,
+    audience: PushAudienceDto,
+    actorUserId?: string,
+  ) {
     await this.ensureSetup(tenantId);
-    const users = await this.resolveUsers(tenantId, audience);
+    const users = await this.resolveUsers(tenantId, audience, actorUserId);
     const devices = await this.prisma.schoolMobileDevice.findMany({
       where: {
         tenantId,
@@ -174,9 +222,19 @@ export class SchoolSisPushService {
     };
   }
 
-  private async resolveUsers(tenantId: string, audience: PushAudienceDto) {
+  private async resolveUsers(
+    tenantId: string,
+    audience: PushAudienceDto,
+    actorUserId?: string,
+  ) {
     const year = await this.sis.currentYear(tenantId);
     const kind = audience.kind;
+    if (kind === 'MY_DEVICES') {
+      if (!actorUserId) {
+        throw new BadRequestException('Sign in to send a test to your phone');
+      }
+      return [{ userId: actorUserId, studentId: null as string | null }];
+    }
     if (kind === 'CUSTOM' && audience.userIds?.length) {
       return audience.userIds.map((userId) => ({
         userId,
@@ -300,7 +358,7 @@ export class SchoolSisPushService {
         'Urgent notifications require confirmation',
       );
     }
-    const users = await this.resolveUsers(tenantId, dto.audience);
+    const users = await this.resolveUsers(tenantId, dto.audience, actor.userId);
     const devices = await this.prisma.schoolMobileDevice.findMany({
       where: {
         tenantId,
@@ -309,6 +367,13 @@ export class SchoolSisPushService {
         pushToken: { not: null },
       },
     });
+    if (send && !devices.length) {
+      throw new BadRequestException(
+        dto.audience.kind === 'MY_DEVICES'
+          ? 'No FCM token on this account. Sign in to the St. Luke’s School app with the same user, then try again.'
+          : 'No registered app devices for this audience. Check Devices, or send to “My signed-in app (test)”.',
+      );
+    }
     if (devices.length > 40 && send && !dto.confirm) {
       throw new BadRequestException('Large broadcasts require confirmation');
     }
@@ -337,8 +402,17 @@ export class SchoolSisPushService {
         priority: dto.priority ?? 'NORMAL',
         imageUrl: dto.imageUrl,
         iconUrl: dto.iconUrl,
-        deepLinkType: dto.deepLinkType ?? 'NONE',
-        deepLinkValue: dto.deepLinkValue,
+        deepLinkType:
+          dto.deepLinkType && dto.deepLinkType !== 'NONE'
+            ? dto.deepLinkType
+            : this.attachmentKind(dto.imageUrl) === 'pdf'
+              ? 'DOCUMENT'
+              : 'NONE',
+        deepLinkValue:
+          dto.deepLinkValue ||
+          (this.attachmentKind(dto.imageUrl) === 'pdf'
+            ? dto.imageUrl
+            : undefined),
         audienceType: dto.audience.kind,
         audienceJson: dto.audience as unknown as Prisma.InputJsonValue,
         status: send
@@ -529,12 +603,18 @@ export class SchoolSisPushService {
       body: campaign.body,
       category: campaign.category,
       priority: campaign.priority,
-      imageUrl: campaign.imageUrl ?? undefined,
+      imageUrl: this.fcmImageUrl(campaign.imageUrl),
       data: {
         notificationId: campaign.id,
         type: campaign.category,
         deepLink,
         entityId: campaign.deepLinkValue ?? '',
+        attachmentUrl: campaign.imageUrl ?? '',
+        attachmentType: this.attachmentKind(campaign.imageUrl),
+        path:
+          this.attachmentKind(campaign.imageUrl) === 'pdf'
+            ? (campaign.imageUrl ?? '')
+            : '',
       },
     });
     const byToken = new Map(result.perToken.map((p) => [p.token, p]));
@@ -815,23 +895,67 @@ export class SchoolSisPushService {
     tenantId: string,
     file: { buffer: Buffer; mimetype: string; originalname: string },
   ) {
-    const ok = /image\/(jpeg|png|webp)/i.test(file.mimetype);
-    if (!ok) throw new BadRequestException('Upload a JPG, PNG or WebP image');
-    const ext = file.mimetype.includes('png')
-      ? 'png'
-      : file.mimetype.includes('webp')
-        ? 'webp'
-        : 'jpg';
-    const key = `school/${tenantId}/push/${randomUUID()}.${ext}`;
-    const stored = await this.storage.put(key, file.buffer, {
-      contentType: file.mimetype,
-    });
-    if (!stored.url) {
-      throw new BadRequestException(
-        'Image stored, but a public HTTPS URL is required for mobile delivery. Configure object storage.',
-      );
+    const image = /image\/(jpeg|jpg|png|webp)/i.test(file.mimetype);
+    const pdf =
+      file.mimetype === 'application/pdf' ||
+      file.originalname.toLowerCase().endsWith('.pdf');
+    if (!image && !pdf) {
+      throw new BadRequestException('Upload a JPG, PNG, WebP image or a PDF');
     }
-    return { url: stored.url, key };
+    const ext = pdf
+      ? 'pdf'
+      : file.mimetype.includes('png')
+        ? 'png'
+        : file.mimetype.includes('webp')
+          ? 'webp'
+          : 'jpg';
+    const fileName = `${randomUUID()}.${ext}`;
+    const key = `school/${tenantId}/push/${fileName}`;
+    await this.storage.put(key, file.buffer, { contentType: file.mimetype });
+    const url = this.mediaPublicUrl(tenantId, fileName);
+    return {
+      url,
+      key,
+      kind: pdf ? 'pdf' : 'image',
+      fileName: file.originalname,
+    };
+  }
+
+  async readMedia(tenantId: string, fileName: string) {
+    if (!/^[0-9a-f-]{36}\.(jpg|jpeg|png|webp|pdf)$/i.test(fileName)) {
+      throw new BadRequestException('Invalid file');
+    }
+    const key = `school/${tenantId}/push/${fileName}`;
+    const buf = await this.storage.get(key);
+    if (!buf) throw new NotFoundException('File not found');
+    const lower = fileName.toLowerCase();
+    const contentType = lower.endsWith('.pdf')
+      ? 'application/pdf'
+      : lower.endsWith('.png')
+        ? 'image/png'
+        : lower.endsWith('.webp')
+          ? 'image/webp'
+          : 'image/jpeg';
+    return { buf, contentType, fileName };
+  }
+
+  private mediaPublicUrl(tenantId: string, fileName: string) {
+    const origin = (
+      this.config.get<string>('API_PUBLIC_ORIGIN') ||
+      this.config.get<string>('APP_PUBLIC_URL') ||
+      'http://localhost:3001'
+    ).replace(/\/$/, '');
+    return `${origin}/api/v1/school-sis/notifications/media-file/${tenantId}/${fileName}`;
+  }
+
+  private attachmentKind(url?: string | null) {
+    if (!url) return '';
+    return /\.pdf($|\?)/i.test(url) ? 'pdf' : 'image';
+  }
+
+  private fcmImageUrl(url?: string | null) {
+    if (!url || this.attachmentKind(url) === 'pdf') return undefined;
+    return /^https?:\/\//i.test(url) ? url : undefined;
   }
 
   async logs(tenantId: string) {

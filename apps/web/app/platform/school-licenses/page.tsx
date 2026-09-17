@@ -33,8 +33,10 @@ export default function SchoolSaasLicensesPage() {
   return (
     <PlatformShell title="School ERP licenses">
       <p className="mb-4 text-sm text-muted-foreground">
-        Issue Ed25519-signed annual licenses for school ERP installations. The private signing key
-        stays on the API host (LICENSE_PRIVATE_KEY) and is never sent to the browser.
+        Issue Ed25519-signed annual licenses for school ERP installations. School keys start with{' '}
+        <span className="font-medium">BCL-SLS-</span>. Do not use Don Bosco college keys from
+        Licenses / Activation keys. The private signing key stays on the API host
+        (LICENSE_PRIVATE_KEY) and is never sent to the browser.
       </p>
       <div className="mb-6 grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-3">
         <input

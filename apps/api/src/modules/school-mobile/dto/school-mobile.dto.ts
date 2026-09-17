@@ -181,6 +181,11 @@ export class SchoolMobileLoginDto {
   deviceId?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  deviceLabel?: string;
+
+  @IsOptional()
   @IsBoolean()
   rememberMe?: boolean;
 }
@@ -195,6 +200,52 @@ export class SchoolMobileChangePasswordDto {
   @MinLength(8)
   @MaxLength(128)
   newPassword!: string;
+}
+
+export class SchoolAuthIdentifierDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  identifier!: string;
+}
+
+export class SchoolAuthChallengeDto {
+  @IsString()
+  @MinLength(8)
+  @MaxLength(80)
+  challengeId!: string;
+}
+
+export class SchoolAuthOtpDto extends SchoolAuthChallengeDto {
+  @IsString()
+  @MinLength(4)
+  @MaxLength(8)
+  otp!: string;
+}
+
+export class SchoolAuthCodeDto extends SchoolAuthChallengeDto {
+  @IsString()
+  @MinLength(6)
+  @MaxLength(20)
+  code!: string;
+}
+
+export class SchoolAuthSetPasswordDto extends SchoolAuthChallengeDto {
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  newPassword!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  confirmPassword!: string;
+}
+
+export class SchoolAuthLogoutDto {
+  @IsOptional()
+  @IsString()
+  refreshToken?: string;
 }
 
 export class SchoolMobileFeedbackDto {

@@ -16,7 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? "St. Luke's School",
   slug: 'st-lukes-school',
-  version: '1.0.0',
+  version: '1.0.1',
   scheme: 'stlukesschool',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
@@ -33,6 +33,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     buildNumber: '1',
     ...(hasGoogleServiceInfo ? { googleServicesFile: googleServiceInfoLocal } : {}),
     infoPlist: {
+      NSFaceIDUsageDescription:
+        "St. Luke's School uses Face ID only to unlock your signed-in school account on this device. Face data stays on your phone.",
       NSPhotoLibraryUsageDescription:
         "St. Luke's School uses your photo library only if you choose to share a gallery image. Photos are not uploaded without your action.",
       ITSAppUsesNonExemptEncryption: false,
@@ -40,11 +42,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'in.stlukestura.school',
-    versionCode: 1,
+    versionCode: 2,
     ...(hasGoogleServices ? { googleServicesFile: googleServicesLocal } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#1a237e',
+      backgroundColor: '#FFFFFF',
     },
     permissions: ['INTERNET', 'RECEIVE_BOOT_COMPLETED', 'VIBRATE', 'POST_NOTIFICATIONS'],
     blockedPermissions: [
@@ -58,7 +60,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         image: './assets/splash-icon.png',
         backgroundColor: '#1a237e',
-        imageWidth: 200,
+        imageWidth: 128,
         resizeMode: 'contain',
       },
     ],
@@ -70,8 +72,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         defaultChannel: 'stlukes_school_default',
       },
     ],
+    'expo-asset',
     'expo-router',
     'expo-secure-store',
+    [
+      'expo-local-authentication',
+      {
+        faceIDPermission:
+          "St. Luke's School uses Face ID only to unlock your signed-in school account on this device.",
+      },
+    ],
     'expo-font',
   ],
   experiments: { typedRoutes: true },

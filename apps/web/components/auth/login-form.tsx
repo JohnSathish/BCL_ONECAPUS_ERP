@@ -293,7 +293,7 @@ export function LoginForm({
               ? isDemoLoginWorkspaceEnabled()
                 ? 'Incorrect username or password. Use the demo credentials below, or contact your administrator.'
                 : schoolSession
-                  ? 'Incorrect admission or roll number or password. Try SLS/2026/0001 or SLS26-0001 with StLuke@2026 on first login, then ask the school office if the account is missing.'
+                  ? 'Invalid admission/roll number or password. First-time students should activate their account. Contact the school office if you need help.'
                   : 'Incorrect username or password. Check your details, use Forgot password, or contact your college administrator.'
               : text,
           );

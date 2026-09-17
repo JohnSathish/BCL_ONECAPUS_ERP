@@ -106,6 +106,11 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
           live('student-list', 'Student List', '/admin/school-sis/students'),
           live('student-add', 'Add Student', '/admin/school-sis/students/new'),
           live('student-enrollment', 'Student Enrollment', '/admin/school-sis/students'),
+          live(
+            'student-account-security',
+            'Account Security',
+            '/admin/school-sis/students/account-security',
+          ),
           soon('student-documents', 'Student Documents'),
           soon('student-history', 'Student History'),
         ],
@@ -789,6 +794,11 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         children: [
           live('sec-roles', 'Roles', '/admin/school-sis/users/roles'),
           live('sec-permissions', 'Permissions', '/admin/school-sis/users/permissions'),
+          live(
+            'student-activation',
+            'Student activation',
+            '/admin/school-sis/students/account-security',
+          ),
           live('password-policies', 'Password policies', '/admin/school-sis/users/security'),
           live('login-security', 'Login security', '/admin/school-sis/users/login-history'),
           live('sessions', 'Sessions', '/admin/school-sis/users/sessions'),

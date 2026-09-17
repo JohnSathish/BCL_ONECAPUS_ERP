@@ -25,6 +25,7 @@ import { TenantResolutionService } from '../tenants/tenant-resolution.service';
 import { SchoolWebGalleryService } from '../school-web/school-web-gallery.service';
 import { SchoolWebService } from '../school-web/school-web.service';
 import { SchoolSisFeesService } from '../school-sis/school-sis-fees.service';
+import { SchoolSisMonthlyFeesService } from '../school-sis/school-sis-monthly-fees.service';
 import { SchoolSisTimetableService } from '../school-sis/school-sis-timetable.service';
 import { SchoolSisAttendanceService } from '../school-sis/school-sis-attendance.service';
 import { SchoolSisExamsService } from '../school-sis/school-sis-exams.service';
@@ -56,6 +57,12 @@ import {
   PatchSchoolMobileInboxDto,
   PatchSchoolMobileSettingsDto,
   RegisterSchoolMobileDeviceDto,
+  SchoolAuthChallengeDto,
+  SchoolAuthCodeDto,
+  SchoolAuthIdentifierDto,
+  SchoolAuthLogoutDto,
+  SchoolAuthOtpDto,
+  SchoolAuthSetPasswordDto,
   SchoolMobileBroadcastDto,
   SchoolMobileChangePasswordDto,
   SchoolMobileFeedbackDto,
@@ -64,6 +71,7 @@ import {
 } from './dto/school-mobile.dto';
 import { SchoolMobileAccessService } from './school-mobile-access.service';
 import { SchoolMobileAuthService } from './school-mobile-auth.service';
+import { SchoolMobileAccountAuthService } from './school-mobile-account-auth.service';
 import { SchoolMobileDeviceService } from './school-mobile-device.service';
 import { SchoolMobileHomeService } from './school-mobile-home.service';
 import { SchoolMobileInboxService } from './school-mobile-inbox.service';
@@ -85,10 +93,12 @@ export class SchoolMobileController {
     private readonly prayer: SchoolMobilePrayerService,
     private readonly access: SchoolMobileAccessService,
     private readonly auth: SchoolMobileAuthService,
+    private readonly accountAuth: SchoolMobileAccountAuthService,
     private readonly web: SchoolWebService,
     private readonly gallery: SchoolWebGalleryService,
     private readonly timetable: SchoolSisTimetableService,
     private readonly fees: SchoolSisFeesService,
+    private readonly monthlyFees: SchoolSisMonthlyFeesService,
     private readonly attendance: SchoolSisAttendanceService,
     private readonly exams: SchoolSisExamsService,
     private readonly hr: SchoolSisHrService,
@@ -146,8 +156,9 @@ export class SchoolMobileController {
     @Headers('x-app-platform') platform?: string,
   ) {
     const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
-    return this.auth.login(tenantId, dto.identifier, dto.password, {
+    return this.accountAuth.login(tenantId, dto.identifier, dto.password, {
       deviceId: dto.deviceId || deviceHeader,
+      deviceLabel: dto.deviceLabel,
       clientType: 'mobile',
       appVersion,
       platform,
@@ -170,7 +181,7 @@ export class SchoolMobileController {
     @Headers('x-app-version') appVersion?: string,
     @Headers('x-app-platform') platform?: string,
   ) {
-    return this.auth.changePassword(
+    return this.accountAuth.changePassword(
       user.tid,
       user.sub,
       dto.currentPassword,
@@ -187,6 +198,198 @@ export class SchoolMobileController {
             ?.trim() || req.ip,
       },
     );
+  }
+
+  @Public()
+  @Post('auth/activate/start')
+  async activateStart(
+    @Req() req: Request,
+    @Body() dto: SchoolAuthIdentifierDto,
+    @Headers('x-tenant-slug') tenantSlug?: string,
+    @Headers('host') host?: string,
+    @Headers('x-login-host') loginHost?: string,
+  ) {
+    const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
+    return this.accountAuth.startChallenge(
+      tenantId,
+      dto.identifier,
+      'ACTIVATE',
+      req.ip,
+    );
+  }
+
+  @Public()
+  @Post('auth/forgot-password')
+  async forgotStart(
+    @Req() req: Request,
+    @Body() dto: SchoolAuthIdentifierDto,
+    @Headers('x-tenant-slug') tenantSlug?: string,
+    @Headers('host') host?: string,
+    @Headers('x-login-host') loginHost?: string,
+  ) {
+    const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
+    return this.accountAuth.startChallenge(
+      tenantId,
+      dto.identifier,
+      'RESET',
+      req.ip,
+    );
+  }
+
+  @Public()
+  @Post('auth/activate/send-otp')
+  async activateSendOtp(
+    @Req() req: Request,
+    @Body() dto: SchoolAuthChallengeDto,
+    @Headers('x-tenant-slug') tenantSlug?: string,
+    @Headers('host') host?: string,
+    @Headers('x-login-host') loginHost?: string,
+  ) {
+    const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
+    return this.accountAuth.sendOtp(tenantId, dto.challengeId, req.ip);
+  }
+
+  @Public()
+  @Post('auth/forgot-password/send-otp')
+  async forgotSendOtp(
+    @Req() req: Request,
+    @Body() dto: SchoolAuthChallengeDto,
+    @Headers('x-tenant-slug') tenantSlug?: string,
+    @Headers('host') host?: string,
+    @Headers('x-login-host') loginHost?: string,
+  ) {
+    const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
+    return this.accountAuth.sendOtp(tenantId, dto.challengeId, req.ip);
+  }
+
+  @Public()
+  @Post('auth/activate/verify-otp')
+  async activateVerifyOtp(
+    @Body() dto: SchoolAuthOtpDto,
+    @Headers('x-tenant-slug') tenantSlug?: string,
+    @Headers('host') host?: string,
+    @Headers('x-login-host') loginHost?: string,
+  ) {
+    const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
+    return this.accountAuth.verifyOtp(tenantId, dto.challengeId, dto.otp);
+  }
+
+  @Public()
+  @Post('auth/forgot-password/verify-otp')
+  async forgotVerifyOtp(
+    @Body() dto: SchoolAuthOtpDto,
+    @Headers('x-tenant-slug') tenantSlug?: string,
+    @Headers('host') host?: string,
+    @Headers('x-login-host') loginHost?: string,
+  ) {
+    const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
+    return this.accountAuth.verifyOtp(tenantId, dto.challengeId, dto.otp);
+  }
+
+  @Public()
+  @Post('auth/activate/verify-code')
+  async activateVerifyCode(
+    @Body() dto: SchoolAuthCodeDto,
+    @Headers('x-tenant-slug') tenantSlug?: string,
+    @Headers('host') host?: string,
+    @Headers('x-login-host') loginHost?: string,
+  ) {
+    const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
+    return this.accountAuth.verifyActivationCode(
+      tenantId,
+      dto.challengeId,
+      dto.code,
+    );
+  }
+
+  @Public()
+  @Post('auth/activate/set-password')
+  async activateSetPassword(
+    @Body() dto: SchoolAuthSetPasswordDto,
+    @Headers('x-tenant-slug') tenantSlug?: string,
+    @Headers('host') host?: string,
+    @Headers('x-login-host') loginHost?: string,
+  ) {
+    const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
+    return this.accountAuth.setPasswordFromChallenge(
+      tenantId,
+      dto.challengeId,
+      dto.newPassword,
+      dto.confirmPassword,
+    );
+  }
+
+  @Public()
+  @Post('auth/forgot-password/set-password')
+  async forgotSetPassword(
+    @Body() dto: SchoolAuthSetPasswordDto,
+    @Headers('x-tenant-slug') tenantSlug?: string,
+    @Headers('host') host?: string,
+    @Headers('x-login-host') loginHost?: string,
+  ) {
+    const tenantId = await this.tenantFromHost(tenantSlug, host, loginHost);
+    return this.accountAuth.setPasswordFromChallenge(
+      tenantId,
+      dto.challengeId,
+      dto.newPassword,
+      dto.confirmPassword,
+    );
+  }
+
+  @Get('auth/sessions')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  sessions(
+    @CurrentUser() user: JwtUser,
+    @Headers('x-refresh-token') refresh?: string,
+  ) {
+    return this.accountAuth.sessions(user.tid, user.sub, refresh);
+  }
+
+  @Post('auth/sessions/revoke')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  revokeSession(
+    @CurrentUser() user: JwtUser,
+    @Body() body: { sessionId?: string },
+  ) {
+    return this.accountAuth.revokeSession(
+      user.tid,
+      user.sub,
+      String(body.sessionId || ''),
+    );
+  }
+
+  @Post('auth/sessions/revoke-others')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  revokeOthers(@CurrentUser() user: JwtUser, @Body() dto: SchoolAuthLogoutDto) {
+    return this.accountAuth.revokeOtherSessions(
+      user.tid,
+      user.sub,
+      dto.refreshToken,
+    );
+  }
+
+  @Post('auth/sessions/revoke-all')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  revokeAllSessions(@CurrentUser() user: JwtUser) {
+    return this.accountAuth.logoutAll(user.tid, user.sub);
+  }
+
+  @Post('auth/logout')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  logout(@CurrentUser() user: JwtUser, @Body() dto: SchoolAuthLogoutDto) {
+    return this.accountAuth.logout(user.tid, user.sub, dto.refreshToken);
+  }
+
+  @Post('auth/logout-all')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  logoutAll(@CurrentUser() user: JwtUser) {
+    return this.accountAuth.logoutAll(user.tid, user.sub);
   }
 
   @Post('feedback')
@@ -325,8 +528,19 @@ export class SchoolMobileController {
       user,
       childId,
     );
-    if (!studentId) return { structure: null, structures: [] };
-    return this.fees.forStudent(user.tid, studentId);
+    if (!studentId)
+      return { structure: null, structures: [], monthly: null, profile: null };
+    const [pack, monthly, profile] = await Promise.all([
+      this.fees.forStudent(user.tid, studentId).catch(() => ({
+        structure: null,
+        structures: [],
+        student: null,
+        enrollment: null,
+      })),
+      this.monthlyFees.ledger(user.tid, studentId).catch(() => null),
+      this.home.me(user, childId),
+    ]);
+    return { ...pack, monthly, profile: profile.student ?? null };
   }
 
   @Get('attendance')
@@ -527,6 +741,13 @@ export class SchoolMobileController {
   @RequireAnyPermission(...ACCESS)
   inboxList(@CurrentUser() user: JwtUser) {
     return this.inbox.list(user);
+  }
+
+  @Get('inbox/:id')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  inboxOne(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.inbox.get(user, id);
   }
 
   @Post('inbox/read-all')

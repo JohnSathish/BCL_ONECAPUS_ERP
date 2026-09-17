@@ -6,6 +6,7 @@ import { SchoolWebModule } from '../school-web/school-web.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { SchoolMobileAccessService } from './school-mobile-access.service';
 import { SchoolMobileAuthService } from './school-mobile-auth.service';
+import { SchoolMobileAccountAuthService } from './school-mobile-account-auth.service';
 import { SchoolMobileDeviceService } from './school-mobile-device.service';
 import { SchoolMobileHomeService } from './school-mobile-home.service';
 import { SchoolMobileInboxService } from './school-mobile-inbox.service';
@@ -26,6 +27,7 @@ import { SchoolMobileController } from './school-mobile.controller';
     SchoolMobileSettingsService,
     SchoolMobileAccessService,
     SchoolMobileAuthService,
+    SchoolMobileAccountAuthService,
     SchoolMobileDeviceService,
     SchoolMobileInboxService,
     SchoolMobilePrayerService,

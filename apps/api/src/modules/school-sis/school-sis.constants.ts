@@ -38,6 +38,13 @@ export const SCHOOL_SIS_STATIONERY_PAY_METHODS = [
   'OTHER',
 ] as const;
 export const SCHOOL_ADMISSION_NUMBER_PREFIX = 'SLS';
-/** First-login portal password for bulk student/staff accounts. Users must change it. */
-export const SCHOOL_PORTAL_DEFAULT_PASSWORD = 'StLuke@2026';
+/** Rejected on login and password set. Never assign as a shared credential. */
+export const SCHOOL_FORBIDDEN_PASSWORDS = [
+  'StLuke@2026',
+  'StLuke@123',
+  'password',
+  'Password1',
+  '12345678',
+] as const;
+export const SCHOOL_PORTAL_DEFAULT_PASSWORD = SCHOOL_FORBIDDEN_PASSWORDS[0];
 export const SCHOOL_APPLICATION_NUMBER_PREFIX = 'APP';

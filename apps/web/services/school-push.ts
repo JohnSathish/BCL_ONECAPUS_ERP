@@ -10,9 +10,15 @@ export async function previewSchoolPushAudience(audience: Record<string, unknown
   return data as { recipients: number; devices: number; sample: Array<{ userId: string }> };
 }
 
-export async function sendSchoolPush(payload: Record<string, unknown>) {
-  const { data } = await api.post('/v1/school-sis/notifications/send', payload);
-  return data;
+export async function testSchoolPush() {
+  const { data } = await api.post('/v1/school-sis/notifications/test');
+  return data as {
+    ok: boolean;
+    devices: number;
+    successCount: number;
+    failureCount: number;
+    engine?: string;
+  };
 }
 
 export async function draftSchoolPush(payload: Record<string, unknown>) {
@@ -113,5 +119,5 @@ export async function uploadSchoolPushImage(file: File) {
   const form = new FormData();
   form.append('file', file);
   const { data } = await api.post('/v1/school-sis/notifications/media', form);
-  return data as { url: string };
+  return data as { url: string; kind?: 'image' | 'pdf'; fileName?: string };
 }

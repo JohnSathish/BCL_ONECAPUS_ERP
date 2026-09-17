@@ -29,6 +29,7 @@ import {
   saveSchoolPushSettings,
   saveSchoolPushTemplate,
   sendSchoolPush,
+  testSchoolPush,
   unregisterSchoolPushDevice,
   uploadSchoolPushImage,
 } from '@/services/school-push';
@@ -57,6 +58,7 @@ const LINKS = [
 ];
 
 const AUDIENCES = [
+  ['MY_DEVICES', 'My signed-in app (test)'],
   ['INDIVIDUAL_STUDENT', 'Individual Student'],
   ['PARENT', 'Parent'],
   ['TEACHER', 'Teacher'],
@@ -141,7 +143,9 @@ export function NotificationsDesk() {
     deepLinkType: 'NONE',
     deepLinkValue: '',
     imageUrl: '',
-    kind: 'ALL_PARENTS',
+    attachmentName: '',
+    attachmentKind: '' as '' | 'image' | 'pdf',
+    kind: 'MY_DEVICES',
     gradeId: '',
     sectionId: '',
     studentIds: [] as string[],
@@ -536,14 +540,51 @@ export function NotificationsDesk() {
             <p className="mt-1 text-sm text-slate-600">
               Project:{' '}
               {String(
-                (settings.data as { fcm?: { projectId?: string } } | undefined)?.fcm?.projectId ??
-                  'Not configured',
+                (settings.data as { fcm?: { projectId?: string; engine?: string } } | undefined)
+                  ?.fcm?.projectId ?? 'Not configured',
               )}
             </p>
             <p className="text-sm text-slate-500">
-              Demo mode and credentials are configured on the server. Administrators do not enter
-              Firebase keys here.
+              Sending uses the Firebase Admin SDK on the API server (FCM HTTP v1). Firebase keys are
+              never entered in this browser.
             </p>
+            {(settings.data as { fcm?: { demo?: boolean } } | undefined)?.fcm?.demo ? (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                FCM_DEMO_MODE is on, so phones will not receive messages. Set FCM_DEMO_MODE=false in
+                apps/api/.env and restart the API.
+              </p>
+            ) : null}
+            <p className="mt-2 text-xs text-slate-500">
+              Use Firebase project st-lukes-school-6f471 on the API (FIREBASE_SERVICE_ACCOUNT_FILE
+              or FCM_PROJECT_ID / FCM_CLIENT_EMAIL / FCM_PRIVATE_KEY). That must match the school
+              app, not another Firebase project.
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              Engine:{' '}
+              {String(
+                (settings.data as { fcm?: { engine?: string } } | undefined)?.fcm?.engine ??
+                  'unknown',
+              )}
+            </p>
+            {canManage ? (
+              <button
+                type="button"
+                className="mt-3 rounded-lg border px-3 py-1.5 text-sm"
+                onClick={() =>
+                  testSchoolPush()
+                    .then((r) =>
+                      setError(
+                        r.ok
+                          ? `Test sent to ${r.successCount} of ${r.devices} device(s).`
+                          : `Test did not reach a device (${r.failureCount} failed).`,
+                      ),
+                    )
+                    .catch((e) => setError(apiErrorMessage(e)))
+                }
+              >
+                Send test to my signed-in app
+              </button>
+            ) : null}
           </div>
           {canManage ? (
             <form
@@ -803,20 +844,40 @@ export function NotificationsDesk() {
                   onChange={(e) => setDraft({ ...draft, deepLinkValue: e.target.value })}
                 />
               </div>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  uploadSchoolPushImage(file)
-                    .then((r) => setDraft((s) => ({ ...s, imageUrl: r.url })))
-                    .catch((err) => setError(apiErrorMessage(err)));
-                }}
-              />
-              {draft.imageUrl ? (
-                <img src={draft.imageUrl} alt="" className="h-20 rounded-lg object-cover" />
-              ) : null}
+              <div>
+                <p className="text-sm font-medium text-slate-700">Image or PDF</p>
+                <p className="mb-1 text-xs text-slate-500">
+                  Images appear on the lock screen. PDFs open when the user taps the notification
+                  (max 5 MB).
+                </p>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf,.pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    uploadSchoolPushImage(file)
+                      .then((r) =>
+                        setDraft((s) => ({
+                          ...s,
+                          imageUrl: r.url,
+                          attachmentKind: r.kind === 'pdf' ? 'pdf' : 'image',
+                          attachmentName: r.fileName || file.name,
+                        })),
+                      )
+                      .catch((err) => setError(apiErrorMessage(err)));
+                  }}
+                />
+                {draft.imageUrl && draft.attachmentKind !== 'pdf' ? (
+                  <img src={draft.imageUrl} alt="" className="mt-2 h-20 rounded-lg object-cover" />
+                ) : null}
+                {draft.attachmentKind === 'pdf' && draft.attachmentName ? (
+                  <p className="mt-2 text-sm text-slate-600">
+                    PDF attached: {draft.attachmentName}
+                  </p>
+                ) : null}
+              </div>
               <div className="flex flex-wrap gap-3 text-sm">
                 <label>
                   <input
@@ -858,6 +919,16 @@ export function NotificationsDesk() {
               <p className="mt-1 text-sm text-slate-200">
                 {draft.body || 'Your message will appear here.'}
               </p>
+              {draft.attachmentKind === 'image' && draft.imageUrl ? (
+                <img
+                  src={draft.imageUrl}
+                  alt=""
+                  className="mt-3 max-h-28 rounded-lg object-cover"
+                />
+              ) : null}
+              {draft.attachmentKind === 'pdf' ? (
+                <p className="mt-3 text-xs text-slate-300">PDF: {draft.attachmentName}</p>
+              ) : null}
               <p className="mt-6 text-right text-xs text-slate-400">now</p>
             </div>
           </div>

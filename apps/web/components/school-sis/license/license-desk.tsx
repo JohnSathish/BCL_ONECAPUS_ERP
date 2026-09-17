@@ -187,7 +187,14 @@ export function SchoolLicenseDesk() {
       </div>
 
       {notice ? (
-        <p className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800">
+        <p
+          className={cn(
+            'rounded-xl border p-3 text-sm',
+            /activated|validated|deactivated|renewed/i.test(notice)
+              ? 'border-slate-200 bg-white text-slate-800'
+              : 'border-rose-200 bg-rose-50 text-rose-900',
+          )}
+        >
           {notice}
         </p>
       ) : null}
@@ -248,10 +255,15 @@ export function SchoolLicenseDesk() {
             <div className="mt-3 space-y-2">
               <input
                 className="h-10 w-full rounded-lg border px-3 text-sm"
-                placeholder="License key (BCL-SLS-… or signed token)"
+                placeholder="School license key (BCL-SLS-2026-…)"
                 value={form.licenseKey}
                 onChange={(e) => setForm({ ...form, licenseKey: e.target.value })}
               />
+              <p className="text-xs text-slate-500">
+                Do not paste a Don Bosco college key (BCL-65BD-… or BCL-2026-…). Issue a school key
+                at <span className="font-medium">/platform/school-licenses</span> while signed in as
+                platform-admin. Keys start with BCL-SLS-.
+              </p>
               <input
                 className="h-10 w-full rounded-lg border px-3 text-sm"
                 placeholder="Institution / school name"

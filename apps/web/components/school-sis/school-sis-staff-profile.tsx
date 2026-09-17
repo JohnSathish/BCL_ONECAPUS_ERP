@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft,
   Banknote,
   BookOpen,
   Bus,
   FileText,
+  GraduationCap,
   Home,
   KeyRound,
+  Phone,
+  Save,
   Share2,
   UserRound,
   Users,
@@ -30,6 +32,7 @@ import {
 } from '@/lib/school-sis/staff-profile';
 import {
   createSchoolSisStaff,
+  fetchSchoolSisMasters,
   fetchSchoolSisStaffOne,
   patchSchoolSisStaff,
   removeSchoolSisStaffPhoto,
@@ -62,6 +65,71 @@ type FormState = {
   remarks: string;
   extras: StaffExtras;
 };
+
+const DESIGNATIONS = [
+  'Teacher',
+  'Senior Teacher',
+  'PGT',
+  'TGT',
+  'PRT',
+  'Lecturer',
+  'Head of Department',
+  'Vice Principal',
+  'Principal',
+  'Librarian',
+];
+
+const FALLBACK_CLASSES = [
+  'Nursery',
+  'KG',
+  'Class I',
+  'Class II',
+  'Class III',
+  'Class IV',
+  'Class V',
+  'Class VI',
+  'Class VII',
+  'Class VIII',
+  'Class IX',
+  'Class X',
+  'Class XI',
+  'Class XII',
+];
+
+const FALLBACK_SUBJECTS = [
+  'English',
+  'Alternative English',
+  'Khasi',
+  'Garo',
+  'Hindi',
+  'Mathematics',
+  'Physics',
+  'Chemistry',
+  'Biology',
+  'Computer Science',
+  'Accountancy',
+  'Business Studies',
+  'Economics',
+  'Political Science',
+  'History',
+  'Geography',
+  'Education',
+  'Physical Education',
+];
+
+function splitList(raw: string) {
+  return raw
+    .split(/[,;|/]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function joinList(items: string[]) {
+  return items
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(', ');
+}
 
 const EMPTY: FormState = {
   employeeCode: '',
@@ -115,14 +183,19 @@ function Field({
   label,
   children,
   className,
+  required,
 }: {
   label: string;
   children: React.ReactNode;
   className?: string;
+  required?: boolean;
 }) {
   return (
     <label className={cn('block min-w-0', className)}>
-      <span className="mb-1 block text-[12px] font-semibold text-slate-500">{label}</span>
+      <span className="mb-1.5 block text-[12px] font-semibold text-slate-600">
+        {label}
+        {required ? <span className="text-rose-500"> *</span> : null}
+      </span>
       {children}
     </label>
   );
@@ -149,6 +222,61 @@ function SelectInput(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
         props.className,
       )}
     />
+  );
+}
+
+function ChipMultiSelect({
+  values,
+  options,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  values: string[];
+  options: string[];
+  onChange: (next: string[]) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const remaining = options.filter((option) => !values.includes(option));
+  return (
+    <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 focus-within:border-sky-300">
+      {values.map((value) => (
+        <span
+          key={value}
+          className="inline-flex items-center gap-1 rounded-md bg-[#e8f1fb] px-2 py-0.5 text-xs font-semibold text-[#1a365d]"
+        >
+          {value}
+          {!disabled ? (
+            <button
+              type="button"
+              className="text-slate-400 hover:text-slate-700"
+              onClick={() => onChange(values.filter((item) => item !== value))}
+              aria-label={`Remove ${value}`}
+            >
+              ×
+            </button>
+          ) : null}
+        </span>
+      ))}
+      {!disabled && remaining.length ? (
+        <select
+          className="h-7 min-w-[7.5rem] flex-1 border-0 bg-transparent text-sm text-slate-600 outline-none"
+          value=""
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next) onChange([...values, next]);
+          }}
+        >
+          <option value="">{placeholder ?? 'Select'}</option>
+          {remaining.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      ) : null}
+    </div>
   );
 }
 
@@ -192,6 +320,11 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
     queryKey: ['school-sis-staff', staffId],
     queryFn: () => fetchSchoolSisStaffOne(staffId),
     enabled: enabled && !isNew && Boolean(staffId),
+  });
+  const masters = useQuery({
+    queryKey: ['school-sis-masters'],
+    queryFn: fetchSchoolSisMasters,
+    enabled,
   });
 
   useEffect(() => {
@@ -264,6 +397,32 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
   const photoUrl = resolveUploadAssetUrl(query.data?.photoUrl);
   const docs = form.extras.documents ?? {};
   const readOnly = !canManage;
+  const classOptions = useMemo(() => {
+    const fromSchool = (masters.data?.grades ?? [])
+      .filter((g) => g.active !== false)
+      .map((g) => g.name)
+      .filter(Boolean);
+    return Array.from(
+      new Set([
+        ...(fromSchool.length ? fromSchool : FALLBACK_CLASSES),
+        ...splitList(form.classAssigned),
+      ]),
+    );
+  }, [masters.data?.grades, form.classAssigned]);
+  const subjectOptions = useMemo(() => {
+    const fromSchool = (masters.data?.subjects ?? [])
+      .filter((s) => s.active !== false)
+      .map((s) => s.name)
+      .filter(Boolean);
+    const selected = form.extras.subjectsTaught ?? [];
+    return Array.from(
+      new Set([...(fromSchool.length ? fromSchool : FALLBACK_SUBJECTS), ...selected]),
+    );
+  }, [masters.data?.subjects, form.extras.subjectsTaught]);
+  const designationOptions = useMemo(
+    () => Array.from(new Set([...DESIGNATIONS, form.designation].filter(Boolean))),
+    [form.designation],
+  );
 
   if (!isNew && query.isLoading) {
     return <p className="text-sm text-slate-500">Loading staff profile…</p>;
@@ -281,71 +440,59 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
         save.mutate();
       }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
+          <p className="text-xs font-medium text-slate-400">
+            <Link href="/admin/school-sis/staff" className="hover:text-[#1a365d]">
+              Staff
+            </Link>
+            <span className="px-1.5">/</span>
+            <span>My Profile</span>
+            <span className="px-1.5">/</span>
+            <span className="text-[#2563eb]">Edit Profile</span>
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold text-[#1a365d]">
+            {isNew ? 'Add staff' : 'Edit Profile'}
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">
+            Keep your information up to date. This information may be visible to authorized staff
+            and administrators.
+            {completion ? ` Profile ${completion.percent}% complete.` : ''}
+          </p>
+        </div>
+        {!isNew ? (
           <Link
             href="/admin/school-sis/staff"
-            className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-[#1a365d]"
+            className="inline-flex h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-[#1a365d]"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Staff register
+            View Profile
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-[#1a365d]">
-            {isNew ? 'Add staff' : form.fullName || 'Staff profile'}
-          </h1>
-          {completion ? (
-            <p className="mt-1 text-sm text-slate-500">
-              Profile {completion.percent}% complete
-              {completion.missing.length ? ` · Missing: ${completion.missing.join(', ')}` : ''}
-            </p>
-          ) : (
-            <p className="mt-1 text-sm text-slate-500">
-              Only fill what the school has. Leave the rest blank.
-            </p>
-          )}
-        </div>
-        {canManage ? (
-          <div className="flex gap-2">
-            <Link
-              href="/admin/school-sis/staff"
-              className="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600"
-            >
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={save.isPending}
-              className="inline-flex h-10 items-center rounded-xl bg-[#2563eb] px-4 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {isNew ? 'Save staff' : 'Save profile'}
-            </button>
-          </div>
         ) : null}
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       <Section icon={UserRound} title="Personal Information">
-        <div className="mb-4 flex flex-wrap items-start gap-4">
+        <div className="grid gap-4 lg:grid-cols-[11rem_1fr]">
           <div>
             {photoUrl ? (
-              <img src={photoUrl} alt="" className="h-24 w-24 rounded-xl object-cover" />
+              <img src={photoUrl} alt="" className="h-28 w-28 rounded-2xl object-cover" />
             ) : (
-              <div className="flex h-24 w-24 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-lg font-semibold text-slate-400">
+              <div className="flex h-28 w-28 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-lg font-semibold text-slate-400">
                 {staffInitials(form.fullName)}
               </div>
             )}
             {canManage && !isNew ? (
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium"
+                  className="rounded-lg bg-[#2563eb] px-2.5 py-1 text-xs font-semibold text-white"
                   onClick={() => photoRef.current?.click()}
                 >
-                  Upload
+                  Upload Photo
                 </button>
                 <button
                   type="button"
-                  className="rounded-md bg-[#2563eb] px-2.5 py-1 text-xs font-medium text-white"
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600"
                   onClick={() => removePhoto.mutate()}
                   disabled={!query.data?.photoUrl}
                 >
@@ -364,107 +511,117 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
                 />
               </div>
             ) : null}
-            <p className="mt-1 text-[11px] text-slate-400">
-              Upload image size 4MB, Format JPG, PNG, SVG
-            </p>
+            <p className="mt-1 text-[11px] text-slate-400">JPG, PNG, SVG (Max 4MB)</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Field label="Teacher ID" required>
+              <TextInput
+                value={form.employeeCode}
+                onChange={(e) => set('employeeCode', e.target.value)}
+                required
+                disabled={readOnly}
+              />
+            </Field>
+            <Field label="Full Name" required>
+              <TextInput
+                value={form.fullName}
+                onChange={(e) => set('fullName', e.target.value)}
+                required
+                disabled={readOnly}
+              />
+            </Field>
+            <Field label="Designation" required>
+              <SelectInput
+                value={form.designation}
+                onChange={(e) => set('designation', e.target.value)}
+                disabled={readOnly}
+              >
+                <option value="">Select</option>
+                {designationOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label="Gender" required>
+              <SelectInput
+                value={form.gender}
+                onChange={(e) => set('gender', e.target.value)}
+                disabled={readOnly}
+              >
+                <option value="">Select</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="Other">Other</option>
+              </SelectInput>
+            </Field>
+            <Field label="Date of Birth" required>
+              <TextInput
+                type="date"
+                value={form.dateOfBirth}
+                onChange={(e) => set('dateOfBirth', e.target.value)}
+                disabled={readOnly}
+              />
+            </Field>
+            <Field label="Blood Group">
+              <SelectInput
+                value={form.bloodGroup}
+                onChange={(e) => set('bloodGroup', e.target.value)}
+                disabled={readOnly}
+              >
+                <option value="">Select</option>
+                {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label="Date of Joining" required>
+              <TextInput
+                type="date"
+                value={form.joiningDate}
+                onChange={(e) => set('joiningDate', e.target.value)}
+                disabled={readOnly}
+              />
+            </Field>
+            <Field label="Status" required>
+              <SelectInput
+                value={form.status}
+                onChange={(e) => set('status', e.target.value)}
+                disabled={readOnly}
+                className={form.status === 'ACTIVE' ? 'font-semibold text-emerald-700' : undefined}
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </SelectInput>
+            </Field>
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <Field label="Teacher ID">
-            <TextInput
-              value={form.employeeCode}
-              onChange={(e) => set('employeeCode', e.target.value)}
-              required
+      </Section>
+
+      <Section icon={GraduationCap} title="Academic & Professional Information">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Field label="Class Assigned" required className="xl:col-span-2">
+            <ChipMultiSelect
+              values={splitList(form.classAssigned)}
+              options={classOptions}
+              onChange={(next) => set('classAssigned', joinList(next))}
               disabled={readOnly}
+              placeholder="Select class"
             />
           </Field>
-          <Field label="Full Name" className="xl:col-span-2">
-            <TextInput
-              value={form.fullName}
-              onChange={(e) => set('fullName', e.target.value)}
-              required
+          <Field label="Subjects Taught" required className="xl:col-span-2">
+            <ChipMultiSelect
+              values={form.extras.subjectsTaught ?? []}
+              options={subjectOptions}
+              onChange={(next) => setExtra('subjectsTaught', next)}
               disabled={readOnly}
+              placeholder="Select subject"
             />
           </Field>
-          <Field label="Class Assigned">
-            <TextInput
-              value={form.classAssigned}
-              onChange={(e) => set('classAssigned', e.target.value)}
-              disabled={readOnly}
-            />
-          </Field>
-          <Field label="Designation">
-            <TextInput
-              value={form.designation}
-              onChange={(e) => set('designation', e.target.value)}
-              disabled={readOnly}
-            />
-          </Field>
-          <Field label="Gender">
-            <SelectInput
-              value={form.gender}
-              onChange={(e) => set('gender', e.target.value)}
-              disabled={readOnly}
-            >
-              <option value="">Not recorded</option>
-              <option value="Female">Female</option>
-              <option value="Male">Male</option>
-              <option value="Other">Other</option>
-            </SelectInput>
-          </Field>
-          <Field label="Primary Contact Number">
-            <TextInput
-              value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
-              disabled={readOnly}
-            />
-          </Field>
-          <Field label="Email Address">
-            <TextInput
-              type="email"
-              value={form.email}
-              onChange={(e) => set('email', e.target.value)}
-              disabled={readOnly}
-            />
-          </Field>
-          <Field label="Blood Group">
-            <SelectInput
-              value={form.bloodGroup}
-              onChange={(e) => set('bloodGroup', e.target.value)}
-              disabled={readOnly}
-            >
-              <option value="">Not recorded</option>
-              {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-          <Field label="Date of Joining">
-            <TextInput
-              type="date"
-              value={form.joiningDate}
-              onChange={(e) => set('joiningDate', e.target.value)}
-              disabled={readOnly}
-            />
-          </Field>
-          <Field label="Father / Spouse Name">
-            <TextInput
-              value={form.fatherSpouseName}
-              onChange={(e) => set('fatherSpouseName', e.target.value)}
-              disabled={readOnly}
-            />
-          </Field>
-          <Field label="Date of Birth">
-            <TextInput
-              type="date"
-              value={form.dateOfBirth}
-              onChange={(e) => set('dateOfBirth', e.target.value)}
-              disabled={readOnly}
-            />
-          </Field>
-          <Field label="Type">
+          <Field label="Type" required>
             <SelectInput
               value={form.staffType}
               onChange={(e) => set('staffType', e.target.value)}
@@ -480,12 +637,12 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
               onChange={(e) => set('trainingStatus', e.target.value)}
               disabled={readOnly}
             >
-              <option value="">Not recorded</option>
+              <option value="">Select</option>
               <option value="Trained">Trained</option>
               <option value="Untrained">Untrained</option>
             </SelectInput>
           </Field>
-          <Field label="Academic Qualification">
+          <Field label="Academic Qualification" required className="xl:col-span-2">
             <TextInput
               value={form.academicQualification}
               onChange={(e) => set('academicQualification', e.target.value)}
@@ -497,43 +654,114 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
               value={form.professionalQualification}
               onChange={(e) => set('professionalQualification', e.target.value)}
               disabled={readOnly}
+              placeholder="Enter professional qualification"
             />
           </Field>
-          <Field label="Teaching Experience">
+          <Field label="Teaching Experience" required>
+            <div className="flex items-center gap-2">
+              <TextInput
+                value={form.teachingExperience.replace(/\s*years?\.?$/i, '').trim()}
+                onChange={(e) => set('teachingExperience', e.target.value)}
+                disabled={readOnly}
+                inputMode="decimal"
+              />
+              <span className="shrink-0 text-sm text-slate-500">years</span>
+            </div>
+          </Field>
+        </div>
+      </Section>
+
+      <Section icon={Phone} title="Contact Information">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Field label="Primary Contact Number" required>
+            <div className="flex">
+              <span className="inline-flex h-10 items-center rounded-l-lg border border-r-0 border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-500">
+                +91
+              </span>
+              <TextInput
+                className="rounded-l-none"
+                value={form.phone.replace(/^\+91\s*/, '')}
+                onChange={(e) => set('phone', e.target.value)}
+                disabled={readOnly}
+              />
+            </div>
+          </Field>
+          <Field label="Email Address" required>
             <TextInput
-              value={form.teachingExperience}
-              onChange={(e) => set('teachingExperience', e.target.value)}
+              type="email"
+              value={form.email}
+              onChange={(e) => set('email', e.target.value)}
               disabled={readOnly}
             />
           </Field>
-          <Field label="Status">
-            <SelectInput
-              value={form.status}
-              onChange={(e) => set('status', e.target.value)}
-              disabled={readOnly}
-            >
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-            </SelectInput>
-          </Field>
-          <Field label="Address" className="sm:col-span-2 xl:col-span-3">
+          <Field label="Address">
             <TextInput
               value={form.address}
               onChange={(e) => set('address', e.target.value)}
               disabled={readOnly}
             />
           </Field>
-          <Field label="Notes" className="sm:col-span-2 xl:col-span-5">
-            <textarea
+        </div>
+      </Section>
+
+      <Section icon={FileText} title="Additional Information">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Field label="Father / Spouse Name">
+            <TextInput
+              value={form.fatherSpouseName}
+              onChange={(e) => set('fatherSpouseName', e.target.value)}
+              disabled={readOnly}
+            />
+          </Field>
+          <Field label="Emergency Contact Number">
+            <div className="flex">
+              <span className="inline-flex h-10 items-center rounded-l-lg border border-r-0 border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-500">
+                +91
+              </span>
+              <TextInput
+                className="rounded-l-none"
+                value={(form.extras.emergencyPhone ?? '').replace(/^\+91\s*/, '')}
+                onChange={(e) => setExtra('emergencyPhone', e.target.value)}
+                disabled={readOnly}
+              />
+            </div>
+          </Field>
+          <Field label="Emergency Contact Name">
+            <TextInput
+              value={form.extras.emergencyName ?? ''}
+              onChange={(e) => setExtra('emergencyName', e.target.value)}
+              disabled={readOnly}
+            />
+          </Field>
+          <Field label="Notes">
+            <TextInput
               value={form.remarks}
               onChange={(e) => set('remarks', e.target.value)}
               disabled={readOnly}
-              rows={3}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300"
+              placeholder="Any additional notes…"
             />
           </Field>
         </div>
       </Section>
+
+      {canManage ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link
+            href="/admin/school-sis/staff"
+            className="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-medium text-slate-600"
+          >
+            Cancel
+          </Link>
+          <button
+            type="submit"
+            disabled={save.isPending}
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#2563eb] px-5 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            <Save className="h-4 w-4" />
+            {save.isPending ? 'Saving…' : isNew ? 'Save staff' : 'Save Changes'}
+          </button>
+        </div>
+      ) : null}
 
       <Section icon={Banknote} title="Payroll">
         <p className="mb-3 text-xs text-slate-400">

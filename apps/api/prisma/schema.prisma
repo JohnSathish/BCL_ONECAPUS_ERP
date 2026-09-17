@@ -17208,6 +17208,107 @@ model SchoolPersonAccount {
   @@schema("school")
 }
 
+model SchoolAuthSettings {
+  id                       String   @id @default(uuid()) @db.Uuid
+  tenantId                 String   @unique @map("tenant_id") @db.Uuid
+  maxLoginAttempts         Int      @default(5) @map("max_login_attempts")
+  lockMinutes              Int      @default(15) @map("lock_minutes")
+  otpTtlSeconds            Int      @default(300) @map("otp_ttl_seconds")
+  otpResendSeconds         Int      @default(45) @map("otp_resend_seconds")
+  maxOtpAttempts           Int      @default(5) @map("max_otp_attempts")
+  maxOtpSendsPerHour       Int      @default(5) @map("max_otp_sends_per_hour")
+  activationCodeHours      Int      @default(72) @map("activation_code_hours")
+  passwordMinLength        Int      @default(8) @map("password_min_length")
+  historyCount             Int      @default(3) @map("history_count")
+  maxSessions              Int      @default(8) @map("max_sessions")
+  otpEnabled               Boolean  @default(true) @map("otp_enabled")
+  activationCodeEnabled    Boolean  @default(true) @map("activation_code_enabled")
+  requireVerifiedContact   Boolean  @default(false) @map("require_verified_contact")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@map("school_auth_settings")
+  @@schema("school")
+}
+
+model SchoolAuthChallenge {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  purpose       String
+  channel       String
+  identifier    String
+  contactMasked String?   @map("contact_masked")
+  contactKind   String?   @map("contact_kind")
+  otpHash       String?   @map("otp_hash")
+  otpExpiresAt  DateTime? @map("otp_expires_at")
+  otpSentAt     DateTime? @map("otp_sent_at")
+  otpAttempts   Int       @default(0) @map("otp_attempts")
+  otpSendCount  Int       @default(0) @map("otp_send_count")
+  verifiedAt    DateTime? @map("verified_at")
+  consumedAt    DateTime? @map("consumed_at")
+  expiresAt     DateTime  @map("expires_at")
+  ipAddress     String?   @map("ip_address")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, purpose, createdAt])
+  @@index([tenantId, userId])
+  @@map("school_auth_challenges")
+  @@schema("school")
+}
+
+model SchoolActivationCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  studentId  String?   @map("student_id") @db.Uuid
+  codeHash   String    @map("code_hash")
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  issuedById String?   @map("issued_by_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, userId])
+  @@index([tenantId, codeHash])
+  @@map("school_activation_codes")
+  @@schema("school")
+}
+
+model SchoolAuthLock {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  identifier   String
+  failedCount  Int       @default(0) @map("failed_count")
+  lockedUntil  DateTime? @map("locked_until")
+  lastFailedAt DateTime  @default(now()) @map("last_failed_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, identifier])
+  @@map("school_auth_locks")
+  @@schema("school")
+}
+
+model SchoolAuthEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  event      String
+  identifier String?
+  device     String?
+  ipAddress  String?  @map("ip_address")
+  reason     String?
+  sessionRef String?  @map("session_ref")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, event])
+  @@map("school_auth_events")
+  @@schema("school")
+}
+
 model SchoolStaff {
   id             String    @id @default(uuid()) @db.Uuid
   tenantId       String    @map("tenant_id") @db.Uuid

@@ -3,10 +3,12 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -14,7 +16,11 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { RequiresSchoolLicense } from './school-sis-license.decorators';
+import {
+  RequiresSchoolLicense,
+  SkipSchoolLicense,
+} from './school-sis-license.decorators';
+import { Public } from '../../common/decorators/public.decorator';
 import {
   CurrentUser,
   type JwtUser,
@@ -76,13 +82,22 @@ export class SchoolSisPushController {
     return this.push.dashboard(user.tid);
   }
 
+  @Post('test')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_MANAGE,
+    SCHOOL_PUSH_PERMISSION_SEND,
+  )
+  test(@CurrentUser() user: JwtUser) {
+    return this.push.sendTest(user.tid, actor(user));
+  }
+
   @Post('audience/preview')
   @RequireAnyPermission(
     SCHOOL_SIS_PERMISSION_MANAGE,
     SCHOOL_PUSH_PERMISSION_SEND,
   )
   preview(@CurrentUser() user: JwtUser, @Body() dto: PushAudienceDto) {
-    return this.push.previewAudience(user.tid, dto);
+    return this.push.previewAudience(user.tid, dto, user.sub);
   }
 
   @Post('draft')
@@ -163,7 +178,7 @@ export class SchoolSisPushController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 2_000_000 },
+      limits: { fileSize: 5_000_000 },
     }),
   )
   upload(
@@ -171,8 +186,23 @@ export class SchoolSisPushController {
     @UploadedFile()
     file?: { buffer: Buffer; mimetype: string; originalname: string },
   ) {
-    if (!file) throw new BadRequestException('Image required');
+    if (!file) throw new BadRequestException('Choose an image or PDF');
     return this.push.uploadImage(user.tid, file);
+  }
+
+  @Public()
+  @SkipSchoolLicense()
+  @Get('media-file/:tenantId/:fileName')
+  @Header('Cache-Control', 'public, max-age=86400')
+  async mediaFile(
+    @Param('tenantId') tenantId: string,
+    @Param('fileName') fileName: string,
+  ) {
+    const file = await this.push.readMedia(tenantId, fileName);
+    return new StreamableFile(file.buf, {
+      type: file.contentType,
+      disposition: `inline; filename="${file.fileName}"`,
+    });
   }
 
   @Get('devices')

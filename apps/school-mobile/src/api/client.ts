@@ -1,9 +1,13 @@
 import { getApiBase, schoolHeaders } from '@/api/config';
 import { getAccessToken } from '@/auth/session';
-import { refreshAccessToken } from '@/auth/token-refresh';
+import {
+  AccountDisabledError,
+  refreshAccessToken,
+  SessionExpiredError,
+} from '@/auth/token-refresh';
 
-let onAuthFailure: (() => void) | null = null;
-export function setAuthFailureHandler(handler: () => void) {
+let onAuthFailure: ((kind: 'expired' | 'disabled') => void) | null = null;
+export function setAuthFailureHandler(handler: (kind: 'expired' | 'disabled') => void) {
   onAuthFailure = handler;
 }
 
@@ -38,17 +42,29 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
     throw new Error("You're offline. Some information may be unavailable.");
   }
   const json = await res.json().catch(() => ({}));
+  const combined = `${messageOf(json, '')}`;
+  if ((res.status === 401 || res.status === 403) && /ACCOUNT_DISABLED/i.test(combined)) {
+    onAuthFailure?.('disabled');
+    throw new AccountDisabledError();
+  }
   if (res.status === 401 && !options.skipAuth && !options._retried) {
     try {
       await refreshAccessToken();
       return apiFetch<T>(path, { ...options, _retried: true });
     } catch (err) {
+      if (err instanceof AccountDisabledError) {
+        onAuthFailure?.('disabled');
+        throw err;
+      }
       const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('offline') || msg.includes('Could not refresh')) {
+      if (msg.toLowerCase().includes('offline')) {
         throw err instanceof Error ? err : new Error(msg);
       }
-      onAuthFailure?.();
-      throw new Error('Please sign in again.');
+      if (err instanceof SessionExpiredError) {
+        onAuthFailure?.('expired');
+        throw new Error('Please sign in again.');
+      }
+      throw err instanceof Error ? err : new Error(msg);
     }
   }
   if (!res.ok) {

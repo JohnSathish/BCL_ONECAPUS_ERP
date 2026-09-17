@@ -7,7 +7,6 @@ import {
   SCHOOL_SIS_PRODUCT,
 } from '../../src/modules/school-sis/school-sis.constants';
 import {
-  SCHOOL_MOBILE_DEFAULT_PASSWORD,
   SCHOOL_MOBILE_PERMISSION_MANAGE,
   SCHOOL_MOBILE_PERMISSION_PARENT,
   SCHOOL_MOBILE_PERMISSION_STAFF,
@@ -606,10 +605,7 @@ export async function seedStLukesSecondarySchool(
     return user;
   };
 
-  const studentDefaultHash = await bcrypt.hash(
-    SCHOOL_MOBILE_DEFAULT_PASSWORD,
-    12,
-  );
+  const studentDefaultHash = await bcrypt.hash(randomUUID() + randomUUID(), 12);
   const studentUser = await ensureUser(
     'student@stlukestura.in',
     'John Marak',

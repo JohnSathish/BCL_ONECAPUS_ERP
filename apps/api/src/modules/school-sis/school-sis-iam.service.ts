@@ -21,7 +21,6 @@ import {
   SCHOOL_IAM_MODULES,
   SUPER_ROLE_SLUGS,
 } from './school-sis-iam.catalog';
-import { SCHOOL_PORTAL_DEFAULT_PASSWORD } from './school-sis.constants';
 import {
   preferredSchoolLoginUsername,
   compactSchoolLoginId,
@@ -606,12 +605,10 @@ export class SchoolSisIamService implements OnModuleInit {
     }
     const temporaryPassword = custom
       ? custom
-      : options.generate
-        ? `Sl.${randomBytes(5)
-            .toString('base64url')
-            .replace(/[^a-zA-Z0-9]/g, 'x')
-            .slice(0, 8)}9A`
-        : SCHOOL_PORTAL_DEFAULT_PASSWORD;
+      : `Sl.${randomBytes(5)
+          .toString('base64url')
+          .replace(/[^a-zA-Z0-9]/g, 'x')
+          .slice(0, 8)}9A`;
     const passwordHash = await bcrypt.hash(temporaryPassword, 12);
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
@@ -831,7 +828,8 @@ export class SchoolSisIamService implements OnModuleInit {
         }),
       ]);
     return {
-      defaultPassword: SCHOOL_PORTAL_DEFAULT_PASSWORD,
+      defaultPassword: null,
+      activationRequired: true,
       studentsTotal,
       studentsMissing,
       staffTotal,
@@ -859,7 +857,7 @@ export class SchoolSisIamService implements OnModuleInit {
     const preview = await this.directoryPreview(tenantId);
     if (!body.confirm) return { ...preview, ready: true };
 
-    const password = body.password?.trim() || SCHOOL_PORTAL_DEFAULT_PASSWORD;
+    const password = body.password?.trim() || randomBytes(24).toString('hex');
     const limit = Math.min(Math.max(body.limit ?? 40, 1), 80);
     const passwordHash = await bcrypt.hash(password, 12);
     const created: string[] = [];
@@ -1018,7 +1016,8 @@ export class SchoolSisIamService implements OnModuleInit {
     );
     return {
       ok: failed.length === 0,
-      defaultPassword: password,
+      defaultPassword: null,
+      activationRequired: true,
       created: created.length,
       linked: linked.length,
       skipped: skipped.length,

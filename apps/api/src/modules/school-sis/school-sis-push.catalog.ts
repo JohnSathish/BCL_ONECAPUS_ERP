@@ -49,6 +49,7 @@ export const PUSH_DEEP_LINKS = [
 ] as const;
 
 export const PUSH_AUDIENCES = [
+  'MY_DEVICES',
   'INDIVIDUAL_STUDENT',
   'PARENT',
   'TEACHER',

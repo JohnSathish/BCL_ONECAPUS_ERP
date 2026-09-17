@@ -39,12 +39,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         id: payload.sub,
         tenantId: payload.tid,
         deletedAt: null,
-        isActive: true,
       },
     });
 
     if (!user) {
       throw new UnauthorizedException('Session invalid or user deactivated');
+    }
+    if (!user.isActive || user.accountStatus === 'disabled') {
+      throw new UnauthorizedException('ACCOUNT_DISABLED');
     }
 
     if (payload.sid) {

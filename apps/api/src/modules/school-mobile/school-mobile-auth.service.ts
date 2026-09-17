@@ -57,11 +57,18 @@ export class SchoolMobileAuthService {
     }
 
     const isStudent = await this.isStudentAccount(tenantId, user.id);
-    let valid = await bcrypt.compare(password, user.passwordHash);
-    const typedDefault = password === SCHOOL_MOBILE_DEFAULT_PASSWORD;
-    if (!valid && isStudent && typedDefault) {
-      valid = true;
+    if (
+      password === SCHOOL_MOBILE_DEFAULT_PASSWORD ||
+      password === 'StLuke@123'
+    ) {
+      const failure = await this.loginAttempts.recordFailure(
+        tenantId,
+        ip,
+        trimmed,
+      );
+      throw new UnauthorizedException(failure.message);
     }
+    const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       const failure = await this.loginAttempts.recordFailure(
         tenantId,
@@ -71,15 +78,13 @@ export class SchoolMobileAuthService {
       throw new UnauthorizedException(failure.message);
     }
 
-    const mustResetPassword =
-      Boolean(user.mustResetPassword) || (isStudent && typedDefault);
-
-    if (mustResetPassword && !user.mustResetPassword) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { mustResetPassword: true },
-      });
+    if (isStudent && user.mustResetPassword) {
+      throw new UnauthorizedException(
+        'Invalid admission/roll number or password.',
+      );
     }
+
+    const mustResetPassword = Boolean(user.mustResetPassword);
 
     await this.loginAttempts.resetOnSuccess(tenantId, ip, trimmed);
     const session = await this.auth.issueRememberedSessionForUser(
@@ -110,9 +115,7 @@ export class SchoolMobileAuthService {
       where: { id: userId, tenantId, deletedAt: null },
     });
     if (!user) throw new UnauthorizedException('User not found');
-    const currentOk =
-      (await bcrypt.compare(currentPassword, user.passwordHash)) ||
-      currentPassword === SCHOOL_MOBILE_DEFAULT_PASSWORD;
+    const currentOk = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!currentOk) {
       throw new UnauthorizedException('Current password is incorrect');
     }
@@ -121,10 +124,11 @@ export class SchoolMobileAuthService {
         'Choose a new password that is different from the current one.',
       );
     }
-    if (newPassword === SCHOOL_MOBILE_DEFAULT_PASSWORD) {
-      throw new BadRequestException(
-        'Please choose a personal password, not the school default.',
-      );
+    if (
+      newPassword === SCHOOL_MOBILE_DEFAULT_PASSWORD ||
+      newPassword === 'StLuke@123'
+    ) {
+      throw new BadRequestException('Choose a different password.');
     }
     await this.auth.resetPasswordAndRevokeSessions(
       userId,

@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { apiFetch } from '@/api/client';
 import { APP_VERSION } from '@/api/config';
-import { getAccessToken, getUser } from '@/auth/session';
+import { restoreSchoolSession } from '@/auth/restore';
+import { CREST, SCHOOL } from '@/brand';
 import { colors } from '@/theme/tokens';
 
 export default function GateScreen() {
@@ -32,26 +33,17 @@ export default function GateScreen() {
               maintenance: boot.maintenanceMode ? '1' : '0',
             },
           });
+          await SplashScreen.hideAsync().catch(() => undefined);
           return;
         }
-        const token = await getAccessToken();
-        const user = await getUser();
-        if (token && user?.mustResetPassword) {
-          router.replace('/password');
-        } else {
-          router.replace(token ? '/(tabs)' : '/login');
-        }
       } catch {
-        const token = await getAccessToken();
-        const user = await getUser();
-        if (token && user?.mustResetPassword) {
-          router.replace('/password');
-        } else {
-          router.replace(token ? '/(tabs)' : '/login');
-        }
-      } finally {
-        await SplashScreen.hideAsync().catch(() => undefined);
+        /* continue with local session */
       }
+      if (cancelled) return;
+      const restored = await restoreSchoolSession();
+      if (cancelled) return;
+      router.replace(restored.route);
+      await SplashScreen.hideAsync().catch(() => undefined);
     })();
     return () => {
       cancelled = true;
@@ -60,11 +52,11 @@ export default function GateScreen() {
 
   return (
     <LinearGradient colors={['#0b1048', '#1a237e', '#24308f']} style={styles.fill}>
-      <Image source={require('../assets/icon.png')} style={styles.crest} />
-      <Text style={styles.name}>St. Luke's Secondary School</Text>
-      <Text style={styles.place}>Tura, Meghalaya</Text>
+      <Image source={CREST} style={styles.crest} resizeMode="contain" />
+      <Text style={styles.name}>{SCHOOL.legalName}</Text>
+      <Text style={styles.place}>{SCHOOL.city}</Text>
       <View style={styles.ribbon}>
-        <Text style={styles.ribbonText}>ENLIGHTEN · EMPOWER · SERVE</Text>
+        <Text style={styles.ribbonText}>{SCHOOL.motto.toUpperCase()}</Text>
       </View>
       <Text style={styles.motto}>Shaping Brighter Futures</Text>
       <View style={styles.bar} />
@@ -74,7 +66,7 @@ export default function GateScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
-  crest: { width: 128, height: 128, borderRadius: 64, marginBottom: 8 },
+  crest: { width: 148, height: 148, marginBottom: 8 },
   name: { color: '#fff', fontSize: 24, fontWeight: '800', textAlign: 'center' },
   place: { color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
   ribbon: {

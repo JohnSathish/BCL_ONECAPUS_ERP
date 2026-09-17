@@ -16,6 +16,8 @@ export type LinkedChild = {
   admissionNumber: string;
   classLabel: string | null;
   photoUrl: string | null;
+  rollNumber: string | null;
+  academicYearName: string | null;
 };
 
 @Injectable()
@@ -102,36 +104,49 @@ export class SchoolMobileAccessService {
       for (const link of links) studentIds.add(link.studentId);
     }
     if (!studentIds.size) return [];
-    const year = await this.sis.currentYear(tenantId);
+    const year = await this.sis.currentYear(tenantId).catch(() => null);
     const students = await this.prisma.schoolStudent.findMany({
       where: {
         tenantId,
         id: { in: [...studentIds] },
         deletedAt: null,
       },
-      include: {
-        enrollments: {
-          where: {
-            deletedAt: null,
-            status: 'ACTIVE',
-            academicYearId: year.id,
-          },
-          include: { section: { include: { grade: true } } },
-          take: 1,
-        },
-      },
     });
+    const enrollments = await this.prisma.schoolEnrollment.findMany({
+      where: {
+        tenantId,
+        studentId: { in: [...studentIds] },
+        deletedAt: null,
+      },
+      include: {
+        academicYear: true,
+        section: { include: { grade: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const byStudent = new Map<string, typeof enrollments>();
+    for (const row of enrollments) {
+      const list = byStudent.get(row.studentId) ?? [];
+      list.push(row);
+      byStudent.set(row.studentId, list);
+    }
     return students.map((student) => {
-      const enrollment = student.enrollments[0];
-      const grade = enrollment?.section.grade;
+      const picked = pickEnrollment(byStudent.get(student.id) ?? [], year?.id);
+      const grade = picked?.section.grade;
       return {
         studentId: student.id,
         fullName: student.fullName,
         admissionNumber: student.admissionNumber,
         classLabel: grade
-          ? `${grade.name}${enrollment?.section.name ? ` ${enrollment.section.name}` : ''}`
+          ? `${grade.name}${picked?.section.name ? ` ${picked.section.name}` : ''}`
           : null,
         photoUrl: student.photoUrl,
+        rollNumber:
+          picked?.rollNumber ||
+          byStudent.get(student.id)?.find((row) => row.rollNumber?.trim())
+            ?.rollNumber ||
+          null,
+        academicYearName: picked?.academicYear?.name ?? year?.name ?? null,
       };
     });
   }
@@ -182,4 +197,25 @@ export class SchoolMobileAccessService {
     });
     return staff?.id ?? null;
   }
+}
+
+export function pickEnrollment<
+  T extends {
+    academicYearId: string;
+    status: string;
+    rollNumber: string | null;
+    createdAt: Date;
+  },
+>(rows: T[], currentYearId?: string | null): T | null {
+  if (!rows.length) return null;
+  const current = currentYearId
+    ? rows.find((row) => row.academicYearId === currentYearId)
+    : undefined;
+  const withRoll = rows.find((row) => row.rollNumber?.trim());
+  return (
+    current ||
+    rows.find((row) => /^active$/i.test(row.status)) ||
+    withRoll ||
+    rows[0]
+  );
 }

@@ -268,7 +268,7 @@ export default function ForceChangePasswordPage() {
             hint={
               <p className="text-xs text-slate-500">
                 {schoolSelf
-                  ? 'Use StLuke@2026 if this is your first login or the office just reset it.'
+                  ? 'Enter the personal password you created when you activated your account.'
                   : 'Use your roll number if this is your first login.'}
               </p>
             }
@@ -365,8 +365,8 @@ export default function ForceChangePasswordPage() {
           </Button>
 
           <p className="text-center text-[11px] leading-relaxed text-slate-400">
-            After saving you stay signed in and leave this page. Use a personal password, not
-            StLuke@2026.
+            After saving you stay signed in and leave this page. Do not reuse a school-wide or
+            default password.
           </p>
         </form>
       </div>

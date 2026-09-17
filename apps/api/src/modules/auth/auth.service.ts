@@ -295,10 +295,10 @@ export class AuthService {
     return true;
   }
 
-  /** St. Luke's first-login password, including older StLuke@123 hashes. */
+  /** Shared school passwords are never accepted. Activation + personal password only. */
   private async trySchoolPortalDefaultPassword(
     tenantId: string,
-    user: {
+    _user: {
       id: string;
       email: string;
       passwordHash: string;
@@ -306,26 +306,10 @@ export class AuthService {
     },
     password: string,
   ): Promise<boolean> {
-    const typed = password.trim();
-    if (typed !== SCHOOL_PORTAL_DEFAULT_PASSWORD && typed !== 'StLuke@123') {
-      return false;
-    }
-    if (!(await isSchoolSisTenant(this.prisma, tenantId))) return false;
-    const stillOnLegacy = await bcrypt.compare('StLuke@123', user.passwordHash);
-    const stillOnSchoolDefault = await bcrypt.compare(
-      SCHOOL_PORTAL_DEFAULT_PASSWORD,
-      user.passwordHash,
-    );
-    if (!user.mustResetPassword && !stillOnLegacy && !stillOnSchoolDefault) {
-      return false;
-    }
-    if (stillOnSchoolDefault) return true;
-    const passwordHash = await bcrypt.hash(SCHOOL_PORTAL_DEFAULT_PASSWORD, 12);
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash, mustResetPassword: true },
-    });
-    return true;
+    void tenantId;
+    void _user;
+    void password;
+    return false;
   }
 
   /**
@@ -996,16 +980,13 @@ export class AuthService {
       password,
     });
     if (
-      !mustResetPassword &&
       (await isSchoolSisTenant(this.prisma, tenant.id)) &&
       (password.trim() === SCHOOL_PORTAL_DEFAULT_PASSWORD ||
         password.trim() === 'StLuke@123')
     ) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { mustResetPassword: true },
-      });
-      mustResetPassword = true;
+      throw new UnauthorizedException(
+        'Invalid admission/roll number or password.',
+      );
     }
     if (
       !mustResetPassword &&
@@ -1188,8 +1169,16 @@ export class AuthService {
     });
 
     if (activeSession) {
-      if (!activeSession.user.isActive || activeSession.user.deletedAt) {
-        throw new UnauthorizedException('Invalid refresh token');
+      if (
+        !activeSession.user.isActive ||
+        activeSession.user.deletedAt ||
+        activeSession.user.accountStatus === 'disabled'
+      ) {
+        await this.prisma.refreshSession.updateMany({
+          where: { userId: activeSession.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        throw new UnauthorizedException('ACCOUNT_DISABLED');
       }
 
       const tenant = await this.prisma.tenant.findFirst({
@@ -1488,7 +1477,7 @@ export class AuthService {
     if (!(await isSchoolSisTenant(this.prisma, user.tenantId))) return false;
     const typed = currentPassword.trim();
     if (typed === SCHOOL_PORTAL_DEFAULT_PASSWORD || typed === 'StLuke@123') {
-      return true;
+      return false;
     }
     const keys = new Set(schoolLoginCompacts(typed));
     if (user.username) {
@@ -1541,9 +1530,7 @@ export class AuthService {
     const valid =
       (await bcrypt.compare(currentPassword, user.passwordHash)) || schoolOk;
     if (!valid) {
-      throw new UnauthorizedException(
-        'Current password is incorrect. For first login use StLuke@2026.',
-      );
+      throw new UnauthorizedException('Current password is incorrect.');
     }
     if (
       (await isSchoolSisTenant(this.prisma, user.tenantId)) &&

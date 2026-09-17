@@ -10,26 +10,28 @@ export function Screen({
   action,
   onBack,
   light,
+  navy,
 }: {
   children: ReactNode;
   title?: string;
   action?: ReactNode;
   onBack?: boolean;
   light?: boolean;
+  navy?: boolean;
 }) {
   const router = useRouter();
   return (
     <SafeAreaView style={[styles.safe, light && styles.safeLight]} edges={['top', 'left', 'right']}>
       {title ? (
-        <View style={styles.bar}>
+        <View style={[styles.bar, navy && styles.barNavy]}>
           {onBack ? (
             <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
-              <Text style={styles.backText}>‹</Text>
+              <Text style={[styles.backText, navy && styles.navyInk]}>‹</Text>
             </Pressable>
           ) : (
             <View style={styles.back} />
           )}
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[styles.title, navy && styles.navyInk]} numberOfLines={1}>
             {title}
           </Text>
           <View style={styles.right}>{action}</View>
@@ -171,6 +173,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  barNavy: { backgroundColor: colors.navy, paddingBottom: 14 },
+  navyInk: { color: '#fff' },
   back: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   backText: { fontSize: 28, color: colors.navy, marginTop: -4 },
   title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.navy },

@@ -108,6 +108,7 @@
     "docx": "^9.7.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "firebase-admin": "^13.10.0",
     "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
     "jszip": "^3.10.1",

@@ -3,9 +3,13 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { fetchHome, switchChild } from '@/auth/login';
-import { getActiveChild } from '@/auth/session';
+import { getActiveChild, getUser, saveUser } from '@/auth/session';
 import { mediaUrl } from '@/api/config';
-import { Card, EmptyState, Feed, Loader, Screen } from '@/ui/kit';
+import { CAMPUS, CREST, SCHOOL } from '@/brand';
+import { isPrincipalUser, isStaffUser } from '@/persona';
+import { PrincipalHome } from '@/screens/principal-home';
+import { StaffHome } from '@/screens/staff-home';
+import { EmptyState, Feed, Loader, Screen } from '@/ui/kit';
 import { colors, radii, space } from '@/theme/tokens';
 
 type Child = {
@@ -14,26 +18,32 @@ type Child = {
   classLabel: string | null;
   photoUrl?: string | null;
 };
-type Notice = {
-  slug: string;
-  title: string;
-  publishedAt?: string | null;
-  category?: string | null;
-};
+type Notice = { slug: string; title: string; publishedAt?: string | null };
 type EventRow = { slug: string; title: string; startsAt?: string | null; venue?: string | null };
-type Flash = { label?: string; items?: Array<{ id: string; title: string; enabled?: boolean }> };
 
 const TILES = [
-  ['📄', 'Notices', '/(tabs)/notices', '#e8f0ff'],
-  ['📅', 'Events', '/(tabs)/events', '#e9f8ee'],
-  ['✅', 'Attendance', '/attendance', '#fff3e6'],
-  ['📘', 'Academics', '/academics', '#ecebff'],
-  ['🗓️', 'Timetable', '/timetable', '#e7f6fb'],
-  ['✏️', 'Homework', '/homework', '#fdecec'],
-  ['🖼️', 'Gallery', '/(tabs)/gallery', '#eef6e8'],
-  ['📆', 'Calendar', '/calendar', '#fff6db'],
-  ['⋯', 'More', '/(tabs)/more', '#eef1f8'],
+  { icon: '👤', label: 'My Profile', href: '/profile', bg: '#fce7f3', fg: '#db2777' },
+  { icon: '🗓️', label: 'Timetable', href: '/timetable', bg: '#f3e8ff', fg: '#7c3aed' },
+  { icon: '✅', label: 'Attendance', href: '/attendance', bg: '#dcfce7', fg: '#16a34a' },
+  { icon: '✏️', label: 'Homework', href: '/homework', bg: '#ffedd5', fg: '#ea580c' },
+  { icon: '📚', label: 'Study Material', href: '/study-material', bg: '#dbeafe', fg: '#2563eb' },
+  { icon: '📋', label: 'Examinations', href: '/examinations', bg: '#e0e7ff', fg: '#4f46e5' },
+  { icon: '₹', label: 'Fees', href: '/fees', bg: '#d1fae5', fg: '#059669' },
+  { icon: '📢', label: 'Notices', href: '/(tabs)/notices', bg: '#fce7f3', fg: '#c026d3' },
+  { icon: '🍱', label: 'Lunch Menu', href: '/lunch', bg: '#fef3c7', fg: '#d97706' },
+  { icon: '🚌', label: 'Transport', href: '/transport', bg: '#cffafe', fg: '#0891b2' },
+  { icon: '🛒', label: 'Stationery', href: '/stationery', bg: '#ffe4e6', fg: '#e11d48' },
+  { icon: '⊞', label: 'More', href: '/(tabs)/more', bg: '#e2e8f0', fg: '#475569' },
 ] as const;
+
+function monthDay(iso?: string | null) {
+  if (!iso) return { mon: '—', day: '—' };
+  const d = new Date(iso);
+  return {
+    mon: d.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase(),
+    day: String(d.getDate()).padStart(2, '0'),
+  };
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -43,7 +53,15 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     try {
       const childId = await getActiveChild();
-      setData(await fetchHome(childId));
+      const home = await fetchHome(childId);
+      setData(home);
+      const me = (home.me ?? {}) as { persona?: string; displayName?: string };
+      const user = await getUser();
+      await saveUser({
+        ...user,
+        persona: me.persona,
+        displayName: me.displayName || user?.displayName,
+      });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load home');
@@ -61,28 +79,24 @@ export default function HomeScreen() {
       </Screen>
     );
   }
-  if (error && !data) {
-    return (
-      <Screen title="Home">
-        <EmptyState title="Something went wrong" body={error} />
-      </Screen>
-    );
+
+  if (data && isPrincipalUser(data.me as { persona?: string })) {
+    return <PrincipalHome data={data} />;
+  }
+
+  if (data && isStaffUser(data.me as { persona?: string })) {
+    return <StaffHome data={data} />;
   }
 
   const me = (data?.me ?? {}) as {
     displayName?: string;
-    persona?: string;
     children?: Child[];
     activeStudentId?: string | null;
     student?: { photoUrl?: string | null; classLabel?: string | null; fullName?: string | null };
   };
-  const flash = (data?.flashNews ?? {}) as Flash;
   const notices = (data?.notices ?? []) as Notice[];
   const events = (data?.events ?? []) as EventRow[];
   const unread = Number(data?.unreadCount ?? 0);
-  const greeting = String(data?.greeting ?? 'Hello');
-  const albums = (data?.albums ?? []) as Array<{ cover?: { url?: string } | string | null }>;
-  const banner = mediaUrl(albums[0]?.cover as never);
   const studentName = me.student?.fullName || me.displayName || 'Student';
   const classLabel = me.student?.classLabel || me.children?.[0]?.classLabel || '';
   const photo =
@@ -92,28 +106,38 @@ export default function HomeScreen() {
     <Screen>
       <Feed>
         <View style={styles.top}>
-          <Pressable onPress={() => router.push('/profile')} style={styles.who}>
-            {photo ? (
-              <Image source={{ uri: mediaUrl(photo) }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarFallback}>
-                <Text style={styles.avatarLetter}>{studentName.charAt(0)}</Text>
-              </View>
-            )}
+          <View style={styles.brand}>
+            <Image source={CREST} style={styles.crest} resizeMode="contain" />
             <View>
-              <Text style={styles.greet}>{greeting}</Text>
-              <Text style={styles.name}>{studentName}</Text>
-              {classLabel ? <Text style={styles.class}>{classLabel}</Text> : null}
+              <Text style={styles.school}>{SCHOOL.shortName}</Text>
+              <Text style={styles.motto}>{SCHOOL.tagline}</Text>
             </View>
-          </Pressable>
-          <Pressable onPress={() => router.push('/inbox')} style={styles.bell}>
-            <Text style={{ fontSize: 18 }}>🔔</Text>
-            {unread > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unread}</Text>
+          </View>
+          <View style={styles.who}>
+            <Pressable onPress={() => router.push('/(tabs)/messages')} style={styles.bell}>
+              <Text style={{ fontSize: 18 }}>🔔</Text>
+              {unread > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+            <Pressable onPress={() => router.push('/profile')} style={styles.person}>
+              {photo ? (
+                <Image source={{ uri: mediaUrl(photo) }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarLetter}>{studentName.charAt(0)}</Text>
+                </View>
+              )}
+              <View>
+                <Text style={styles.name} numberOfLines={1}>
+                  {studentName.split(' ')[0]}
+                </Text>
+                {classLabel ? <Text style={styles.class}>{classLabel}</Text> : null}
               </View>
-            ) : null}
-          </Pressable>
+            </Pressable>
+          </View>
         </View>
 
         {me.children && me.children.length > 1 ? (
@@ -137,94 +161,138 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <LinearGradient colors={['#1a237e', '#3949ab']} style={styles.banner}>
-          {banner ? <Image source={{ uri: banner }} style={styles.bannerImg} /> : null}
-          <View style={styles.bannerShade} />
-          <Text style={styles.bannerTitle}>Discipline Today</Text>
-          <Text style={styles.bannerSub}>A Brighter Tomorrow</Text>
-        </LinearGradient>
+        <View style={styles.hero}>
+          <Image source={CAMPUS} style={styles.heroImg} />
+          <LinearGradient
+            colors={['rgba(11,22,88,0.15)', 'rgba(11,22,88,0.82)']}
+            style={styles.heroShade}
+          >
+            <Text style={styles.heroKicker}>WELCOME TO</Text>
+            <Text style={styles.heroTitle}>{SCHOOL.shortName}</Text>
+            <Text style={styles.heroQuote}>“{SCHOOL.bannerQuote}”</Text>
+          </LinearGradient>
+        </View>
 
         <View style={styles.grid}>
-          {TILES.map(([emoji, label, href, bg]) => (
-            <Pressable key={label} style={styles.tile} onPress={() => router.push(href as never)}>
-              <View style={[styles.tileIcon, { backgroundColor: bg }]}>
-                <Text style={{ fontSize: 18 }}>{emoji}</Text>
+          {TILES.map((tile) => (
+            <Pressable
+              key={tile.label}
+              style={styles.tile}
+              onPress={() => router.push(tile.href as never)}
+            >
+              <View style={[styles.tileIcon, { backgroundColor: tile.bg }]}>
+                <Text style={{ fontSize: 20, color: tile.fg }}>{tile.icon}</Text>
               </View>
-              <Text style={styles.tileLabel}>{label}</Text>
+              <Text style={styles.tileLabel}>{tile.label}</Text>
             </Pressable>
           ))}
         </View>
 
         <View style={styles.sectionRow}>
-          <Text style={styles.section}>Today’s Update</Text>
+          <View style={styles.sectionLeft}>
+            <Text style={{ fontSize: 16 }}>📢</Text>
+            <Text style={styles.section}>Latest Announcement</Text>
+          </View>
           <Pressable onPress={() => router.push('/(tabs)/notices')}>
-            <Text style={styles.seeAll}>See All ›</Text>
+            <Text style={styles.seeAll}>View All ›</Text>
           </Pressable>
         </View>
-        {flash.items
-          ?.filter((item) => item.enabled !== false)
-          .slice(0, 2)
-          .map((item) => (
-            <Card key={item.id}>
-              <Text style={styles.kicker}>{flash.label || 'FLASH NEWS'}</Text>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-            </Card>
-          ))}
-        {notices.slice(0, 3).map((notice) => (
-          <Card key={notice.slug} onPress={() => router.push(`/notice/${notice.slug}`)}>
-            <Text style={styles.kicker}>{notice.category || 'Notice'}</Text>
-            <Text style={styles.cardTitle}>{notice.title}</Text>
-          </Card>
-        ))}
-        {events.slice(0, 1).map((event) => (
-          <Card key={event.slug} onPress={() => router.push(`/event/${event.slug}`)}>
-            <Text style={styles.kicker}>Event</Text>
-            <Text style={styles.cardTitle}>{event.title}</Text>
-          </Card>
-        ))}
-        {!notices.length && !events.length && !flash.items?.length ? (
-          <EmptyState title="No new notices at the moment." body="Check back after school hours." />
+        {notices[0] ? (
+          <Pressable
+            style={styles.announce}
+            onPress={() => router.push(`/notice/${notices[0].slug}`)}
+          >
+            <Text style={styles.announceText}>{notices[0].title}</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.announce}>
+            <Text style={styles.announceText}>
+              School notices from the office will appear here.
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.sectionRow}>
+          <View style={styles.sectionLeft}>
+            <Text style={{ fontSize: 16 }}>📅</Text>
+            <Text style={styles.section}>Upcoming Events</Text>
+          </View>
+          <Pressable onPress={() => router.push('/(tabs)/calendar')}>
+            <Text style={styles.seeAll}>View All ›</Text>
+          </Pressable>
+        </View>
+        {events.slice(0, 3).map((event) => {
+          const md = monthDay(event.startsAt);
+          return (
+            <Pressable
+              key={event.slug}
+              style={styles.eventRow}
+              onPress={() => router.push(`/event/${event.slug}`)}
+            >
+              <View style={styles.dateBox}>
+                <Text style={styles.dateMon}>{md.mon}</Text>
+                <Text style={styles.dateDay}>{md.day}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                {event.startsAt ? (
+                  <Text style={styles.eventWhen}>
+                    {new Date(event.startsAt).toLocaleDateString('en-IN', { dateStyle: 'long' })}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={styles.chev}>›</Text>
+            </Pressable>
+          );
+        })}
+        {!events.length ? (
+          <EmptyState title="No upcoming events" body="Published school events will show here." />
         ) : null}
+        {error ? <Text style={styles.warn}>{error}</Text> : null}
       </Feed>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  who: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 48, height: 48, borderRadius: 24 },
+  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  crest: { width: 44, height: 44 },
+  school: { color: colors.navy, fontSize: 17, fontWeight: '800' },
+  motto: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  who: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  person: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 110 },
+  avatar: { width: 36, height: 36, borderRadius: 18 },
   avatarFallback: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.navy,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLetter: { color: '#fff', fontWeight: '800', fontSize: 18 },
-  greet: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  name: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-  class: { color: colors.navy, fontWeight: '700', fontSize: 12 },
+  avatarLetter: { color: '#fff', fontWeight: '800' },
+  name: { color: colors.ink, fontWeight: '800', fontSize: 13 },
+  class: { color: colors.muted, fontSize: 10, fontWeight: '600' },
   bell: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
   badge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: 0,
+    right: 0,
     backgroundColor: colors.danger,
     borderRadius: 8,
     minWidth: 16,
     height: 16,
     alignItems: 'center',
   },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
   kids: { flexDirection: 'row', gap: 8 },
   kid: {
     borderWidth: 1,
@@ -237,30 +305,67 @@ const styles = StyleSheet.create({
   kidOn: { backgroundColor: colors.navy, borderColor: colors.navy },
   kidText: { color: colors.navy, fontWeight: '700' },
   kidTextOn: { color: '#fff' },
-  banner: {
-    height: 150,
-    borderRadius: radii.lg,
-    overflow: 'hidden',
+  hero: { height: 168, borderRadius: radii.lg, overflow: 'hidden' },
+  heroImg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  heroShade: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
     padding: space.md,
   },
-  bannerImg: { ...StyleSheet.absoluteFillObject, opacity: 0.45 },
-  bannerShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(10,16,72,0.25)' },
-  bannerTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },
-  bannerSub: { color: colors.gold, fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  tile: { width: '33.33%', alignItems: 'center', paddingVertical: 10, gap: 6 },
+  heroKicker: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  heroTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },
+  heroQuote: { color: '#fde68a', fontStyle: 'italic', marginTop: 4, fontSize: 13 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#fff', borderRadius: radii.lg },
+  tile: { width: '25%', alignItems: 'center', paddingVertical: 12, gap: 6 },
   tileIcon: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileLabel: { fontSize: 12, fontWeight: '700', color: colors.ink },
-  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  section: { fontWeight: '800', color: colors.ink, fontSize: 16 },
-  seeAll: { color: colors.navy, fontWeight: '700' },
-  kicker: { color: colors.green, fontSize: 12, fontWeight: '800' },
-  cardTitle: { fontSize: 15, fontWeight: '800', color: colors.ink },
+  tileLabel: { fontSize: 10, fontWeight: '700', color: colors.ink, textAlign: 'center' },
+  sectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  sectionLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  section: { fontWeight: '800', color: colors.ink, fontSize: 15 },
+  seeAll: { color: colors.navy, fontWeight: '700', fontSize: 12 },
+  announce: {
+    backgroundColor: '#fff',
+    borderRadius: radii.md,
+    padding: 14,
+    borderLeftWidth: 4,
+    borderLeftColor: '#c026d3',
+  },
+  announceText: { color: colors.ink, fontWeight: '600', lineHeight: 20 },
+  eventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#fff',
+    borderRadius: radii.md,
+    padding: 12,
+  },
+  dateBox: {
+    width: 48,
+    borderRadius: 10,
+    backgroundColor: '#eef2ff',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  dateMon: { color: colors.navy, fontSize: 10, fontWeight: '800' },
+  dateDay: { color: colors.navy, fontSize: 18, fontWeight: '800' },
+  eventTitle: { fontWeight: '800', color: colors.ink },
+  eventWhen: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  chev: { color: colors.muted, fontSize: 22 },
+  warn: { color: colors.danger, fontSize: 12 },
 });

@@ -39,6 +39,15 @@ export class SchoolMobileInboxService {
     return { unreadCount, items: rows };
   }
 
+  async get(user: JwtUser, id: string) {
+    this.access.assertAccess(user);
+    const row = await this.prisma.schoolMobileInbox.findFirst({
+      where: { id, tenantId: user.tid, userId: user.sub },
+    });
+    if (!row) throw new NotFoundException('Notification not found');
+    return row;
+  }
+
   async patch(user: JwtUser, id: string, dto: PatchSchoolMobileInboxDto) {
     this.access.assertAccess(user);
     const row = await this.prisma.schoolMobileInbox.findFirst({

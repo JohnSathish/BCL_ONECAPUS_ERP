@@ -25,6 +25,8 @@ import type { JwtUser } from '../../common/decorators/current-user.decorator';
 const FRIENDLY: Record<string, string> = {
   INVALID_LICENSE:
     'The license key could not be verified. Please check the key and try again.',
+  WRONG_PRODUCT:
+    "That key is a college ERP license (Don Bosco), not a St. Luke's school license. Generate a school key in BaseCode Platform → School licenses. School keys start with BCL-SLS-.",
   EXPIRED: 'This license has expired. Please renew your ERP license.',
   WRONG_INSTITUTION: 'This license is not registered for this institution.',
   REVOKED:
@@ -356,6 +358,9 @@ export class SchoolSisLicenseService {
   }
 
   private async resolveIssued(licenseKey: string) {
+    if (isCollegeErpLicenseKey(licenseKey)) {
+      throw this.httpFor('WRONG_PRODUCT');
+    }
     if (licenseKey.startsWith('BCL1.')) {
       const claims = this.verifyToken(licenseKey);
       const row = await this.prisma.schoolSaasLicense.findFirst({
@@ -727,4 +732,12 @@ export class SchoolSisLicenseService {
     }
     return new BadRequestException({ code, message });
   }
+}
+
+function isCollegeErpLicenseKey(key: string) {
+  const k = key.trim().toUpperCase();
+  if (k.startsWith('BCL-SLS-') || k.startsWith('BCL1.')) return false;
+  return (
+    /^BCL-\d{4}-/.test(k) || /^BCL-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}/.test(k)
+  );
 }
