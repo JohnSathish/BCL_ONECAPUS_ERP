@@ -64,6 +64,13 @@ services:
       FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
       FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-}
       FCM_PRIVATE_KEY: ${FCM_PRIVATE_KEY:-}
+      # St. Luke's School app (in.stlukestura.school / st-lukes-school-6f471) — do not reuse college FCM_*
+      SCHOOL_FCM_DEMO_MODE: ${SCHOOL_FCM_DEMO_MODE:-false}
+      SCHOOL_FCM_PROJECT_ID: ${SCHOOL_FCM_PROJECT_ID:-}
+      SCHOOL_FCM_CLIENT_EMAIL: ${SCHOOL_FCM_CLIENT_EMAIL:-}
+      SCHOOL_FCM_PRIVATE_KEY: ${SCHOOL_FCM_PRIVATE_KEY:-}
+      SCHOOL_FIREBASE_SERVICE_ACCOUNT_JSON: ${SCHOOL_FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      API_PUBLIC_ORIGIN: ${API_PUBLIC_ORIGIN:-}
       # College CMS publish → college-web ISR (internal Docker network, not public nginx /api)
       WEBSITE_REVALIDATE_WEBHOOK_URL: ${WEBSITE_REVALIDATE_WEBHOOK_URL:-http://donboscocollege-web:3000/api/revalidate}
       WEBSITE_REVALIDATE_SECRET: ${REVALIDATE_SECRET:-}

@@ -17,10 +17,22 @@ export function isSchoolMobileVersionBelow(
   return compareSchoolMobileVersions(current, minimum) < 0;
 }
 
-/** JS Sunday=0 → ISO weekday Monday=1 … Sunday=7 */
+/** IST weekday Monday=1 … Sunday=7 (school is in Tura; VPS clocks are UTC). */
 export function isoWeekday(now = new Date()): number {
-  const day = now.getDay();
-  return day === 0 ? 7 : day;
+  const weekday = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'short',
+  }).format(now);
+  const map: Record<string, number> = {
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+    Sun: 7,
+  };
+  return map[weekday] ?? 7;
 }
 
 export function weekdayLabel(weekday: number): string {
