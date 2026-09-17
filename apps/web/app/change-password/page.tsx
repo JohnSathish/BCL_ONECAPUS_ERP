@@ -174,6 +174,7 @@ export default function ForceChangePasswordPage() {
       if (next?.accessToken) {
         tokenRefreshManager.clearSchedule();
         setSession(next);
+        useAuthStore.getState().setBootstrapping(false);
         tokenRefreshManager.scheduleProactiveRefresh(next);
         const nextRoles = next.user.roles ?? [];
         const nextPerms = next.user.permissions ?? [];
@@ -182,7 +183,8 @@ export default function ForceChangePasswordPage() {
           : nextRoles.includes('school-student') || nextRoles.includes('school-parent')
             ? '/school-sis-portal/me'
             : resolveHomePath(nextRoles, nextPerms);
-        window.location.assign(dest);
+        // Soft navigate so the new in-memory session is not wiped by a full reload.
+        router.replace(dest);
         return;
       }
       tokenRefreshManager.clearSchedule();

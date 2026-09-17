@@ -2,24 +2,27 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/use-auth';
 import { SCHOOL_SIS_LOGO_SRC } from '@/lib/school-erp/product';
+import { canAccessAdminPortal } from '@/lib/permissions/portal-access';
 import { logout } from '@/services/auth';
 import { useAuthStore } from '@/store/auth-store';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 
 export default function SchoolSisSignedInPage() {
   const router = useRouter();
-  const session = useAuthStore((s) => s.session);
+  const { session, isReady } = useAuth();
   const clear = useAuthStore((s) => s.clear);
-  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const name = session?.user?.displayName?.trim() || session?.user?.email || 'Student';
   const roles = session?.user?.roles ?? [];
-  const schoolSelf = roles.includes('school-student') || roles.includes('school-parent');
+  const permissions = session?.user?.permissions ?? [];
+  const canOpenOffice = canAccessAdminPortal(roles, permissions);
 
   useEffect(() => {
-    if (!hasHydrated) return;
+    if (!isReady) return;
     if (!session?.accessToken) {
       router.replace('/login');
       return;
@@ -27,13 +30,24 @@ export default function SchoolSisSignedInPage() {
     if (session.user.mustResetPassword) {
       router.replace('/change-password');
     }
-  }, [hasHydrated, router, session?.accessToken, session?.user?.mustResetPassword]);
+  }, [isReady, router, session?.accessToken, session?.user?.mustResetPassword]);
 
   async function onLogout() {
     tokenRefreshManager.clearSchedule();
     clear();
     await logout().catch(() => undefined);
     window.location.assign('/login');
+  }
+
+  if (!isReady || !session?.accessToken) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-[#f4f7fb] px-4 py-10">
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-8 text-sm text-slate-600 shadow-sm">
+          <Loader2 className="h-4 w-4 animate-spin text-slate-800" />
+          Signing you in…
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -54,11 +68,11 @@ export default function SchoolSisSignedInPage() {
           app — this web login is for staff office work.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
-          {schoolSelf ? null : (
+          {canOpenOffice ? (
             <Button className="bg-slate-900 hover:bg-slate-800" asChild>
               <a href="/admin">Open school office</a>
             </Button>
-          )}
+          ) : null}
           <Button variant="outline" type="button" onClick={() => void onLogout()}>
             Sign out
           </Button>

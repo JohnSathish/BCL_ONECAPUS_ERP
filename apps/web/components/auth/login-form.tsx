@@ -224,6 +224,11 @@ export function LoginForm({
             : null) ??
           schoolHome ??
           resolveHomePath(roles, permissions);
+        // School student home has no portal shell — keep the in-memory session.
+        if (destination === '/school-sis-portal/me' || destination === '/change-password') {
+          router.replace(destination);
+          return;
+        }
         // Full navigation avoids client chunk mismatch and post-login render loops on portal shells.
         window.location.assign(destination);
       } catch (err) {
