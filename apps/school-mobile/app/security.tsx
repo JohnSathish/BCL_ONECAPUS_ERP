@@ -2,10 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  fetchMyDevices,
   fetchSessions,
   logoutAllDevices,
   revokeOtherSessions,
   revokeSession,
+  signOutMyDevice,
+  signOutOtherDevices,
 } from '@/auth/account';
 import { biometricCapability, disableBiometricLogin, enableBiometricLogin } from '@/auth/biometric';
 import { confirmLogout } from '@/auth/logout';
@@ -20,9 +23,21 @@ type SessionRow = {
   device: string;
 };
 
+type DeviceRow = {
+  id: string;
+  thisDevice?: boolean;
+  deviceModel?: string | null;
+  deviceLabel?: string | null;
+  platform?: string;
+  osVersion?: string | null;
+  lastActiveAt?: string;
+  deviceStatus?: string;
+};
+
 export default function SecurityScreen() {
   const router = useRouter();
   const [rows, setRows] = useState<SessionRow[] | null>(null);
+  const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [biometric, setBiometric] = useState(false);
   const [appLock, setAppLock] = useState(false);
   const [canBiometric, setCanBiometric] = useState(false);
@@ -32,6 +47,9 @@ export default function SecurityScreen() {
     void fetchSessions()
       .then(setRows)
       .catch(() => setRows([]));
+    void fetchMyDevices()
+      .then((list) => setDevices(Array.isArray(list) ? list : []))
+      .catch(() => setDevices([]));
     void isBiometricLoginEnabled().then(setBiometric);
     void isAppLockEnabled().then(setAppLock);
     void biometricCapability().then((cap) => {
@@ -111,6 +129,40 @@ export default function SecurityScreen() {
 
         <Pressable onPress={() => router.push('/password')}>
           <Text style={styles.link}>Change Password</Text>
+        </Pressable>
+        <Text style={styles.heading}>My Devices</Text>
+        {devices.map((row) => (
+          <Card key={row.id}>
+            <Text style={styles.device}>
+              {row.thisDevice ? 'This Device' : row.deviceModel || row.deviceLabel || 'App'}
+            </Text>
+            <Text style={styles.meta}>
+              {[row.platform, row.osVersion, row.deviceStatus].filter(Boolean).join(' · ')}
+            </Text>
+            {row.lastActiveAt ? (
+              <Text style={styles.meta}>
+                Last active {new Date(row.lastActiveAt).toLocaleString()}
+              </Text>
+            ) : null}
+            {!row.thisDevice ? (
+              <Pressable onPress={() => void signOutMyDevice(row.id).then(load)}>
+                <Text style={styles.danger}>Sign Out</Text>
+              </Pressable>
+            ) : null}
+          </Card>
+        ))}
+        <Pressable
+          onPress={() => {
+            Alert.alert('Sign out all other devices?', 'This device will stay signed in.', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Sign Out All Other Devices',
+                onPress: () => void signOutOtherDevices().then(load),
+              },
+            ]);
+          }}
+        >
+          <Text style={styles.link}>Sign Out All Other Devices</Text>
         </Pressable>
         <Text style={styles.heading}>Active Sessions</Text>
         {rows.map((row) => (

@@ -98,6 +98,43 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
+  private async assertSchoolMobileDeviceAllowed(
+    tenantId: string,
+    deviceId: string,
+    sessionId: string,
+  ) {
+    if (!deviceId) return;
+    const device = await this.prisma.schoolMobileDevice.findFirst({
+      where: { tenantId, deviceId },
+      select: { id: true, deviceStatus: true, revokedAt: true },
+    });
+    if (!device) return;
+    if (
+      device.deviceStatus === 'BLOCKED' ||
+      device.deviceStatus === 'REVOKED' ||
+      device.deviceStatus === 'SIGNED_OUT' ||
+      device.revokedAt
+    ) {
+      await this.prisma.refreshSession.update({
+        where: { id: sessionId },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException(
+        device.deviceStatus === 'BLOCKED'
+          ? 'DEVICE_BLOCKED'
+          : 'SESSION_REVOKED',
+      );
+    }
+    await this.prisma.schoolMobileDevice.update({
+      where: { id: device.id },
+      data: {
+        lastActiveAt: new Date(),
+        lastTokenRefreshAt: new Date(),
+        lastSyncAt: new Date(),
+      },
+    });
+  }
+
   parseTtlSeconds(ttl: string): number {
     const match = /^(\d+)([smhd])$/.exec(ttl);
     if (!match) return 1200;
@@ -1190,6 +1227,16 @@ export class AuthService {
       });
       if (!tenant) throw new UnauthorizedException('Invalid refresh token');
 
+      const sessionMeta = (activeSession.metadata ?? {}) as Record<
+        string,
+        unknown
+      >;
+      await this.assertSchoolMobileDeviceAllowed(
+        activeSession.tenantId,
+        String(sessionMeta.deviceId || ''),
+        activeSession.id,
+      );
+
       const roles = activeSession.user.roles.map((r) => r.role.slug);
       const resolved = await this.resolveUserPermissions(
         activeSession.user.id,
@@ -1200,10 +1247,6 @@ export class AuthService {
         roles,
       );
 
-      const sessionMeta = (activeSession.metadata ?? {}) as Record<
-        string,
-        unknown
-      >;
       const rememberMe = Boolean(sessionMeta.rememberMe);
 
       const session = await this.issueTokens(

@@ -144,6 +144,29 @@ export async function setPasswordFromChallenge(
   });
 }
 
+export async function fetchMyDevices() {
+  return apiFetch<
+    Array<{
+      id: string;
+      thisDevice?: boolean;
+      deviceModel?: string | null;
+      deviceLabel?: string | null;
+      platform?: string;
+      osVersion?: string | null;
+      lastActiveAt?: string;
+      deviceStatus?: string;
+    }>
+  >('/v1/school-mobile/devices/sessions');
+}
+
+export async function signOutOtherDevices() {
+  return apiFetch('/v1/school-mobile/devices/sign-out-others', { method: 'POST' });
+}
+
+export async function signOutMyDevice(id: string) {
+  return apiFetch(`/v1/school-mobile/devices/sessions/${id}`, { method: 'DELETE' });
+}
+
 export async function fetchSessions() {
   const refresh = await getRefreshToken();
   return apiFetch<

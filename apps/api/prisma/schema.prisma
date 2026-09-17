@@ -18298,16 +18298,84 @@ model SchoolMobileDevice {
   deviceLabel String?   @map("device_label")
   deviceModel String?   @map("device_model")
   osVersion   String?   @map("os_version")
+  manufacturer String?
+  deviceName   String?   @map("device_name")
+  buildNumber  String?   @map("build_number")
+  screenResolution String? @map("screen_resolution")
+  timezone     String?
+  locale       String?
+  networkType  String?   @map("network_type")
+  lastIpAddress      String?   @map("last_ip_address")
+  previousIpAddress  String?   @map("previous_ip_address")
+  deviceStatus String    @default("ACTIVE") @map("device_status")
+  pushEnabled  Boolean   @default(false) @map("push_enabled")
+  biometricEnabled Boolean @default(false) @map("biometric_enabled")
   lastTokenRefreshAt DateTime? @map("last_token_refresh_at")
   lastActiveAt DateTime @default(now()) @map("last_active_at")
-  revokedAt   DateTime? @map("revoked_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+  lastLogoutAt DateTime? @map("last_logout_at")
+  lastPushAt   DateTime? @map("last_push_at")
+  lastSyncAt   DateTime? @map("last_sync_at")
+  failedAuthCount Int    @default(0) @map("failed_auth_count")
+  flaggedAt    DateTime? @map("flagged_at")
+  flagReason   String?   @map("flag_reason")
+  revokedAt    DateTime? @map("revoked_at")
+  revokedBy    String?   @map("revoked_by")
+  revokeReason String?   @map("revoke_reason")
+  blockedAt    DateTime? @map("blocked_at")
+  blockedBy    String?   @map("blocked_by")
+  blockReason  String?   @map("block_reason")
+  signedOutAt  DateTime? @map("signed_out_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  ipHistory SchoolDeviceIpHistory[]
+  events    SchoolDeviceSecurityEvent[]
 
   @@unique([tenantId, deviceId])
   @@index([tenantId, userId])
   @@index([tenantId, persona, revokedAt])
+  @@index([tenantId, deviceStatus])
+  @@index([tenantId, platform])
+  @@index([tenantId, lastActiveAt])
   @@map("school_mobile_devices")
+  @@schema("school")
+}
+
+model SchoolDeviceIpHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  deviceRowId String   @map("device_row_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  ipAddress   String   @map("ip_address")
+  networkType String?  @map("network_type")
+  observedAt  DateTime @default(now()) @map("observed_at")
+
+  device SchoolMobileDevice @relation(fields: [deviceRowId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, deviceRowId, observedAt])
+  @@map("school_device_ip_history")
+  @@schema("school")
+}
+
+model SchoolDeviceSecurityEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  deviceRowId String?  @map("device_row_id") @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  eventType   String   @map("event_type")
+  description String
+  ipAddress   String?  @map("ip_address")
+  performedBy String?  @map("performed_by")
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  device SchoolMobileDevice? @relation(fields: [deviceRowId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, deviceRowId, createdAt])
+  @@map("school_device_security_events")
   @@schema("school")
 }
 

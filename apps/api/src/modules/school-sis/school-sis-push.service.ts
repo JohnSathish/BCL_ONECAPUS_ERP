@@ -184,7 +184,7 @@ export class SchoolSisPushService {
     if (result.invalidTokens.length) {
       await this.prisma.schoolMobileDevice.updateMany({
         where: { tenantId, pushToken: { in: result.invalidTokens } },
-        data: { pushToken: null },
+        data: { pushToken: null, pushEnabled: false },
       });
     }
     await this.audit(tenantId, actor, 'NOTIFICATION_TEST', {
@@ -623,6 +623,12 @@ export class SchoolSisPushService {
       const token = device?.pushToken ?? '';
       const row = byToken.get(token);
       if (row?.ok) {
+        if (device) {
+          await this.prisma.schoolMobileDevice.update({
+            where: { id: device.id },
+            data: { lastPushAt: new Date(), pushEnabled: true },
+          });
+        }
         await this.prisma.schoolPushRecipient.update({
           where: { id: rec.id },
           data: {
@@ -677,7 +683,7 @@ export class SchoolSisPushService {
     if (result.invalidTokens.length) {
       await this.prisma.schoolMobileDevice.updateMany({
         where: { tenantId, pushToken: { in: result.invalidTokens } },
-        data: { pushToken: null },
+        data: { pushToken: null, pushEnabled: false },
       });
     }
     const remaining = await this.prisma.schoolPushRecipient.count({
@@ -722,7 +728,7 @@ export class SchoolSisPushService {
 
   async listDevices(tenantId: string, q?: string) {
     await this.ensureSetup(tenantId);
-    return this.prisma.schoolMobileDevice.findMany({
+    const rows = await this.prisma.schoolMobileDevice.findMany({
       where: {
         tenantId,
         ...(q
@@ -737,7 +743,23 @@ export class SchoolSisPushService {
       },
       orderBy: { lastActiveAt: 'desc' },
       take: 200,
+      select: {
+        id: true,
+        userId: true,
+        deviceId: true,
+        platform: true,
+        persona: true,
+        appVersion: true,
+        deviceLabel: true,
+        deviceModel: true,
+        osVersion: true,
+        deviceStatus: true,
+        pushEnabled: true,
+        lastActiveAt: true,
+        lastPushAt: true,
+      },
     });
+    return rows;
   }
 
   async registerDevice(
@@ -746,8 +768,14 @@ export class SchoolSisPushService {
   ) {
     const platform = dto.platform.toLowerCase() === 'ios' ? 'ios' : 'android';
     const deviceId = dto.deviceId || `push:${dto.token.slice(-24)}`;
+    const existing = await this.prisma.schoolMobileDevice.findUnique({
+      where: { tenantId_deviceId: { tenantId: user.tid, deviceId } },
+    });
+    if (existing?.deviceStatus === 'BLOCKED') {
+      return { ok: false, deviceStatus: 'BLOCKED' };
+    }
     const now = new Date();
-    return this.prisma.schoolMobileDevice.upsert({
+    const row = await this.prisma.schoolMobileDevice.upsert({
       where: { tenantId_deviceId: { tenantId: user.tid, deviceId } },
       create: {
         tenantId: user.tid,
@@ -759,6 +787,7 @@ export class SchoolSisPushService {
         pushToken: dto.token,
         deviceModel: dto.deviceModel,
         osVersion: dto.osVersion,
+        pushEnabled: true,
         lastTokenRefreshAt: now,
         lastActiveAt: now,
       },
@@ -771,9 +800,14 @@ export class SchoolSisPushService {
         osVersion: dto.osVersion ?? undefined,
         lastTokenRefreshAt: now,
         lastActiveAt: now,
-        revokedAt: null,
+        pushEnabled: true,
+        revokedAt:
+          existing?.deviceStatus === 'BLOCKED' ? existing.revokedAt : null,
       },
     });
+    const { pushToken: _hidden, ...safe } = row;
+    void _hidden;
+    return safe;
   }
 
   async unregisterDevice(tenantId: string, id: string, userId?: string) {

@@ -100,8 +100,8 @@ export function SchoolSisStudentsDirectory() {
   const canManage = canManageSchoolSis(user?.permissions);
   const [q, setQ] = useState(params.get('q') ?? '');
   const [debouncedQ, setDebouncedQ] = useState(q);
-  const [gradeId, setGradeId] = useState('');
-  const [sectionId, setSectionId] = useState('');
+  const [gradeId, setGradeId] = useState(params.get('gradeId') ?? '');
+  const [sectionId, setSectionId] = useState(params.get('sectionId') ?? '');
   const [incompleteOnly, setIncompleteOnly] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);

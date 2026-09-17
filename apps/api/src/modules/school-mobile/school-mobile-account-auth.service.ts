@@ -115,6 +115,16 @@ export class SchoolMobileAccountAuthService {
       throw new UnauthorizedException(GENERIC_LOGIN);
     }
 
+    if (meta?.deviceId) {
+      const blocked = await this.prisma.schoolMobileDevice.findFirst({
+        where: { tenantId, deviceId: meta.deviceId, deviceStatus: 'BLOCKED' },
+        select: { id: true },
+      });
+      if (blocked) {
+        throw new UnauthorizedException('DEVICE_BLOCKED');
+      }
+    }
+
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       await this.failLock(tenantId, userId, trimmed);
@@ -124,6 +134,38 @@ export class SchoolMobileAccountAuthService {
         ip: meta?.ipAddress,
         device: meta?.userAgent,
       });
+      if (meta?.deviceId) {
+        const device = await this.prisma.schoolMobileDevice.findFirst({
+          where: { tenantId, deviceId: meta.deviceId },
+        });
+        if (device) {
+          const failedAuthCount = device.failedAuthCount + 1;
+          await this.prisma.schoolMobileDevice.update({
+            where: { id: device.id },
+            data: {
+              failedAuthCount,
+              flaggedAt: failedAuthCount >= 5 ? new Date() : device.flaggedAt,
+              flagReason:
+                failedAuthCount >= 5
+                  ? 'Multiple failed login attempts'
+                  : device.flagReason,
+            },
+          });
+          if (failedAuthCount === 5) {
+            await this.prisma.schoolDeviceSecurityEvent.create({
+              data: {
+                tenantId,
+                deviceRowId: device.id,
+                userId,
+                eventType: 'MULTIPLE_FAILED_LOGIN',
+                description:
+                  '5 failed authentication attempts from this device',
+                ipAddress: meta.ipAddress ?? null,
+              },
+            });
+          }
+        }
+      }
       throw new UnauthorizedException(GENERIC_LOGIN);
     }
 
@@ -154,6 +196,20 @@ export class SchoolMobileAccountAuthService {
       ip: meta?.ipAddress,
       device: meta?.userAgent,
     });
+    if (meta?.deviceId) {
+      await this.prisma.schoolMobileDevice.updateMany({
+        where: {
+          tenantId,
+          deviceId: meta.deviceId,
+          deviceStatus: { not: 'BLOCKED' },
+        },
+        data: {
+          lastLoginAt: new Date(),
+          lastActiveAt: new Date(),
+          failedAuthCount: 0,
+        },
+      });
+    }
     const license = await Promise.race([
       this.licenses.publicStatus(tenantId),
       new Promise((resolve) => setTimeout(() => resolve(null), 1500)),

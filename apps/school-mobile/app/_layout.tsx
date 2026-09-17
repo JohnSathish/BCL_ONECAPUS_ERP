@@ -18,6 +18,8 @@ const OPEN_ROUTES = new Set([
   '/auth-success',
   '/unlock',
   '/account-disabled',
+  '/session-ended',
+  '/device-blocked',
   '/biometric-setup',
   '/',
 ]);
@@ -29,7 +31,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     setAuthFailureHandler((kind) => {
-      router.replace(kind === 'disabled' ? '/account-disabled' : '/login');
+      if (kind === 'disabled') router.replace('/account-disabled');
+      else if (kind === 'blocked') router.replace('/device-blocked');
+      else if (kind === 'revoked') router.replace('/session-ended');
+      else router.replace('/login');
     });
     let sub: { remove: () => void } | undefined;
     void import('expo-notifications')
@@ -67,6 +72,9 @@ export default function RootLayout() {
       const away = Date.now() - backgroundedAt.current;
       if (!backgroundedAt.current || away < 8_000) return;
       if (OPEN_ROUTES.has(path)) return;
+      void import('@/services/push').then(({ pingDeviceHeartbeat }) => {
+        void pingDeviceHeartbeat();
+      });
       void Promise.all([isAppLockEnabled(), isBiometricLoginEnabled()]).then(([lock, bio]) => {
         if (lock && bio) router.replace('/unlock');
       });
@@ -89,6 +97,8 @@ export default function RootLayout() {
         <Stack.Screen name="biometric-setup" />
         <Stack.Screen name="unlock" />
         <Stack.Screen name="account-disabled" />
+        <Stack.Screen name="session-ended" />
+        <Stack.Screen name="device-blocked" />
         <Stack.Screen name="password" />
         <Stack.Screen name="security" />
         <Stack.Screen name="update" />

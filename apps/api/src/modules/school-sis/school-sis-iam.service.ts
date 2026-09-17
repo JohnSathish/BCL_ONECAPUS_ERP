@@ -242,6 +242,7 @@ export class SchoolSisIamService implements OnModuleInit {
       status?: string;
       role?: string;
       mfa?: string;
+      sectionId?: string;
       page?: number;
       limit?: number;
     },
@@ -266,6 +267,24 @@ export class SchoolSisIamService implements OnModuleInit {
         { phone: { contains: term, mode: 'insensitive' } },
       ];
     }
+    if (q.sectionId) {
+      const inClass = await this.prisma.schoolPersonAccount.findMany({
+        where: {
+          tenantId,
+          student: {
+            enrollments: {
+              some: {
+                deletedAt: null,
+                status: 'ACTIVE',
+                sectionId: q.sectionId,
+              },
+            },
+          },
+        },
+        select: { userId: true },
+      });
+      where.id = { in: inClass.map((r) => r.userId) };
+    }
     const [total, rows] = await Promise.all([
       this.prisma.user.count({ where }),
       this.prisma.user.findMany({
@@ -285,14 +304,15 @@ export class SchoolSisIamService implements OnModuleInit {
           select: {
             admissionNumber: true,
             enrollments: {
-              where: {
-                deletedAt: null,
-                status: 'ACTIVE',
-                rollNumber: { not: null },
-              },
+              where: { deletedAt: null, status: 'ACTIVE' },
               orderBy: { updatedAt: 'desc' },
               take: 1,
-              select: { rollNumber: true },
+              select: {
+                rollNumber: true,
+                section: {
+                  select: { name: true, grade: { select: { name: true } } },
+                },
+              },
             },
           },
         },
@@ -306,6 +326,13 @@ export class SchoolSisIamService implements OnModuleInit {
           admissionNumber: l.student?.admissionNumber ?? null,
           rollNumber: l.student?.enrollments[0]?.rollNumber ?? null,
           employeeCode: l.staff?.employeeCode ?? null,
+          classLabel: l.student?.enrollments[0]?.section
+            ? `${l.student.enrollments[0].section.grade.name}${
+                l.student.enrollments[0].section.name
+                  ? ` ${l.student.enrollments[0].section.name}`
+                  : ''
+              }`
+            : null,
         },
       ]),
     );
@@ -320,6 +347,7 @@ export class SchoolSisIamService implements OnModuleInit {
           admissionNumber: login?.admissionNumber ?? null,
           rollNumber: login?.rollNumber ?? null,
           employeeCode: login?.employeeCode ?? null,
+          classLabel: login?.classLabel ?? null,
         };
       }),
     };

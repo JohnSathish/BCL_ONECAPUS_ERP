@@ -8,6 +8,20 @@ export class AccountDisabledError extends Error {
   }
 }
 
+export class SessionRevokedError extends Error {
+  constructor() {
+    super('SESSION_REVOKED');
+    this.name = 'SessionRevokedError';
+  }
+}
+
+export class DeviceBlockedError extends Error {
+  constructor() {
+    super('DEVICE_BLOCKED');
+    this.name = 'DeviceBlockedError';
+  }
+}
+
 export class SessionExpiredError extends Error {
   constructor(message = 'Session expired') {
     super(message);
@@ -38,6 +52,14 @@ export async function refreshAccessToken(opts?: { biometricUnlock?: boolean }) {
     json) as { accessToken?: string; refreshToken?: string; message?: string };
   const message = `${data.message || ''} ${(json as { message?: string }).message || ''}`;
   if (res.status === 401 || res.status === 403) {
+    if (/DEVICE_BLOCKED/i.test(message)) {
+      await clearSession();
+      throw new DeviceBlockedError();
+    }
+    if (/SESSION_REVOKED/i.test(message)) {
+      await clearSession();
+      throw new SessionRevokedError();
+    }
     if (/ACCOUNT_DISABLED|disabled/i.test(message)) {
       await clearSession();
       throw new AccountDisabledError();

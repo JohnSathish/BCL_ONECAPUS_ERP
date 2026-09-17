@@ -82,6 +82,7 @@ export class SchoolSisIamController {
     @Query('status') status?: string,
     @Query('role') role?: string,
     @Query('mfa') mfa?: string,
+    @Query('sectionId') sectionId?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -90,6 +91,7 @@ export class SchoolSisIamController {
       status,
       role,
       mfa,
+      sectionId,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 25,
     });

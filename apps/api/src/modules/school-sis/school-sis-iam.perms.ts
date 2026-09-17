@@ -9,6 +9,45 @@ export const SIS_READ = [
   SCHOOL_SIS_PERMISSION_MANAGE,
 ] as const;
 
+export const SIS_DEVICES_VIEW = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'devices.view',
+] as const;
+
+export const SIS_DEVICES_IP = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'devices.view_ip',
+] as const;
+
+export const SIS_DEVICES_REVOKE = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'devices.revoke',
+  'devices.revoke_all',
+] as const;
+
+export const SIS_DEVICES_SIGNOUT = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'devices.signout',
+  'devices.revoke',
+] as const;
+
+export const SIS_DEVICES_BLOCK = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'devices.block',
+  'devices.unblock',
+] as const;
+
+export const SIS_DEVICES_LOGS = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'devices.security_logs',
+  'devices.view',
+] as const;
+
+export const SIS_DEVICES_EXPORT = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'devices.export',
+] as const;
+
 export const SIS_STUDENTS_VIEW = [
   SCHOOL_SIS_PERMISSION_READ,
   SCHOOL_SIS_PERMISSION_MANAGE,

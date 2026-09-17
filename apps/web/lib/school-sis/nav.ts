@@ -162,6 +162,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
           live('user-accounts', 'User Accounts', '/admin/school-sis/users'),
           live('user-roles', 'Roles', '/admin/school-sis/users/roles'),
           live('user-permissions', 'Permissions', '/admin/school-sis/users/permissions'),
+          live('device-control', 'Device Control', '/admin/school-sis/device-control'),
           live('user-sessions', 'Sessions', '/admin/school-sis/users/sessions'),
           live('user-audit', 'Security logs', '/admin/school-sis/users/audit'),
         ],
@@ -802,6 +803,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
           live('password-policies', 'Password policies', '/admin/school-sis/users/security'),
           live('login-security', 'Login security', '/admin/school-sis/users/login-history'),
           live('sessions', 'Sessions', '/admin/school-sis/users/sessions'),
+          live('device-control-sec', 'Device Control', '/admin/school-sis/device-control'),
           live('audit-logs', 'Audit logs', '/admin/school-sis/users/audit'),
         ],
       },
@@ -887,6 +889,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         status: 'active',
         children: [
           live('system-dashboard', 'System Dashboard', '/admin/school-sis/system'),
+          live('device-control-sys', 'Device Control', '/admin/school-sis/device-control'),
           live('system-status', 'System Status', '/admin/school-sis/system/status'),
           live('system-cache', 'Cache', '/admin/school-sis/system/cache'),
           live('system-backup', 'Backups', '/admin/school-sis/system/backups'),

@@ -47,7 +47,7 @@ export function AcademicPageHeader({
 export function AcademicSubnav() {
   const pathname = usePathname();
   return (
-    <nav className="sls-chip-row -mx-1 px-1 pb-1">
+    <nav className="flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
       {ACADEMIC_LINKS.map((item) => {
         const active = item.exact
           ? pathname === item.href
@@ -57,10 +57,8 @@ export function AcademicSubnav() {
             key={item.href}
             href={item.href}
             className={cn(
-              'rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition sm:text-sm',
-              active
-                ? 'bg-[var(--school-erp-primary)] text-white ring-[var(--school-erp-primary)]'
-                : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50',
+              'rounded-xl px-3 py-2 text-xs font-medium transition sm:text-sm',
+              active ? 'bg-[#1e3a8a] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
             )}
           >
             {item.label}

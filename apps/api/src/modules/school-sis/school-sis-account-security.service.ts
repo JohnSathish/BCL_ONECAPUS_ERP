@@ -305,9 +305,9 @@ export class SchoolSisAccountSecurityService {
     const code = await this.issueCode(tenantId, actor, userId);
     return {
       ok: true,
+      ...code,
       notice:
         'Password was cleared. Give the student this one-time activation code. It will not be stored in plain text.',
-      ...code,
     };
   }
 

@@ -1037,7 +1037,15 @@ export async function fetchSchoolStaffMap() {
   const { data } = await api.get('/v1/school-sis/academic/staff-map');
   return data as {
     academicYear: { id: string; name: string };
-    staff: Array<{ id: string; fullName: string; employeeCode: string }>;
+    staff: Array<{
+      id: string;
+      fullName: string;
+      employeeCode: string;
+      department?: string | null;
+      email?: string | null;
+      status?: string | null;
+      designation?: string | null;
+    }>;
     classTeachers: Array<{
       id: string;
       staff: { id: string; fullName: string };
@@ -1050,12 +1058,19 @@ export async function fetchSchoolStaffMap() {
       section: { name: string; grade: { name: string } };
       periodsPerWeek: number;
     }>;
+    coverage?: { assignedSections: number; totalSections: number };
     workload: Array<{
       id: string;
       fullName: string;
       employeeCode: string;
+      department?: string | null;
+      email?: string | null;
+      status?: string | null;
+      designation?: string | null;
       classTeacherSections: number;
+      classTeacherLabel?: string | null;
       subjects: number;
+      subjectList?: Array<{ name: string; section: string; periods: number }>;
       periods: number;
     }>;
   };

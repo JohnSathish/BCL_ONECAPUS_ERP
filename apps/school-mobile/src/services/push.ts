@@ -58,7 +58,11 @@ async function registerDevice(extra?: Record<string, unknown>) {
       platform: Platform.OS === 'ios' ? 'ios' : 'android',
       appVersion: APP_VERSION,
       deviceModel: Device.modelName ?? undefined,
+      manufacturer: Device.manufacturer ?? undefined,
+      deviceName: Device.deviceName ?? undefined,
       osVersion: Device.osVersion ?? undefined,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      locale: Intl.DateTimeFormat().resolvedOptions().locale,
       ...extra,
     }),
   });
@@ -115,5 +119,16 @@ export async function markNotificationOpened(notificationId?: string | null) {
     await apiFetch(`/v1/school-sis/notifications/${notificationId}/opened`, { method: 'POST' });
   } catch {
     /* inbox read is enough if campaign tracking is unavailable */
+  }
+}
+
+export async function pingDeviceHeartbeat() {
+  try {
+    await apiFetch('/v1/school-mobile/devices/heartbeat', {
+      method: 'POST',
+      body: JSON.stringify({ deviceId: await getDeviceId() }),
+    });
+  } catch {
+    /* last-seen updates when the app next authenticates */
   }
 }

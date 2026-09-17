@@ -428,7 +428,15 @@ export class SchoolSisAcademicService {
       }),
       this.prisma.schoolStaff.findMany({
         where: { tenantId, deletedAt: null, staffType: 'TEACHING' },
-        select: { id: true, fullName: true, employeeCode: true },
+        select: {
+          id: true,
+          fullName: true,
+          employeeCode: true,
+          department: true,
+          email: true,
+          status: true,
+          designation: true,
+        },
         orderBy: { fullName: 'asc' },
       }),
     ]);
@@ -452,11 +460,47 @@ export class SchoolSisAcademicService {
       w.subjects += 1;
       w.periods += row.periodsPerWeek;
     }
+    const classByStaff = new Map<
+      string,
+      { label: string; sectionId: string }
+    >();
+    for (const row of classTeachers) {
+      classByStaff.set(row.staffId, {
+        sectionId: row.sectionId,
+        label: `${row.section.grade.name} - ${row.section.name}`,
+      });
+    }
+    const subjectsByStaff = new Map<
+      string,
+      Array<{ name: string; section: string; periods: number }>
+    >();
+    for (const row of subjectTeachers) {
+      const list = subjectsByStaff.get(row.staffId) ?? [];
+      list.push({
+        name: row.subject.name,
+        section: `${row.section.grade.name} ${row.section.name}`,
+        periods: row.periodsPerWeek,
+      });
+      subjectsByStaff.set(row.staffId, list);
+    }
+    const assignedSectionIds = new Set(classTeachers.map((r) => r.sectionId));
+    const sectionCount = await this.prisma.schoolSection.count({
+      where: {
+        tenantId,
+        academicYearId: year.id,
+        deletedAt: null,
+        active: true,
+      },
+    });
     return {
       academicYear: year,
       staff,
       classTeachers,
       subjectTeachers,
+      coverage: {
+        assignedSections: assignedSectionIds.size,
+        totalSections: sectionCount,
+      },
       workload: staff.map((person) => ({
         ...person,
         ...(workload.get(person.id) ?? {
@@ -464,6 +508,8 @@ export class SchoolSisAcademicService {
           subjects: 0,
           periods: 0,
         }),
+        classTeacherLabel: classByStaff.get(person.id)?.label ?? null,
+        subjectList: subjectsByStaff.get(person.id) ?? [],
       })),
     };
   }

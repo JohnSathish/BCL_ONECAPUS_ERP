@@ -42,6 +42,7 @@ import {
   syncSchoolIamLoginNames,
   testSchoolIamAccess,
 } from '@/services/school-iam';
+import { fetchSchoolAcademicClasses } from '@/services/school-sis';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 import {
@@ -87,21 +88,123 @@ function iamUserItems(data: unknown): Array<Record<string, unknown>> {
   return [];
 }
 
-const USERS_PAGE_SIZE = 20;
+const USERS_PAGE_SIZE_DEFAULT = 10;
 
 const LINKS = [
-  { href: '/admin/school-sis/users', label: 'All Users', exact: true },
-  { href: '/admin/school-sis/users/active', label: 'Active' },
-  { href: '/admin/school-sis/users/invitations', label: 'Invitations' },
-  { href: '/admin/school-sis/users/locked', label: 'Locked' },
-  { href: '/admin/school-sis/users/suspended', label: 'Suspended' },
-  { href: '/admin/school-sis/users/roles', label: 'Roles' },
-  { href: '/admin/school-sis/users/permissions', label: 'Permissions' },
-  { href: '/admin/school-sis/users/sessions', label: 'Sessions' },
-  { href: '/admin/school-sis/users/login-history', label: 'Login History' },
-  { href: '/admin/school-sis/users/audit', label: 'Audit' },
-  { href: '/admin/school-sis/users/security', label: 'Security' },
+  { href: '/admin/school-sis/users', label: 'All Users', exact: true, icon: 'users' },
+  { href: '/admin/school-sis/users/active', label: 'Active', icon: 'active' },
+  { href: '/admin/school-sis/users/invitations', label: 'Invitations', icon: 'invite' },
+  { href: '/admin/school-sis/users/locked', label: 'Locked', icon: 'lock' },
+  { href: '/admin/school-sis/users/suspended', label: 'Suspended', icon: 'suspend' },
+  { href: '/admin/school-sis/users/roles', label: 'Roles', icon: 'roles' },
+  { href: '/admin/school-sis/users/permissions', label: 'Permissions', icon: 'key' },
+  { href: '/admin/school-sis/users/sessions', label: 'Sessions', icon: 'monitor' },
+  { href: '/admin/school-sis/users/login-history', label: 'Login History', icon: 'history' },
+  { href: '/admin/school-sis/users/audit', label: 'Audit', icon: 'audit' },
+  { href: '/admin/school-sis/users/security', label: 'Security', icon: 'shield' },
 ];
+
+const AVATAR_TONES = [
+  'bg-emerald-100 text-emerald-800',
+  'bg-violet-100 text-violet-800',
+  'bg-sky-100 text-sky-800',
+  'bg-amber-100 text-amber-800',
+  'bg-rose-100 text-rose-800',
+  'bg-indigo-100 text-indigo-800',
+  'bg-teal-100 text-teal-800',
+  'bg-orange-100 text-orange-800',
+];
+
+function avatarTone(seed: string) {
+  let n = 0;
+  for (let i = 0; i < seed.length; i += 1) n += seed.charCodeAt(i);
+  return AVATAR_TONES[n % AVATAR_TONES.length];
+}
+
+function initialsOf(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase();
+}
+
+function roleChipClass(name: string) {
+  const n = name.toLowerCase();
+  if (n.includes('student')) return 'bg-sky-50 text-sky-800 ring-sky-200';
+  if (n.includes('teacher')) return 'bg-indigo-50 text-indigo-800 ring-indigo-200';
+  if (n.includes('parent') || n.includes('guardian'))
+    return 'bg-violet-50 text-violet-800 ring-violet-200';
+  if (n.includes('admin') || n.includes('principal'))
+    return 'bg-slate-100 text-slate-800 ring-slate-200';
+  return 'bg-slate-50 text-slate-700 ring-slate-200';
+}
+
+function isRecentlyOnline(iso: unknown) {
+  if (!iso) return false;
+  const t = new Date(String(iso)).getTime();
+  return Number.isFinite(t) && Date.now() - t < 15 * 60 * 1000;
+}
+
+function pagerItems(current: number, total: number): Array<number | '…'> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const items: Array<number | '…'> = [1];
+  const start = Math.max(2, Math.min(current - 1, total - 4));
+  const end = Math.min(total - 1, Math.max(start + 3, 5));
+  if (start > 2) items.push('…');
+  for (let i = start; i <= end; i += 1) items.push(i);
+  if (end < total - 1) items.push('…');
+  items.push(total);
+  return items;
+}
+
+function TabIcon({ name, active }: { name: string; active?: boolean }) {
+  const stroke = active ? '#ffffff' : '#64748b';
+  const common = {
+    width: 16,
+    height: 16,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke,
+    strokeWidth: 1.8,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+  if (name === 'active') {
+    return (
+      <span className="relative inline-flex h-4 w-4 items-center justify-center">
+        <svg {...common}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+        </svg>
+        <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white" />
+      </span>
+    );
+  }
+  const paths: Record<string, string> = {
+    users:
+      'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+    invite: 'M4 4h16v16H4zM4 8l8 6 8-6',
+    lock: 'M7 11V8a5 5 0 0 1 10 0v3M6 11h12v10H6z',
+    suspend:
+      'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8M17 8l5 5M22 8l-5 5',
+    roles: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+    key: 'M21 2l-2 2m-7.4 7.4a5 5 0 1 1-2 2L13 17h3v3h3v-3h2l-7.4-7.6',
+    monitor: 'M3 4h18v12H3zM8 20h8M12 16v4',
+    history:
+      'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
+    audit:
+      'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2',
+    shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  };
+  return (
+    <svg {...common}>
+      <path d={paths[name] ?? paths.users} />
+    </svg>
+  );
+}
 
 export function UsersDesk() {
   const path = usePathname();
@@ -126,8 +229,12 @@ export function UsersDesk() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [role, setRole] = useState('');
+  const [sectionId, setSectionId] = useState('');
+  const [pageSize, setPageSize] = useState(USERS_PAGE_SIZE_DEFAULT);
   const [listPage, setListPage] = useState(1);
   const [selected, setSelected] = useState<string[]>([]);
+  const [moreFilters, setMoreFilters] = useState(false);
+  const [rowMenuId, setRowMenuId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<{
     name: string;
     username?: string | null;
@@ -190,15 +297,29 @@ export function UsersDesk() {
     enabled: ready,
   });
   const users = useQuery({
-    queryKey: ['school-iam-users', search, status || statusFromPath, role, listPage],
+    queryKey: [
+      'school-iam-users',
+      search,
+      status || statusFromPath,
+      role,
+      sectionId,
+      listPage,
+      pageSize,
+    ],
     queryFn: () =>
       fetchSchoolIamUsers({
         search,
         status: status || statusFromPath,
         role,
+        sectionId: sectionId || undefined,
         page: listPage,
-        limit: USERS_PAGE_SIZE,
+        limit: pageSize,
       }),
+    enabled: ready && usersListPage,
+  });
+  const classes = useQuery({
+    queryKey: ['school-sis-academic-classes'],
+    queryFn: fetchSchoolAcademicClasses,
     enabled: ready && usersListPage,
   });
   const invites = useQuery({
@@ -257,7 +378,7 @@ export function UsersDesk() {
     users.data && typeof users.data === 'object'
       ? Number((users.data as { total?: number }).total ?? userRows.length)
       : userRows.length;
-  const usersPageCount = Math.max(1, Math.ceil(usersTotal / USERS_PAGE_SIZE));
+  const usersPageCount = Math.max(1, Math.ceil(usersTotal / pageSize));
   const modules = ((
     catalog.data as {
       modules?: Array<{
@@ -296,7 +417,7 @@ export function UsersDesk() {
   useEffect(() => {
     setListPage(1);
     setSelected([]);
-  }, [search, status, role, statusFromPath]);
+  }, [search, status, role, sectionId, pageSize, statusFromPath]);
 
   const loginNamesSynced = useRef(false);
   useEffect(() => {
@@ -346,137 +467,269 @@ export function UsersDesk() {
     });
   };
 
+  const openAddUser = () => {
+    setWizardStep(0);
+    setForm({
+      source: 'manual',
+      displayName: '',
+      email: '',
+      username: '',
+      phone: '',
+      roleSlugs: ['teacher'],
+      invite: false,
+      passwordMode: 'default',
+      password: '',
+      staffId: '',
+      studentId: '',
+    });
+    setPersonQ('');
+    setWizard(true);
+  };
+
+  const kpiCards = [
+    {
+      key: 'total',
+      label: 'Total Users',
+      sub: 'All registered users',
+      href: '/admin/school-sis/users',
+      value: kpis.total,
+      wrap: 'bg-blue-50/80',
+      iconWrap: 'bg-blue-100 text-blue-700',
+      icon: 'users',
+    },
+    {
+      key: 'active',
+      label: 'Active',
+      sub: 'Currently active',
+      href: '/admin/school-sis/users/active',
+      value: kpis.active,
+      wrap: 'bg-emerald-50/80',
+      iconWrap: 'bg-emerald-100 text-emerald-700',
+      icon: 'active',
+    },
+    {
+      key: 'invited',
+      label: 'Pending Invites',
+      sub: 'Awaiting activation',
+      href: '/admin/school-sis/users/invitations',
+      value: kpis.invited,
+      wrap: 'bg-amber-50/80',
+      iconWrap: 'bg-amber-100 text-amber-700',
+      icon: 'invite',
+    },
+    {
+      key: 'suspended',
+      label: 'Suspended',
+      sub: 'Temporarily blocked',
+      href: '/admin/school-sis/users/suspended',
+      value: kpis.suspended,
+      wrap: 'bg-rose-50/80',
+      iconWrap: 'bg-rose-100 text-rose-700',
+      icon: 'suspend',
+    },
+    {
+      key: 'locked',
+      label: 'Locked',
+      sub: 'Locked accounts',
+      href: '/admin/school-sis/users/locked',
+      value: kpis.locked,
+      wrap: 'bg-violet-50/80',
+      iconWrap: 'bg-violet-100 text-violet-700',
+      icon: 'lock',
+    },
+    {
+      key: 'sessions',
+      label: 'Active Sessions',
+      sub: 'Users online now',
+      href: '/admin/school-sis/users/sessions',
+      value: kpis.sessions,
+      wrap: 'bg-cyan-50/80',
+      iconWrap: 'bg-cyan-100 text-cyan-700',
+      icon: 'monitor',
+    },
+    {
+      key: 'mfaOn',
+      label: 'MFA Enabled',
+      sub: 'Two-factor auth',
+      href: '/admin/school-sis/users/security',
+      value: kpis.mfaOn,
+      wrap: 'bg-teal-50/80',
+      iconWrap: 'bg-teal-100 text-teal-700',
+      icon: 'shield',
+    },
+    {
+      key: 'failedLogins',
+      label: 'Failed Logins (24h)',
+      sub: 'Security events',
+      href: '/admin/school-sis/users/security',
+      value: kpis.failedLogins,
+      wrap: 'bg-red-50/80',
+      iconWrap: 'bg-red-100 text-red-700',
+      icon: 'audit',
+    },
+  ];
+
   const badge = (st: string) => (
     <span
       className={cn(
-        'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1',
-        st === 'active' && 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-        st === 'invited' && 'bg-sky-50 text-sky-800 ring-sky-200',
-        st === 'pending' && 'bg-sky-50 text-sky-800 ring-sky-200',
-        st === 'suspended' && 'bg-amber-50 text-amber-800 ring-amber-200',
-        st === 'locked' && 'bg-rose-50 text-rose-800 ring-rose-200',
-        (st === 'disabled' || !st) && 'bg-slate-100 text-slate-600 ring-slate-200',
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+        st === 'active' && 'bg-emerald-50 text-emerald-800',
+        st === 'invited' && 'bg-sky-50 text-sky-800',
+        st === 'pending' && 'bg-sky-50 text-sky-800',
+        st === 'suspended' && 'bg-amber-50 text-amber-800',
+        st === 'locked' && 'bg-rose-50 text-rose-800',
+        (st === 'disabled' || !st) && 'bg-slate-100 text-slate-600',
       )}
     >
-      {st}
+      {st === 'active' ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> : null}
+      {st ? st.charAt(0).toUpperCase() + st.slice(1) : '—'}
     </span>
   );
 
   return (
     <div className="space-y-4 p-4 md:p-6" style={{ background: '#f4f7fb', minHeight: '100%' }}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Users &amp; Access</h1>
-          <p className="text-sm text-slate-500">
-            School identity, roles, sessions and security — not a college portal. Students sign in
-            with admission number (SLS/2026/0001) or roll number (SLS26-0001). Staff use employee
-            code.
-          </p>
-        </div>
-        {manage ? (
-          <div className="flex gap-2">
-            <GhostButton
-              onClick={() =>
-                void run(
-                  () => syncSchoolIamLoginNames(),
-                  'Login names set from admission / roll / employee code',
-                )
-              }
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#1e3a8a] text-white shadow-sm">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
             >
-              Set login names
-            </GhostButton>
-            <GhostButton onClick={() => seed.mutate()}>Seed default roles</GhostButton>
-            <GhostButton onClick={() => setInvite(true)}>Invite</GhostButton>
-            <GhostButton onClick={() => setImportOpen(true)}>Import Excel</GhostButton>
-            <GhostButton onClick={() => setDirectoryOpen(true)}>
-              Add all students &amp; staff
-            </GhostButton>
-            <PrimaryButton
-              onClick={() => {
-                setWizardStep(0);
-                setForm({
-                  source: 'manual',
-                  displayName: '',
-                  email: '',
-                  username: '',
-                  phone: '',
-                  roleSlugs: ['teacher'],
-                  invite: false,
-                  passwordMode: 'default',
-                  password: '',
-                  staffId: '',
-                  studentId: '',
-                });
-                setPersonQ('');
-                setWizard(true);
-              }}
-            >
-              + Add user
-            </PrimaryButton>
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </span>
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Users &amp; Access</h1>
+            <p className="max-w-3xl text-sm text-slate-500">
+              School identity, roles, sessions and security — not a college portal. Students sign in
+              with admission number (SLS/2026/0001) or roll number (SLS26-0001). Staff use employee
+              code.
+            </p>
           </div>
-        ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            onClick={() =>
+              setNotice(
+                'Students sign in with admission or roll number. Staff use employee code. There is no shared school password.',
+              )
+            }
+          >
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-xs">
+              ?
+            </span>
+            Help
+          </button>
+          {manage ? (
+            <button
+              type="button"
+              onClick={openAddUser}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#1e3a8a] px-4 text-sm font-semibold text-white shadow-sm hover:bg-[#172e6f]"
+            >
+              + Add User
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {LINKS.map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            className={cn(
-              'rounded-full border px-3 py-1 text-sm',
-              path === l.href || (l.href !== '/admin/school-sis/users' && path.startsWith(l.href))
-                ? 'border-blue-600 bg-blue-50 text-blue-800'
-                : 'border-slate-200 bg-white text-slate-600',
-            )}
-          >
-            {l.label}
-          </Link>
-        ))}
+      <div className="flex flex-wrap gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
+        {LINKS.map((l) => {
+          const on =
+            path === l.href || (l.href !== '/admin/school-sis/users' && path.startsWith(l.href));
+          return (
+            <Link
+              key={l.href}
+              href={l.href}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium',
+                on ? 'bg-[#1e3a8a] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
+              )}
+            >
+              <TabIcon name={l.icon} active={on} />
+              {l.label}
+            </Link>
+          );
+        })}
       </div>
 
       {notice ? (
-        <p className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">{notice}</p>
+        <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+          {notice}
+        </p>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-        {[
-          ['Total', kpis.total],
-          ['Active', kpis.active],
-          ['Pending invites', kpis.invited],
-          ['Suspended', kpis.suspended],
-          ['Locked', kpis.locked],
-          ['Sessions', kpis.sessions],
-          ['MFA on', kpis.mfaOn],
-          ['Failed logins (24h)', kpis.failedLogins],
-        ].map(([label, value]) => (
-          <Panel key={String(label)} className="p-3">
-            <p className="text-xs text-slate-500">{label}</p>
-            <p className="text-xl font-semibold text-slate-900">{value ?? '—'}</p>
-          </Panel>
+        {kpiCards.map((card) => (
+          <Link
+            key={card.key}
+            href={card.href}
+            className={cn(
+              'rounded-2xl border border-white/70 p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md',
+              card.wrap,
+            )}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[11px] font-medium text-slate-500">{card.label}</p>
+              <span
+                className={cn('flex h-8 w-8 items-center justify-center rounded-xl', card.iconWrap)}
+              >
+                <TabIcon name={card.icon} />
+              </span>
+            </div>
+            <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+              {card.value ?? '—'}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-500">{card.sub}</p>
+          </Link>
         ))}
       </div>
 
       {usersListPage ? (
         <Panel className="overflow-hidden p-0">
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3">
-            <input
-              className="h-9 min-w-[16rem] flex-1 rounded-md border px-3 text-sm"
-              placeholder="Search name, email, username, mobile"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <div className="relative min-w-[16rem] flex-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
+              </span>
+              <input
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm"
+                placeholder="Search by name, email, username or mobile number..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
             <select
-              className="h-9 rounded-md border px-2 text-sm"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
             >
               <option value="">All statuses</option>
               {['active', 'invited', 'suspended', 'locked', 'disabled'].map((s) => (
-                <option key={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </option>
               ))}
             </select>
             <select
-              className="h-9 rounded-md border px-2 text-sm"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"
               value={role}
               onChange={(e) => setRole(e.target.value)}
             >
@@ -487,17 +740,57 @@ export function UsersDesk() {
                 </option>
               ))}
             </select>
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+              value={sectionId}
+              onChange={(e) => setSectionId(e.target.value)}
+            >
+              <option value="">All classes</option>
+              {(classes.data?.sections ?? []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.grade.name} {s.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={cn(
+                'inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium',
+                moreFilters
+                  ? 'border-[#1e3a8a] bg-blue-50 text-[#1e3a8a]'
+                  : 'border-slate-200 bg-white text-slate-600',
+              )}
+              onClick={() => setMoreFilters((v) => !v)}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 5h18M6 12h12M10 19h4" />
+              </svg>
+              More Filters
+            </button>
             {manage ? (
-              <GhostButton
+              <button
+                type="button"
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 onClick={() => {
                   const rows = userRows;
-                  const header = 'Name,Email,Username,Status,Roles,LastLogin,MFA';
+                  const header =
+                    'Name,Email,Username,Admission,Roll,Class,Status,Roles,LastLogin,MFA';
                   const body = rows
                     .map((u) =>
                       [
                         u.displayName,
                         u.email,
                         u.username,
+                        u.admissionNumber,
+                        u.rollNumber,
+                        u.classLabel,
                         u.accountStatus,
                         ((u.roles as Array<{ name: string }>) ?? []).map((r) => r.name).join('|'),
                         u.lastLoginAt ?? '',
@@ -514,8 +807,18 @@ export function UsersDesk() {
                   a.click();
                 }}
               >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M12 3v12M8 11l4 4 4-4M4 21h16" />
+                </svg>
                 Export CSV
-              </GhostButton>
+              </button>
             ) : null}
             {manage && selected.length ? (
               <>
@@ -550,34 +853,51 @@ export function UsersDesk() {
               </>
             ) : null}
           </div>
+          {moreFilters && manage ? (
+            <div className="flex flex-wrap gap-2 border-b border-slate-100 bg-slate-50/70 px-3 py-2">
+              <GhostButton
+                onClick={() =>
+                  void run(
+                    () => syncSchoolIamLoginNames(),
+                    'Login names set from admission / roll / employee code',
+                  )
+                }
+              >
+                Set login names
+              </GhostButton>
+              <GhostButton onClick={() => seed.mutate()}>Seed default roles</GhostButton>
+              <GhostButton onClick={() => setInvite(true)}>Invite</GhostButton>
+              <GhostButton onClick={() => setImportOpen(true)}>Import Excel</GhostButton>
+              <GhostButton onClick={() => setDirectoryOpen(true)}>
+                Add all students &amp; staff
+              </GhostButton>
+            </div>
+          ) : null}
           <div className="overflow-auto">
-            <table className="w-full min-w-[64rem] text-left text-sm">
-              <thead className="sticky top-0 bg-slate-50 text-xs text-slate-500">
+            <table className="w-full min-w-[70rem] text-left text-sm">
+              <thead className="sticky top-0 bg-[#f8fafc] text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="p-2" />
-                  <th className="p-2">User</th>
-                  <th className="p-2">Username</th>
-                  <th className="p-2">Admission / roll</th>
-                  <th className="p-2">Role</th>
-                  <th className="p-2">Status</th>
-                  <th className="p-2">Last login</th>
-                  <th className="p-2">MFA</th>
-                  <th className="p-2 text-right">Actions</th>
+                  <th className="p-3" />
+                  <th className="p-3">User</th>
+                  <th className="p-3">Username</th>
+                  <th className="p-3">Admission / Roll</th>
+                  <th className="p-3">Role</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Last Login</th>
+                  <th className="p-3">MFA</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {userRows.map((u) => {
                   const id = String(u.id);
                   const rolesList = (u.roles as Array<{ name: string }>) ?? [];
-                  const initials = String(u.displayName || u.email || '?')
-                    .split(/\s+/)
-                    .slice(0, 2)
-                    .map((p) => p[0])
-                    .join('')
-                    .toUpperCase();
+                  const name = String(u.displayName || u.email || '?');
+                  const initials = initialsOf(name);
+                  const online = isRecentlyOnline(u.lastLoginAt);
                   return (
                     <tr key={id} className="border-t border-slate-100 hover:bg-slate-50/80">
-                      <td className="p-2">
+                      <td className="p-3">
                         <input
                           type="checkbox"
                           checked={selected.includes(id)}
@@ -588,26 +908,31 @@ export function UsersDesk() {
                           }
                         />
                       </td>
-                      <td className="p-2">
+                      <td className="p-3">
                         <button
-                          className="flex items-center gap-2 text-left"
+                          className="flex items-center gap-3 text-left"
                           onClick={() => setDrawerId(id)}
                         >
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-600">
+                          <span
+                            className={cn(
+                              'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                              avatarTone(name),
+                            )}
+                          >
                             {initials}
                           </span>
                           <span>
-                            <span className="block font-medium text-slate-900">
-                              {String(u.displayName || u.email)}
+                            <span className="block font-semibold uppercase tracking-wide text-slate-900">
+                              {name}
                             </span>
                             <span className="block text-xs text-slate-500">{String(u.email)}</span>
                           </span>
                         </button>
                       </td>
-                      <td className="p-2 font-mono text-xs text-slate-700">
+                      <td className="p-3 font-semibold text-slate-800">
                         {u.username ? String(u.username) : '—'}
                       </td>
-                      <td className="p-2 text-xs text-slate-600">
+                      <td className="p-3 text-xs text-slate-600">
                         {u.admissionNumber || u.rollNumber || u.employeeCode ? (
                           <span className="block">
                             {u.admissionNumber ? (
@@ -621,34 +946,128 @@ export function UsersDesk() {
                             {u.employeeCode && !u.admissionNumber ? (
                               <span className="font-mono">{String(u.employeeCode)}</span>
                             ) : null}
+                            {u.classLabel ? (
+                              <span className="mt-0.5 block text-[11px] text-slate-400">
+                                {String(u.classLabel)}
+                              </span>
+                            ) : null}
                           </span>
                         ) : (
                           '—'
                         )}
                       </td>
-                      <td className="p-2">{rolesList.map((r) => r.name).join(', ') || '—'}</td>
-                      <td className="p-2">
+                      <td className="p-3">
+                        <div className="flex flex-wrap gap-1">
+                          {rolesList.length
+                            ? rolesList.map((r) => (
+                                <span
+                                  key={r.name}
+                                  className={cn(
+                                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1',
+                                    roleChipClass(r.name),
+                                  )}
+                                >
+                                  {r.name.toLowerCase().includes('student') ? '🎓 ' : null}
+                                  {r.name}
+                                </span>
+                              ))
+                            : '—'}
+                        </div>
+                      </td>
+                      <td className="p-3">
                         <div className="flex flex-wrap items-center gap-1">
                           {badge(String(u.accountStatus))}
                           {u.mustResetPassword ? (
-                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
                               Must change
                             </span>
                           ) : null}
                         </div>
                       </td>
-                      <td className="p-2 text-xs">
-                        {u.lastLoginAt ? new Date(String(u.lastLoginAt)).toLocaleString() : 'Never'}
+                      <td className="p-3 text-xs text-slate-600">
+                        {u.lastLoginAt ? (
+                          <span>
+                            <span className="block">
+                              {new Date(String(u.lastLoginAt)).toLocaleString()}
+                            </span>
+                            {online ? (
+                              <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                Online
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : (
+                          'Never'
+                        )}
                       </td>
-                      <td className="p-2">{u.mfaEnabled ? '✓' : '—'}</td>
-                      <td className="p-2 text-right">
-                        <div className="flex justify-end gap-1">
+                      <td className="p-3 text-slate-500">{u.mfaEnabled ? '✓' : '—'}</td>
+                      <td className="p-3 text-right">
+                        <div className="relative flex items-center justify-end gap-1">
                           {manage ? (
-                            <GhostButton onClick={() => askReset({ ...u, id })}>
-                              Reset password
-                            </GhostButton>
+                            <button
+                              type="button"
+                              className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                              onClick={() => askReset({ ...u, id })}
+                            >
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              >
+                                <path d="M21 2l-2 2m-7.4 7.4a5 5 0 1 1-2 2L13 17h3v3h3v-3h2l-7.4-7.6" />
+                              </svg>
+                              Reset Password
+                            </button>
                           ) : null}
-                          <GhostButton onClick={() => setDrawerId(id)}>Open</GhostButton>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+                            onClick={() => setRowMenuId((cur) => (cur === id ? null : id))}
+                          >
+                            ⋮
+                          </button>
+                          {rowMenuId === id ? (
+                            <div className="absolute right-0 top-9 z-20 min-w-[10rem] rounded-xl border border-slate-200 bg-white py-1 text-left text-sm shadow-lg">
+                              <button
+                                className="block w-full px-3 py-1.5 text-left hover:bg-slate-50"
+                                onClick={() => {
+                                  setRowMenuId(null);
+                                  setDrawerId(id);
+                                }}
+                              >
+                                Open
+                              </button>
+                              {manage ? (
+                                <>
+                                  <button
+                                    className="block w-full px-3 py-1.5 text-left hover:bg-slate-50"
+                                    onClick={() => {
+                                      setRowMenuId(null);
+                                      void run(
+                                        () => setSchoolIamStatus(id, 'suspended'),
+                                        'Suspended',
+                                      );
+                                    }}
+                                  >
+                                    Suspend
+                                  </button>
+                                  <button
+                                    className="block w-full px-3 py-1.5 text-left hover:bg-slate-50"
+                                    onClick={() => {
+                                      setRowMenuId(null);
+                                      void run(() => logoutSchoolIamUser(id), 'Sessions ended');
+                                    }}
+                                  >
+                                    End sessions
+                                  </button>
+                                </>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -666,22 +1085,63 @@ export function UsersDesk() {
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
               <span>
-                Showing {(listPage - 1) * USERS_PAGE_SIZE + 1}–
-                {Math.min(listPage * USERS_PAGE_SIZE, usersTotal)} of {usersTotal}
+                Showing {(listPage - 1) * pageSize + 1}–{Math.min(listPage * pageSize, usersTotal)}{' '}
+                of {usersTotal} users
               </span>
-              <div className="flex gap-1">
-                <GhostButton
-                  disabled={listPage <= 1}
-                  onClick={() => setListPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </GhostButton>
-                <GhostButton
-                  disabled={listPage >= usersPageCount}
-                  onClick={() => setListPage((p) => Math.min(usersPageCount, p + 1))}
-                >
-                  Next
-                </GhostButton>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white disabled:opacity-40"
+                    disabled={listPage <= 1}
+                    onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                  >
+                    «
+                  </button>
+                  {pagerItems(listPage, usersPageCount).map((item, i) =>
+                    item === '…' ? (
+                      <span key={`e${i}`} className="px-1">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setListPage(item)}
+                        className={cn(
+                          'inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-semibold',
+                          item === listPage
+                            ? 'bg-[#1e3a8a] text-white'
+                            : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                        )}
+                      >
+                        {item}
+                      </button>
+                    ),
+                  )}
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white disabled:opacity-40"
+                    disabled={listPage >= usersPageCount}
+                    onClick={() => setListPage((p) => Math.min(usersPageCount, p + 1))}
+                  >
+                    »
+                  </button>
+                </div>
+                <label className="inline-flex items-center gap-2">
+                  Rows per page
+                  <select
+                    className="h-8 rounded-lg border border-slate-200 bg-white px-2"
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                  >
+                    {[10, 20, 50].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
             </div>
           )}

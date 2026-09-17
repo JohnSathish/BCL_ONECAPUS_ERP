@@ -2,12 +2,16 @@ import { getApiBase, schoolHeaders } from '@/api/config';
 import { getAccessToken } from '@/auth/session';
 import {
   AccountDisabledError,
+  DeviceBlockedError,
   refreshAccessToken,
   SessionExpiredError,
+  SessionRevokedError,
 } from '@/auth/token-refresh';
 
-let onAuthFailure: ((kind: 'expired' | 'disabled') => void) | null = null;
-export function setAuthFailureHandler(handler: (kind: 'expired' | 'disabled') => void) {
+let onAuthFailure: ((kind: 'expired' | 'disabled' | 'revoked' | 'blocked') => void) | null = null;
+export function setAuthFailureHandler(
+  handler: (kind: 'expired' | 'disabled' | 'revoked' | 'blocked') => void,
+) {
   onAuthFailure = handler;
 }
 
@@ -43,6 +47,14 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   }
   const json = await res.json().catch(() => ({}));
   const combined = `${messageOf(json, '')}`;
+  if ((res.status === 401 || res.status === 403) && /DEVICE_BLOCKED/i.test(combined)) {
+    onAuthFailure?.('blocked');
+    throw new DeviceBlockedError();
+  }
+  if ((res.status === 401 || res.status === 403) && /SESSION_REVOKED/i.test(combined)) {
+    onAuthFailure?.('revoked');
+    throw new SessionRevokedError();
+  }
   if ((res.status === 401 || res.status === 403) && /ACCOUNT_DISABLED/i.test(combined)) {
     onAuthFailure?.('disabled');
     throw new AccountDisabledError();
@@ -54,6 +66,14 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
     } catch (err) {
       if (err instanceof AccountDisabledError) {
         onAuthFailure?.('disabled');
+        throw err;
+      }
+      if (err instanceof DeviceBlockedError) {
+        onAuthFailure?.('blocked');
+        throw err;
+      }
+      if (err instanceof SessionRevokedError) {
+        onAuthFailure?.('revoked');
         throw err;
       }
       const msg = err instanceof Error ? err.message : '';

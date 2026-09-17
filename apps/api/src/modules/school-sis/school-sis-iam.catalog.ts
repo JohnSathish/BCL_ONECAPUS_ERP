@@ -16,6 +16,22 @@ export type IamModuleDef = {
 
 export const SCHOOL_IAM_MODULES: IamModuleDef[] = [
   {
+    id: 'devices',
+    label: 'Device Control',
+    actions: [
+      { action: 'view', slug: 'devices.view', label: 'View' },
+      { action: 'view', slug: 'devices.view_ip', label: 'View IP' },
+      { action: 'view', slug: 'devices.view_sessions', label: 'View sessions' },
+      { action: 'manage', slug: 'devices.revoke', label: 'Revoke' },
+      { action: 'manage', slug: 'devices.signout', label: 'Sign out' },
+      { action: 'manage', slug: 'devices.block', label: 'Block' },
+      { action: 'manage', slug: 'devices.unblock', label: 'Unblock' },
+      { action: 'manage', slug: 'devices.revoke_all', label: 'Revoke all' },
+      { action: 'view', slug: 'devices.security_logs', label: 'Security logs' },
+      { action: 'export', slug: 'devices.export', label: 'Export' },
+    ],
+  },
+  {
     id: 'users',
     label: 'Users',
     actions: [

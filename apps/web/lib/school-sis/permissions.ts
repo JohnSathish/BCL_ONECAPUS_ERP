@@ -115,8 +115,13 @@ export function canViewSchoolUsers(permissions?: string[]) {
   return (
     canManageSchoolUsers(permissions) ||
     has(permissions, 'users.view') ||
-    has(permissions, 'users:read')
+    has(permissions, 'users:read') ||
+    has(permissions, 'devices.view')
   );
+}
+
+export function canSchoolDevice(permissions: string[] | undefined, slug: string) {
+  return has(permissions, MANAGE) || has(permissions, slug);
 }
 
 export function canConfigureSchoolPaymentGateways(permissions?: string[], roles?: string[]) {

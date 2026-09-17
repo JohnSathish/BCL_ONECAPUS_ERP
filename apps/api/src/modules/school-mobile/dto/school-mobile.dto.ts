@@ -90,6 +90,49 @@ export class RegisterSchoolMobileDeviceDto {
   @IsString()
   @MaxLength(40)
   osVersion?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  manufacturer?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  deviceName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  buildNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  screenResolution?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  timezone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  locale?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  networkType?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  biometricEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  pushCapability?: boolean;
 }
 
 export class PatchSchoolMobileDeviceDto {

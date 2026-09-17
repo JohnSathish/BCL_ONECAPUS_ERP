@@ -4,6 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisAttendanceService } from '../school-sis/school-sis-attendance.service';
 import { SchoolSisExamsService } from '../school-sis/school-sis-exams.service';
 import { SchoolSisFeesService } from '../school-sis/school-sis-fees.service';
+import { SchoolSisService } from '../school-sis/school-sis.service';
 import { SchoolSisTimetableService } from '../school-sis/school-sis-timetable.service';
 import { SchoolWebGalleryService } from '../school-web/school-web-gallery.service';
 import { SchoolWebService } from '../school-web/school-web.service';
@@ -29,6 +30,7 @@ function greeting(now = new Date()) {
 export class SchoolMobileHomeService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly sis: SchoolSisService,
     private readonly access: SchoolMobileAccessService,
     private readonly web: SchoolWebService,
     private readonly gallery: SchoolWebGalleryService,

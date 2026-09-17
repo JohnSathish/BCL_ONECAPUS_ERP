@@ -67,6 +67,8 @@ import { SchoolSisOpsService } from './school-sis-ops.service';
 import { SchoolSisOpsProcessor } from './school-sis-ops.processor';
 import { SchoolSisOpsMetrics } from './school-sis-ops.metrics';
 import { SchoolSisOpsInterceptor } from './school-sis-ops.interceptor';
+import { SchoolSisDevicesController } from './school-sis-devices.controller';
+import { SchoolSisDevicesService } from './school-sis-devices.service';
 import { SchoolMaintenanceGuard } from './school-sis-ops.guard';
 import { SchoolSisAttendanceService } from './school-sis-attendance.service';
 import { SchoolSisReportsService } from './school-sis-reports.service';
@@ -112,6 +114,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisLibraryController,
     SchoolSisSmsController,
     SchoolSisOpsController,
+    SchoolSisDevicesController,
   ],
   providers: [
     SchoolSisService,
@@ -150,6 +153,7 @@ import { SchoolReportExcelService } from './report-engine/report-excel.service';
     SchoolSisOpsService,
     SchoolSisOpsProcessor,
     SchoolSisOpsMetrics,
+    SchoolSisDevicesService,
     { provide: APP_INTERCEPTOR, useClass: SchoolSisOpsInterceptor },
     { provide: APP_GUARD, useClass: SchoolLicenseGuard },
     { provide: APP_GUARD, useClass: SchoolMaintenanceGuard },

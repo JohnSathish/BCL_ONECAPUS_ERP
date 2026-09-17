@@ -21,6 +21,7 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequireAnyPermission } from '../../common/decorators/require-permissions.decorator';
+import { extractClientIp } from '../../common/utils/request-host';
 import { TenantResolutionService } from '../tenants/tenant-resolution.service';
 import { SchoolWebGalleryService } from '../school-web/school-web-gallery.service';
 import { SchoolWebService } from '../school-web/school-web.service';
@@ -697,8 +698,20 @@ export class SchoolMobileController {
   register(
     @CurrentUser() user: JwtUser,
     @Body() dto: RegisterSchoolMobileDeviceDto,
+    @Req() req: Request,
   ) {
-    return this.devices.register(user, dto);
+    return this.devices.register(user, dto, extractClientIp(req));
+  }
+
+  @Post('devices/heartbeat')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  heartbeat(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: { deviceId: string; networkType?: string },
+    @Req() req: Request,
+  ) {
+    return this.devices.heartbeat(user, dto, extractClientIp(req));
   }
 
   @Patch('devices/:deviceId')
@@ -725,14 +738,28 @@ export class SchoolMobileController {
   @Get('devices/sessions')
   @ApiBearerAuth()
   @RequireAnyPermission(...ACCESS)
-  sessions(@CurrentUser() user: JwtUser) {
-    return this.devices.listMine(user);
+  listDeviceSessions(
+    @CurrentUser() user: JwtUser,
+    @Headers('x-device-id') deviceHeader?: string,
+  ) {
+    return this.devices.listMine(user, deviceHeader);
+  }
+
+  @Post('devices/sign-out-others')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  signOutOthers(
+    @CurrentUser() user: JwtUser,
+    @Headers('x-device-id') deviceHeader?: string,
+  ) {
+    if (!deviceHeader) throw new BadRequestException('Missing device');
+    return this.devices.signOutOthers(user, deviceHeader);
   }
 
   @Delete('devices/sessions/:id')
   @ApiBearerAuth()
   @RequireAnyPermission(...ACCESS)
-  revokeSession(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+  revokeDeviceSession(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.devices.revoke(user, id);
   }
 
