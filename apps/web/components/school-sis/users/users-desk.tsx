@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -62,6 +62,19 @@ function Panel({ className, children }: { className?: string; children?: React.R
   );
 }
 
+const SCHOOL_DEFAULT_PASSWORD = 'StLuke@2026';
+const USERS_PAGE_SIZE = 50;
+
+function revealPassword(res: {
+  temporaryPassword?: string;
+  generatedPassword?: string;
+  plainPassword?: string;
+}) {
+  return (
+    res.temporaryPassword || res.generatedPassword || res.plainPassword || SCHOOL_DEFAULT_PASSWORD
+  );
+}
+
 function iamUserItems(data: unknown): Array<Record<string, unknown>> {
   if (Array.isArray(data)) return data as Array<Record<string, unknown>>;
   if (!data || typeof data !== 'object') return [];
@@ -115,7 +128,17 @@ export function UsersDesk() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [role, setRole] = useState('');
+  const [listPage, setListPage] = useState(1);
   const [selected, setSelected] = useState<string[]>([]);
+  const [revealed, setRevealed] = useState<{
+    name: string;
+    username?: string | null;
+    email?: string;
+    password: string;
+    defaultUsed?: boolean;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [customReset, setCustomReset] = useState('');
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [wizard, setWizard] = useState(false);
   const [invite, setInvite] = useState(false);
@@ -169,9 +192,15 @@ export function UsersDesk() {
     enabled: ready,
   });
   const users = useQuery({
-    queryKey: ['school-iam-users', search, status || statusFromPath, role],
+    queryKey: ['school-iam-users', search, status || statusFromPath, role, listPage],
     queryFn: () =>
-      fetchSchoolIamUsers({ search, status: status || statusFromPath, role, limit: 50 }),
+      fetchSchoolIamUsers({
+        search,
+        status: status || statusFromPath,
+        role,
+        page: listPage,
+        limit: USERS_PAGE_SIZE,
+      }),
     enabled: ready && usersListPage,
   });
   const invites = useQuery({
@@ -226,6 +255,11 @@ export function UsersDesk() {
   };
   const kpis = dashPayload.kpis ?? dashPayload.data?.kpis ?? {};
   const userRows = iamUserItems(users.data);
+  const usersTotal =
+    users.data && typeof users.data === 'object'
+      ? Number((users.data as { total?: number }).total ?? userRows.length)
+      : userRows.length;
+  const usersPageCount = Math.max(1, Math.ceil(usersTotal / USERS_PAGE_SIZE));
   const modules = ((
     catalog.data as {
       modules?: Array<{
@@ -261,9 +295,40 @@ export function UsersDesk() {
     }
   };
 
+  useEffect(() => {
+    setListPage(1);
+    setSelected([]);
+  }, [search, status, role, statusFromPath]);
+
   const seed = useMutation({
     mutationFn: () => run(seedSchoolIamRoles, 'Default school roles seeded'),
   });
+
+  const askReset = (u: {
+    id: string;
+    displayName?: unknown;
+    email?: unknown;
+    username?: unknown;
+  }) => {
+    const name = String(u.displayName || u.email || 'this user');
+    setConfirm({
+      title: `Reset password for ${name}?`,
+      body: `This signs them out of every session and sets a temporary password. They must change it on the next login. Default school password is ${SCHOOL_DEFAULT_PASSWORD}.`,
+      ok: 'Password reset',
+      okLabel: 'Reset password',
+      run: async () => {
+        const r = await resetSchoolIamPassword(String(u.id));
+        setRevealed({
+          name,
+          username: r.username ?? (u.username ? String(u.username) : null),
+          email: r.email ?? (u.email ? String(u.email) : undefined),
+          password: revealPassword(r),
+          defaultUsed: r.defaultUsed !== false,
+        });
+        return r;
+      },
+    });
+  };
 
   const badge = (st: string) => (
     <span
@@ -287,7 +352,8 @@ export function UsersDesk() {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Users &amp; Access</h1>
           <p className="text-sm text-slate-500">
-            School identity, roles, sessions and security — not a college portal.
+            School identity, roles, sessions and security — not a college portal. If a student or
+            staff member forgets their password, open the row and reset it here.
           </p>
         </div>
         {manage ? (
@@ -364,10 +430,10 @@ export function UsersDesk() {
       </div>
 
       {usersListPage ? (
-        <Panel className="overflow-auto p-0">
-          <div className="flex flex-wrap gap-2 border-b border-slate-100 p-3">
+        <Panel className="overflow-hidden p-0">
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3">
             <input
-              className="h-9 rounded-md border px-3 text-sm"
+              className="h-9 min-w-[16rem] flex-1 rounded-md border px-3 text-sm"
               placeholder="Search name, email, username, mobile"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -441,65 +507,137 @@ export function UsersDesk() {
                 >
                   Logout
                 </GhostButton>
+                <GhostButton
+                  onClick={() =>
+                    setConfirm({
+                      title: `Reset ${selected.length} passwords?`,
+                      body: `Selected accounts will be signed out and set to ${SCHOOL_DEFAULT_PASSWORD}. They must change the password on next login.`,
+                      ok: 'Passwords reset',
+                      okLabel: 'Reset selected',
+                      run: () => bulkSchoolIam(selected, 'reset-password'),
+                    })
+                  }
+                >
+                  Reset passwords
+                </GhostButton>
               </>
             ) : null}
           </div>
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
-              <tr>
-                <th className="p-2" />
-                <th className="p-2">User</th>
-                <th className="p-2">Role</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Last login</th>
-                <th className="p-2">MFA</th>
-                <th className="p-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {userRows.map((u) => {
-                const id = String(u.id);
-                const rolesList = (u.roles as Array<{ name: string }>) ?? [];
-                return (
-                  <tr key={id} className="border-t border-slate-100">
-                    <td className="p-2">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(id)}
-                        onChange={(e) =>
-                          setSelected((s) =>
-                            e.target.checked ? [...s, id] : s.filter((x) => x !== id),
-                          )
-                        }
-                      />
-                    </td>
-                    <td className="p-2">
-                      <button className="text-left" onClick={() => setDrawerId(id)}>
-                        <div className="font-medium">{String(u.displayName || u.email)}</div>
-                        <div className="text-xs text-slate-500">{String(u.email)}</div>
-                      </button>
-                    </td>
-                    <td className="p-2">{rolesList.map((r) => r.name).join(', ') || '—'}</td>
-                    <td className="p-2">{badge(String(u.accountStatus))}</td>
-                    <td className="p-2 text-xs">
-                      {u.lastLoginAt ? new Date(String(u.lastLoginAt)).toLocaleString() : 'Never'}
-                    </td>
-                    <td className="p-2">{u.mfaEnabled ? '✓' : '—'}</td>
-                    <td className="p-2 text-right">
-                      <GhostButton onClick={() => setDrawerId(id)}>Open</GhostButton>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-auto">
+            <table className="w-full min-w-[64rem] text-left text-sm">
+              <thead className="sticky top-0 bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="p-2" />
+                  <th className="p-2">User</th>
+                  <th className="p-2">Username</th>
+                  <th className="p-2">Role</th>
+                  <th className="p-2">Status</th>
+                  <th className="p-2">Last login</th>
+                  <th className="p-2">MFA</th>
+                  <th className="p-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {userRows.map((u) => {
+                  const id = String(u.id);
+                  const rolesList = (u.roles as Array<{ name: string }>) ?? [];
+                  const initials = String(u.displayName || u.email || '?')
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((p) => p[0])
+                    .join('')
+                    .toUpperCase();
+                  return (
+                    <tr key={id} className="border-t border-slate-100 hover:bg-slate-50/80">
+                      <td className="p-2">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(id)}
+                          onChange={(e) =>
+                            setSelected((s) =>
+                              e.target.checked ? [...s, id] : s.filter((x) => x !== id),
+                            )
+                          }
+                        />
+                      </td>
+                      <td className="p-2">
+                        <button
+                          className="flex items-center gap-2 text-left"
+                          onClick={() => setDrawerId(id)}
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-600">
+                            {initials}
+                          </span>
+                          <span>
+                            <span className="block font-medium text-slate-900">
+                              {String(u.displayName || u.email)}
+                            </span>
+                            <span className="block text-xs text-slate-500">{String(u.email)}</span>
+                          </span>
+                        </button>
+                      </td>
+                      <td className="p-2 font-mono text-xs text-slate-700">
+                        {u.username ? String(u.username) : '—'}
+                      </td>
+                      <td className="p-2">{rolesList.map((r) => r.name).join(', ') || '—'}</td>
+                      <td className="p-2">
+                        <div className="flex flex-wrap items-center gap-1">
+                          {badge(String(u.accountStatus))}
+                          {u.mustResetPassword ? (
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                              Must change
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="p-2 text-xs">
+                        {u.lastLoginAt ? new Date(String(u.lastLoginAt)).toLocaleString() : 'Never'}
+                      </td>
+                      <td className="p-2">{u.mfaEnabled ? '✓' : '—'}</td>
+                      <td className="p-2 text-right">
+                        <div className="flex justify-end gap-1">
+                          {manage ? (
+                            <GhostButton onClick={() => askReset({ ...u, id })}>
+                              Reset password
+                            </GhostButton>
+                          ) : null}
+                          <GhostButton onClick={() => setDrawerId(id)}>Open</GhostButton>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           {users.isError ? (
             <p className="p-6 text-sm text-rose-700">{apiErrorMessage(users.error)}</p>
           ) : users.isLoading ? (
             <p className="p-6 text-sm text-slate-500">Loading users…</p>
           ) : !userRows.length ? (
             <p className="p-6 text-sm text-slate-500">No users match the current filters.</p>
-          ) : null}
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-3 py-2 text-xs text-slate-500">
+              <span>
+                Showing {(listPage - 1) * USERS_PAGE_SIZE + 1}–
+                {Math.min(listPage * USERS_PAGE_SIZE, usersTotal)} of {usersTotal}
+              </span>
+              <div className="flex gap-1">
+                <GhostButton
+                  disabled={listPage <= 1}
+                  onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </GhostButton>
+                <GhostButton
+                  disabled={listPage >= usersPageCount}
+                  onClick={() => setListPage((p) => Math.min(usersPageCount, p + 1))}
+                >
+                  Next
+                </GhostButton>
+              </div>
+            </div>
+          )}
         </Panel>
       ) : null}
 
@@ -733,7 +871,19 @@ export function UsersDesk() {
             <button onClick={() => setDrawerId(null)}>✕</button>
           </div>
           <p className="text-sm text-slate-500">{String(detail.data.email)}</p>
-          <div className="mt-2">{badge(String(detail.data.accountStatus))}</div>
+          {detail.data.username ? (
+            <p className="font-mono text-xs text-slate-600">
+              Username {String(detail.data.username)}
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-wrap items-center gap-1">
+            {badge(String(detail.data.accountStatus))}
+            {detail.data.mustResetPassword ? (
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                Must change password
+              </span>
+            ) : null}
+          </div>
           <p className="mt-3 text-xs text-slate-500">
             Roles:{' '}
             {((detail.data.roles as Array<{ name: string }>) ?? []).map((r) => r.name).join(', ') ||
@@ -748,6 +898,96 @@ export function UsersDesk() {
           <div className="mt-4 space-y-2">
             {manage ? (
               <>
+                <div className="rounded-xl border border-sky-100 bg-sky-50/80 p-3">
+                  <p className="text-sm font-semibold text-slate-900">Forgot password</p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Reset sets a temporary password, signs the user out, and requires a change on
+                    next login. Share it only with that person.
+                  </p>
+                  <input
+                    className="mt-2 w-full rounded-md border bg-white px-2 py-1.5 text-sm"
+                    placeholder={`Custom password (optional, else ${SCHOOL_DEFAULT_PASSWORD})`}
+                    value={customReset}
+                    onChange={(e) => setCustomReset(e.target.value)}
+                  />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <PrimaryButton
+                      onClick={() =>
+                        setConfirm({
+                          title: 'Reset to school default?',
+                          body: `Password will become ${SCHOOL_DEFAULT_PASSWORD}. All sessions end.`,
+                          ok: 'Password reset',
+                          okLabel: 'Use school default',
+                          run: async () => {
+                            const r = await resetSchoolIamPassword(drawerId);
+                            setRevealed({
+                              name: String(detail.data.displayName || detail.data.email),
+                              username: r.username ?? String(detail.data.username ?? ''),
+                              email: r.email ?? String(detail.data.email),
+                              password: revealPassword(r),
+                              defaultUsed: true,
+                            });
+                            setCustomReset('');
+                            return r;
+                          },
+                        })
+                      }
+                    >
+                      Reset to {SCHOOL_DEFAULT_PASSWORD}
+                    </PrimaryButton>
+                    <GhostButton
+                      onClick={() =>
+                        setConfirm({
+                          title: 'Generate a temporary password?',
+                          body: 'A one-time password will be created. Show it to the user once, then they must change it.',
+                          ok: 'Password reset',
+                          okLabel: 'Generate password',
+                          run: async () => {
+                            const r = await resetSchoolIamPassword(drawerId, { generate: true });
+                            setRevealed({
+                              name: String(detail.data.displayName || detail.data.email),
+                              username: r.username ?? String(detail.data.username ?? ''),
+                              email: r.email ?? String(detail.data.email),
+                              password: revealPassword(r),
+                              defaultUsed: false,
+                            });
+                            return r;
+                          },
+                        })
+                      }
+                    >
+                      Generate password
+                    </GhostButton>
+                    {customReset.trim().length >= 8 ? (
+                      <GhostButton
+                        onClick={() =>
+                          setConfirm({
+                            title: 'Set this custom password?',
+                            body: 'The user must change it after they sign in.',
+                            ok: 'Password reset',
+                            okLabel: 'Set custom password',
+                            run: async () => {
+                              const r = await resetSchoolIamPassword(drawerId, {
+                                password: customReset.trim(),
+                              });
+                              setRevealed({
+                                name: String(detail.data.displayName || detail.data.email),
+                                username: r.username ?? String(detail.data.username ?? ''),
+                                email: r.email ?? String(detail.data.email),
+                                password: revealPassword(r),
+                                defaultUsed: false,
+                              });
+                              setCustomReset('');
+                              return r;
+                            },
+                          })
+                        }
+                      >
+                        Set custom
+                      </GhostButton>
+                    ) : null}
+                  </div>
+                </div>
                 <GhostButton
                   onClick={() => run(() => setSchoolIamStatus(drawerId, 'active'), 'Activated')}
                 >
@@ -767,18 +1007,6 @@ export function UsersDesk() {
                   onClick={() => run(() => logoutSchoolIamUser(drawerId), 'Sessions revoked')}
                 >
                   Logout all sessions
-                </GhostButton>
-                <GhostButton
-                  onClick={async () => {
-                    const r = (await run(
-                      () => resetSchoolIamPassword(drawerId),
-                      'Password reset',
-                    )) as { generatedPassword?: string };
-                    if (r?.generatedPassword)
-                      setNotice(`Temporary password: ${r.generatedPassword}`);
-                  }}
-                >
-                  Reset password
                 </GhostButton>
                 <div className="rounded border p-2">
                   <p className="text-xs font-medium">Assign roles</p>
@@ -1460,6 +1688,67 @@ export function UsersDesk() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={!!revealed}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRevealed(null);
+            setCopied(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Temporary password</DialogTitle>
+            <DialogDescription>
+              Share this only with {revealed?.name}. It will not be shown again after you close this
+              window. They must change it on next login.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 rounded-xl border bg-slate-50 p-3 text-sm">
+            {revealed?.username ? (
+              <p>
+                <span className="text-slate-500">Username</span>{' '}
+                <span className="font-mono">{revealed.username}</span>
+              </p>
+            ) : null}
+            {revealed?.email ? (
+              <p>
+                <span className="text-slate-500">Email</span> {revealed.email}
+              </p>
+            ) : null}
+            <p>
+              <span className="text-slate-500">Password</span>{' '}
+              <span className="font-mono text-base font-semibold">{revealed?.password}</span>
+            </p>
+            {revealed?.defaultUsed ? (
+              <p className="text-xs text-slate-500">This is the school default portal password.</p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <GhostButton
+              type="button"
+              onClick={async () => {
+                if (!revealed?.password) return;
+                await navigator.clipboard.writeText(revealed.password);
+                setCopied(true);
+              }}
+            >
+              {copied ? 'Copied' : 'Copy password'}
+            </GhostButton>
+            <PrimaryButton
+              type="button"
+              onClick={() => {
+                setRevealed(null);
+                setCopied(false);
+              }}
+            >
+              Done
+            </PrimaryButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!confirm} onOpenChange={() => (!directoryBusy ? setConfirm(null) : null)}>
         <DialogContent>
           <DialogHeader>
@@ -1496,6 +1785,8 @@ export function UsersDesk() {
                       : (confirm.ok ?? 'Saved'),
                   );
                   await qc.invalidateQueries({ queryKey: ['school-iam'] });
+                  await qc.invalidateQueries({ queryKey: ['school-iam-users'] });
+                  await qc.invalidateQueries({ queryKey: ['school-iam-user'] });
                 } catch (e) {
                   setNotice(apiErrorMessage(e));
                 } finally {

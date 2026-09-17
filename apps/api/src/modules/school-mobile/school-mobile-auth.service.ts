@@ -11,13 +11,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from '../school-sis/school-sis.service';
 import { SchoolSisLicenseService } from '../school-sis/school-sis-license.service';
 import { SCHOOL_MOBILE_DEFAULT_PASSWORD } from './school-mobile.constants';
-
-function compactId(value: string) {
-  return value
-    .trim()
-    .toUpperCase()
-    .replace(/[\s\-_.]/g, '');
-}
+import { resolveSchoolPortalUserId } from '../school-sis/school-sis-login-lookup';
 
 @Injectable()
 export class SchoolMobileAuthService {
@@ -157,102 +151,6 @@ export class SchoolMobileAuthService {
     tenantId: string,
     identifier: string,
   ): Promise<string | null> {
-    const trimmed = identifier.trim();
-    const compact = compactId(trimmed);
-
-    if (trimmed.includes('@')) {
-      const byEmail = await this.prisma.user.findFirst({
-        where: {
-          tenantId,
-          email: trimmed.toLowerCase(),
-          deletedAt: null,
-          isActive: true,
-        },
-        select: { id: true },
-      });
-      return byEmail?.id ?? null;
-    }
-
-    const byUsername = await this.prisma.user.findFirst({
-      where: {
-        tenantId,
-        username: { equals: trimmed, mode: 'insensitive' },
-        deletedAt: null,
-        isActive: true,
-      },
-      select: { id: true },
-    });
-    if (byUsername) return byUsername.id;
-
-    const admissionRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM school.school_students
-      WHERE tenant_id = ${tenantId}
-        AND deleted_at IS NULL
-        AND regexp_replace(upper(admission_number), '[^A-Z0-9]', '', 'g') = ${compact}
-      LIMIT 2
-    `;
-    if (admissionRows[0]) {
-      const account = await this.prisma.schoolPersonAccount.findFirst({
-        where: {
-          tenantId,
-          studentId: admissionRows[0].id,
-          personType: 'STUDENT',
-        },
-        select: { userId: true },
-      });
-      if (account) return account.userId;
-    }
-
-    const rollHits = await this.prisma.$queryRaw<Array<{ student_id: string }>>`
-      SELECT student_id FROM school.school_enrollments
-      WHERE tenant_id = ${tenantId}
-        AND deleted_at IS NULL
-        AND status = 'ACTIVE'
-        AND roll_number IS NOT NULL
-        AND regexp_replace(upper(roll_number), '[^A-Z0-9]', '', 'g') = ${compact}
-      LIMIT 5
-    `;
-    const uniqueStudentIds = [
-      ...new Set(rollHits.map((row) => row.student_id)),
-    ];
-    if (uniqueStudentIds.length === 1) {
-      const account = await this.prisma.schoolPersonAccount.findFirst({
-        where: {
-          tenantId,
-          studentId: uniqueStudentIds[0],
-          personType: 'STUDENT',
-        },
-        select: { userId: true },
-      });
-      if (account) return account.userId;
-    }
-    if (uniqueStudentIds.length > 1) {
-      throw new UnauthorizedException(
-        'That roll number is used in more than one class. Sign in with your admission number.',
-      );
-    }
-
-    const staff = await this.prisma.schoolStaff.findFirst({
-      where: {
-        tenantId,
-        deletedAt: null,
-        employeeCode: { equals: trimmed, mode: 'insensitive' },
-      },
-      select: { email: true },
-    });
-    if (staff?.email) {
-      const staffUser = await this.prisma.user.findFirst({
-        where: {
-          tenantId,
-          email: { equals: staff.email, mode: 'insensitive' },
-          deletedAt: null,
-          isActive: true,
-        },
-        select: { id: true },
-      });
-      if (staffUser) return staffUser.id;
-    }
-
-    return null;
+    return resolveSchoolPortalUserId(this.prisma, tenantId, identifier);
   }
 }

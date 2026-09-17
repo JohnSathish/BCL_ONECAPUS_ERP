@@ -527,19 +527,56 @@ export class SchoolSisIamService implements OnModuleInit {
     actor: JwtUser,
     id: string,
     forceChange: boolean,
+    options: { password?: string; generate?: boolean } = {},
   ) {
     await this.sis.assertSecondarySisTenant(tenantId);
     this.access.assert(actor, 'users.update', 'users:manage');
     await this.access.assertCanManageUser(actor, id);
-    const result = await this.provisioning.resetPassword(tenantId, id, {
-      forceReset: forceChange,
-      actorUserId: actor.sub,
+    const user = await this.prisma.user.findFirst({
+      where: { id, tenantId, deletedAt: null },
+      select: { id: true, username: true, displayName: true, email: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    const custom = options.password?.trim();
+    if (custom && custom.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
+    }
+    const temporaryPassword = custom
+      ? custom
+      : options.generate
+        ? `Sl.${randomBytes(5)
+            .toString('base64url')
+            .replace(/[^a-zA-Z0-9]/g, 'x')
+            .slice(0, 8)}9A`
+        : SCHOOL_PORTAL_DEFAULT_PASSWORD;
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: {
+          passwordHash,
+          passwordChangedAt: new Date(),
+          mustResetPassword: forceChange !== false,
+        },
+      });
+      await tx.passwordHistory.create({ data: { userId: id, passwordHash } });
     });
     await this.auth.revokeAllSessionsForUser(id);
     await this.log(tenantId, actor.sub, 'user.password_reset', id, {
       forceChange,
+      generated: Boolean(options.generate),
     });
-    return result;
+    return {
+      ok: true,
+      username: user.username,
+      displayName: user.displayName,
+      email: user.email,
+      temporaryPassword,
+      generatedPassword: temporaryPassword,
+      plainPassword: temporaryPassword,
+      mustChange: forceChange !== false,
+      defaultUsed: !custom && !options.generate,
+    };
   }
 
   async assignRoles(

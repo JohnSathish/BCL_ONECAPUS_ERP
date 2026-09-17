@@ -27,6 +27,11 @@ import {
   resolveStudentDefaultPassword,
   studentIdsMatch,
 } from '../students/student-credentials.util';
+import { SCHOOL_PORTAL_DEFAULT_PASSWORD } from '../school-sis/school-sis.constants';
+import {
+  isSchoolSisTenant,
+  resolveSchoolPortalUserId,
+} from '../school-sis/school-sis-login-lookup';
 
 type ShiftScope = {
   shiftIds: string[];
@@ -284,6 +289,37 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: userId },
       data: { mustResetPassword: true },
+    });
+    return true;
+  }
+
+  /** St. Luke's first-login password, including older StLuke@123 hashes. */
+  private async trySchoolPortalDefaultPassword(
+    tenantId: string,
+    user: {
+      id: string;
+      email: string;
+      mustResetPassword?: boolean | null;
+    },
+    password: string,
+  ): Promise<boolean> {
+    const typed = password.trim();
+    if (typed !== SCHOOL_PORTAL_DEFAULT_PASSWORD && typed !== 'StLuke@123') {
+      return false;
+    }
+    if (!(await isSchoolSisTenant(this.prisma, tenantId))) return false;
+    const linked = await this.prisma.schoolPersonAccount.findFirst({
+      where: { tenantId, userId: user.id },
+      select: { id: true },
+    });
+    const portalMail = user.email
+      ?.toLowerCase()
+      .endsWith('@portal.stlukestura.in');
+    if (!linked && !portalMail && !user.mustResetPassword) return false;
+    const passwordHash = await bcrypt.hash(SCHOOL_PORTAL_DEFAULT_PASSWORD, 12);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, mustResetPassword: true },
     });
     return true;
   }
@@ -699,6 +735,24 @@ export class AuthService {
     });
     if (byUsername) return byUsername;
 
+    if (await isSchoolSisTenant(this.prisma, tenantId)) {
+      const schoolUserId = await resolveSchoolPortalUserId(
+        this.prisma,
+        tenantId,
+        trimmed,
+      );
+      if (!schoolUserId) return null;
+      return this.prisma.user.findFirst({
+        where: {
+          id: schoolUserId,
+          tenantId,
+          deletedAt: null,
+          isActive: true,
+        },
+        include,
+      });
+    }
+
     const student = await this.prisma.student.findFirst({
       where: {
         tenantId,
@@ -879,6 +933,17 @@ export class AuthService {
     }
 
     let valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      const schoolDefault = await this.trySchoolPortalDefaultPassword(
+        tenant.id,
+        user,
+        password,
+      );
+      if (schoolDefault) {
+        valid = true;
+        user.mustResetPassword = true;
+      }
+    }
     if (!valid) {
       const bootstrap = await this.tryStudentBootstrapPassword(user, password);
       if (bootstrap) {

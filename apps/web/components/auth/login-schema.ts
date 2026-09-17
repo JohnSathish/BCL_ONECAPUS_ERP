@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const loginSchema = z.object({
   identifier: z
     .string()
-    .min(2, 'Enter your college roll number or email')
+    .min(2, 'Enter your username, admission number or email')
     .max(120, 'Identifier is too long'),
   password: z.string().min(1, 'Enter your password'),
   rememberMe: z.boolean().optional(),

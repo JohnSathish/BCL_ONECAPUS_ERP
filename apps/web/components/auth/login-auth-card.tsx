@@ -115,7 +115,7 @@ export function LoginAuthCard({
           </p>
           <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
             {schoolPortal
-              ? 'Use your school office email to open the School ERP.'
+              ? 'Students: use your admission number (for example SLS26-0108). Staff: use your school email or employee code.'
               : 'Students: use your college roll number. Staff: use your work email.'}
           </p>
         </motion.div>
@@ -127,7 +127,11 @@ export function LoginAuthCard({
             <motion.div className="space-y-3" {...fadeUp(0.22, animate)}>
               <LoginField
                 id="identifier"
-                label={schoolPortal ? 'Email' : 'College roll number or email'}
+                label={
+                  schoolPortal
+                    ? 'Admission number, username or email'
+                    : 'College roll number or email'
+                }
                 icon={UserRound}
                 type="text"
                 autoComplete="username"

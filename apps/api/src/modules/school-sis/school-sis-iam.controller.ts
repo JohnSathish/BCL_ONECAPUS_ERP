@@ -142,13 +142,15 @@ export class SchoolSisIamController {
   reset(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
-    @Body() body: { forceChange?: boolean },
+    @Body()
+    body: { forceChange?: boolean; password?: string; generate?: boolean },
   ) {
     return this.iam.resetPassword(
       user.tid,
       user,
       id,
       body.forceChange !== false,
+      { password: body.password, generate: body.generate },
     );
   }
 

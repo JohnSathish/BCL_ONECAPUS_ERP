@@ -67,11 +67,28 @@ export async function setSchoolIamStatus(id: string, status: string) {
   return data;
 }
 
-export async function resetSchoolIamPassword(id: string) {
+export async function resetSchoolIamPassword(
+  id: string,
+  opts: { forceChange?: boolean; password?: string; generate?: boolean } = {},
+) {
   const { data } = await api.post(`/v1/school-sis/iam/users/${id}/reset-password`, {
-    forceChange: true,
+    forceChange: opts.forceChange !== false,
+    password: opts.password,
+    generate: opts.generate,
   });
-  return data;
+  const envelope = asObject(data);
+  const payload = asObject(envelope?.success === true ? envelope.data : data) ?? envelope ?? {};
+  return payload as {
+    ok?: boolean;
+    username?: string | null;
+    displayName?: string | null;
+    email?: string;
+    temporaryPassword?: string;
+    generatedPassword?: string;
+    plainPassword?: string;
+    mustChange?: boolean;
+    defaultUsed?: boolean;
+  };
 }
 
 export async function assignSchoolIamRoles(id: string, roleSlugs: string[]) {

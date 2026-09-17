@@ -204,14 +204,19 @@ export function LoginForm({
         }
         const roles = session.user.roles ?? [];
         const permissions = session.user.permissions ?? [];
-        const schoolHome =
-          context?.institutionType === 'SCHOOL'
-            ? canAccessAdminPortal(roles, permissions)
-              ? '/admin'
-              : canAccessApplicantPortal(roles, permissions)
-                ? '/school-admissions-portal/dashboard'
-                : null
-            : null;
+        const schoolSession =
+          context?.institutionType === 'SCHOOL' ||
+          schoolSis ||
+          context?.schoolProduct === 'SECONDARY_SIS';
+        const schoolHome = schoolSession
+          ? canAccessAdminPortal(roles, permissions)
+            ? '/admin'
+            : canAccessApplicantPortal(roles, permissions)
+              ? '/school-admissions-portal/dashboard'
+              : roles.includes('school-student') || roles.includes('school-parent')
+                ? '/change-password'
+                : '/admin'
+          : null;
         const requestedPath = postLoginPath ?? queryNextPath;
         const destination =
           (requestedPath && canAccessPath(roles, requestedPath, permissions)
@@ -259,17 +264,32 @@ export function LoginForm({
           return;
         }
         if (status === 403) {
-          setError(text || 'Access denied for this device. Contact your college administrator.');
+          const schoolSession =
+            context?.institutionType === 'SCHOOL' ||
+            schoolSis ||
+            context?.schoolProduct === 'SECONDARY_SIS';
+          setError(
+            text ||
+              (schoolSession
+                ? 'Access denied for this device. Contact the school office.'
+                : 'Access denied for this device. Contact your college administrator.'),
+          );
           void loadChallenge();
           return;
         }
         if (status === 401) {
           const isGeneric = !text || text === 'Invalid credentials' || /^unauthorized$/i.test(text);
+          const schoolSession =
+            context?.institutionType === 'SCHOOL' ||
+            schoolSis ||
+            context?.schoolProduct === 'SECONDARY_SIS';
           setError(
             isGeneric
               ? isDemoLoginWorkspaceEnabled()
                 ? 'Incorrect username or password. Use the demo credentials below, or contact your administrator.'
-                : 'Incorrect username or password. Check your details, use Forgot password, or contact your college administrator.'
+                : schoolSession
+                  ? 'Incorrect admission number or password. Students sign in with the admission number (for example SLS26-0108) and StLuke@2026, then change it. Ask the school office if the account is missing.'
+                  : 'Incorrect username or password. Check your details, use Forgot password, or contact your college administrator.'
               : text,
           );
           void loadChallenge();
@@ -281,6 +301,7 @@ export function LoginForm({
     },
     [
       challenge,
+      schoolSis,
       context,
       hardRedirect,
       loadChallenge,
