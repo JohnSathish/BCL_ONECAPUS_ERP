@@ -117,6 +117,8 @@ export default function ForceChangePasswordPage() {
 
   const policy = useMemo(() => evaluatePasswordPolicy(newPassword), [newPassword]);
   const loginHref = kioskHost ? '/library-desk/login' : '/login';
+  const roles = session?.user?.roles ?? [];
+  const schoolSelf = roles.includes('school-student') || roles.includes('school-parent');
 
   useEffect(() => {
     setKioskHost(isLibraryKioskHost());
@@ -127,8 +129,18 @@ export default function ForceChangePasswordPage() {
     if (!session?.accessToken || session.user.mustResetPassword) return;
     if (isLibraryKioskHost()) {
       window.location.replace('/library-desk');
+      return;
     }
-  }, [hasHydrated, isBootstrapping, session?.accessToken, session?.user.mustResetPassword]);
+    if (schoolSelf) {
+      window.location.replace('/school-sis-portal/me');
+    }
+  }, [
+    hasHydrated,
+    isBootstrapping,
+    schoolSelf,
+    session?.accessToken,
+    session?.user.mustResetPassword,
+  ]);
 
   const match =
     confirmPassword.length > 0 && newPassword.length > 0 && newPassword === confirmPassword;
@@ -221,7 +233,7 @@ export default function ForceChangePasswordPage() {
                 </h1>
                 <p className="mt-1.5 text-sm leading-relaxed text-slate-300">
                   Welcome, <span className="font-medium text-white">{displayName}</span>. Change the
-                  default password before entering the campus portal.
+                  default password before continuing.
                 </p>
               </div>
             </div>
@@ -237,7 +249,9 @@ export default function ForceChangePasswordPage() {
             autoComplete="current-password"
             hint={
               <p className="text-xs text-slate-500">
-                Use your roll number if this is your first login.
+                {schoolSelf
+                  ? 'Use StLuke@2026 if this is your first login or the office just reset it.'
+                  : 'Use your roll number if this is your first login.'}
               </p>
             }
           />
@@ -333,7 +347,8 @@ export default function ForceChangePasswordPage() {
           </Button>
 
           <p className="text-center text-[11px] leading-relaxed text-slate-400">
-            After saving, you&apos;ll return to login with your new password.
+            After saving, sign in once more with your new password. You will not be asked to reset
+            it again.
           </p>
         </form>
       </div>

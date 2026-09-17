@@ -22,6 +22,10 @@ import {
   SUPER_ROLE_SLUGS,
 } from './school-sis-iam.catalog';
 import { SCHOOL_PORTAL_DEFAULT_PASSWORD } from './school-sis.constants';
+import {
+  preferredSchoolLoginUsername,
+  compactSchoolLoginId,
+} from './school-sis-login-lookup';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 
 function sha(token: string) {
@@ -275,11 +279,50 @@ export class SchoolSisIamService implements OnModuleInit {
         },
       }),
     ]);
+    const links = await this.prisma.schoolPersonAccount.findMany({
+      where: { tenantId, userId: { in: rows.map((r) => r.id) } },
+      include: {
+        student: {
+          select: {
+            admissionNumber: true,
+            enrollments: {
+              where: {
+                deletedAt: null,
+                status: 'ACTIVE',
+                rollNumber: { not: null },
+              },
+              orderBy: { updatedAt: 'desc' },
+              take: 1,
+              select: { rollNumber: true },
+            },
+          },
+        },
+        staff: { select: { employeeCode: true } },
+      },
+    });
+    const loginByUser = new Map(
+      links.map((l) => [
+        l.userId,
+        {
+          admissionNumber: l.student?.admissionNumber ?? null,
+          rollNumber: l.student?.enrollments[0]?.rollNumber ?? null,
+          employeeCode: l.staff?.employeeCode ?? null,
+        },
+      ]),
+    );
     return {
       total,
       page,
       limit,
-      items: rows.map((u) => this.serializeUser(u)),
+      items: rows.map((u) => {
+        const login = loginByUser.get(u.id);
+        return {
+          ...this.serializeUser(u),
+          admissionNumber: login?.admissionNumber ?? null,
+          rollNumber: login?.rollNumber ?? null,
+          employeeCode: login?.employeeCode ?? null,
+        };
+      }),
     };
   }
 
@@ -297,7 +340,21 @@ export class SchoolSisIamService implements OnModuleInit {
       where: { tenantId, userId: id },
       include: {
         student: {
-          select: { id: true, fullName: true, admissionNumber: true },
+          select: {
+            id: true,
+            fullName: true,
+            admissionNumber: true,
+            enrollments: {
+              where: {
+                deletedAt: null,
+                status: 'ACTIVE',
+                rollNumber: { not: null },
+              },
+              orderBy: { updatedAt: 'desc' },
+              take: 1,
+              select: { rollNumber: true },
+            },
+          },
         },
         guardian: { select: { id: true, fullName: true, phone: true } },
         staff: {
@@ -339,6 +396,12 @@ export class SchoolSisIamService implements OnModuleInit {
     });
     return {
       ...this.serializeUser(user),
+      admissionNumber:
+        links.find((l) => l.student)?.student?.admissionNumber ?? null,
+      rollNumber:
+        links.find((l) => l.student)?.student?.enrollments[0]?.rollNumber ??
+        null,
+      employeeCode: links.find((l) => l.staff)?.staff?.employeeCode ?? null,
       directPermissions: user.userPermissions.map((p) => ({
         slug: p.permission.slug,
         effect: p.effect,
@@ -880,13 +943,26 @@ export class SchoolSisIamService implements OnModuleInit {
           admissionNumber: true,
           email: true,
           phone: true,
+          enrollments: {
+            where: {
+              deletedAt: null,
+              status: 'ACTIVE',
+              rollNumber: { not: null },
+            },
+            orderBy: { updatedAt: 'desc' },
+            take: 1,
+            select: { rollNumber: true },
+          },
         },
       });
       for (const row of students) {
         queue.push({
           name: row.fullName,
           email: this.portalEmail('student', row.admissionNumber, row.email),
-          username: row.admissionNumber,
+          username: preferredSchoolLoginUsername({
+            rollNumber: row.enrollments[0]?.rollNumber,
+            admissionNumber: row.admissionNumber,
+          }),
           phone: row.phone,
           roleSlug: 'school-student',
           studentId: row.id,
@@ -925,6 +1001,7 @@ export class SchoolSisIamService implements OnModuleInit {
     const remaining =
       (body.includeStaff !== false ? leftover.staffMissing : 0) +
       (body.includeStudents !== false ? leftover.studentsMissing : 0);
+    const synced = await this.syncLoginIdentifiers(tenantId);
 
     await this.log(
       tenantId,
@@ -936,6 +1013,7 @@ export class SchoolSisIamService implements OnModuleInit {
         linked: linked.length,
         failed: failed.length,
         remaining,
+        usernamesSynced: synced.updated,
       },
     );
     return {
@@ -947,6 +1025,7 @@ export class SchoolSisIamService implements OnModuleInit {
       remaining,
       done: remaining === 0,
       failed,
+      usernamesSynced: synced.updated,
     };
   }
 
@@ -1032,7 +1111,7 @@ export class SchoolSisIamService implements OnModuleInit {
 
   private nextUnusedUsername(preferred: string, used: Set<string>) {
     const base =
-      preferred.replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 40) ||
+      preferred.replace(/[^a-zA-Z0-9._/-]/g, '').slice(0, 40) ||
       `u${Date.now().toString(36)}`;
     let candidate = base;
     let n = 1;
@@ -1068,7 +1147,7 @@ export class SchoolSisIamService implements OnModuleInit {
 
   private async uniqueUsername(tenantId: string, preferred: string) {
     const base =
-      preferred.replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 40) ||
+      preferred.replace(/[^a-zA-Z0-9._/-]/g, '').slice(0, 40) ||
       `u${Date.now().toString(36)}`;
     let candidate = base;
     let n = 1;
@@ -1082,6 +1161,71 @@ export class SchoolSisIamService implements OnModuleInit {
       n += 1;
     }
     return candidate;
+  }
+
+  async syncLoginIdentifiers(tenantId: string) {
+    await this.sis.assertSecondarySisTenant(tenantId);
+    const accounts = await this.prisma.schoolPersonAccount.findMany({
+      where: { tenantId },
+      include: {
+        student: {
+          select: {
+            admissionNumber: true,
+            enrollments: {
+              where: {
+                deletedAt: null,
+                status: 'ACTIVE',
+                rollNumber: { not: null },
+              },
+              orderBy: { updatedAt: 'desc' },
+              take: 1,
+              select: { rollNumber: true },
+            },
+          },
+        },
+        staff: { select: { employeeCode: true } },
+      },
+    });
+    const users = await this.prisma.user.findMany({
+      where: { tenantId, deletedAt: null },
+      select: { id: true, username: true },
+    });
+    const byId = new Map(users.map((u) => [u.id, u]));
+    const used = new Set(
+      users.map((u) => (u.username ?? '').toLowerCase()).filter(Boolean),
+    );
+    let updated = 0;
+    for (const acc of accounts) {
+      const user = byId.get(acc.userId);
+      if (!user) continue;
+      const preferred = preferredSchoolLoginUsername({
+        rollNumber: acc.student?.enrollments[0]?.rollNumber,
+        admissionNumber: acc.student?.admissionNumber,
+        employeeCode: acc.staff?.employeeCode,
+      });
+      if (!preferred) continue;
+      if (
+        compactSchoolLoginId(user.username ?? '') ===
+        compactSchoolLoginId(preferred)
+      ) {
+        continue;
+      }
+      used.delete((user.username ?? '').toLowerCase());
+      let candidate = preferred;
+      let n = 1;
+      while (used.has(candidate.toLowerCase())) {
+        candidate = `${preferred}${n}`;
+        n += 1;
+      }
+      used.add(candidate.toLowerCase());
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { username: candidate },
+      });
+      user.username = candidate;
+      updated += 1;
+    }
+    return { ok: true, updated, total: accounts.length };
   }
 
   private async upsertDirectoryUser(
@@ -1514,6 +1658,16 @@ export class SchoolSisIamService implements OnModuleInit {
           admissionNumber: true,
           email: true,
           phone: true,
+          enrollments: {
+            where: {
+              deletedAt: null,
+              status: 'ACTIVE',
+              rollNumber: { not: null },
+            },
+            orderBy: { updatedAt: 'desc' },
+            take: 1,
+            select: { rollNumber: true },
+          },
         },
       }),
       this.prisma.schoolGuardian.findMany({
@@ -1529,7 +1683,18 @@ export class SchoolSisIamService implements OnModuleInit {
         select: { id: true, fullName: true, phone: true },
       }),
     ]);
-    return { staff, students, guardians };
+    return {
+      staff,
+      students: students.map((s) => ({
+        id: s.id,
+        fullName: s.fullName,
+        admissionNumber: s.admissionNumber,
+        rollNumber: s.enrollments[0]?.rollNumber ?? null,
+        email: s.email,
+        phone: s.phone,
+      })),
+      guardians,
+    };
   }
 
   private async createInvite(

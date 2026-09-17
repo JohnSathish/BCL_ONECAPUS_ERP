@@ -299,6 +299,7 @@ export class AuthService {
     user: {
       id: string;
       email: string;
+      passwordHash: string;
       mustResetPassword?: boolean | null;
     },
     password: string,
@@ -308,14 +309,15 @@ export class AuthService {
       return false;
     }
     if (!(await isSchoolSisTenant(this.prisma, tenantId))) return false;
-    const linked = await this.prisma.schoolPersonAccount.findFirst({
-      where: { tenantId, userId: user.id },
-      select: { id: true },
-    });
-    const portalMail = user.email
-      ?.toLowerCase()
-      .endsWith('@portal.stlukestura.in');
-    if (!linked && !portalMail && !user.mustResetPassword) return false;
+    const stillOnLegacy = await bcrypt.compare('StLuke@123', user.passwordHash);
+    const stillOnSchoolDefault = await bcrypt.compare(
+      SCHOOL_PORTAL_DEFAULT_PASSWORD,
+      user.passwordHash,
+    );
+    if (!user.mustResetPassword && !stillOnLegacy && !stillOnSchoolDefault) {
+      return false;
+    }
+    if (stillOnSchoolDefault) return true;
     const passwordHash = await bcrypt.hash(SCHOOL_PORTAL_DEFAULT_PASSWORD, 12);
     await this.prisma.user.update({
       where: { id: user.id },
@@ -993,6 +995,18 @@ export class AuthService {
     });
     if (
       !mustResetPassword &&
+      (await isSchoolSisTenant(this.prisma, tenant.id)) &&
+      (password.trim() === SCHOOL_PORTAL_DEFAULT_PASSWORD ||
+        password.trim() === 'StLuke@123')
+    ) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { mustResetPassword: true },
+      });
+      mustResetPassword = true;
+    }
+    if (
+      !mustResetPassword &&
       (await this.isPasswordExpired(tenant.id, user.passwordChangedAt))
     ) {
       await this.prisma.user.update({
@@ -1475,9 +1489,22 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException('User not found');
 
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    const valid =
+      (await bcrypt.compare(currentPassword, user.passwordHash)) ||
+      ((await isSchoolSisTenant(this.prisma, user.tenantId)) &&
+        (currentPassword.trim() === SCHOOL_PORTAL_DEFAULT_PASSWORD ||
+          currentPassword.trim() === 'StLuke@123'));
     if (!valid) {
       throw new UnauthorizedException('Current password is incorrect');
+    }
+    if (
+      (await isSchoolSisTenant(this.prisma, user.tenantId)) &&
+      (newPassword.trim() === SCHOOL_PORTAL_DEFAULT_PASSWORD ||
+        newPassword.trim() === 'StLuke@123')
+    ) {
+      throw new BadRequestException(
+        'Choose a personal password, not the school default.',
+      );
     }
     if (currentPassword === newPassword) {
       throw new BadRequestException(

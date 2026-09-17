@@ -14,20 +14,33 @@ export function compactSchoolLoginId(value: string) {
     .replace(/[^A-Z0-9]/g, '');
 }
 
-/** SLS26-0108 and SLS2026-0108 resolve to the same keys. */
+/** SLS26-0001, SLS/2026/0001 and SLS2026-0001 resolve to the same keys. */
 export function schoolLoginCompacts(identifier: string): string[] {
   const compact = compactSchoolLoginId(identifier);
   if (!compact) return [];
   const keys = new Set<string>([compact]);
-  const shortYear = compact.match(/^([A-Z]+)(\d{2})(\d{4})$/);
+  const shortYear = compact.match(/^([A-Z]+)(\d{2})(\d{3,5})$/);
   if (shortYear) {
     keys.add(`${shortYear[1]}20${shortYear[2]}${shortYear[3]}`);
   }
-  const longYear = compact.match(/^([A-Z]+)20(\d{2})(\d{4})$/);
+  const longYear = compact.match(/^([A-Z]+)20(\d{2})(\d{3,5})$/);
   if (longYear) {
     keys.add(`${longYear[1]}${longYear[2]}${longYear[3]}`);
   }
   return [...keys];
+}
+
+export function preferredSchoolLoginUsername(input: {
+  rollNumber?: string | null;
+  admissionNumber?: string | null;
+  employeeCode?: string | null;
+}) {
+  const raw =
+    input.rollNumber?.trim() ||
+    input.admissionNumber?.trim() ||
+    input.employeeCode?.trim() ||
+    '';
+  return raw.replace(/[^a-zA-Z0-9._/-]/g, '').slice(0, 40);
 }
 
 export async function isSchoolSisTenant(

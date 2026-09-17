@@ -174,6 +174,13 @@ export function canAccessPath(roles: string[], path: string, permissions: string
   if (path.startsWith('/principal-desk')) {
     return canAccessPrincipalDesk(roles, permissions) || canAccessAdminPortal(roles, permissions);
   }
+  if (path.startsWith('/school-sis-portal/me')) {
+    return (
+      roles.includes('school-student') ||
+      roles.includes('school-parent') ||
+      canAccessAdminPortal(roles, permissions)
+    );
+  }
   if (path.startsWith('/admissions-portal') || path.startsWith('/school-admissions-portal')) {
     return canAccessApplicantPortal(roles, permissions) || canAccessAdminPortal(roles, permissions);
   }

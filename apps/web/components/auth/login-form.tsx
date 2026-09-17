@@ -214,7 +214,7 @@ export function LoginForm({
             : canAccessApplicantPortal(roles, permissions)
               ? '/school-admissions-portal/dashboard'
               : roles.includes('school-student') || roles.includes('school-parent')
-                ? '/change-password'
+                ? '/school-sis-portal/me'
                 : '/admin'
           : null;
         const requestedPath = postLoginPath ?? queryNextPath;
@@ -288,7 +288,7 @@ export function LoginForm({
               ? isDemoLoginWorkspaceEnabled()
                 ? 'Incorrect username or password. Use the demo credentials below, or contact your administrator.'
                 : schoolSession
-                  ? 'Incorrect admission number or password. Students sign in with the admission number (for example SLS26-0108) and StLuke@2026, then change it. Ask the school office if the account is missing.'
+                  ? 'Incorrect admission or roll number or password. Try SLS/2026/0001 or SLS26-0001 with StLuke@2026 on first login, then ask the school office if the account is missing.'
                   : 'Incorrect username or password. Check your details, use Forgot password, or contact your college administrator.'
               : text,
           );

@@ -96,13 +96,13 @@ export function SchoolLoginScreen() {
 
         <View style={styles.card}>
           <Text style={styles.hello}>Sign in</Text>
-          <Text style={styles.hint}>Admission number, email or username</Text>
+          <Text style={styles.hint}>Admission number or roll number</Text>
           <TextInput
             value={identifier}
             onChangeText={setIdentifier}
             autoCapitalize="none"
             keyboardType="email-address"
-            placeholder="e.g. SLS26-0001 · password StLuke@2026"
+            placeholder="SLS/2026/0001 or SLS26-0001"
             placeholderTextColor="#94a3b8"
             style={styles.input}
             accessibilityLabel="Username"

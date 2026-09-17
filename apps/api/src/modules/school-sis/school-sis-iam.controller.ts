@@ -357,4 +357,10 @@ export class SchoolSisIamController {
   ) {
     return this.iam.provisionDirectory(user.tid, user, body);
   }
+
+  @Post('users/sync-login-names')
+  @RequireAnyPermission(...MANAGE)
+  syncLoginNames(@CurrentUser() user: JwtUser) {
+    return this.iam.syncLoginIdentifiers(user.tid);
+  }
 }

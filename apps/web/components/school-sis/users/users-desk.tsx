@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -39,6 +39,7 @@ import {
   saveSchoolIamSecurity,
   seedSchoolIamRoles,
   setSchoolIamStatus,
+  syncSchoolIamLoginNames,
   testSchoolIamAccess,
 } from '@/services/school-iam';
 import { apiErrorMessage } from '@/utils/api-error';
@@ -300,6 +301,24 @@ export function UsersDesk() {
     setSelected([]);
   }, [search, status, role, statusFromPath]);
 
+  const loginNamesSynced = useRef(false);
+  useEffect(() => {
+    if (!ready || !manage || !usersListPage || loginNamesSynced.current) return;
+    loginNamesSynced.current = true;
+    void syncSchoolIamLoginNames()
+      .then((res) => {
+        if (res.updated) {
+          setNotice(
+            `Login names updated for ${res.updated} accounts. Students can sign in with admission or roll number.`,
+          );
+        }
+        return qc.invalidateQueries({ queryKey: ['school-iam-users'] });
+      })
+      .catch(() => {
+        loginNamesSynced.current = false;
+      });
+  }, [ready, manage, usersListPage, qc]);
+
   const seed = useMutation({
     mutationFn: () => run(seedSchoolIamRoles, 'Default school roles seeded'),
   });
@@ -352,12 +371,23 @@ export function UsersDesk() {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Users &amp; Access</h1>
           <p className="text-sm text-slate-500">
-            School identity, roles, sessions and security — not a college portal. If a student or
-            staff member forgets their password, open the row and reset it here.
+            School identity, roles, sessions and security — not a college portal. Students sign in
+            with admission number (SLS/2026/0001) or roll number (SLS26-0001). Staff use employee
+            code.
           </p>
         </div>
         {manage ? (
           <div className="flex gap-2">
+            <GhostButton
+              onClick={() =>
+                void run(
+                  () => syncSchoolIamLoginNames(),
+                  'Login names set from admission / roll / employee code',
+                )
+              }
+            >
+              Set login names
+            </GhostButton>
             <GhostButton onClick={() => seed.mutate()}>Seed default roles</GhostButton>
             <GhostButton onClick={() => setInvite(true)}>Invite</GhostButton>
             <GhostButton onClick={() => setImportOpen(true)}>Import Excel</GhostButton>
@@ -530,6 +560,7 @@ export function UsersDesk() {
                   <th className="p-2" />
                   <th className="p-2">User</th>
                   <th className="p-2">Username</th>
+                  <th className="p-2">Admission / roll</th>
                   <th className="p-2">Role</th>
                   <th className="p-2">Status</th>
                   <th className="p-2">Last login</th>
@@ -578,6 +609,25 @@ export function UsersDesk() {
                       </td>
                       <td className="p-2 font-mono text-xs text-slate-700">
                         {u.username ? String(u.username) : '—'}
+                      </td>
+                      <td className="p-2 text-xs text-slate-600">
+                        {u.admissionNumber || u.rollNumber || u.employeeCode ? (
+                          <span className="block">
+                            {u.admissionNumber ? (
+                              <span className="block font-mono">{String(u.admissionNumber)}</span>
+                            ) : null}
+                            {u.rollNumber ? (
+                              <span className="block font-mono text-slate-500">
+                                {String(u.rollNumber)}
+                              </span>
+                            ) : null}
+                            {u.employeeCode && !u.admissionNumber ? (
+                              <span className="font-mono">{String(u.employeeCode)}</span>
+                            ) : null}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                       <td className="p-2">{rolesList.map((r) => r.name).join(', ') || '—'}</td>
                       <td className="p-2">
@@ -1184,7 +1234,7 @@ export function UsersDesk() {
                                 studentId: s.id,
                                 staffId: '',
                                 displayName: s.fullName,
-                                username: s.admissionNumber,
+                                username: s.rollNumber || s.admissionNumber,
                                 email: s.email || '',
                                 phone: (s as { phone?: string }).phone || '',
                                 roleSlugs: ['school-student'],
@@ -1192,7 +1242,10 @@ export function UsersDesk() {
                             }
                           >
                             <span className="font-medium">{s.fullName}</span>
-                            <span className="ml-2 text-slate-500">{s.admissionNumber}</span>
+                            <span className="ml-2 text-slate-500">
+                              {s.admissionNumber}
+                              {s.rollNumber ? ` · ${s.rollNumber}` : ''}
+                            </span>
                           </button>
                         ))
                       : (people.data?.staff ?? []).map((s) => (

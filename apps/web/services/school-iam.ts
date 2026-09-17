@@ -220,6 +220,7 @@ export async function fetchSchoolIamLinkOptions(q: string) {
       id: string;
       fullName: string;
       admissionNumber: string;
+      rollNumber?: string | null;
       email?: string;
     }>;
     guardians: Array<{ id: string; fullName: string; phone: string | null }>;
@@ -251,4 +252,15 @@ export async function provisionSchoolIamDirectory(payload: Record<string, unknow
     done: boolean;
     failed: Array<{ name: string; error: string }>;
   };
+}
+
+export async function syncSchoolIamLoginNames() {
+  const { data } = await api.post(
+    '/v1/school-sis/iam/users/sync-login-names',
+    {},
+    { timeout: 120_000 },
+  );
+  const envelope = asObject(data);
+  const payload = asObject(envelope?.success === true ? envelope.data : data) ?? envelope ?? {};
+  return payload as { ok?: boolean; updated?: number; total?: number };
 }
