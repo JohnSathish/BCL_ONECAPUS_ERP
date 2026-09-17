@@ -29,8 +29,10 @@ import {
 } from '../students/student-credentials.util';
 import { SCHOOL_PORTAL_DEFAULT_PASSWORD } from '../school-sis/school-sis.constants';
 import {
+  compactSchoolLoginId,
   isSchoolSisTenant,
   resolveSchoolPortalUserId,
+  schoolLoginCompacts,
 } from '../school-sis/school-sis-login-lookup';
 
 type ShiftScope = {
@@ -1479,6 +1481,49 @@ export class AuthService {
     return { success: true, tokenPreview: token.slice(0, 8) };
   }
 
+  private async schoolCurrentPasswordMatches(
+    user: { id: string; tenantId: string; username: string | null },
+    currentPassword: string,
+  ): Promise<boolean> {
+    if (!(await isSchoolSisTenant(this.prisma, user.tenantId))) return false;
+    const typed = currentPassword.trim();
+    if (typed === SCHOOL_PORTAL_DEFAULT_PASSWORD || typed === 'StLuke@123') {
+      return true;
+    }
+    const keys = new Set(schoolLoginCompacts(typed));
+    if (user.username) {
+      if (user.username.toLowerCase() === typed.toLowerCase()) return true;
+      if (keys.has(compactSchoolLoginId(user.username))) return true;
+    }
+    const account = await this.prisma.schoolPersonAccount.findFirst({
+      where: { tenantId: user.tenantId, userId: user.id },
+      include: {
+        student: {
+          select: {
+            admissionNumber: true,
+            enrollments: {
+              where: { deletedAt: null, rollNumber: { not: null } },
+              select: { rollNumber: true },
+            },
+          },
+        },
+        staff: { select: { employeeCode: true } },
+      },
+    });
+    const candidates = [
+      account?.student?.admissionNumber,
+      account?.staff?.employeeCode,
+      ...(account?.student?.enrollments.map((e) => e.rollNumber) ?? []),
+    ];
+    return candidates.some((value) => {
+      if (!value) return false;
+      return (
+        value.toLowerCase() === typed.toLowerCase() ||
+        keys.has(compactSchoolLoginId(value))
+      );
+    });
+  }
+
   async changePassword(
     userId: string,
     currentPassword: string,
@@ -1489,13 +1534,16 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException('User not found');
 
+    const schoolOk = await this.schoolCurrentPasswordMatches(
+      user,
+      currentPassword,
+    );
     const valid =
-      (await bcrypt.compare(currentPassword, user.passwordHash)) ||
-      ((await isSchoolSisTenant(this.prisma, user.tenantId)) &&
-        (currentPassword.trim() === SCHOOL_PORTAL_DEFAULT_PASSWORD ||
-          currentPassword.trim() === 'StLuke@123'));
+      (await bcrypt.compare(currentPassword, user.passwordHash)) || schoolOk;
     if (!valid) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new UnauthorizedException(
+        'Current password is incorrect. For first login use StLuke@2026.',
+      );
     }
     if (
       (await isSchoolSisTenant(this.prisma, user.tenantId)) &&

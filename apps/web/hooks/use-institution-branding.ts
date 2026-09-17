@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
 import { fetchInstitutionBranding } from '@/services/branding';
-import { isAuthColdPath } from '@/lib/auth/auth-cold-path';
+import { skipTenantBrandingFetch } from '@/lib/auth/auth-cold-path';
 import { useAuthStore } from '@/store/auth-store';
 import type { InstitutionBranding } from '@/types/branding';
 
@@ -13,7 +13,7 @@ export function useInstitutionBranding() {
   const query = useQuery({
     queryKey: ['institution-branding', session?.user.tenantId],
     queryFn: fetchInstitutionBranding,
-    enabled: Boolean(session?.accessToken) && !isAuthColdPath(pathname),
+    enabled: Boolean(session?.accessToken) && !skipTenantBrandingFetch(pathname),
     staleTime: 5 * 60_000,
   });
 

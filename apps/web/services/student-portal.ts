@@ -1,4 +1,5 @@
 import { api } from '@/services/api';
+import type { AuthSession } from '@/types/auth';
 import type { LibraryQrPass } from '@/types/library';
 import type { StudentDashboardView } from '@/types/student-portal';
 
@@ -116,7 +117,12 @@ export async function changePassword(payload: {
   confirmPassword: string;
 }) {
   const { data } = await api.post('/v1/auth/change-password', payload);
-  return data as { success: boolean };
+  const envelope =
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? (data as { success?: boolean; data?: AuthSession })
+      : null;
+  const session = envelope?.success === true && envelope.data ? envelope.data : data;
+  return session as AuthSession & { success?: boolean };
 }
 
 export async function revokeAllSessions() {

@@ -275,6 +275,7 @@ export class AuthController {
   async changePassword(
     @CurrentUser() user: JwtUser,
     @Body() dto: ChangePasswordDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     if (dto.newPassword !== dto.confirmPassword) {
@@ -287,8 +288,13 @@ export class AuthController {
       dto.currentPassword,
       dto.newPassword,
     );
-    clearRefreshCookie(res, this.cookieSecure());
-    return { success: true };
+    const session = await this.auth.issueRememberedSessionForUser(
+      user.sub,
+      user.tid,
+      this.mobileMeta(req),
+      { mustResetPassword: false },
+    );
+    return this.respondSession(req, res, session);
   }
 
   @Post('sessions/revoke-all')

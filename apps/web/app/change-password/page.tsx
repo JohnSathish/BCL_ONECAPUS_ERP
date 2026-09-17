@@ -14,6 +14,7 @@ import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { evaluatePasswordPolicy } from '@/utils/password-policy';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+import { resolveHomePath } from '@/lib/permissions/portal-access';
 
 function isLibraryKioskHost() {
   return (
@@ -103,6 +104,7 @@ function PasswordField({
 export default function ForceChangePasswordPage() {
   const router = useRouter();
   const clear = useAuthStore((s) => s.clear);
+  const setSession = useAuthStore((s) => s.setSession);
   const session = useAuthStore((s) => s.session);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const isBootstrapping = useAuthStore((s) => s.isBootstrapping);
@@ -168,7 +170,21 @@ export default function ForceChangePasswordPage() {
     }
     setBusy(true);
     try {
-      await changePassword({ currentPassword, newPassword, confirmPassword });
+      const next = await changePassword({ currentPassword, newPassword, confirmPassword });
+      if (next?.accessToken) {
+        tokenRefreshManager.clearSchedule();
+        setSession(next);
+        tokenRefreshManager.scheduleProactiveRefresh(next);
+        const nextRoles = next.user.roles ?? [];
+        const nextPerms = next.user.permissions ?? [];
+        const dest = isLibraryKioskHost()
+          ? '/library-desk'
+          : nextRoles.includes('school-student') || nextRoles.includes('school-parent')
+            ? '/school-sis-portal/me'
+            : resolveHomePath(nextRoles, nextPerms);
+        window.location.assign(dest);
+        return;
+      }
       tokenRefreshManager.clearSchedule();
       clear();
       void logout().catch(() => undefined);
@@ -347,8 +363,8 @@ export default function ForceChangePasswordPage() {
           </Button>
 
           <p className="text-center text-[11px] leading-relaxed text-slate-400">
-            After saving, sign in once more with your new password. You will not be asked to reset
-            it again.
+            After saving you stay signed in and leave this page. Use a personal password, not
+            StLuke@2026.
           </p>
         </form>
       </div>
