@@ -523,7 +523,16 @@ export class SchoolSisPushService {
     }
     if (send) {
       for (const u of users) {
-        await this.ensureInbox(tenantId, u.userId, campaign);
+        await this.ensureInbox(tenantId, u.userId, {
+          id: campaign.id,
+          title: campaign.title,
+          body: campaign.body,
+          imageUrl: campaign.imageUrl,
+          category: campaign.category,
+          audienceType: campaign.audienceType,
+          deepLinkType: campaign.deepLinkType ?? 'NONE',
+          deepLinkValue: campaign.deepLinkValue,
+        });
       }
     }
     await this.audit(
