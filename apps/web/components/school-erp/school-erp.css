@@ -306,12 +306,17 @@
   padding: 0.55rem 1rem 0.7rem;
 }
 
-.school-erp-body {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
+.school-erp-shell.is-sls.is-sidebar-right .school-erp-body {
+  flex-direction: row-reverse;
+}
+
+.school-erp-shell.is-sls.is-sidebar-glass .school-erp-sidebar {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+}
+
+.school-erp-shell.is-sls.is-sidebar-compact {
+  --school-erp-sidebar-width: 13.5rem;
 }
 
 .school-erp-sidebar-slot {

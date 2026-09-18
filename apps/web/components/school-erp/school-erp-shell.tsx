@@ -1,11 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
 import { useBranding } from '@/hooks/use-branding';
 import { ImpersonationBanner } from '@/components/administration-module/impersonation-banner';
 import { useAuthStore } from '@/store/auth-store';
 import { isSecondarySchoolSisSession } from '@/lib/school-erp/product';
+import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { fetchPublishedAppearance } from '@/services/school-appearance';
+import { appearanceCssVars } from '@/lib/school-sis/appearance-tokens';
 import { cn } from '@/utils/cn';
 import { SchoolErpSidebar } from './school-erp-sidebar';
 import { SchoolErpTopbar } from './school-erp-topbar';
@@ -52,6 +56,27 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
     hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
     extras: branding?.portalExtras,
   });
+  const authed = useAuthQueryEnabled();
+  const look = useQuery({
+    queryKey: ['school-appearance-published'],
+    queryFn: fetchPublishedAppearance,
+    enabled: authed && sis,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    const title = look.data?.config?.identity?.browserTitle;
+    if (title) document.title = title;
+    const fav = look.data?.faviconUrl;
+    if (!fav) return;
+    let link = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = fav;
+  }, [look.data]);
 
   useEffect(() => {
     const desktop = window.matchMedia('(min-width: 1024px)');
@@ -71,7 +96,22 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className={cn('school-erp-shell', sis && 'is-sls')}>
+    <div
+      className={cn(
+        'school-erp-shell',
+        sis && 'is-sls',
+        sis && look.data?.sidebarPosition === 'right' && 'is-sidebar-right',
+        sis && look.data?.sidebarStyle === 'glass' && 'is-sidebar-glass',
+        sis && look.data?.sidebarStyle === 'compact' && 'is-sidebar-compact',
+        look.data?.config?.a11y?.reducedMotion && 'motion-reduce',
+      )}
+      style={
+        sis
+          ? appearanceCssVars(look.data?.config, { sidebarWidth: look.data?.sidebarWidth })
+          : undefined
+      }
+    >
+      {sis && look.data?.customCss ? <style>{look.data.customCss}</style> : null}
       <SchoolErpTopbar onMenu={onMenu} />
 
       <div className="school-erp-body">

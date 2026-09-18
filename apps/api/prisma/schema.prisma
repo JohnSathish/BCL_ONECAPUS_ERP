@@ -23548,6 +23548,83 @@ model SchoolSysAudit {
   @@schema("school")
 }
 
+model SchoolAppearanceSettings {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @unique @map("tenant_id") @db.Uuid
+  theme           String    @default("royal")
+  mode            String    @default("system")
+  primaryColor    String    @default("#1A365D") @map("primary_color")
+  secondaryColor  String    @default("#2B4C7E") @map("secondary_color")
+  accentColor     String    @default("#0EA5E9") @map("accent_color")
+  successColor    String    @default("#16A34A") @map("success_color")
+  warningColor    String    @default("#D97706") @map("warning_color")
+  dangerColor     String    @default("#DC2626") @map("danger_color")
+  fontFamily      String    @default("Inter") @map("font_family")
+  logoUrl         String?   @map("logo_url")
+  darkLogoUrl     String?   @map("dark_logo_url")
+  mobileLogoUrl   String?   @map("mobile_logo_url")
+  faviconUrl      String?   @map("favicon_url")
+  sidebarStyle    String    @default("classic") @map("sidebar_style")
+  sidebarWidth    Int       @default(260) @map("sidebar_width")
+  sidebarPosition String    @default("left") @map("sidebar_position")
+  borderRadius    Int       @default(16) @map("border_radius")
+  cardStyle       String    @default("elevated") @map("card_style")
+  buttonStyle     String    @default("solid") @map("button_style")
+  loginLayout     String    @default("split") @map("login_layout")
+  loginBackground String    @default("gradient") @map("login_background")
+  loginOverlay    Int       @default(40) @map("login_overlay")
+  customCss       String    @default("") @map("custom_css") @db.Text
+  configJson      Json      @default("{}") @map("config_json")
+  status          String    @default("DRAFT")
+  version         Int       @default(1)
+  publishedAt     DateTime? @map("published_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  updatedBy       String?   @map("updated_by") @db.Uuid
+
+  versions SchoolAppearanceVersion[]
+  themes   SchoolAppearanceTheme[]
+
+  @@map("school_appearance_settings")
+  @@schema("school")
+}
+
+model SchoolAppearanceVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  settingsId  String   @map("settings_id") @db.Uuid
+  version     Int
+  label       String
+  snapshot    Json
+  publishedBy String?  @map("published_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  settings SchoolAppearanceSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@unique([settingsId, version])
+  @@map("school_appearance_versions")
+  @@schema("school")
+}
+
+model SchoolAppearanceTheme {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  settingsId  String   @map("settings_id") @db.Uuid
+  name        String
+  description String   @default("")
+  snapshot    Json
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  settings SchoolAppearanceSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, name])
+  @@map("school_appearance_themes")
+  @@schema("school")
+}
+
 
 
 
