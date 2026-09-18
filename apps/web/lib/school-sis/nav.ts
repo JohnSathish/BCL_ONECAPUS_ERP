@@ -955,3 +955,32 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
 ];
 
 export const SCHOOL_SIS_NAV: SchoolErpNavModule[] = SCHOOL_SIS_NAV_GROUPS.flatMap((g) => g.items);
+
+/** Coming-soon items stay in the catalog but are hidden in the sidebar except Appearance. */
+const SIDEBAR_SOON_KEEP_IDS = new Set(['appearance']);
+
+function pruneSoonNav<T extends SchoolErpNavLink>(item: T, keepSoon: boolean): T | null {
+  const keep = keepSoon || SIDEBAR_SOON_KEEP_IDS.has(item.id);
+  const children = item.children
+    ?.map((child) => pruneSoonNav(child, keep))
+    .filter((child): child is SchoolErpNavLink => Boolean(child));
+
+  if (item.status === 'coming_soon' && !keep) {
+    if (children?.length) {
+      return { ...item, status: 'active', children };
+    }
+    return null;
+  }
+  return children ? { ...item, children } : item;
+}
+
+export function schoolSisSidebarNavGroups(groups: SchoolSisNavGroup[]): SchoolSisNavGroup[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items
+        .map((item) => pruneSoonNav(item, false))
+        .filter((item): item is SchoolErpNavModule => Boolean(item)),
+    }))
+    .filter((group) => group.items.length > 0);
+}

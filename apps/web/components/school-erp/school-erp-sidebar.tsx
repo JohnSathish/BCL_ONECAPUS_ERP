@@ -12,7 +12,7 @@ import {
   type SchoolErpNavModule,
 } from '@/lib/school-erp/nav';
 import { isSecondarySchoolSisSession, SCHOOL_SIS_LOGO_SRC } from '@/lib/school-erp/product';
-import { SCHOOL_SIS_NAV_GROUPS } from '@/lib/school-sis/nav';
+import { SCHOOL_SIS_NAV_GROUPS, schoolSisSidebarNavGroups } from '@/lib/school-sis/nav';
 import { filterSchoolSisNavGroups } from '@/lib/school-sis/permissions';
 import { filterSchoolErpNavForRole } from '@/lib/school-erp/permissions';
 import { SCHOOL_PORTAL_LOGO_SRC } from '@/lib/school-admissions-branding';
@@ -261,12 +261,14 @@ export function SchoolErpSidebar({ open, onClose }: { open?: boolean; onClose?: 
     staleTime: 60_000,
   });
   const groups = sis
-    ? filterSchoolSisNavGroups(SCHOOL_SIS_NAV_GROUPS, {
-        permissions: user?.permissions,
-        roles: user?.roles,
-        modules: overview.data?.modules,
-        licenseModules: license.data?.enabledModules,
-      })
+    ? schoolSisSidebarNavGroups(
+        filterSchoolSisNavGroups(SCHOOL_SIS_NAV_GROUPS, {
+          permissions: user?.permissions,
+          roles: user?.roles,
+          modules: overview.data?.modules,
+          licenseModules: license.data?.enabledModules,
+        }),
+      )
     : null;
   const nav = SCHOOL_ERP_NAV;
   const shortName = branding?.shortName || (sis ? 'SLS Tura' : 'TPS Tura');
