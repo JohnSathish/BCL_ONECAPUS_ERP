@@ -1,7 +1,14 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install
+# postinstall runs prisma generate; schema is not in this layer yet
+RUN npm install --ignore-scripts
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npx prisma generate && npm run build
 
 FROM node:20-alpine AS builder
 WORKDIR /app
