@@ -12,7 +12,6 @@ import { api } from '@/services/api';
 import {
   archiveSchoolPush,
   cancelSchoolPush,
-  fetchSchoolPushCampaign,
   fetchSchoolPushCampaigns,
   fetchSchoolPushDashboard,
   fetchSchoolPushDelivery,
@@ -71,6 +70,7 @@ import {
   NotificationComposer,
   type NotificationDraft,
 } from './notification-composer';
+import { NotificationDeliveryReport } from './notification-delivery-report';
 
 const LINKS = [
   {
@@ -171,7 +171,11 @@ export function NotificationsDesk() {
   });
   const campaigns = useQuery({
     queryKey: ['school-push-campaigns', section],
-    queryFn: () => fetchSchoolPushCampaigns(section === 'scheduled' ? 'SCHEDULED' : undefined),
+    queryFn: () =>
+      fetchSchoolPushCampaigns(
+        section === 'scheduled' ? 'SCHEDULED' : undefined,
+        section === 'history',
+      ),
     enabled: enabled && ['dashboard', 'scheduled', 'history'].includes(section),
   });
   const templates = useQuery({
@@ -222,12 +226,6 @@ export function NotificationsDesk() {
       ['INDIVIDUAL_STUDENT', 'PARENT'].includes(draft.kind) &&
       draft.studentQ.length > 1,
   });
-  const detail = useQuery({
-    queryKey: ['school-push-one', detailId],
-    queryFn: () => fetchSchoolPushCampaign(detailId!),
-    enabled: Boolean(detailId),
-  });
-
   const audience = useMemo(() => {
     const base: Record<string, unknown> = { kind: draft.kind };
     if (draft.gradeId) base.gradeIds = [draft.gradeId];
@@ -317,7 +315,9 @@ export function NotificationsDesk() {
             </p>
             <h1 className="text-2xl font-bold tracking-tight text-[#1d4ed8]">{title}</h1>
             <p className="mt-0.5 text-sm text-slate-500">
-              Send and manage mobile notifications for students, parents, teachers and staff.
+              {section === 'history'
+                ? 'Review every sent notification and open a full delivery report for recipients, devices, and failures.'
+                : 'Send and manage mobile notifications for students, parents, teachers and staff.'}
             </p>
           </div>
         </div>
@@ -893,34 +893,7 @@ export function NotificationsDesk() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(detailId)} onOpenChange={() => setDetailId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Notification details</DialogTitle>
-          </DialogHeader>
-          {detail.data ? (
-            <div className="space-y-2 text-sm">
-              <p className="font-semibold">{String(detail.data.title)}</p>
-              <p>{String(detail.data.body)}</p>
-              <WaBadge value={String(detail.data.status)} />
-              <div className="grid grid-cols-2 gap-2">
-                <p>Sent {String(detail.data.sentCount)}</p>
-                <p>Delivered {String(detail.data.deliveredCount)}</p>
-                <p>Opened {String(detail.data.openedCount)}</p>
-                <p>Failed {String(detail.data.failedCount)}</p>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full bg-emerald-500"
-                  style={{
-                    width: `${Math.min(100, (Number(detail.data.deliveredCount) / Math.max(1, Number(detail.data.deviceCount))) * 100)}%`,
-                  }}
-                />
-              </div>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <NotificationDeliveryReport campaignId={detailId} onClose={() => setDetailId(null)} />
     </div>
   );
 }
@@ -1100,6 +1073,7 @@ function CampaignTable({
                 'Delivered',
                 'Opened',
                 'Failed',
+                'Rate',
                 'Status',
                 'Actions',
               ].map((h) => (
@@ -1122,7 +1096,10 @@ function CampaignTable({
                     hour12: false,
                   })}
                 </td>
-                <td className="px-3 py-3 font-medium text-slate-800">{String(row.title)}</td>
+                <td className="px-3 py-3">
+                  <p className="font-medium text-slate-800">{String(row.title)}</p>
+                  <p className="line-clamp-1 text-xs text-slate-400">{String(row.body ?? '')}</p>
+                </td>
                 <td className="px-3 py-3">
                   <span
                     className={cn(
@@ -1139,6 +1116,9 @@ function CampaignTable({
                 <td className="px-3 py-3">{String(row.deliveredCount)}</td>
                 <td className="px-3 py-3">{String(row.openedCount)}</td>
                 <td className="px-3 py-3">{String(row.failedCount)}</td>
+                <td className="px-3 py-3">
+                  {`${((Number(row.deliveredCount) / Math.max(1, Number(row.recipientCount) || Number(row.sentCount))) * 100).toFixed(1)}%`}
+                </td>
                 <td className="px-3 py-3">
                   <StatusMark value={String(row.status)} />
                 </td>
@@ -1164,7 +1144,7 @@ function CampaignTable({
                   </div>
                   {openMenu === String(row.id) ? (
                     <div className="absolute right-3 z-10 mt-1 w-36 rounded-xl border border-slate-200 bg-white py-1 text-sm shadow-lg">
-                      {onRetry && String(row.status).includes('FAIL') ? (
+                      {onRetry && Number(row.failedCount) > 0 ? (
                         <button
                           type="button"
                           className="block w-full px-3 py-1.5 text-left hover:bg-slate-50"

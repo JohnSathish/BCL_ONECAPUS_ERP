@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'fs';
 import { createSign } from 'crypto';
 import * as admin from 'firebase-admin';
 import { PUSH_CHANNELS } from './school-sis-push.catalog';
+import { classifyPushFailure } from './school-sis-push-errors';
 
 export type PushSendResult = {
   ok: boolean;
@@ -312,16 +313,13 @@ export class SchoolSisFcmProvider implements NotificationProvider {
           );
         if (invalid) invalidTokens.push(token);
         this.logger.warn(`FCM failed (${code})`);
+        const classified = classifyPushFailure(code, row.error?.message);
         perToken.push({
           token,
           ok: false,
           code,
-          reason: invalid
-            ? 'Device unregistered'
-            : 'Unable to send notification',
-          retryable:
-            !invalid &&
-            /unavailable|internal|quota|resource-exhausted/i.test(code),
+          reason: classified.label,
+          retryable: classified.retryable,
         });
       });
     }
@@ -455,14 +453,13 @@ export class SchoolSisFcmProvider implements NotificationProvider {
           );
         if (invalid) invalidTokens.push(token);
         this.logger.warn(`FCM failed (${code})`);
+        const classified = classifyPushFailure(code, body.error?.message);
         perToken.push({
           token,
           ok: false,
           code,
-          reason: invalid
-            ? 'Device unregistered'
-            : 'Unable to send notification',
-          retryable: !invalid,
+          reason: classified.label,
+          retryable: classified.retryable,
         });
       }
     }

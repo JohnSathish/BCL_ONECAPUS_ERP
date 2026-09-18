@@ -129,8 +129,16 @@ export class SchoolSisPushController {
 
   @Get()
   @RequireAnyPermission(...VIEW)
-  list(@CurrentUser() user: JwtUser, @Query('status') status?: string) {
-    return this.push.listCampaigns(user.tid, status);
+  list(
+    @CurrentUser() user: JwtUser,
+    @Query('status') status?: string,
+    @Query('includeArchived') includeArchived?: string,
+  ) {
+    return this.push.listCampaigns(
+      user.tid,
+      status,
+      includeArchived === 'true' || includeArchived === '1',
+    );
   }
 
   @Get('delivery-report')
@@ -266,6 +274,18 @@ export class SchoolSisPushController {
   @RequireAnyPermission(...VIEW)
   logs(@CurrentUser() user: JwtUser) {
     return this.push.logs(user.tid);
+  }
+
+  @Get(':id/report')
+  @RequireAnyPermission(...VIEW)
+  reportOne(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query('q') q?: string,
+    @Query('status') status?: string,
+    @Query('platform') platform?: string,
+  ) {
+    return this.push.campaignReport(user.tid, id, { q, status, platform });
   }
 
   @Get(':id')

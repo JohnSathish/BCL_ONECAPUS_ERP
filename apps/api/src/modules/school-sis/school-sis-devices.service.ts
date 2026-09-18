@@ -560,6 +560,7 @@ export class SchoolSisDevicesService {
         include: {
           student: {
             select: {
+              id: true,
               fullName: true,
               admissionNumber: true,
               enrollments: {
@@ -588,6 +589,7 @@ export class SchoolSisDevicesService {
         username: string | null;
         identifier: string | null;
         classLabel: string | null;
+        studentId: string | null;
       }
     >();
     for (const u of users) {
@@ -611,6 +613,7 @@ export class SchoolSisDevicesService {
         classLabel: enr
           ? `${enr.section.grade.name} ${enr.section.name}`
           : null,
+        studentId: link?.student?.id ?? null,
       });
     }
     return map;
@@ -661,6 +664,7 @@ export class SchoolSisDevicesService {
           username: string | null;
           identifier: string | null;
           classLabel: string | null;
+          studentId: string | null;
         }
       | undefined,
     showIp: boolean,
@@ -706,6 +710,8 @@ export class SchoolSisDevicesService {
       username: person?.username ?? null,
       identifier: person?.identifier ?? null,
       classLabel: person?.classLabel ?? null,
+      studentId: person?.studentId ?? null,
+      timezone: row.timezone,
       lastIpAddress: showIp ? row.lastIpAddress : null,
     };
     if (!detail) return base;

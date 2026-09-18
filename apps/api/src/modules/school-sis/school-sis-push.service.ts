@@ -19,6 +19,7 @@ import {
   deepLinkHref,
 } from './school-sis-push.catalog';
 import { SchoolSisFcmProvider } from './school-sis-push.provider';
+import { classifyPushFailure } from './school-sis-push-errors';
 import type {
   PushAudienceDto,
   RegisterPushDeviceDto,
@@ -610,12 +611,420 @@ export class SchoolSisPushService {
     return row;
   }
 
-  async listCampaigns(tenantId: string, status?: string) {
+  async campaignReport(
+    tenantId: string,
+    id: string,
+    query?: { q?: string; status?: string; platform?: string },
+  ) {
+    const campaign = await this.prisma.schoolPushCampaign.findFirst({
+      where: { id, tenantId },
+    });
+    if (!campaign) throw new NotFoundException('Notification not found');
+    const recipients = await this.prisma.schoolPushRecipient.findMany({
+      where: { tenantId, campaignId: id },
+      orderBy: { createdAt: 'asc' },
+      take: 2000,
+    });
+    const deviceIds = [
+      ...new Set(recipients.map((r) => r.deviceId).filter(Boolean)),
+    ] as string[];
+    const userIds = [...new Set(recipients.map((r) => r.userId))];
+    const studentIds = [
+      ...new Set(recipients.map((r) => r.studentId).filter(Boolean)),
+    ] as string[];
+    const [devices, users, students, sender, year, audits] = await Promise.all([
+      deviceIds.length
+        ? this.prisma.schoolMobileDevice.findMany({
+            where: { id: { in: deviceIds } },
+            select: {
+              id: true,
+              platform: true,
+              appVersion: true,
+              osVersion: true,
+              deviceModel: true,
+              deviceLabel: true,
+              deviceName: true,
+              manufacturer: true,
+              pushEnabled: true,
+            },
+          })
+        : Promise.resolve([]),
+      userIds.length
+        ? this.prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, displayName: true, phone: true, email: true },
+          })
+        : Promise.resolve([]),
+      studentIds.length
+        ? this.prisma.schoolStudent.findMany({
+            where: { id: { in: studentIds } },
+            select: {
+              id: true,
+              fullName: true,
+              admissionNumber: true,
+              phone: true,
+            },
+          })
+        : Promise.resolve([]),
+      campaign.createdBy
+        ? this.prisma.user.findFirst({
+            where: { id: campaign.createdBy },
+            select: { displayName: true, email: true },
+          })
+        : Promise.resolve(null),
+      this.sis.currentYear(tenantId).catch(() => null),
+      this.prisma.schoolPushAuditLog.findMany({
+        where: { tenantId, campaignId: id },
+        orderBy: { createdAt: 'asc' },
+        take: 40,
+      }),
+    ]);
+    const deviceById = new Map(devices.map((d) => [d.id, d]));
+    const userById = new Map(users.map((u) => [u.id, u]));
+    const studentById = new Map(students.map((s) => [s.id, s]));
+    const classByStudent = new Map<string, string>();
+    if (studentIds.length) {
+      const enrollments = await this.prisma.schoolEnrollment.findMany({
+        where: {
+          tenantId,
+          studentId: { in: studentIds },
+          deletedAt: null,
+          status: 'ACTIVE',
+          ...(year ? { academicYearId: year.id } : {}),
+        },
+        include: {
+          section: { include: { grade: { select: { name: true } } } },
+        },
+      });
+      for (const row of enrollments) {
+        classByStudent.set(
+          row.studentId,
+          `${row.section.grade?.name ?? ''} ${row.section.name}`.trim(),
+        );
+      }
+    }
+
+    const n = Math.max(1, recipients.length || campaign.recipientCount || 0);
+    const sent = recipients.filter(
+      (r) => r.sentAt || r.status !== 'QUEUED',
+    ).length;
+    const delivered = recipients.filter((r) => r.deliveredAt).length;
+    const opened = recipients.filter((r) => r.openedAt).length;
+    const failed = recipients.filter((r) => r.status === 'FAILED').length;
+    const pending = recipients.filter((r) =>
+      ['QUEUED', 'PENDING'].includes(r.status),
+    ).length;
+    const ratio = (count: number) => Number(((count / n) * 100).toFixed(2));
+
+    const mapped = recipients.map((r) => {
+      const device = r.deviceId ? deviceById.get(r.deviceId) : undefined;
+      const student = r.studentId ? studentById.get(r.studentId) : undefined;
+      const user = userById.get(r.userId);
+      const fail =
+        r.status === 'FAILED'
+          ? classifyPushFailure(r.failureCode, r.failureReason)
+          : null;
+      const deviceName =
+        device?.deviceLabel ||
+        device?.deviceName ||
+        device?.deviceModel ||
+        (r.platform
+          ? r.platform === 'ios'
+            ? 'iPhone'
+            : 'Android'
+          : r.deviceId
+            ? 'App device'
+            : 'Inbox only');
+      return {
+        id: r.id,
+        studentName: student?.fullName || user?.displayName || 'School user',
+        admissionNo: student?.admissionNumber || '—',
+        className: r.studentId ? (classByStudent.get(r.studentId) ?? '') : '',
+        mobile: student?.phone || user?.phone || '',
+        device: deviceName,
+        platform: (device?.platform || r.platform || 'unknown').toLowerCase(),
+        appVersion: device?.appVersion || '',
+        osVersion: device?.osVersion || '',
+        status: r.openedAt ? 'OPENED' : r.deliveredAt ? 'DELIVERED' : r.status,
+        sentAt: r.sentAt,
+        deliveredAt: r.deliveredAt,
+        openedAt: r.openedAt,
+        failedAt: r.failedAt,
+        failureLabel: fail?.label ?? r.failureReason,
+        retryable: fail?.retryable ?? false,
+      };
+    });
+
+    const needle = (query?.q ?? '').trim().toLowerCase();
+    const statusFilter = (query?.status ?? 'ALL').toUpperCase();
+    const platformFilter = (query?.platform ?? 'ALL').toLowerCase();
+    const filtered = mapped.filter((row) => {
+      if (statusFilter !== 'ALL' && row.status !== statusFilter) return false;
+      if (platformFilter !== 'all' && row.platform !== platformFilter)
+        return false;
+      if (!needle) return true;
+      return `${row.studentName} ${row.admissionNo} ${row.mobile} ${row.device} ${row.className}`
+        .toLowerCase()
+        .includes(needle);
+    });
+
+    const retryableFailed = mapped.filter(
+      (r) => r.status === 'FAILED' && r.retryable,
+    ).length;
+
+    const countBy = (key: (r: (typeof mapped)[number]) => string) => {
+      const out: Record<
+        string,
+        { sent: number; delivered: number; failed: number }
+      > = {};
+      for (const row of mapped) {
+        const k = key(row) || 'unknown';
+        if (!out[k]) out[k] = { sent: 0, delivered: 0, failed: 0 };
+        out[k].sent += 1;
+        if (row.deliveredAt) out[k].delivered += 1;
+        if (row.status === 'FAILED') out[k].failed += 1;
+      }
+      return Object.entries(out)
+        .map(([label, v]) => ({ label, ...v }))
+        .sort((a, b) => b.sent - a.sent);
+    };
+
+    const android = mapped.filter((r) => r.platform === 'android').length;
+    const ios = mapped.filter((r) => r.platform === 'ios').length;
+
+    const deltas = mapped
+      .filter(
+        (r) =>
+          r.sentAt &&
+          r.deliveredAt &&
+          new Date(r.deliveredAt).getTime() - new Date(r.sentAt).getTime() >=
+            200,
+      )
+      .map(
+        (r) =>
+          new Date(r.deliveredAt!).getTime() - new Date(r.sentAt!).getTime(),
+      );
+    const processingMs =
+      campaign.sentAt && campaign.createdAt
+        ? Math.max(
+            0,
+            new Date(campaign.sentAt).getTime() -
+              new Date(campaign.createdAt).getTime(),
+          )
+        : null;
+    const performance =
+      processingMs != null || deltas.length
+        ? {
+            processingMs,
+            averageDeliveryMs: deltas.length
+              ? Math.round(deltas.reduce((a, b) => a + b, 0) / deltas.length)
+              : null,
+            fastestDeliveryMs: deltas.length ? Math.min(...deltas) : null,
+            slowestDeliveryMs: deltas.length ? Math.max(...deltas) : null,
+          }
+        : null;
+
+    const openedTimes = mapped
+      .map((r) => r.openedAt)
+      .filter(Boolean)
+      .sort(
+        (a, b) => new Date(a!).getTime() - new Date(b!).getTime(),
+      ) as Date[];
+
+    const timeline: Array<{ at: string; label: string }> = [
+      { at: campaign.createdAt.toISOString(), label: 'Notification created' },
+    ];
+    const firstSent = mapped
+      .map((r) => r.sentAt)
+      .filter(Boolean)
+      .sort((a, b) => new Date(a!).getTime() - new Date(b!).getTime())[0];
+    if (firstSent)
+      timeline.push({
+        at: new Date(firstSent).toISOString(),
+        label: 'Sending started',
+      });
+    if (recipients.length) {
+      const last = mapped[mapped.length - 1];
+      timeline.push({
+        at: new Date(
+          last.sentAt || last.failedAt || campaign.updatedAt,
+        ).toISOString(),
+        label: `${recipients.length} recipients processed`,
+      });
+    }
+    if (sent)
+      timeline.push({
+        at: (campaign.sentAt || campaign.updatedAt).toISOString(),
+        label: `${sent} notifications accepted`,
+      });
+    if (delivered)
+      timeline.push({
+        at: (campaign.sentAt || campaign.updatedAt).toISOString(),
+        label: `${delivered} delivered`,
+      });
+    if (openedTimes[0])
+      timeline.push({
+        at: new Date(openedTimes[0]).toISOString(),
+        label: `${opened} notification${opened === 1 ? '' : 's'} opened`,
+      });
+    for (const log of audits) {
+      timeline.push({
+        at: log.createdAt.toISOString(),
+        label: log.action.replaceAll('_', ' ').toLowerCase(),
+      });
+    }
+    timeline.sort((a, b) => a.at.localeCompare(b.at));
+
+    const aud = (campaign.audienceJson ?? {}) as {
+      kind?: string;
+      gradeIds?: string[];
+      sectionIds?: string[];
+      studentIds?: string[];
+    };
+    let classLabels: string[] = [];
+    if (aud.sectionIds?.length) {
+      const sections = await this.prisma.schoolSection.findMany({
+        where: { id: { in: aud.sectionIds }, tenantId },
+        include: { grade: { select: { name: true } } },
+      });
+      classLabels = sections.map((s) =>
+        `${s.grade?.name ?? 'Class'} ${s.name}`.trim(),
+      );
+    } else if (aud.gradeIds?.length) {
+      const grades = await this.prisma.schoolGrade.findMany({
+        where: { id: { in: aud.gradeIds }, tenantId },
+        select: { name: true },
+      });
+      classLabels = grades.map((g) => g.name);
+    }
+
+    const audienceLabel = (campaign.audienceType || aud.kind || '')
+      .replaceAll('_', ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+    return {
+      campaign: {
+        id: campaign.id,
+        title: campaign.title,
+        body: campaign.body,
+        category: campaign.category,
+        priority: campaign.priority,
+        imageUrl: campaign.imageUrl,
+        deepLinkType: campaign.deepLinkType,
+        deepLinkValue: campaign.deepLinkValue,
+        audienceType: campaign.audienceType,
+        status: campaign.status,
+        scheduledAt: campaign.scheduledAt,
+        sentAt: campaign.sentAt,
+        createdAt: campaign.createdAt,
+        archivedAt: campaign.archivedAt,
+        messageId: `NTF-${campaign.createdAt
+          .toISOString()
+          .slice(0, 10)
+          .replaceAll(
+            '-',
+            '',
+          )}-${campaign.id.replaceAll('-', '').slice(-5).toUpperCase()}`,
+        recipientCount: campaign.recipientCount || recipients.length,
+        deviceCount: campaign.deviceCount,
+      },
+      sender: {
+        name: sender?.displayName || sender?.email || 'Office staff',
+        role: 'Administrator / Office Staff',
+      },
+      summary: {
+        recipients: campaign.recipientCount || recipients.length,
+        sent,
+        delivered,
+        opened,
+        failed,
+        pending,
+        sentPct: ratio(sent),
+        deliveredPct: ratio(delivered),
+        openedPct: ratio(opened),
+        failedPct: ratio(failed),
+        pendingPct: ratio(pending),
+      },
+      content: {
+        title: campaign.title,
+        message: campaign.body,
+        category: campaign.category,
+        priority: campaign.priority,
+        audience: campaign.audienceType,
+        attachmentUrl: campaign.imageUrl,
+        attachmentKind: this.attachmentKind(campaign.imageUrl),
+        action: campaign.deepLinkType || 'NONE',
+        deepLink: deepLinkHref(campaign.deepLinkType, campaign.deepLinkValue),
+      },
+      audience: {
+        label: audienceLabel,
+        academicYear: year ? `${year.name ?? ''}`.trim() || null : null,
+        targeted: campaign.recipientCount || recipients.length,
+        eligible: campaign.recipientCount || recipients.length,
+        excluded: 0,
+        classes: classLabels,
+      },
+      statusBreakdown: [
+        { status: 'SENT', count: sent, pct: ratio(sent) },
+        { status: 'DELIVERED', count: delivered, pct: ratio(delivered) },
+        { status: 'OPENED', count: opened, pct: ratio(opened) },
+        { status: 'FAILED', count: failed, pct: ratio(failed) },
+        { status: 'PENDING', count: pending, pct: ratio(pending) },
+      ],
+      recipients: filtered,
+      recipientTotal: filtered.length,
+      devices: {
+        android,
+        ios,
+        unknown: mapped.length - android - ios,
+        platforms: countBy((r) =>
+          r.platform === 'ios'
+            ? 'iOS'
+            : r.platform === 'android'
+              ? 'Android'
+              : 'Other',
+        ),
+        osVersions: countBy((r) => r.osVersion || 'Unknown'),
+        appVersions: countBy((r) => r.appVersion || 'Unknown'),
+        deviceModels: countBy((r) => r.device || 'Unknown'),
+        failedByPlatform: countBy((r) =>
+          r.platform === 'ios'
+            ? 'iOS'
+            : r.platform === 'android'
+              ? 'Android'
+              : 'Other',
+        ),
+      },
+      failures: mapped.filter((r) => r.status === 'FAILED'),
+      retryableFailedCount: retryableFailed,
+      timeline,
+      performance,
+      engagement: {
+        delivered,
+        opened,
+        openRate: delivered
+          ? Number(((opened / delivered) * 100).toFixed(2))
+          : 0,
+        firstOpened: openedTimes[0] ?? null,
+        lastOpened: openedTimes[openedTimes.length - 1] ?? null,
+      },
+    };
+  }
+
+  async listCampaigns(
+    tenantId: string,
+    status?: string,
+    includeArchived = false,
+  ) {
     await this.ensureSetup(tenantId);
     return this.prisma.schoolPushCampaign.findMany({
-      where: { tenantId, archivedAt: null, ...(status ? { status } : {}) },
+      where: {
+        tenantId,
+        ...(includeArchived ? {} : { archivedAt: null }),
+        ...(status ? { status } : {}),
+      },
       orderBy: { createdAt: 'desc' },
-      take: 80,
+      take: 200,
     });
   }
 
@@ -642,15 +1051,20 @@ export class SchoolSisPushService {
 
   async retryFailed(tenantId: string, id: string, actor: PushActor) {
     this.assert(actor, true);
+    const failed = await this.prisma.schoolPushRecipient.findMany({
+      where: { campaignId: id, tenantId, status: 'FAILED' },
+    });
+    const retryable = failed.filter(
+      (row) =>
+        classifyPushFailure(row.failureCode, row.failureReason).retryable,
+    );
+    if (!retryable.length) {
+      throw new BadRequestException(
+        'No failed recipients can be retried. Remaining failures have invalid or expired devices.',
+      );
+    }
     await this.prisma.schoolPushRecipient.updateMany({
-      where: {
-        campaignId: id,
-        tenantId,
-        status: 'FAILED',
-        failureCode: {
-          notIn: ['UNREGISTERED', 'INVALID_ARGUMENT', 'NOT_FOUND'],
-        },
-      },
+      where: { id: { in: retryable.map((r) => r.id) } },
       data: { status: 'QUEUED', failureCode: null, failureReason: null },
     });
     await this.prisma.schoolPushCampaign.updateMany({
@@ -793,7 +1207,7 @@ export class SchoolSisPushService {
             status: 'FAILED',
             failedAt: new Date(),
             failureCode: row?.code ?? 'UNKNOWN',
-            failureReason: row?.reason ?? 'Unable to send notification',
+            failureReason: classifyPushFailure(row?.code, row?.reason).label,
           },
         });
         await this.prisma.schoolPushCampaign.update({
