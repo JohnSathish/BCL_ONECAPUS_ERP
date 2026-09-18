@@ -130,6 +130,81 @@ export class SchoolSaasLicenseIssuerService {
     return this.serialize(row, signedToken);
   }
 
+  /**
+   * After BaseCode Central accepts a product key (BCL-ONC-…), mint a local
+   * signed school token so St. Luke's can activate with that same key.
+   */
+  async adoptCentralLicense(input: {
+    licenseKey: string;
+    tenantId: string;
+    institutionCode: string;
+    institutionName: string;
+    expiryDate: string | null;
+    graceDays: number;
+    licenseType?: string;
+  }) {
+    const licenseKey = input.licenseKey.trim().toUpperCase();
+    const existing = await this.prisma.schoolSaasLicense.findUnique({
+      where: { licenseKey },
+    });
+    if (existing) return existing;
+    const nbf = new Date();
+    const exp = input.expiryDate ? new Date(input.expiryDate) : null;
+    const id = randomUUID();
+    const modules = allSchoolLicenseModuleIds();
+    const claims: SchoolLicenseClaims = {
+      v: 1,
+      jti: id,
+      key: licenseKey,
+      instId: input.tenantId,
+      instCode: input.institutionCode.trim().toLowerCase(),
+      instName: input.institutionName.trim(),
+      type: (input.licenseType || 'ANNUAL').toUpperCase(),
+      status: 'ISSUED',
+      iat: nbf.toISOString(),
+      nbf: nbf.toISOString(),
+      exp: exp?.toISOString() ?? null,
+      maxStudents: 2000,
+      maxStaff: 250,
+      maxAdmins: 50,
+      installLimit: 3,
+      modules,
+      graceDays: input.graceDays || 7,
+      offlineHours: Number(
+        this.config.get('LICENSE_OFFLINE_GRACE_PERIOD') ?? 72,
+      ),
+      expiredPolicy: 'read_only',
+      licVer: '1.0',
+    };
+    const signedToken = signSchoolLicense(claims, this.privateKey());
+    return this.prisma.schoolSaasLicense.create({
+      data: {
+        id,
+        licenseKey,
+        tenantId: input.tenantId,
+        institutionCode: claims.instCode,
+        institutionName: claims.instName,
+        licenseType: claims.type,
+        status: 'ISSUED',
+        issuedAt: nbf,
+        validFrom: nbf,
+        expiresAt: exp,
+        maxStudents: claims.maxStudents,
+        maxStaff: claims.maxStaff,
+        maxAdminUsers: claims.maxAdmins,
+        installationLimit: claims.installLimit,
+        modulesJson: modules,
+        graceDays: claims.graceDays,
+        offlineGraceHours: claims.offlineHours,
+        expiredPolicy: 'read_only',
+        licenseVersion: '1.0',
+        tokenFingerprint: fingerprintToken(signedToken),
+        signedToken,
+        notes: 'Adopted from BaseCode Central',
+      },
+    });
+  }
+
   async list() {
     const rows = await this.prisma.schoolSaasLicense.findMany({
       orderBy: { createdAt: 'desc' },

@@ -1,0 +1,16 @@
+services:
+  web:
+    build: .
+    ports:
+      - '1610:1610'
+    environment:
+      DATABASE_URL: file:./prisma/dev.db
+      APP_URL: http://localhost:1610
+      JWT_SECRET: change-me
+      LICENSE_SIGNING_SECRET: change-me-too
+      ADMIN_EMAIL: contact@basecodelabs.com
+    volumes:
+      - bcl-data:/app/prisma
+
+volumes:
+  bcl-data:

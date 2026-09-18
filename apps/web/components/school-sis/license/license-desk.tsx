@@ -255,14 +255,17 @@ export function SchoolLicenseDesk() {
             <div className="mt-3 space-y-2">
               <input
                 className="h-10 w-full rounded-lg border px-3 text-sm"
-                placeholder="School license key (BCL-SLS-2026-…)"
+                placeholder="License key (BCL-ONC-… or BCL-SLS-…)"
                 value={form.licenseKey}
                 onChange={(e) => setForm({ ...form, licenseKey: e.target.value })}
               />
               <p className="text-xs text-slate-500">
-                Do not paste a Don Bosco college key (BCL-65BD-… or BCL-2026-…). Issue a school key
-                at <span className="font-medium">/platform/school-licenses</span> while signed in as
-                platform-admin. Keys start with BCL-SLS-.
+                Paste a BaseCode Central OneCampus key (
+                <span className="font-medium">BCL-ONC-…</span>) or a school key starting with
+                BCL-SLS-. Institution code must be{' '}
+                <span className="font-medium">st-lukes-tura</span>. Production ERP calls{' '}
+                <span className="font-medium">BASECODE_CENTRAL_URL</span>{' '}
+                (https://basecodelabs.com).
               </p>
               <input
                 className="h-10 w-full rounded-lg border px-3 text-sm"

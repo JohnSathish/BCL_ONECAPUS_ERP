@@ -1,0 +1,429 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  role         String    @default("SUPER_ADMIN")
+  status       String    @default("ACTIVE")
+  clientId     String?
+  client       Client?   @relation(fields: [clientId], references: [id])
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+  auditLogs    AuditLog[] @relation("Actor")
+}
+
+model OtpChallenge {
+  id         String    @id @default(cuid())
+  email      String
+  purpose    String    @default("ADMIN_LOGIN")
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  ip         String?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, purpose])
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+}
+
+model Sequence {
+  key  String @id
+  year Int
+  next Int
+}
+
+model Client {
+  id             String   @id @default(cuid())
+  clientCode     String   @unique
+  organisation   String
+  contactPerson  String?
+  email          String?
+  phone          String?
+  address        String?
+  gstNumber      String?
+  pan            String?
+  institutionType String?
+  website        String?
+  primaryDomain  String?
+  logoUrl        String?
+  status         String   @default("ACTIVE")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  contacts       ClientContact[]
+  users          User[]
+  licenses       License[]
+  contracts      Contract[]
+  leads          Lead[]
+  invoices       Invoice[]
+  tickets        SupportTicket[]
+  websites       Website[]
+  apps           MobileApplication[]
+  documents      Document[]
+}
+
+model ClientContact {
+  id        String  @id @default(cuid())
+  clientId  String
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name      String
+  title     String?
+  email     String?
+  phone     String?
+  role      String  @default("CLIENT_USER")
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  code         String   @unique
+  version      String   @default("1.0")
+  description  String
+  category     String
+  platform     String?
+  pricingModel String?
+  licenseType  String?
+  supportPlan  String?
+  featuresJson String   @default("[]")
+  status       String   @default("PUBLISHED")
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  licenses     License[]
+}
+
+model License {
+  id               String   @id @default(cuid())
+  licenseCode      String   @unique
+  licenseKey       String   @unique
+  clientId         String
+  client           Client   @relation(fields: [clientId], references: [id])
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id])
+  edition          String?
+  version          String?
+  licenseType      String
+  startDate        DateTime
+  expiryDate       DateTime?
+  activationLimit  Int      @default(1)
+  currentActivations Int    @default(0)
+  userLimit        Int?
+  studentLimit     Int?
+  deviceLimit      Int?
+  domainRestriction String?
+  ipRestriction    String?
+  graceDays        Int      @default(7)
+  status           String   @default("ACTIVE")
+  createdBy        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  activations      LicenseActivation[]
+}
+
+model LicenseActivation {
+  id             String    @id @default(cuid())
+  licenseId      String
+  license        License   @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  installationId String
+  deviceId       String?
+  domain         String?
+  ip             String?
+  os             String?
+  appVersion     String?
+  locationHint   String?
+  status         String    @default("ACTIVE")
+  lastHeartbeat  DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([licenseId, installationId])
+}
+
+model Contract {
+  id           String    @id @default(cuid())
+  contractCode String    @unique
+  clientId     String
+  client       Client    @relation(fields: [clientId], references: [id])
+  title        String
+  type         String
+  startDate    DateTime
+  endDate      DateTime?
+  value        Float?
+  paymentTerms String?
+  sla          String?
+  status       String    @default("DRAFT")
+  createdAt    DateTime  @default(now())
+}
+
+model Lead {
+  id           String    @id @default(cuid())
+  name         String
+  organisation String?
+  email        String
+  phone        String?
+  service      String?
+  budget       String?
+  message      String
+  source       String    @default("WEBSITE")
+  stage        String    @default("NEW")
+  clientId     String?
+  client       Client?   @relation(fields: [clientId], references: [id])
+  createdAt    DateTime  @default(now())
+}
+
+model Invoice {
+  id          String    @id @default(cuid())
+  invoiceCode String    @unique
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id])
+  amount      Float
+  gst         Float     @default(0)
+  discount    Float     @default(0)
+  total       Float
+  dueDate     DateTime?
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  payments    Payment[]
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  invoiceId     String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id])
+  amount        Float
+  mode          String
+  transactionId String?
+  paidAt        DateTime @default(now())
+}
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  ticketCode  String   @unique
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  subject     String
+  description String
+  category    String?
+  priority    String   @default("MEDIUM")
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+}
+
+model Website {
+  id        String  @id @default(cuid())
+  clientId  String
+  client    Client  @relation(fields: [clientId], references: [id])
+  name      String
+  url       String
+  cms       String?
+  status    String  @default("ACTIVE")
+  domains   Domain[]
+}
+
+model Domain {
+  id          String    @id @default(cuid())
+  websiteId   String
+  website     Website   @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  hostname    String
+  registrar   String?
+  expiryDate  DateTime?
+  sslExpiry   DateTime?
+  status      String    @default("ACTIVE")
+}
+
+model MobileApplication {
+  id            String  @id @default(cuid())
+  clientId      String
+  client        Client  @relation(fields: [clientId], references: [id])
+  name          String
+  platform      String
+  packageId     String?
+  currentVersion String?
+  storeUrl      String?
+  status        String  @default("ACTIVE")
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+  title     String
+  category  String
+  path      String
+  createdAt DateTime @default(now())
+}
+
+model Testimonial {
+  id           String  @id @default(cuid())
+  name         String
+  designation  String
+  organisation String
+  quote        String
+  photo        String?
+  rating       Int     @default(5)
+  project      String?
+  industry     String?
+  website      String?
+  featured     Boolean @default(true)
+  displayOrder Int     @default(0)
+  status       String  @default("PUBLISHED")
+}
+
+model PortfolioProject {
+  id           String    @id @default(cuid())
+  name         String
+  slug         String    @unique
+  clientName   String
+  industry     String
+  services     String
+  technologies String?
+  description  String
+  websiteUrl   String?
+  screenshot   String?
+  completedAt  DateTime?
+  status       String    @default("PUBLISHED")
+  displayOrder Int       @default(0)
+}
+
+model ClientLogo {
+  id           String  @id @default(cuid())
+  name         String
+  logoUrl      String?
+  website      String?
+  industry     String?
+  displayOrder Int     @default(0)
+  status       String  @default("PUBLISHED")
+}
+
+model CaseStudy {
+  id           String  @id @default(cuid())
+  slug         String  @unique
+  title        String
+  clientName   String
+  challenge    String
+  solution     String
+  technology   String
+  implementation String
+  result       String
+  status       String  @default("PUBLISHED")
+}
+
+model BlogPost {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  excerpt     String
+  body        String
+  category    String
+  tags        String    @default("")
+  status      String    @default("PUBLISHED")
+  publishedAt DateTime  @default(now())
+}
+
+model ServiceItem {
+  id           String @id @default(cuid())
+  slug         String @unique
+  category     String
+  title        String
+  description  String
+  featuresJson String @default("[]")
+  technologies String?
+  industries   String?
+  displayOrder Int    @default(0)
+  status       String @default("PUBLISHED")
+}
+
+model VisitorDay {
+  id             String @id @default(cuid())
+  day            String @unique
+  uniqueVisitors Int    @default(0)
+  pageViews      Int    @default(0)
+}
+
+model PageView {
+  id        String   @id @default(cuid())
+  path      String
+  visitorId String
+  referrer  String?
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation("Actor", fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  ip        String?
+  userAgent String?
+  meta      String?
+  createdAt DateTime @default(now())
+}
+
+model SystemSetting {
+  key   String @id
+  value String
+}
+
+model LegalDocument {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  title            String
+  shortDescription String
+  category         String   @default("Legal")
+  icon             String   @default("FileText")
+  version          String   @default("1.0")
+  status           String   @default("PUBLISHED")
+  effectiveDate    DateTime
+  lastUpdated      DateTime
+  contentHtml      String
+  publishedBy      String   @default("BaseCode Labs Pvt. Ltd.")
+  displayOrder     Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  versions         LegalDocumentVersion[]
+  acceptances      PolicyAcceptance[]
+}
+
+model LegalDocumentVersion {
+  id            String   @id @default(cuid())
+  documentId    String
+  document      LegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version       String
+  contentHtml   String
+  changeSummary String
+  publishedBy   String
+  publishedAt   DateTime @default(now())
+}
+
+model PolicyAcceptance {
+  id          String   @id @default(cuid())
+  userId      String?
+  email       String?
+  documentId  String
+  document    LegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version     String
+  acceptedAt  DateTime @default(now())
+  ip          String?
+  userAgent   String?
+}

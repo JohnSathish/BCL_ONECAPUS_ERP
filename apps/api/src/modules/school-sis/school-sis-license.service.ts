@@ -20,13 +20,22 @@ import {
 } from './school-sis-license.crypto';
 import { NAV_MODULE_LICENSE } from './school-sis-license.catalog';
 import { SchoolSaasLicenseIssuerService } from './school-saas-license-issuer.service';
+import {
+  activateAgainstBaseCodeCentral,
+  heartbeatBaseCodeCentral,
+} from './school-sis-central-license.client';
+import {
+  isOneCampusCentralKey,
+  isCollegeErpLicenseKey,
+} from './school-sis-license-keys';
+import { licenseDomainAllowed } from './school-sis-license-domain';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 
 const FRIENDLY: Record<string, string> = {
   INVALID_LICENSE:
     'The license key could not be verified. Please check the key and try again.',
   WRONG_PRODUCT:
-    "That key is a college ERP license (Don Bosco), not a St. Luke's school license. Generate a school key in BaseCode Platform → School licenses. School keys start with BCL-SLS-.",
+    "That key is a college ERP license (Don Bosco), not a St. Luke's school license. Use a BaseCode Central key (BCL-ONC-…) or a school key (BCL-SLS-).",
   EXPIRED: 'This license has expired. Please renew your ERP license.',
   WRONG_INSTITUTION: 'This license is not registered for this institution.',
   REVOKED:
@@ -103,7 +112,11 @@ export class SchoolSisLicenseService {
   ) {
     this.assertManage(actor);
     const tokenOrKey = body.licenseKey.trim();
-    const issued = await this.resolveIssued(tokenOrKey);
+    const issued = await this.resolveIssued(tokenOrKey, {
+      tenantId,
+      institutionCode: body.institutionCode,
+      institutionName: body.institutionName,
+    });
     const claims = this.verifyToken(issued.signedToken);
     this.assertInstitution(claims, tenantId, body.institutionCode);
     this.assertNotRevoked(issued.status, claims);
@@ -175,6 +188,17 @@ export class SchoolSisLicenseService {
       });
       if (issued?.status === 'REVOKED') throw new Error('REVOKED');
       if (issued?.status === 'SUSPENDED') throw new Error('SUSPENDED');
+      if (state.licenseKey && isOneCampusCentralKey(state.licenseKey)) {
+        const beat = await heartbeatBaseCodeCentral({
+          licenseKey: state.licenseKey,
+          installationId: tenantId,
+        });
+        if (!beat.unreachable && !beat.ok) {
+          if (beat.status === 'SUSPENDED') throw new Error('SUSPENDED');
+          if (beat.status === 'REVOKED') throw new Error('REVOKED');
+          if (beat.expired) throw new Error('EXPIRED');
+        }
+      }
       const claims = this.verifyToken(state.signedToken);
       const next = await this.persistState(
         tenantId,
@@ -357,7 +381,14 @@ export class SchoolSisLicenseService {
     }
   }
 
-  private async resolveIssued(licenseKey: string) {
+  private async resolveIssued(
+    licenseKey: string,
+    ctx?: {
+      tenantId: string;
+      institutionCode: string;
+      institutionName: string;
+    },
+  ) {
     if (isCollegeErpLicenseKey(licenseKey)) {
       throw this.httpFor('WRONG_PRODUCT');
     }
@@ -376,11 +407,74 @@ export class SchoolSisLicenseService {
       }
       return row;
     }
+    const lookupKey = isOneCampusCentralKey(licenseKey)
+      ? licenseKey.toUpperCase()
+      : licenseKey;
     const row = await this.prisma.schoolSaasLicense.findUnique({
-      where: { licenseKey },
+      where: { licenseKey: lookupKey },
     });
-    if (!row) throw this.httpFor('INVALID_LICENSE');
-    return row;
+    if (row) return row;
+    if (ctx && isOneCampusCentralKey(lookupKey)) {
+      const hosts = await this.centralHosts(ctx.tenantId, ctx.institutionCode);
+      const remote = await activateAgainstBaseCodeCentral({
+        licenseKey: lookupKey,
+        installationId: ctx.tenantId,
+        institutionCode: ctx.institutionCode,
+        hosts,
+      });
+      if (!remote) {
+        throw new BadRequestException({
+          code: 'INVALID_LICENSE',
+          message:
+            'This BaseCode Central key was not accepted. Keep BaseCode Central running, set BASECODE_CENTRAL_URL and BASECODE_LICENSE_API_SECRET on this API, confirm the license is Active for BCL OneCampus ERP, and use institution code st-lukes-tura (domain stlukestura.in is also accepted).',
+        });
+      }
+      try {
+        return await this.issuer.adoptCentralLicense({
+          licenseKey: remote.licenseKey,
+          tenantId: ctx.tenantId,
+          institutionCode: ctx.institutionCode,
+          institutionName: ctx.institutionName,
+          expiryDate: remote.expiryDate,
+          graceDays: remote.graceDays,
+        });
+      } catch (e) {
+        this.log.warn(`Could not adopt Central license: ${String(e)}`);
+        if (String(e).includes('LICENSE_PRIVATE_KEY')) {
+          throw new BadRequestException({
+            code: 'SERVER',
+            message:
+              'ERP license signing is not configured. Set LICENSE_PRIVATE_KEY on the API (pair with LICENSE_PUBLIC_KEY), then try Activate again.',
+          });
+        }
+        throw this.httpFor('SERVER');
+      }
+    }
+    throw this.httpFor('INVALID_LICENSE');
+  }
+
+  private async centralHosts(tenantId: string, institutionCode: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        slug: true,
+        domains: {
+          where: { deletedAt: null },
+          select: { host: true },
+        },
+      },
+    });
+    return [
+      ...new Set(
+        [
+          institutionCode,
+          tenant?.slug,
+          ...(tenant?.domains.map((d) => d.host) ?? []),
+        ]
+          .filter(Boolean)
+          .map((h) => h.trim().toLowerCase()),
+      ),
+    ];
   }
 
   private assertInstitution(
@@ -389,17 +483,10 @@ export class SchoolSisLicenseService {
     code: string,
   ) {
     const wanted = code.trim().toLowerCase();
-    if (
-      claims.instCode &&
-      claims.instCode !== wanted &&
-      claims.instId &&
-      claims.instId !== tenantId
-    ) {
-      throw this.httpFor('WRONG_INSTITUTION');
-    }
-    if (claims.instCode && claims.instCode !== wanted && !claims.instId) {
-      throw this.httpFor('WRONG_INSTITUTION');
-    }
+    if (!claims.instCode) return;
+    if (claims.instCode === wanted || claims.instId === tenantId) return;
+    if (licenseDomainAllowed(claims.instCode, [wanted, tenantId])) return;
+    throw this.httpFor('WRONG_INSTITUTION');
   }
 
   private assertNotRevoked(status: string, claims: SchoolLicenseClaims) {
@@ -732,12 +819,4 @@ export class SchoolSisLicenseService {
     }
     return new BadRequestException({ code, message });
   }
-}
-
-function isCollegeErpLicenseKey(key: string) {
-  const k = key.trim().toUpperCase();
-  if (k.startsWith('BCL-SLS-') || k.startsWith('BCL1.')) return false;
-  return (
-    /^BCL-\d{4}-/.test(k) || /^BCL-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}/.test(k)
-  );
 }
