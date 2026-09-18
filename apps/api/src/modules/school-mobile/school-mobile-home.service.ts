@@ -240,6 +240,11 @@ export class SchoolMobileHomeService {
       teachers: number;
       classes: number;
       attendanceToday: number | null;
+      present: number;
+      absent: number;
+      late: number;
+      classesMarked: number;
+      classesTotal: number;
     } | null = null;
     if (me.persona === 'admin') {
       try {
@@ -266,6 +271,11 @@ export class SchoolMobileHomeService {
           classes,
           attendanceToday:
             typeof att.totals?.percent === 'number' ? att.totals.percent : null,
+          present: att.totals?.present ?? 0,
+          absent: att.totals?.absent ?? 0,
+          late: att.totals?.late ?? 0,
+          classesMarked: att.completion?.submitted ?? 0,
+          classesTotal: att.completion?.total ?? classes,
         };
       } catch {
         office = {
@@ -273,6 +283,11 @@ export class SchoolMobileHomeService {
           teachers: 0,
           classes: 0,
           attendanceToday: null,
+          present: 0,
+          absent: 0,
+          late: 0,
+          classesMarked: 0,
+          classesTotal: 0,
         };
       }
     }

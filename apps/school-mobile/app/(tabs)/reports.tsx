@@ -4,16 +4,23 @@ import { Card, Feed, Screen } from '@/ui/kit';
 import { colors, radii } from '@/theme/tokens';
 
 const ITEMS = [
-  { icon: '✅', title: 'Attendance', body: 'Today’s class-wise attendance', href: '/attendance' },
+  {
+    icon: '✅',
+    title: 'Attendance',
+    body: 'Today’s class-wise attendance',
+    href: '/office/attendance',
+  },
   {
     icon: '📊',
     title: 'Examinations',
     body: 'Published results and schedules',
-    href: '/examinations',
+    href: '/office/examinations',
   },
-  { icon: '₹', title: 'Fees', body: 'Collection overview', href: '/fees' },
-  { icon: '📄', title: 'Notices', body: 'Circulars and announcements', href: '/(tabs)/notices' },
+  { icon: '₹', title: 'Fees', body: 'Collection overview', href: '/office/fees' },
+  { icon: '📄', title: 'Notices', body: 'Circulars and announcements', href: '/office/notices' },
   { icon: '📅', title: 'Calendar', body: 'Upcoming school events', href: '/(tabs)/calendar' },
+  { icon: '👥', title: 'Students', body: 'Search the school roll', href: '/office/students' },
+  { icon: '🧑‍🏫', title: 'Teachers', body: 'Teaching staff directory', href: '/office/teachers' },
 ];
 
 export default function ReportsScreen() {

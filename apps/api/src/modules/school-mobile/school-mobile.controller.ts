@@ -75,6 +75,7 @@ import { SchoolMobileAuthService } from './school-mobile-auth.service';
 import { SchoolMobileAccountAuthService } from './school-mobile-account-auth.service';
 import { SchoolMobileDeviceService } from './school-mobile-device.service';
 import { SchoolMobileHomeService } from './school-mobile-home.service';
+import { SchoolMobilePrincipalService } from './school-mobile-principal.service';
 import { SchoolMobileInboxService } from './school-mobile-inbox.service';
 import { SchoolMobilePrayerService } from './school-mobile-prayer.service';
 import { SchoolMobileSettingsService } from './school-mobile-settings.service';
@@ -108,6 +109,7 @@ export class SchoolMobileController {
     private readonly calendar: SchoolSisCalendarService,
     private readonly gateways: SchoolSisPaymentGatewaysService,
     private readonly library: SchoolSisLibraryService,
+    private readonly principal: SchoolMobilePrincipalService,
   ) {}
 
   private async tenantFromHost(
@@ -430,6 +432,98 @@ export class SchoolMobileController {
     @Headers('x-school-child-id') childHeader?: string,
   ) {
     return this.home.home(user, childId || childHeader);
+  }
+
+  @Get('principal/desk')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:manage',
+    '*',
+  )
+  principalDesk(@CurrentUser() user: JwtUser) {
+    return this.principal.desk(user);
+  }
+
+  @Get('principal/students')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:manage',
+    '*',
+  )
+  principalStudents(
+    @CurrentUser() user: JwtUser,
+    @Query('q') q?: string,
+    @Query('gradeId') gradeId?: string,
+  ) {
+    return this.principal.students(user, q, gradeId);
+  }
+
+  @Get('principal/teachers')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:manage',
+    '*',
+  )
+  principalTeachers(@CurrentUser() user: JwtUser, @Query('q') q?: string) {
+    return this.principal.teachers(user, q);
+  }
+
+  @Get('principal/academics')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:manage',
+    '*',
+  )
+  principalAcademics(@CurrentUser() user: JwtUser) {
+    return this.principal.academics(user);
+  }
+
+  @Get('principal/examinations')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:manage',
+    '*',
+  )
+  principalExams(@CurrentUser() user: JwtUser) {
+    return this.principal.examinations(user);
+  }
+
+  @Get('principal/attendance')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:manage',
+    '*',
+  )
+  principalAttendance(@CurrentUser() user: JwtUser) {
+    return this.principal.attendanceOverview(user);
+  }
+
+  @Get('principal/fees')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:manage',
+    '*',
+  )
+  principalFees(@CurrentUser() user: JwtUser) {
+    return this.principal.feesOverview(user);
+  }
+
+  @Get('principal/notices')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:manage',
+    '*',
+  )
+  principalNotices(@CurrentUser() user: JwtUser) {
+    return this.principal.notices(user);
   }
 
   @Get('prayer')

@@ -240,7 +240,7 @@ export class SchoolSisPushService {
       imageUrl: string | null;
       category: string;
       audienceType: string;
-      deepLinkType: string;
+      deepLinkType: string | null;
       deepLinkValue: string | null;
     },
   ) {

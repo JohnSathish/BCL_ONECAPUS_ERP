@@ -1,94 +1,98 @@
+import { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { apiFetch } from '@/api/client';
 import { mediaUrl } from '@/api/config';
-import { CAMPUS, CREST, SCHOOL } from '@/brand';
-import { colors, radii, space } from '@/theme/tokens';
+import { CREST, SCHOOL } from '@/brand';
+import { inr } from '@/fees/format';
+import { colors, space } from '@/theme/tokens';
 
 type Notice = { slug: string; title: string; publishedAt?: string | null };
 type EventRow = { slug: string; title: string; startsAt?: string | null; venue?: string | null };
-
-type Props = {
-  data: Record<string, unknown>;
+type Desk = {
+  kpis?: {
+    present?: number;
+    absent?: number;
+    late?: number;
+    classesMarked?: number;
+    classesTotal?: number;
+    feeCollectedMonth?: number;
+    feePending?: number;
+    feePendingStudents?: number;
+    examsUpcoming?: number;
+    examsOngoing?: number;
+    marksPending?: number;
+  };
 };
+
+type Props = { data: Record<string, unknown> };
 
 const TILES = [
   {
     icon: '📢',
     label: 'Announcements',
-    hint: 'Send messages to students, parents & staff',
-    href: '/(tabs)/messages',
+    hint: 'Send a message to the school family',
+    href: '/office/announcements',
     tint: '#eff6ff',
-    fg: '#2563eb',
   },
   {
     icon: '👥',
     label: 'Students',
-    hint: 'View student records and details',
-    href: '/academics',
+    hint: 'Search rolls, classes and profiles',
+    href: '/office/students',
     tint: '#ecfdf5',
-    fg: '#059669',
   },
   {
     icon: '🧑‍🏫',
     label: 'Teachers',
-    hint: 'Manage staff information',
-    href: '/school',
+    hint: 'Staff directory and contacts',
+    href: '/office/teachers',
     tint: '#f5f3ff',
-    fg: '#7c3aed',
   },
   {
     icon: '📅',
     label: 'Academics',
-    hint: 'Classes, subjects and timetable',
-    href: '/academics',
+    hint: 'Classes, sections and class teachers',
+    href: '/office/academics',
     tint: '#fff7ed',
-    fg: '#ea580c',
   },
   {
     icon: '📊',
     label: 'Examinations',
-    hint: 'Results and performance',
-    href: '/examinations',
+    hint: 'Schedules, marks and pass rate',
+    href: '/office/examinations',
     tint: '#fef2f2',
-    fg: '#dc2626',
   },
   {
     icon: '✅',
     label: 'Attendance',
-    hint: 'View attendance summary',
-    href: '/attendance',
+    hint: 'Today’s class-wise present roll',
+    href: '/office/attendance',
     tint: '#ecfdf5',
-    fg: '#16a34a',
   },
   {
     icon: '₹',
     label: 'Fees',
-    hint: 'Overview and fee reports',
-    href: '/fees',
+    hint: 'Collection, pending and receipts',
+    href: '/office/fees',
     tint: '#eef2ff',
-    fg: '#4f46e5',
   },
   {
     icon: '📄',
     label: 'Notices & Circulars',
-    hint: 'Manage school notices',
-    href: '/(tabs)/notices',
+    hint: 'Website circulars and app notices',
+    href: '/office/notices',
     tint: '#eff6ff',
-    fg: '#1d4ed8',
   },
   {
     icon: '⚙️',
     label: 'Settings',
-    hint: 'App preferences and security',
+    hint: 'App lock and account security',
     href: '/security',
     tint: '#f8fafc',
-    fg: '#475569',
   },
 ] as const;
-
-const VALUES = ['Discipline', 'Excellence', 'Character', 'Service'];
 
 function ago(iso?: string | null) {
   if (!iso) return 'Recently';
@@ -113,9 +117,9 @@ function eventWhen(iso?: string | null) {
 
 export function PrincipalHome({ data }: Props) {
   const router = useRouter();
+  const [desk, setDesk] = useState<Desk | null>(null);
   const me = (data.me ?? {}) as {
     displayName?: string;
-    persona?: string;
     staff?: { fullName?: string; photoUrl?: string | null; designation?: string | null } | null;
   };
   const office = (data.office ?? {}) as {
@@ -123,6 +127,10 @@ export function PrincipalHome({ data }: Props) {
     teachers?: number;
     classes?: number;
     attendanceToday?: number | null;
+    present?: number;
+    absent?: number;
+    classesMarked?: number;
+    classesTotal?: number;
   };
   const notices = (data.notices ?? []) as Notice[];
   const events = (data.events ?? []) as EventRow[];
@@ -131,6 +139,13 @@ export function PrincipalHome({ data }: Props) {
   const photo = me.staff?.photoUrl;
   const today = new Date();
   const att = office.attendanceToday != null ? `${Math.round(office.attendanceToday)}%` : '—';
+  const kpis = desk?.kpis;
+
+  useEffect(() => {
+    apiFetch<Desk>('/v1/school-mobile/principal/desk')
+      .then(setDesk)
+      .catch(() => setDesk(null));
+  }, []);
 
   const stats = [
     {
@@ -138,23 +153,29 @@ export function PrincipalHome({ data }: Props) {
       value: String(office.students ?? '—'),
       tint: '#eff6ff',
       icon: '👤',
-      href: '/academics',
+      href: '/office/students',
     },
     {
       label: 'Teachers',
       value: String(office.teachers ?? '—'),
       tint: '#ecfdf5',
       icon: '🧑‍🏫',
-      href: '/school',
+      href: '/office/teachers',
     },
     {
       label: 'Classes',
       value: String(office.classes ?? '—'),
       tint: '#fffbeb',
       icon: '🏫',
-      href: '/academics',
+      href: '/office/academics',
     },
-    { label: 'Attendance Today', value: att, tint: '#fdf2f8', icon: '🎓', href: '/attendance' },
+    {
+      label: 'Attendance Today',
+      value: att,
+      tint: '#fdf2f8',
+      icon: '🎓',
+      href: '/office/attendance',
+    },
   ];
 
   return (
@@ -196,11 +217,13 @@ export function PrincipalHome({ data }: Props) {
       >
         <View style={styles.welcomeRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.welcomeKicker}>Welcome back,</Text>
+            <Text style={styles.welcomeKicker}>Good to have you in,</Text>
             <Text style={styles.welcomeName} numberOfLines={2}>
               {name}
             </Text>
-            <Text style={styles.lead}>Lead · Guide · Inspire</Text>
+            <Text style={styles.lead}>
+              {me.staff?.designation || 'Principal'} · Lead · Guide · Inspire
+            </Text>
           </View>
           <Pressable onPress={() => router.push('/(tabs)/calendar')} style={styles.todayCard}>
             <Text style={styles.todayIcon}>📅</Text>
@@ -232,29 +255,44 @@ export function PrincipalHome({ data }: Props) {
           ))}
         </View>
 
-        <View style={styles.hero}>
-          <Image source={CAMPUS} style={styles.heroImg} />
-          <LinearGradient
-            colors={['rgba(10,18,72,0.15)', 'rgba(10,18,72,0.88)']}
-            start={{ x: 0, y: 0.2 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroShade}
+        <View style={styles.insights}>
+          <Pressable style={styles.insight} onPress={() => router.push('/office/attendance')}>
+            <Text style={styles.insightKicker}>Attendance pulse</Text>
+            <Text style={styles.insightValue}>{att}</Text>
+            <Text style={styles.insightHint}>
+              {kpis?.present ?? office.present ?? 0} present · {kpis?.absent ?? office.absent ?? 0}{' '}
+              absent
+            </Text>
+            <Text style={styles.insightFoot}>
+              {kpis?.classesMarked ?? office.classesMarked ?? 0}/
+              {kpis?.classesTotal ?? office.classesTotal ?? 0} classes marked
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.insight, styles.insightFee]}
+            onPress={() => router.push('/office/fees')}
           >
-            <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-              <Text style={styles.heroTitle}>Together for{'\n'}a Brighter Tomorrow</Text>
-              <Text style={styles.heroQuote}>“{SCHOOL.motto}”</Text>
-              <Text style={styles.heroSchool}>{SCHOOL.legalName}</Text>
-            </View>
-            <View style={styles.values}>
-              {VALUES.map((v) => (
-                <Text key={v} style={styles.value}>
-                  {v}
-                </Text>
-              ))}
-            </View>
-          </LinearGradient>
+            <Text style={styles.insightKicker}>Fees this month</Text>
+            <Text style={styles.insightValue}>{inr(kpis?.feeCollectedMonth ?? 0)}</Text>
+            <Text style={styles.insightHint}>
+              {kpis?.feePendingStudents ?? 0} students still pending
+            </Text>
+            <Text style={styles.insightFoot}>Open the collection desk →</Text>
+          </Pressable>
         </View>
 
+        <Pressable style={styles.examStrip} onPress={() => router.push('/office/examinations')}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.examTitle}>Examination desk</Text>
+            <Text style={styles.examHint}>
+              {kpis?.examsOngoing ?? 0} ongoing · {kpis?.examsUpcoming ?? 0} upcoming ·{' '}
+              {kpis?.marksPending ?? 0} marks pending
+            </Text>
+          </View>
+          <Text style={styles.examChev}>›</Text>
+        </Pressable>
+
+        <Text style={styles.section}>Principal’s office</Text>
         <View style={styles.grid}>
           {TILES.map((tile) => (
             <Pressable
@@ -279,8 +317,8 @@ export function PrincipalHome({ data }: Props) {
         <View style={styles.split}>
           <View style={styles.panel}>
             <View style={styles.panelHead}>
-              <Text style={styles.panelTitle}>Recent Activities</Text>
-              <Pressable onPress={() => router.push('/(tabs)/notices')}>
+              <Text style={styles.panelTitle}>Recent circulars</Text>
+              <Pressable onPress={() => router.push('/office/notices')}>
                 <Text style={styles.viewAll}>View All</Text>
               </Pressable>
             </View>
@@ -309,7 +347,7 @@ export function PrincipalHome({ data }: Props) {
 
           <View style={styles.panel}>
             <View style={styles.panelHead}>
-              <Text style={styles.panelTitle}>Upcoming Events</Text>
+              <Text style={styles.panelTitle}>Upcoming events</Text>
               <Pressable onPress={() => router.push('/(tabs)/calendar')}>
                 <Text style={styles.viewAll}>View All</Text>
               </Pressable>
@@ -358,12 +396,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 8,
   },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   menuGlyph: { color: '#fff', fontSize: 22, fontWeight: '700' },
   crest: { width: 36, height: 36 },
   headerText: { flex: 1 },
@@ -393,12 +426,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.7)',
   },
   avatarLetter: { color: '#fff', fontWeight: '800' },
-  body: {
-    flex: 1,
-    backgroundColor: '#eef2fb',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-  },
+  body: { flex: 1, backgroundColor: '#eef2fb', borderTopLeftRadius: 22, borderTopRightRadius: 22 },
   inner: { padding: space.md, paddingBottom: 36, gap: 14 },
   welcomeRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   welcomeKicker: { color: colors.muted, fontWeight: '600', fontSize: 13 },
@@ -417,36 +445,30 @@ const styles = StyleSheet.create({
   todayLabel: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   todayDate: { color: colors.navy, fontWeight: '800', fontSize: 12 },
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  stat: {
-    width: '48%',
-    flexGrow: 1,
-    borderRadius: 16,
-    padding: 12,
-    minWidth: 140,
-  },
+  stat: { width: '48%', flexGrow: 1, borderRadius: 16, padding: 12, minWidth: 140 },
   statIcon: { fontSize: 16, marginBottom: 6 },
   statValue: { fontSize: 22, fontWeight: '800', color: colors.ink },
   statLabel: { color: colors.muted, fontWeight: '700', fontSize: 11, marginTop: 2 },
-  hero: { height: 168, borderRadius: radii.lg, overflow: 'hidden' },
-  heroImg: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  heroShade: {
-    ...StyleSheet.absoluteFillObject,
+  insights: { flexDirection: 'row', gap: 8 },
+  insight: { flex: 1, backgroundColor: colors.navy, borderRadius: 18, padding: 14 },
+  insightFee: { backgroundColor: '#0f766e' },
+  insightKicker: { color: 'rgba(255,255,255,0.75)', fontWeight: '700', fontSize: 11 },
+  insightValue: { color: '#fff', fontWeight: '800', fontSize: 22, marginTop: 6 },
+  insightHint: { color: 'rgba(255,255,255,0.82)', marginTop: 6, fontSize: 11, lineHeight: 15 },
+  insightFoot: { color: 'rgba(255,255,255,0.65)', marginTop: 8, fontSize: 11, fontWeight: '700' },
+  examStrip: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 8,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
   },
-  heroTitle: { color: '#fff', fontSize: 22, fontWeight: '800', lineHeight: 26 },
-  heroQuote: { color: 'rgba(255,255,255,0.9)', fontStyle: 'italic', marginTop: 8, fontSize: 12 },
-  heroSchool: { color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 4, fontWeight: '600' },
-  values: { justifyContent: 'flex-end', alignItems: 'flex-end', gap: 4 },
-  value: { color: 'rgba(255,255,255,0.92)', fontWeight: '700', fontSize: 11 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  examTitle: { fontWeight: '800', color: colors.ink },
+  examHint: { color: colors.muted, marginTop: 3, fontSize: 12 },
+  examChev: { color: '#c5cbe0', fontSize: 22 },
+  section: { fontWeight: '800', color: colors.ink, fontSize: 15 },
+  grid: { gap: 8 },
   tile: {
-    width: '100%',
-    maxWidth: '100%',
-    flexGrow: 1,
-    minWidth: 150,
-    flexBasis: '31%',
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 12,
@@ -461,7 +483,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileLabel: { fontWeight: '800', color: colors.ink, fontSize: 13 },
+  tileLabel: { fontWeight: '800', color: colors.ink, fontSize: 14 },
   tileHint: { color: colors.muted, fontSize: 11, marginTop: 2, lineHeight: 14 },
   tileChev: { color: '#c5cbe0', fontSize: 20 },
   split: { gap: 12 },

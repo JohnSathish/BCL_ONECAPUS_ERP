@@ -9,6 +9,7 @@ import { SchoolMobileAuthService } from './school-mobile-auth.service';
 import { SchoolMobileAccountAuthService } from './school-mobile-account-auth.service';
 import { SchoolMobileDeviceService } from './school-mobile-device.service';
 import { SchoolMobileHomeService } from './school-mobile-home.service';
+import { SchoolMobilePrincipalService } from './school-mobile-principal.service';
 import { SchoolMobileInboxService } from './school-mobile-inbox.service';
 import { SchoolMobilePrayerService } from './school-mobile-prayer.service';
 import { SchoolMobileSettingsService } from './school-mobile-settings.service';
@@ -32,6 +33,7 @@ import { SchoolMobileController } from './school-mobile.controller';
     SchoolMobileInboxService,
     SchoolMobilePrayerService,
     SchoolMobileHomeService,
+    SchoolMobilePrincipalService,
   ],
 })
 export class SchoolMobileModule {}

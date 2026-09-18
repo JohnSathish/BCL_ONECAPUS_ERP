@@ -81,6 +81,16 @@ export class SchoolMobileAccessService {
     return this.persona(user);
   }
 
+  assertOffice(user: JwtUser) {
+    const persona = this.assertAccess(user);
+    if (persona !== 'admin') {
+      throw new ForbiddenException(
+        'This screen is for the principal’s office.',
+      );
+    }
+    return persona;
+  }
+
   async childrenForUser(
     tenantId: string,
     userId: string,
