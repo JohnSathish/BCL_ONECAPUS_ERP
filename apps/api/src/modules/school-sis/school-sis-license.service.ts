@@ -471,7 +471,7 @@ export class SchoolSisLicenseService {
           tenant?.slug,
           ...(tenant?.domains.map((d) => d.host) ?? []),
         ]
-          .filter(Boolean)
+          .filter((h): h is string => Boolean(h))
           .map((h) => h.trim().toLowerCase()),
       ),
     ];
