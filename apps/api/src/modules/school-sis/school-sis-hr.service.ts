@@ -356,28 +356,34 @@ export class SchoolSisHrService {
       if (a.status in attCounts)
         (attCounts as Record<string, number>)[a.status] += 1;
     }
+    const person = (s: (typeof staff)[number], date: Date | null) => ({
+      id: s.id,
+      fullName: s.fullName,
+      designation:
+        s.designation || (s.staffType === 'TEACHING' ? 'Teacher' : 'Staff'),
+      date,
+      initials: s.fullName
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase() ?? '')
+        .join(''),
+    });
     const birthdays = active
       .filter(
         (s) =>
           s.dateOfBirth && s.dateOfBirth.getUTCMonth() === today.getUTCMonth(),
       )
       .slice(0, 8)
-      .map((s) => ({
-        id: s.id,
-        fullName: s.fullName,
-        dateOfBirth: s.dateOfBirth,
-      }));
+      .map((s) => person(s, s.dateOfBirth));
     const anniversaries = active
       .filter(
         (s) =>
           s.joiningDate && s.joiningDate.getUTCMonth() === today.getUTCMonth(),
       )
       .slice(0, 8)
-      .map((s) => ({
-        id: s.id,
-        fullName: s.fullName,
-        joiningDate: s.joiningDate,
-      }));
+      .map((s) => person(s, s.joiningDate));
+    const inactive = staff.filter((s) => s.status !== 'ACTIVE').length;
     const paid =
       run?.lines
         .filter((l) => l.payStatus === 'PAID')
@@ -405,6 +411,12 @@ export class SchoolSisHrService {
       },
       byType: Object.entries(byType).map(([name, value]) => ({ name, value })),
       byDept: Object.entries(byDept).map(([name, value]) => ({ name, value })),
+      staffStatus: {
+        active: active.length,
+        onLeave: leaveToday.length,
+        absent: attCounts.ABSENT,
+        inactive,
+      },
       attendance: attCounts,
       leave: {
         pending: await this.prisma.schoolHrLeaveRequest.count({
