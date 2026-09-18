@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -17,7 +17,10 @@ import {
 import {
   BookOpen,
   CalendarDays,
+  CheckSquare,
   ClipboardList,
+  FileBarChart,
+  Globe,
   GraduationCap,
   Library,
   Megaphone,
@@ -63,7 +66,7 @@ function statusTone(status: string) {
 }
 
 function formatDay(iso?: string | null) {
-  if (!iso) return '—';
+  if (!iso) return 'â€”';
   return new Date(iso).toLocaleDateString('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -74,6 +77,30 @@ function formatDay(iso?: string | null) {
 function formatTime(iso?: string | null) {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function noticeDot(category: string) {
+  const c = category.toUpperCase();
+  if (c.includes('ACADEMIC')) return 'bg-emerald-500';
+  if (c.includes('FINANCE') || c.includes('FEE')) return 'bg-amber-500';
+  if (c.includes('EVENT')) return 'bg-violet-500';
+  if (c.includes('EXAM')) return 'bg-rose-500';
+  return 'bg-sky-500';
+}
+
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  const max = Math.max(...values, 1);
+  const pts = values.map((v, i) => {
+    const x = values.length <= 1 ? 0 : (i / (values.length - 1)) * 100;
+    const y = 28 - (v / max) * 22;
+    return `${x},${y}`;
+  });
+  return (
+    <svg viewBox="0 0 100 32" className="h-10 w-full" preserveAspectRatio="none" aria-hidden>
+      <polyline fill="none" stroke={color} strokeWidth="2" points={pts.join(' ')} />
+      <polyline fill={`${color}22`} stroke="none" points={`0,32 ${pts.join(' ')} 100,32`} />
+    </svg>
+  );
 }
 
 export function SchoolSisDashboard() {
@@ -132,18 +159,22 @@ export function SchoolSisDashboard() {
     {
       label: 'Total Students',
       value: counts?.students,
-      hint: 'Active student records',
+      hint: `${counts?.enrollments ?? 0} enrolled this year`,
       href: '/admin/school-sis/students',
       icon: GraduationCap,
       tone: 'bg-sky-50 text-sky-700',
+      spark: classChart.map((r) => r.count),
+      sparkColor: SKY,
     },
     {
       label: 'Teachers',
       value: counts?.teachingStaff,
-      hint: 'Teaching staff',
+      hint: `${counts?.staff ?? 0} staff in total`,
       href: '/admin/school-sis/staff',
       icon: Users,
       tone: 'bg-emerald-50 text-emerald-700',
+      spark: [counts?.teachingStaff ?? 0, counts?.nonTeachingStaff ?? 0, counts?.staff ?? 0],
+      sparkColor: '#10b981',
     },
     {
       label: 'Non-Teaching Staff',
@@ -152,83 +183,161 @@ export function SchoolSisDashboard() {
       href: '/admin/school-sis/staff',
       icon: Users,
       tone: 'bg-violet-50 text-violet-700',
+      spark: [0, counts?.nonTeachingStaff ?? 0, counts?.staff ?? 0],
+      sparkColor: '#8b5cf6',
     },
     {
       label: 'Classes',
       value: counts?.grades,
       hint: `${counts?.sections ?? 0} sections this year`,
-      href: '/admin/school-sis/classes',
+      href: '/admin/school-sis/academic/classes',
       icon: BookOpen,
       tone: 'bg-orange-50 text-orange-700',
+      spark: classChart.map((r) => r.count || 1),
+      sparkColor: '#f97316',
     },
     {
       label: 'Upcoming Events',
       value: counts?.eventsUpcoming,
       hint: 'Published on the school website',
+      href: '/admin/school-sis/website',
       icon: CalendarDays,
       tone: 'bg-pink-50 text-pink-700',
+      spark: [
+        counts?.eventsUpcoming ?? 0,
+        counts?.eventsUpcoming ?? 0,
+        counts?.eventsUpcoming ?? 0,
+      ],
+      sparkColor: '#ec4899',
     },
     {
       label: 'New Enquiries',
       value: counts?.newEnquiries,
-      hint: 'Website contact form',
+      hint: `${counts?.openApplications ?? 0} open applications`,
+      href: '/admin/school-sis/website',
       icon: Megaphone,
       tone: 'bg-cyan-50 text-cyan-700',
+      spark: [0, counts?.openApplications ?? 0, counts?.newEnquiries ?? 0],
+      sparkColor: '#06b6d4',
     },
   ];
 
-  const quickActions = [
+  const shortcuts = [
     canManage
-      ? { href: '/admin/school-sis/students/new', label: 'Add Student', icon: UserPlus, live: true }
+      ? {
+          href: '/admin/school-sis/students/new',
+          label: 'Add Student',
+          icon: UserPlus,
+          color: 'bg-sky-50 text-sky-700',
+        }
       : null,
-    { href: '/admin/school-sis/students', label: 'Student List', icon: GraduationCap, live: true },
-    { href: '/admin/school-sis/staff', label: 'Teacher List', icon: Users, live: true },
     {
-      href: '/admin/school-sis/admissions',
-      label: 'Applications',
-      icon: ClipboardList,
-      live: true,
+      href: '/admin/school-sis/attendance',
+      label: 'Take Attendance',
+      icon: CheckSquare,
+      color: 'bg-emerald-50 text-emerald-700',
     },
-    { href: '#', label: 'Add Notice', icon: Megaphone, live: false },
-    { href: '#', label: 'Add Event', icon: CalendarDays, live: false },
-    { href: '#', label: 'Fee Collection', icon: Wallet, live: false },
-    { href: '#', label: 'Attendance', icon: ClipboardList, live: false },
-    { href: '#', label: 'Examination', icon: BookOpen, live: false },
-    { href: '#', label: 'Library', icon: Library, live: false },
-  ].filter(Boolean) as Array<{ href: string; label: string; icon: typeof UserPlus; live: boolean }>;
+    {
+      href: '/admin/school-sis/academic/classes',
+      label: 'Manage Classes',
+      icon: BookOpen,
+      color: 'bg-violet-50 text-violet-700',
+    },
+    {
+      href: '/admin/school-sis/website',
+      label: 'Publish Notice',
+      icon: Megaphone,
+      color: 'bg-orange-50 text-orange-700',
+    },
+    {
+      href: '/admin/school-sis/reports/design',
+      label: 'View Reports',
+      icon: FileBarChart,
+      color: 'bg-pink-50 text-pink-700',
+    },
+    {
+      href: '/admin/school-sis/website',
+      label: 'Website CMS',
+      icon: Globe,
+      color: 'bg-cyan-50 text-cyan-700',
+    },
+    {
+      href: '/admin/school-sis/fees',
+      label: 'Fee Collection',
+      icon: Wallet,
+      color: 'bg-amber-50 text-amber-800',
+    },
+    {
+      href: '/admin/school-sis/exams',
+      label: 'Examinations',
+      icon: ClipboardList,
+      color: 'bg-rose-50 text-rose-700',
+    },
+    {
+      href: '/admin/school-sis/library',
+      label: 'Library',
+      icon: Library,
+      color: 'bg-indigo-50 text-indigo-700',
+    },
+  ].filter(Boolean) as Array<{
+    href: string;
+    label: string;
+    icon: typeof UserPlus;
+    color: string;
+  }>;
 
   return (
     <div className="sls-dashboard space-y-5">
       <div className="sls-page-head">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[#1a365d]">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-[#1a365d] sm:text-3xl">
+            Welcome back, {welcomeName}!
+          </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Welcome back, {welcomeName}! Here&apos;s what&apos;s happening at {schoolName}.
+            Here&apos;s what&apos;s happening at {schoolName}.
           </p>
         </div>
         <div className="sls-page-actions">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm">
+            <CalendarDays className="h-4 w-4 text-sky-600" />
+            <div>
+              <p className="text-[11px] leading-none text-slate-400">{dateLabel}</p>
+              <p className="mt-0.5 font-semibold text-[#1a365d]">{timeLabel}</p>
+            </div>
+          </div>
           <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm">
-            <span className="text-[11px] uppercase tracking-wide text-slate-400">Year</span>
+            <span className="text-[11px] uppercase tracking-wide text-slate-400">
+              Academic Year
+            </span>
             <select
               className="bg-transparent font-medium text-[#1a365d] outline-none"
               value={data?.academicYear.id ?? ''}
               disabled
             >
-              <option value={data?.academicYear.id ?? ''}>{data?.academicYear.name ?? '—'}</option>
+              <option value={data?.academicYear.id ?? ''}>
+                {data?.academicYear.name ?? 'â€”'}
+              </option>
             </select>
           </label>
-          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
-            {dateLabel}
-            <span className="ml-2 font-medium text-[#1a365d]">{timeLabel}</span>
-          </div>
           {canManage ? (
-            <Link
-              href="/admin/school-sis/students/new"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#1a365d] px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#163056]"
-            >
-              <Zap className="h-4 w-4" />
-              Quick Actions
-            </Link>
+            <details className="relative">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 [&::-webkit-details-marker]:hidden">
+                <Zap className="h-4 w-4" />
+                Quick Actions
+              </summary>
+              <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                {shortcuts.slice(0, 6).map((action) => (
+                  <Link
+                    key={action.label}
+                    href={action.href}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-sky-50"
+                  >
+                    <action.icon className="h-4 w-4 text-sky-600" />
+                    {action.label}
+                  </Link>
+                ))}
+              </div>
+            </details>
           ) : null}
         </div>
       </div>
@@ -237,7 +346,7 @@ export function SchoolSisDashboard() {
         <p className="text-sm text-red-600">{apiErrorMessage(overview.error)}</p>
       ) : null}
 
-      <SchoolLicenseStatusCard />
+      <SchoolLicenseStatusCard variant="banner" />
 
       <div className="sls-stat-grid">
         {stats.map((card) => {
@@ -254,14 +363,19 @@ export function SchoolSisDashboard() {
               <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 {card.label}
               </p>
-              <p className="mt-1 text-2xl font-semibold text-[#1a365d]">
-                {overview.isLoading ? '—' : (card.value ?? 0)}
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-[#1a365d]">
+                {overview.isLoading ? 'â€”' : (card.value ?? 0)}
               </p>
               <p className="mt-1 text-xs text-slate-400">{card.hint}</p>
+              {card.spark.some((n) => n > 0) ? (
+                <div className="mt-2">
+                  <Sparkline values={card.spark} color={card.sparkColor} />
+                </div>
+              ) : null}
             </>
           );
           const className =
-            'min-w-0 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]';
+            'min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]';
           if (card.href) {
             return (
               <Link
@@ -283,13 +397,26 @@ export function SchoolSisDashboard() {
 
       <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-[#1a365d]">Today's Timetable</h2>
+          <div>
+            <h2 className="text-sm font-semibold text-[#1a365d]">Today&apos;s Timetable</h2>
+            <p className="text-xs text-slate-400">Bell periods for this school day</p>
+          </div>
           <Link href="/admin/school-sis/timetable" className="text-xs font-semibold text-sky-700">
-            Open module
+            Open module â†’
           </Link>
         </div>
-        {todayTt.data?.weekend ? (
-          <p className="text-sm text-slate-500">Weekend — no teaching periods.</p>
+        {todayTt.isLoading ? (
+          <p className="text-sm text-slate-500">Loading timetableâ€¦</p>
+        ) : todayTt.data?.weekend ? (
+          <div className="flex flex-col items-center justify-center rounded-xl bg-slate-50 py-10 text-center">
+            <CalendarDays className="h-8 w-8 text-slate-300" />
+            <p className="mt-2 text-sm font-medium text-slate-600">
+              Weekend â€” no teaching periods.
+            </p>
+            <p className="text-xs text-slate-400">Enjoy your weekend.</p>
+          </div>
+        ) : (todayTt.data?.bells ?? []).length === 0 ? (
+          <p className="text-sm text-slate-500">No bell schedule for today.</p>
         ) : (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {(todayTt.data?.bells ?? []).map((row: any) => (
@@ -304,7 +431,7 @@ export function SchoolSisDashboard() {
               >
                 <p className="font-semibold uppercase tracking-wide">{row.bell.label}</p>
                 <p>
-                  {row.bell.startTime}–{row.bell.endTime}
+                  {row.bell.startTime}â€“{row.bell.endTime}
                 </p>
                 {row.state === 'current' ? <p>Now</p> : null}
                 {row.state === 'upcoming' && todayTt.data?.next?.bell?.id === row.bell.id ? (
@@ -323,7 +450,7 @@ export function SchoolSisDashboard() {
             <span className="text-xs text-slate-400">{data?.academicYear.name}</span>
           </div>
           {overview.isLoading ? (
-            <p className="text-sm text-slate-500">Loading enrolment…</p>
+            <p className="text-sm text-slate-500">Loading enrolmentâ€¦</p>
           ) : classChart.length === 0 && genderChart.length === 0 ? (
             <p className="text-sm text-slate-500">
               No enrolment figures for this year yet. Add students and enrol them in a class and
@@ -379,9 +506,21 @@ export function SchoolSisDashboard() {
                     </div>
                   </>
                 ) : (
-                  <p className="text-sm text-slate-500">
-                    Gender is not recorded for enough students to chart.
-                  </p>
+                  <div className="flex h-full flex-col justify-center rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                    <p>Gender is not recorded for enough students to chart.</p>
+                    {(data?.gender.unspecified ?? 0) > 0 ? (
+                      <p className="mt-2 text-xs">
+                        {data?.gender.unspecified} student
+                        {(data?.gender.unspecified ?? 0) === 1 ? '' : 's'} have no gender on file.
+                      </p>
+                    ) : null}
+                    <Link
+                      href="/admin/school-sis/students"
+                      className="mt-3 text-xs font-semibold text-sky-700"
+                    >
+                      Update student profiles â†’
+                    </Link>
+                  </div>
                 )}
               </div>
             </div>
@@ -391,10 +530,12 @@ export function SchoolSisDashboard() {
         <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[#1a365d]">Latest Notices</h2>
-            <span className="text-xs text-slate-400">Website CMS</span>
+            <Link href="/admin/school-sis/website" className="text-xs font-medium text-sky-700">
+              View all
+            </Link>
           </div>
           {overview.isLoading ? (
-            <p className="text-sm text-slate-500">Loading…</p>
+            <p className="text-sm text-slate-500">Loadingâ€¦</p>
           ) : !data?.notices.length ? (
             <p className="text-sm text-slate-500">No published notices yet.</p>
           ) : (
@@ -404,17 +545,27 @@ export function SchoolSisDashboard() {
                   key={notice.id}
                   className="border-b border-slate-100 pb-3 last:border-0 last:pb-0"
                 >
-                  <p className="text-sm font-medium text-slate-800">{notice.title}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                    <span className="rounded-full bg-sky-50 px-2 py-0.5 font-medium text-sky-700">
-                      {notice.category}
-                    </span>
-                    {notice.featured ? (
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
-                        Important
-                      </span>
-                    ) : null}
-                    <span>{formatDay(notice.publishedAt)}</span>
+                  <div className="flex gap-2">
+                    <span
+                      className={cn(
+                        'mt-1.5 h-2 w-2 shrink-0 rounded-full',
+                        noticeDot(notice.category),
+                      )}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-800">{notice.title}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                        <span className="rounded-full bg-sky-50 px-2 py-0.5 font-medium text-sky-700">
+                          {notice.category}
+                        </span>
+                        {notice.featured ? (
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
+                            Important
+                          </span>
+                        ) : null}
+                        <span>{formatDay(notice.publishedAt)}</span>
+                      </div>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -425,9 +576,14 @@ export function SchoolSisDashboard() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-          <h2 className="mb-3 text-sm font-semibold text-[#1a365d]">Upcoming Events</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[#1a365d]">Upcoming Events</h2>
+            <Link href="/admin/school-sis/website" className="text-xs font-medium text-sky-700">
+              Calendar
+            </Link>
+          </div>
           {overview.isLoading ? (
-            <p className="text-sm text-slate-500">Loading…</p>
+            <p className="text-sm text-slate-500">Loadingâ€¦</p>
           ) : !data?.events.length ? (
             <p className="text-sm text-slate-500">No upcoming published events.</p>
           ) : (
@@ -446,7 +602,7 @@ export function SchoolSisDashboard() {
                     <p className="text-sm font-medium text-slate-800">{event.title}</p>
                     <p className="text-xs text-slate-500">
                       {formatTime(event.startsAt)}
-                      {event.venue ? ` · ${event.venue}` : ''}
+                      {event.venue ? ` Â· ${event.venue}` : ''}
                     </p>
                   </div>
                 </li>
@@ -466,7 +622,7 @@ export function SchoolSisDashboard() {
             </Link>
           </div>
           {overview.isLoading ? (
-            <p className="text-sm text-slate-500">Loading…</p>
+            <p className="text-sm text-slate-500">Loadingâ€¦</p>
           ) : !data?.recentApplications.length ? (
             <p className="text-sm text-slate-500">No admission applications yet.</p>
           ) : (
@@ -510,26 +666,22 @@ export function SchoolSisDashboard() {
       <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
         <h2 className="mb-3 text-sm font-semibold text-[#1a365d]">Quick Links</h2>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          {quickActions.map((action) => {
+          {shortcuts.map((action) => {
             const Icon = action.icon;
-            if (!action.live) {
-              return (
-                <div
-                  key={action.label}
-                  className="flex items-center gap-2 rounded-xl border border-dashed border-slate-200 px-3 py-3 text-sm text-slate-400"
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{action.label}</span>
-                </div>
-              );
-            }
             return (
               <Link
                 key={action.label}
                 href={action.href}
-                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 text-sm font-medium text-[#1a365d] hover:border-sky-200 hover:bg-sky-50"
+                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-[#1a365d] hover:border-sky-200 hover:shadow-sm"
               >
-                <Icon className="h-4 w-4 text-sky-600" />
+                <span
+                  className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-lg',
+                    action.color,
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
                 {action.label}
               </Link>
             );
@@ -542,29 +694,41 @@ export function SchoolSisDashboard() {
           <div>
             <p className="text-[11px] uppercase tracking-wide text-slate-400">School Year</p>
             <p className="font-medium text-[#1a365d]">
-              {data?.academicYear.name ?? '—'}
+              {data?.academicYear.name ?? 'â€”'}
               {data?.academicYear.status === 'CURRENT' ? (
                 <span className="ml-2 text-xs font-normal text-emerald-600">Active</span>
               ) : null}
             </p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-slate-400">Total Users</p>
-            <p className="font-medium text-[#1a365d]">{counts?.users ?? '—'} active accounts</p>
+            <p className="text-[11px] uppercase tracking-wide text-slate-400">Enrolment</p>
+            <p className="font-medium text-[#1a365d]">
+              {counts?.enrollments ?? 'â€”'} of {counts?.students ?? 'â€”'} students
+            </p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-slate-400">Storage Used</p>
-            <p className="font-medium text-slate-500">Not configured</p>
+            <p className="text-[11px] uppercase tracking-wide text-slate-400">Open applications</p>
+            <p className="font-medium text-[#1a365d]">{counts?.openApplications ?? 'â€”'}</p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-slate-400">Last Backup</p>
-            <p className="font-medium text-slate-500">Not configured</p>
+            <p className="text-[11px] uppercase tracking-wide text-slate-400">Users</p>
+            <p className="font-medium text-[#1a365d]">{counts?.users ?? 'â€”'} active accounts</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span
+              className={cn(
+                'h-2 w-2 rounded-full',
+                overview.isError ? 'bg-rose-500' : 'bg-emerald-500',
+              )}
+            />
             <div>
               <p className="text-[11px] uppercase tracking-wide text-slate-400">System Status</p>
-              <p className="font-medium text-emerald-700">
+              <p
+                className={cn(
+                  'font-medium',
+                  overview.isError ? 'text-rose-700' : 'text-emerald-700',
+                )}
+              >
                 {overview.isError ? 'Unavailable' : 'Online'}
               </p>
             </div>

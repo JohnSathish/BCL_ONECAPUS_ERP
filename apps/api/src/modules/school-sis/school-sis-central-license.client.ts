@@ -45,19 +45,27 @@ export async function activateAgainstBaseCodeCentral(input: {
   institutionCode: string;
   hosts?: string[];
   appVersion?: string;
-}): Promise<CentralActivateResult | null> {
-  if (!isOneCampusCentralKey(input.licenseKey)) return null;
+}): Promise<CentralActivateResult | { ok: false; error: string }> {
+  if (!isOneCampusCentralKey(input.licenseKey)) {
+    return { ok: false, error: 'Not a BCL-ONC Central key' };
+  }
   const base = centralBaseUrl();
   if (!base) {
     log.error('BASECODE_CENTRAL_URL is required in production');
-    return null;
+    return {
+      ok: false,
+      error: 'BASECODE_CENTRAL_URL is not set on the ERP API container',
+    };
   }
   if (
     process.env.NODE_ENV === 'production' &&
     !process.env.BASECODE_LICENSE_API_SECRET?.trim()
   ) {
     log.error('BASECODE_LICENSE_API_SECRET is required in production');
-    return null;
+    return {
+      ok: false,
+      error: 'BASECODE_LICENSE_API_SECRET is not set on the ERP API container',
+    };
   }
   try {
     const res = await fetch(`${base}/api/license/activate`, {
@@ -78,10 +86,9 @@ export async function activateAgainstBaseCodeCentral(input: {
       unknown
     >;
     if (!res.ok) {
-      log.warn(
-        `BaseCode Central activate failed ${res.status}: ${String(data.error ?? res.statusText)}`,
-      );
-      return null;
+      const detail = String(data.error ?? res.statusText);
+      log.warn(`BaseCode Central activate failed ${res.status}: ${detail}`);
+      return { ok: false, error: `${res.status} ${detail}` };
     }
     return {
       ok: true,
@@ -100,7 +107,10 @@ export async function activateAgainstBaseCodeCentral(input: {
     };
   } catch (e) {
     log.warn(`BaseCode Central unreachable: ${String(e)}`);
-    return null;
+    return {
+      ok: false,
+      error: `Central unreachable at ${base}: ${String(e)}`,
+    };
   }
 }
 

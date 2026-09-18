@@ -869,16 +869,35 @@ export function NotificationsDesk() {
                 ? 'You are sending an urgent notification. This notification may reach a large number of users. '
                 : ''}
               Audience: {AUDIENCES.find(([v]) => v === draft.kind)?.[1]}. Estimated recipients:{' '}
-              {preview?.recipients ?? 0}. Devices: {preview?.devices ?? 0}.
+              {preview?.recipients ?? 0}. Push-ready phones: {preview?.devices ?? 0}
+              {preview?.registeredApps ? ` (apps signed in: ${preview.registeredApps})` : ''}.
             </DialogDescription>
           </DialogHeader>
           <p className="font-medium">{draft.title}</p>
           <p className="text-sm text-slate-600">{draft.body}</p>
           {preview && preview.devices === 0 ? (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              Lock-screen push needs an FCM token from the St. Luke’s School APK (not a browser).
-              Open the app on the parent or student phone, allow notifications, then send again. For
-              a test to this office login, choose audience “My signed-in app (test)”.
+              {draft.kind === 'MY_DEVICES' ? (
+                <>
+                  This office login has no St. Luke’s School app token. Sign in on the APK with the
+                  same email as this ERP user, allow notifications, then send again.
+                </>
+              ) : (preview.registeredApps ?? 0) > 0 ? (
+                <>
+                  {preview.registeredApps} school app
+                  {preview.registeredApps === 1 ? ' is' : 's are'} signed in, but none have a
+                  lock-screen push token. The APK must be built with Firebase ( google-services.json
+                  for st-lukes-school-6f471). Open the app, allow notifications, and check Device
+                  Control — the phone should show push enabled. Logging in is not enough if FCM was
+                  left out of the APK.
+                </>
+              ) : (
+                <>
+                  {preview.recipients} people match this audience, but no St. Luke’s School app has
+                  registered. Install the school APK, sign in, and allow notifications. Adrian’s
+                  login on the phone only counts after that device is saved with a push token.
+                </>
+              )}
             </p>
           ) : null}
           {error ? (

@@ -208,11 +208,11 @@ if shared in weak:
 bcl["BASECODE_LICENSE_API_SECRET"] = shared
 bcl["APP_URL"] = "https://basecodelabs.com"
 bcl["NODE_ENV"] = "production"
-bcl["DATABASE_URL"] = "file:./prisma/data/prod.db"
+bcl["DATABASE_URL"] = "file:./data/prod.db"
 write(bcl_path, bcl, bcl_order)
 
 if nep_path.exists():
-    nep["BASECODE_CENTRAL_URL"] = "https://basecodelabs.com"
+    nep["BASECODE_CENTRAL_URL"] = "http://basecode-labs:1610"
     nep["BASECODE_LICENSE_API_SECRET"] = shared
     write(nep_path, nep, nep_order)
     print("Patched NEP .env BASECODE_CENTRAL_URL + shared license secret")
@@ -263,6 +263,7 @@ if [[ "${SEED_BCL:-1}" == "1" ]]; then
     echo "Admin user already present — skip seed"
   else
     "${BCL_COMPOSE[@]}" exec -T basecode-labs npx tsx prisma/seed.ts || \
+      "${BCL_COMPOSE[@]}" exec -T basecode-labs node prisma/ensure-admin.cjs || \
       echo "WARN: seed failed — run: docker exec -it basecode-labs npx tsx prisma/seed.ts"
   fi
 fi

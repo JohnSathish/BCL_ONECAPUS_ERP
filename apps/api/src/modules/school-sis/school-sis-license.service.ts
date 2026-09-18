@@ -422,11 +422,10 @@ export class SchoolSisLicenseService {
         institutionCode: ctx.institutionCode,
         hosts,
       });
-      if (!remote) {
+      if (!remote.ok) {
         throw new BadRequestException({
           code: 'INVALID_LICENSE',
-          message:
-            'This BaseCode Central key was not accepted. Keep BaseCode Central running, set BASECODE_CENTRAL_URL and BASECODE_LICENSE_API_SECRET on this API, confirm the license is Active for BCL OneCampus ERP, and use institution code st-lukes-tura (domain stlukestura.in is also accepted).',
+          message: `This BaseCode Central key was not accepted (${remote.error}). Confirm BASECODE_CENTRAL_URL=http://basecode-labs:1610 and BASECODE_LICENSE_API_SECRET on the ERP API container, that the license is Active, and institution code st-lukes-tura.`,
         });
       }
       try {

@@ -29,6 +29,7 @@ export type SchoolLicenseSnapshot = {
   warning?: string | null;
   status?: string;
   expiredPolicy?: string;
+  maxAdmins?: number | null;
 };
 
 export async function fetchSchoolLicenseStatus() {

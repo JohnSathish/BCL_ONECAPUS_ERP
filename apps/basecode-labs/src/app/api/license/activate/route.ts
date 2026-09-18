@@ -32,9 +32,13 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ error: 'License not found' }, { status: 404 });
   }
+  const requestedProduct = parsed.data.productCode?.trim().toUpperCase();
+  const licenseProduct = license.product.code.toUpperCase();
+  const keyProduct = parsed.data.licenseKey.trim().toUpperCase().split('-')[1] ?? '';
   if (
-    parsed.data.productCode &&
-    parsed.data.productCode.toUpperCase() !== license.product.code.toUpperCase()
+    requestedProduct &&
+    requestedProduct !== licenseProduct &&
+    !(requestedProduct === 'ONC' && keyProduct === 'ONC')
   ) {
     return NextResponse.json({ error: 'Product mismatch' }, { status: 403 });
   }

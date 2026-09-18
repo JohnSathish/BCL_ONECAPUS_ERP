@@ -3,6 +3,11 @@
 # Does not replace web, api, college-web, or nginx images.
 
 services:
+  api:
+    environment:
+      BASECODE_CENTRAL_URL: 'http://basecode-labs:1610'
+      BASECODE_LICENSE_API_SECRET: '${BASECODE_LICENSE_API_SECRET:-}'
+
   basecode-labs:
     build:
       context: ./apps/basecode-labs
@@ -14,7 +19,8 @@ services:
     environment:
       NODE_ENV: production
       APP_URL: https://basecodelabs.com
-      DATABASE_URL: file:./prisma/data/prod.db
+      # Relative to prisma/schema.prisma → /app/prisma/data/prod.db (the volume).
+      DATABASE_URL: file:./data/prod.db
     volumes:
       - basecode_labs_db:/app/prisma/data
     expose:

@@ -6,7 +6,7 @@ RUN npm install --ignore-scripts
 
 FROM node:20-alpine AS builder
 WORKDIR /app
-ENV DATABASE_URL="file:./prisma/data/build.db"
+ENV DATABASE_URL="file:./data/build.db"
 ENV APP_URL="https://basecodelabs.com"
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -27,4 +27,4 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 RUN mkdir -p /app/prisma/data
 EXPOSE 1610
-CMD ["sh", "-c", "mkdir -p prisma/data && npx prisma db push && npx next start -H 0.0.0.0 -p 1610"]
+CMD ["sh", "-c", "mkdir -p prisma/data && npx prisma db push && node prisma/ensure-admin.cjs && npx next start -H 0.0.0.0 -p 1610"]

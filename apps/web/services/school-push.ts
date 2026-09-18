@@ -9,7 +9,13 @@ export async function fetchSchoolPushDashboard() {
 
 export async function previewSchoolPushAudience(audience: Record<string, unknown>) {
   const { data } = await api.post('/v1/school-sis/notifications/audience/preview', audience);
-  return data as { recipients: number; devices: number; sample: Array<{ userId: string }> };
+  return data as {
+    recipients: number;
+    devices: number;
+    registeredApps?: number;
+    appsWithoutPush?: number;
+    sample: Array<{ userId: string }>;
+  };
 }
 
 export async function testSchoolPush() {

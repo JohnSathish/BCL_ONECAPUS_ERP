@@ -100,6 +100,11 @@ services:
       SCHOOL_SMTP_FROM: ${SCHOOL_SMTP_FROM:-}
       SCHOOL_SMTP_FROM_NAME: ${SCHOOL_SMTP_FROM_NAME:-}
       SCHOOL_ADMISSIONS_LOGIN_URL: ${SCHOOL_ADMISSIONS_LOGIN_URL:-}
+      # BaseCode Central (St. Luke's BCL-ONC keys). Reach the labs container on the compose network, not public HTTPS hairpin.
+      BASECODE_CENTRAL_URL: '${BASECODE_CENTRAL_URL:-http://basecode-labs:1610}'
+      BASECODE_LICENSE_API_SECRET: '${BASECODE_LICENSE_API_SECRET:-}'
+      LICENSE_PUBLIC_KEY: '${LICENSE_PUBLIC_KEY:-}'
+      LICENSE_PRIVATE_KEY: '${LICENSE_PRIVATE_KEY:-}'
     volumes:
       - nep_uploads:/data/uploads
       - nep_storage:/data/storage

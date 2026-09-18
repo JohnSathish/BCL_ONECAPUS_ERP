@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const production = process.env.NODE_ENV === 'production';
   if (production && !smtpReady()) {
     return NextResponse.json(
-      { error: 'Email login is not configured. Contact BaseCode Labs.' },
+      { error: 'Email sending is not configured on this server (set SMTP_PASS).' },
       { status: 503 },
     );
   }

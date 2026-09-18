@@ -78,7 +78,8 @@ const testimonials = [
 ];
 
 async function main() {
-  const adminEmail = (process.env.ADMIN_EMAIL ?? 'contact@basecodelabs.com').toLowerCase();
+  const adminEmail =
+    (process.env.ADMIN_EMAIL ?? '').toLowerCase().trim() || 'contact@basecodelabs.com';
   await prisma.user.upsert({
     where: { email: adminEmail },
     update: { role: 'SUPER_ADMIN', status: 'ACTIVE' },

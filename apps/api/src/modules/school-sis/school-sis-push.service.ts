@@ -213,9 +213,12 @@ export class SchoolSisPushService {
       tenantId,
       users.map((u) => u.userId),
     );
+    const withToken = rows.filter((d) => Boolean(d.pushToken));
     return {
       recipients: users.length,
-      devices: rows.filter((d) => d.pushToken).length,
+      devices: withToken.length,
+      registeredApps: rows.length,
+      appsWithoutPush: rows.length - withToken.length,
       sample: users.slice(0, 12),
     };
   }
