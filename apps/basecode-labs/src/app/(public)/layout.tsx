@@ -4,6 +4,8 @@ import { VisitorBeacon } from '@/components/public/visitor-beacon';
 import { CookieBanner } from '@/components/legal/cookie-banner';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const totals = await prisma.visitorDay
     .aggregate({ _sum: { uniqueVisitors: true } })
