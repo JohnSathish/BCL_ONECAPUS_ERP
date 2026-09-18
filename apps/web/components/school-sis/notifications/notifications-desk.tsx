@@ -8,10 +8,10 @@ import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useAuthStore } from '@/store/auth-store';
 import { canManageSchoolSis } from '@/lib/school-sis/permissions';
 import { fetchSchoolAcademicClasses, fetchSchoolSisStudents } from '@/services/school-sis';
+import { api } from '@/services/api';
 import {
   archiveSchoolPush,
   cancelSchoolPush,
-  draftSchoolPush,
   fetchSchoolPushCampaign,
   fetchSchoolPushCampaigns,
   fetchSchoolPushDashboard,
@@ -28,10 +28,8 @@ import {
   saveSchoolPushRule,
   saveSchoolPushSettings,
   saveSchoolPushTemplate,
-  sendSchoolPush,
   testSchoolPush,
   unregisterSchoolPushDevice,
-  uploadSchoolPushImage,
 } from '@/services/school-push';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
@@ -45,6 +43,13 @@ import {
 } from '@/components/ui/dialog';
 import { GhostButton, PrimaryButton } from '../academic/academic-ui';
 import { WaBadge, WaCard } from '../whatsapp/whatsapp-ui';
+import {
+  AUDIENCES,
+  CATEGORIES,
+  DEEP_LINKS,
+  NotificationComposer,
+  type NotificationDraft,
+} from './notification-composer';
 
 const LINKS = [
   { href: '/admin/school-sis/notifications', label: 'Push Notifications', exact: true },
@@ -55,62 +60,6 @@ const LINKS = [
   { href: '/admin/school-sis/notifications/devices', label: 'Devices' },
   { href: '/admin/school-sis/notifications/preferences', label: 'Preferences' },
   { href: '/admin/school-sis/notifications/settings', label: 'Settings' },
-];
-
-const AUDIENCES = [
-  ['MY_DEVICES', 'My signed-in app (test)'],
-  ['INDIVIDUAL_STUDENT', 'Individual Student'],
-  ['PARENT', 'Parent'],
-  ['TEACHER', 'Teacher'],
-  ['STAFF', 'Staff'],
-  ['CLASS', 'Class'],
-  ['SECTION', 'Section'],
-  ['MULTI_CLASS', 'Multiple Classes'],
-  ['MULTI_SECTION', 'Multiple Sections'],
-  ['ALL_STUDENTS', 'All Students'],
-  ['ALL_PARENTS', 'All Parents'],
-  ['ALL_TEACHERS', 'All Teachers'],
-  ['ALL_STAFF', 'All Staff'],
-  ['CUSTOM', 'Custom Selection'],
-];
-
-const CATEGORIES = [
-  'GENERAL',
-  'ANNOUNCEMENT',
-  'FEE',
-  'ATTENDANCE',
-  'EXAMINATION',
-  'RESULT',
-  'HOMEWORK',
-  'HOLIDAY',
-  'ACADEMIC_CALENDAR',
-  'TRANSPORT',
-  'EMERGENCY',
-  'EVENT',
-  'MEETING',
-  'ADMISSION',
-  'LIBRARY',
-  'BIRTHDAY',
-  'SYSTEM',
-];
-
-const DEEP_LINKS = [
-  'NONE',
-  'DASHBOARD',
-  'FEES',
-  'ATTENDANCE',
-  'EXAMINATION',
-  'RESULT',
-  'HOMEWORK',
-  'NOTICES',
-  'HOLIDAY',
-  'ACADEMIC_CALENDAR',
-  'TRANSPORT',
-  'LIBRARY',
-  'EVENT',
-  'STUDENT',
-  'DOCUMENT',
-  'CUSTOM',
 ];
 
 function pct(n: number) {
@@ -135,7 +84,7 @@ export function NotificationsDesk() {
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [preview, setPreview] = useState<{ recipients: number; devices: number } | null>(null);
-  const [draft, setDraft] = useState({
+  const [draft, setDraft] = useState<NotificationDraft>({
     title: '',
     body: '',
     category: 'GENERAL',
@@ -144,7 +93,7 @@ export function NotificationsDesk() {
     deepLinkValue: '',
     imageUrl: '',
     attachmentName: '',
-    attachmentKind: '' as '' | 'image' | 'pdf',
+    attachmentKind: '',
     kind: 'MY_DEVICES',
     gradeId: '',
     sectionId: '',
@@ -227,7 +176,7 @@ export function NotificationsDesk() {
   }, [draft]);
 
   const sendMut = useMutation({
-    mutationFn: (confirm: boolean) => {
+    mutationFn: async (confirm: boolean) => {
       const payload = {
         title: draft.title,
         body: draft.body,
@@ -243,7 +192,14 @@ export function NotificationsDesk() {
             : undefined,
         confirm,
       };
-      return draft.sendMode === 'draft' ? draftSchoolPush(payload) : sendSchoolPush(payload);
+      const path =
+        draft.sendMode === 'draft'
+          ? '/v1/school-sis/notifications/draft'
+          : draft.sendMode === 'schedule'
+            ? '/v1/school-sis/notifications/schedule'
+            : '/v1/school-sis/notifications/send';
+      const { data } = await api.post(path, payload);
+      return data;
     },
     onSuccess: () => {
       setComposer(false);
@@ -325,7 +281,7 @@ export function NotificationsDesk() {
         })}
       </nav>
 
-      {error ? (
+      {error && !composer && !confirmOpen ? (
         <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
       ) : null}
 
@@ -703,261 +659,31 @@ export function NotificationsDesk() {
         </div>
       ) : null}
 
-      <Dialog open={composer} onOpenChange={setComposer}>
-        <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Send notification</DialogTitle>
-            <DialogDescription>
-              Compose a message. Large broadcasts need confirmation before sending.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-            <div className="space-y-3">
-              <label className="block text-sm">
-                Audience
-                <select
-                  className="mt-1 w-full rounded-lg border px-3 py-2"
-                  value={draft.kind}
-                  onChange={(e) => setDraft({ ...draft, kind: e.target.value })}
-                >
-                  {AUDIENCES.map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {['CLASS', 'MULTI_CLASS', 'SECTION', 'MULTI_SECTION'].includes(draft.kind) ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <select
-                    className="rounded-lg border px-3 py-2"
-                    value={draft.gradeId}
-                    onChange={(e) => setDraft({ ...draft, gradeId: e.target.value })}
-                  >
-                    <option value="">Select class</option>
-                    {(classes.data?.grades ?? []).map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="rounded-lg border px-3 py-2"
-                    value={draft.sectionId}
-                    onChange={(e) => setDraft({ ...draft, sectionId: e.target.value })}
-                  >
-                    <option value="">All sections</option>
-                    {(classes.data?.sections ?? [])
-                      .filter((s) => !draft.gradeId || s.gradeId === draft.gradeId)
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.grade.name} {s.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              ) : null}
-              {['INDIVIDUAL_STUDENT', 'PARENT'].includes(draft.kind) ? (
-                <div>
-                  <input
-                    className="w-full rounded-lg border px-3 py-2"
-                    placeholder="Search name, admission no., roll no., parent mobile"
-                    value={draft.studentQ}
-                    onChange={(e) => setDraft({ ...draft, studentQ: e.target.value })}
-                  />
-                  <div className="mt-2 max-h-40 overflow-auto rounded-lg border bg-white">
-                    {(students.data ?? []).map((st) => (
-                      <button
-                        type="button"
-                        key={st.id}
-                        className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
-                        onClick={() =>
-                          setDraft({
-                            ...draft,
-                            studentIds: draft.studentIds.includes(st.id)
-                              ? draft.studentIds
-                              : [...draft.studentIds, st.id],
-                          })
-                        }
-                      >
-                        {st.fullName} · {st.admissionNumber}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">{draft.studentIds.length} selected</p>
-                </div>
-              ) : null}
-              <label className="block text-sm">
-                Title
-                <input
-                  className="mt-1 w-full rounded-lg border px-3 py-2"
-                  maxLength={100}
-                  value={draft.title}
-                  onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                />
-                <span className="text-xs text-slate-400">{draft.title.length} / 100</span>
-              </label>
-              <label className="block text-sm">
-                Message
-                <textarea
-                  className="mt-1 min-h-[120px] w-full rounded-lg border px-3 py-2"
-                  maxLength={500}
-                  value={draft.body}
-                  onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-                />
-                <span className="text-xs text-slate-400">{draft.body.length} / 500</span>
-              </label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <select
-                  className="rounded-lg border px-3 py-2"
-                  value={draft.category}
-                  onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-                <select
-                  className="rounded-lg border px-3 py-2"
-                  value={draft.priority}
-                  onChange={(e) => setDraft({ ...draft, priority: e.target.value })}
-                >
-                  <option>NORMAL</option>
-                  <option>HIGH</option>
-                  <option>URGENT</option>
-                </select>
-                <select
-                  className="rounded-lg border px-3 py-2"
-                  value={draft.deepLinkType}
-                  onChange={(e) => setDraft({ ...draft, deepLinkType: e.target.value })}
-                >
-                  {DEEP_LINKS.map((c) => (
-                    <option key={c} value={c}>
-                      {c.replaceAll('_', ' ')}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  className="rounded-lg border px-3 py-2"
-                  placeholder="Link value or custom URL"
-                  value={draft.deepLinkValue}
-                  onChange={(e) => setDraft({ ...draft, deepLinkValue: e.target.value })}
-                />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-700">Image or PDF</p>
-                <p className="mb-1 text-xs text-slate-500">
-                  Images appear on the lock screen. PDFs open when the user taps the notification
-                  (max 5 MB).
-                </p>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf,.pdf"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = '';
-                    if (!file) return;
-                    uploadSchoolPushImage(file)
-                      .then((r) =>
-                        setDraft((s) => ({
-                          ...s,
-                          imageUrl: r.url,
-                          attachmentKind: r.kind === 'pdf' ? 'pdf' : 'image',
-                          attachmentName: r.fileName || file.name,
-                        })),
-                      )
-                      .catch((err) => setError(apiErrorMessage(err)));
-                  }}
-                />
-                {draft.imageUrl && draft.attachmentKind !== 'pdf' ? (
-                  <img src={draft.imageUrl} alt="" className="mt-2 h-20 rounded-lg object-cover" />
-                ) : null}
-                {draft.attachmentKind === 'pdf' && draft.attachmentName ? (
-                  <p className="mt-2 text-sm text-slate-600">
-                    PDF attached: {draft.attachmentName}
-                  </p>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap gap-3 text-sm">
-                <label>
-                  <input
-                    type="radio"
-                    checked={draft.sendMode === 'now'}
-                    onChange={() => setDraft({ ...draft, sendMode: 'now' })}
-                  />{' '}
-                  Send now
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    checked={draft.sendMode === 'schedule'}
-                    onChange={() => setDraft({ ...draft, sendMode: 'schedule' })}
-                  />{' '}
-                  Schedule
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    checked={draft.sendMode === 'draft'}
-                    onChange={() => setDraft({ ...draft, sendMode: 'draft' })}
-                  />{' '}
-                  Save as draft
-                </label>
-              </div>
-              {draft.sendMode === 'schedule' ? (
-                <input
-                  type="datetime-local"
-                  className="rounded-lg border px-3 py-2"
-                  value={draft.scheduledAt}
-                  onChange={(e) => setDraft({ ...draft, scheduledAt: e.target.value })}
-                />
-              ) : null}
-            </div>
-            <div className="rounded-2xl bg-slate-900 p-4 text-white shadow-inner">
-              <p className="text-xs text-slate-300">St. Luke&apos;s Secondary School</p>
-              <p className="mt-3 font-semibold">{draft.title || 'Notification title'}</p>
-              <p className="mt-1 text-sm text-slate-200">
-                {draft.body || 'Your message will appear here.'}
-              </p>
-              {draft.attachmentKind === 'image' && draft.imageUrl ? (
-                <img
-                  src={draft.imageUrl}
-                  alt=""
-                  className="mt-3 max-h-28 rounded-lg object-cover"
-                />
-              ) : null}
-              {draft.attachmentKind === 'pdf' ? (
-                <p className="mt-3 text-xs text-slate-300">PDF: {draft.attachmentName}</p>
-              ) : null}
-              <p className="mt-6 text-right text-xs text-slate-400">now</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <GhostButton type="button" onClick={() => setComposer(false)}>
-              Cancel
-            </GhostButton>
-            <PrimaryButton
-              type="button"
-              disabled={!draft.title || !draft.body || sendMut.isPending}
-              onClick={async () => {
-                if (draft.sendMode === 'draft') {
-                  sendMut.mutate(false);
-                  return;
-                }
-                const p = await previewSchoolPushAudience(audience);
-                setPreview(p);
-                if (draft.priority === 'URGENT') {
-                  setConfirmOpen(true);
-                  return;
-                }
-                setConfirmOpen(true);
-              }}
-            >
-              Continue
-            </PrimaryButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NotificationComposer
+        open={composer}
+        onOpenChange={setComposer}
+        draft={draft}
+        setDraft={setDraft}
+        classes={classes.data}
+        students={students.data}
+        sending={sendMut.isPending}
+        error={error}
+        onError={setError}
+        onContinue={async () => {
+          try {
+            if (draft.sendMode === 'draft') {
+              sendMut.mutate(false);
+              return;
+            }
+            const p = await previewSchoolPushAudience(audience);
+            setPreview(p);
+            setError(null);
+            setConfirmOpen(true);
+          } catch (err) {
+            setError(apiErrorMessage(err));
+          }
+        }}
+      />
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
@@ -973,6 +699,16 @@ export function NotificationsDesk() {
           </DialogHeader>
           <p className="font-medium">{draft.title}</p>
           <p className="text-sm text-slate-600">{draft.body}</p>
+          {preview && preview.devices === 0 ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              No lock-screen push token yet. The message will still appear in the school app inbox
+              for this account. Sign in to the St. Luke’s app with the same user to receive a phone
+              notification.
+            </p>
+          ) : null}
+          {error ? (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+          ) : null}
           <DialogFooter>
             <GhostButton onClick={() => setConfirmOpen(false)}>Cancel</GhostButton>
             <PrimaryButton disabled={sendMut.isPending} onClick={() => sendMut.mutate(true)}>

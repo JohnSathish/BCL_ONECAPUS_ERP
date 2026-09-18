@@ -207,19 +207,63 @@ export class SchoolSisPushService {
   ) {
     await this.ensureSetup(tenantId);
     const users = await this.resolveUsers(tenantId, audience, actorUserId);
-    const devices = await this.prisma.schoolMobileDevice.findMany({
-      where: {
-        tenantId,
-        userId: { in: users.map((u) => u.userId) },
-        revokedAt: null,
-        pushToken: { not: null },
-      },
-    });
+    const rows = await this.devicesForUsers(
+      tenantId,
+      users.map((u) => u.userId),
+    );
     return {
       recipients: users.length,
-      devices: devices.length,
+      devices: rows.filter((d) => d.pushToken).length,
       sample: users.slice(0, 12),
     };
+  }
+
+  private async devicesForUsers(tenantId: string, userIds: string[]) {
+    if (!userIds.length) return [];
+    return this.prisma.schoolMobileDevice.findMany({
+      where: {
+        tenantId,
+        userId: { in: userIds },
+        deviceStatus: { notIn: ['BLOCKED', 'REVOKED'] },
+        revokedAt: null,
+      },
+    });
+  }
+
+  private async ensureInbox(
+    tenantId: string,
+    userId: string,
+    campaign: {
+      id: string;
+      title: string;
+      body: string;
+      imageUrl: string | null;
+      category: string;
+      audienceType: string;
+      deepLinkType: string;
+      deepLinkValue: string | null;
+    },
+  ) {
+    const existing = await this.prisma.schoolMobileInbox.findFirst({
+      where: { tenantId, userId, relatedId: campaign.id },
+    });
+    if (existing) return;
+    const deepLink =
+      deepLinkHref(campaign.deepLinkType, campaign.deepLinkValue) ?? '';
+    await this.prisma.schoolMobileInbox.create({
+      data: {
+        id: randomUUID(),
+        tenantId,
+        userId,
+        title: campaign.title,
+        body: campaign.body,
+        imageUrl: campaign.imageUrl,
+        type: campaign.category.toLowerCase(),
+        deepLink: deepLink || null,
+        relatedId: campaign.id,
+        audience: campaign.audienceType,
+      },
+    });
   }
 
   private async resolveUsers(
@@ -279,7 +323,15 @@ export class SchoolSisPushService {
       }));
     }
     if (kind.startsWith('ALL_') || kind === 'TEACHER' || kind === 'STAFF') {
-      const map: Record<string, string> = {
+      const personTypes: Record<string, string[]> = {
+        ALL_STUDENTS: ['STUDENT'],
+        ALL_PARENTS: ['GUARDIAN', 'PARENT'],
+        ALL_TEACHERS: ['STAFF'],
+        TEACHER: ['STAFF'],
+        ALL_STAFF: ['STAFF'],
+        STAFF: ['STAFF'],
+      };
+      const devicePersona: Record<string, string> = {
         ALL_STUDENTS: 'student',
         ALL_PARENTS: 'parent',
         ALL_TEACHERS: 'teacher',
@@ -287,15 +339,34 @@ export class SchoolSisPushService {
         ALL_STAFF: 'admin',
         STAFF: 'admin',
       };
-      const rows = await this.prisma.schoolMobileDevice.findMany({
-        where: { tenantId, revokedAt: null, persona: map[kind] },
+      const types = personTypes[kind] ?? [];
+      const accounts = types.length
+        ? await this.prisma.schoolPersonAccount.findMany({
+            where: { tenantId, personType: { in: types } },
+            select: { userId: true, studentId: true },
+          })
+        : [];
+      const devices = await this.prisma.schoolMobileDevice.findMany({
+        where: {
+          tenantId,
+          revokedAt: null,
+          persona: devicePersona[kind],
+        },
         select: { userId: true },
         distinct: ['userId'],
       });
-      return rows.map((r) => ({
-        userId: r.userId,
-        studentId: null as string | null,
-      }));
+      const byUser = new Map(
+        accounts.map((a) => [
+          a.userId,
+          { userId: a.userId, studentId: a.studentId },
+        ]),
+      );
+      for (const d of devices) {
+        if (!byUser.has(d.userId)) {
+          byUser.set(d.userId, { userId: d.userId, studentId: null });
+        }
+      }
+      return [...byUser.values()];
     }
     let sectionIds = audience.sectionIds ?? [];
     if (
@@ -359,20 +430,13 @@ export class SchoolSisPushService {
       );
     }
     const users = await this.resolveUsers(tenantId, dto.audience, actor.userId);
-    const devices = await this.prisma.schoolMobileDevice.findMany({
-      where: {
-        tenantId,
-        userId: { in: users.map((u) => u.userId) },
-        revokedAt: null,
-        pushToken: { not: null },
-      },
-    });
-    if (send && !devices.length) {
-      throw new BadRequestException(
-        dto.audience.kind === 'MY_DEVICES'
-          ? 'No FCM token on this account. Sign in to the St. Luke’s School app with the same user, then try again.'
-          : 'No registered app devices for this audience. Check Devices, or send to “My signed-in app (test)”.',
-      );
+    const devices = await this.devicesForUsers(
+      tenantId,
+      users.map((u) => u.userId),
+    );
+    const withToken = devices.filter((d) => d.pushToken);
+    if (send && !users.length) {
+      throw new BadRequestException('No recipients for this audience.');
     }
     if (devices.length > 40 && send && !dto.confirm) {
       throw new BadRequestException('Large broadcasts require confirmation');
@@ -422,24 +486,45 @@ export class SchoolSisPushService {
           : 'DRAFT',
         scheduledAt,
         recipientCount: users.length,
-        deviceCount: devices.length,
+        deviceCount: withToken.length,
         createdBy: actor.userId,
       },
     });
     const userMap = new Map(users.map((u) => [u.userId, u]));
-    if (devices.length) {
-      await this.prisma.schoolPushRecipient.createMany({
-        data: devices.map((d) => ({
+    const tokenUserIds = new Set(withToken.map((d) => d.userId));
+    const recipientRows = [
+      ...withToken.map((d) => ({
+        id: randomUUID(),
+        tenantId,
+        campaignId: campaign.id,
+        userId: d.userId,
+        studentId: userMap.get(d.userId)?.studentId ?? null,
+        deviceId: d.id,
+        platform: d.platform,
+        idempotencyKey: `${campaign.id}:${d.id}`,
+      })),
+      ...users
+        .filter((u) => !tokenUserIds.has(u.userId))
+        .map((u) => ({
           id: randomUUID(),
           tenantId,
           campaignId: campaign.id,
-          userId: d.userId,
-          studentId: userMap.get(d.userId)?.studentId ?? null,
-          deviceId: d.id,
-          platform: d.platform,
-          idempotencyKey: `${campaign.id}:${d.id}`,
+          userId: u.userId,
+          studentId: u.studentId ?? null,
+          deviceId: null as string | null,
+          platform: 'inbox',
+          idempotencyKey: `${campaign.id}:inbox:${u.userId}`,
         })),
+    ];
+    if (recipientRows.length) {
+      await this.prisma.schoolPushRecipient.createMany({
+        data: recipientRows,
       });
+    }
+    if (send) {
+      for (const u of users) {
+        await this.ensureInbox(tenantId, u.userId, campaign);
+      }
     }
     await this.audit(
       tenantId,
@@ -451,7 +536,11 @@ export class SchoolSisPushService {
       },
     );
     if (send && campaign.status === 'PROCESSING') {
-      await this.enqueue(tenantId, campaign.id, settings?.retryAttempts ?? 3);
+      try {
+        await this.processCampaign(tenantId, campaign.id);
+      } catch {
+        await this.enqueue(tenantId, campaign.id, settings?.retryAttempts ?? 3);
+      }
     } else if (send && campaign.status === 'SCHEDULED' && scheduledAt) {
       await this.queue.add(
         'campaign',
@@ -597,32 +686,48 @@ export class SchoolSisPushService {
     const deepLink =
       deepLinkHref(campaign.deepLinkType, campaign.deepLinkValue) ?? '';
     const tokens = devices.map((d) => d.pushToken!).filter(Boolean);
-    const result = await this.fcm.send({
-      tokens,
-      title: campaign.title,
-      body: campaign.body,
-      category: campaign.category,
-      priority: campaign.priority,
-      imageUrl: this.fcmImageUrl(campaign.imageUrl),
-      data: {
-        notificationId: campaign.id,
-        type: campaign.category,
-        deepLink,
-        entityId: campaign.deepLinkValue ?? '',
-        attachmentUrl: campaign.imageUrl ?? '',
-        attachmentType: this.attachmentKind(campaign.imageUrl),
-        path:
-          this.attachmentKind(campaign.imageUrl) === 'pdf'
-            ? (campaign.imageUrl ?? '')
-            : '',
-      },
-    });
+    const result = tokens.length
+      ? await this.fcm.send({
+          tokens,
+          title: campaign.title,
+          body: campaign.body,
+          category: campaign.category,
+          priority: campaign.priority,
+          imageUrl: this.fcmImageUrl(campaign.imageUrl),
+          data: {
+            notificationId: campaign.id,
+            type: campaign.category,
+            deepLink,
+            entityId: campaign.deepLinkValue ?? '',
+            attachmentUrl: campaign.imageUrl ?? '',
+            attachmentType: this.attachmentKind(campaign.imageUrl),
+            path:
+              this.attachmentKind(campaign.imageUrl) === 'pdf'
+                ? (campaign.imageUrl ?? '')
+                : '',
+          },
+        })
+      : {
+          ok: true,
+          provider: 'inbox',
+          successCount: 0,
+          failureCount: 0,
+          invalidTokens: [] as string[],
+          perToken: [] as Array<{
+            token: string;
+            ok: boolean;
+            ref?: string;
+            code?: string;
+            reason?: string;
+          }>,
+        };
     const byToken = new Map(result.perToken.map((p) => [p.token, p]));
     for (const rec of recipients) {
       const device = rec.deviceId ? tokenByDevice.get(rec.deviceId) : undefined;
       const token = device?.pushToken ?? '';
-      const row = byToken.get(token);
-      if (row?.ok) {
+      const row = token ? byToken.get(token) : undefined;
+      const inboxOnly = !token;
+      if (row?.ok || inboxOnly) {
         if (device) {
           await this.prisma.schoolMobileDevice.update({
             where: { id: device.id },
@@ -635,7 +740,7 @@ export class SchoolSisPushService {
             status: 'SENT',
             sentAt: new Date(),
             deliveredAt: new Date(),
-            providerRef: row.ref,
+            providerRef: row?.ref ?? (inboxOnly ? 'inbox' : undefined),
           },
         });
         await this.prisma.schoolPushCampaign.update({
@@ -690,11 +795,19 @@ export class SchoolSisPushService {
       where: { campaignId, status: 'QUEUED' },
     });
     if (remaining) {
-      await this.queue.add(
-        'campaign',
-        { tenantId, campaignId },
-        { jobId: `push__${campaignId}__${remaining}`, delay: 400, attempts: 3 },
-      );
+      try {
+        await this.queue.add(
+          'campaign',
+          { tenantId, campaignId },
+          {
+            jobId: `push__${campaignId}__${remaining}`,
+            delay: 400,
+            attempts: 3,
+          },
+        );
+      } catch {
+        await this.processCampaign(tenantId, campaignId);
+      }
     } else {
       const failed = await this.prisma.schoolPushRecipient.count({
         where: { campaignId, status: 'FAILED' },

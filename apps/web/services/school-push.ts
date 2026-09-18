@@ -1,3 +1,5 @@
+'use client';
+
 import { api } from './api';
 
 export async function fetchSchoolPushDashboard() {
@@ -23,6 +25,16 @@ export async function testSchoolPush() {
 
 export async function draftSchoolPush(payload: Record<string, unknown>) {
   const { data } = await api.post('/v1/school-sis/notifications/draft', payload);
+  return data;
+}
+
+export async function sendSchoolPush(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/notifications/send', payload);
+  return data;
+}
+
+export async function scheduleSchoolPush(payload: Record<string, unknown>) {
+  const { data } = await api.post('/v1/school-sis/notifications/schedule', payload);
   return data;
 }
 
