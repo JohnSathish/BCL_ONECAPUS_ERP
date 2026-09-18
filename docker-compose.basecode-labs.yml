@@ -1,0 +1,36 @@
+# Isolated BaseCode Labs container. Join the ERP compose project so nginx can
+# reach hostname `basecode-labs` on the default Docker network.
+# Does not replace web, api, college-web, or nginx images.
+
+services:
+  basecode-labs:
+    build:
+      context: ./apps/basecode-labs
+      dockerfile: Dockerfile
+    container_name: basecode-labs
+    restart: unless-stopped
+    env_file:
+      - .env.basecode-labs
+    environment:
+      NODE_ENV: production
+      APP_URL: https://basecodelabs.com
+      DATABASE_URL: file:./prisma/data/prod.db
+    volumes:
+      - basecode_labs_db:/app/prisma/data
+    expose:
+      - '1610'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:1610/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+volumes:
+  basecode_labs_db: {}

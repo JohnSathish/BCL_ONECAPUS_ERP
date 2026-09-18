@@ -44,7 +44,20 @@ Every admin and client login requires a **one-time email code**. If SMTP is not 
 - SEO metadata, JSON-LD, sitemap, robots, Google site verification from the live site
 - Local-search pages for Tamil Nadu and Meghalaya software queries (on-page SEO + blog). Google ranking cannot be guaranteed.
 
-SQLite is the default database so you can run without Docker. For VPS, point `DATABASE_URL` at PostgreSQL and change `prisma/schema.prisma` `provider` to `postgresql`.
+SQLite is the default database so you can run without Docker. For VPS, point `DATABASE_URL` at the sqlite file in `prisma/data` (the isolated deploy script mounts a Docker volume there).
+
+## VPS (shared with Don Bosco — isolated extra site)
+
+Do **not** add this hostname to the college certificate. On `82.25.110.120`:
+
+```bash
+cd /opt/nep-erp
+git pull origin master
+# DNS A for @ and www must already point here
+bash scripts/deploy/vps-configure-basecode-labs.sh
+```
+
+Optional mailbox password: `SMTP_PASS='…' bash scripts/deploy/vps-configure-basecode-labs.sh`
 
 ## Docker (optional)
 

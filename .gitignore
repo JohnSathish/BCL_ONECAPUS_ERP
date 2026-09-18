@@ -48,6 +48,9 @@ apps/api/backups/**
 nginx/extra-sites.d/*.conf
 !nginx/extra-sites.d/00-stub.conf
 
+# BaseCode Labs runtime env on the shared VPS
+.env.basecode-labs
+
 # Local / runtime artifacts (do not commit)
 /_local/
 staffcredentials.txt
