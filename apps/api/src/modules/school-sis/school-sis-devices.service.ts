@@ -159,16 +159,17 @@ export class SchoolSisDevicesService {
     if (q.search?.trim()) {
       const userIds = await this.searchUserIds(tenantId, q.search.trim());
       const term = q.search.trim();
-      where.OR = [
+      const or: Prisma.SchoolMobileDeviceWhereInput[] = [
         { deviceId: { contains: term, mode: 'insensitive' } },
         { deviceModel: { contains: term, mode: 'insensitive' } },
         { deviceLabel: { contains: term, mode: 'insensitive' } },
         { manufacturer: { contains: term, mode: 'insensitive' } },
-        ...(has(actor, 'devices.view_ip')
-          ? [{ lastIpAddress: { contains: term, mode: 'insensitive' } }]
-          : []),
-        ...(userIds.length ? [{ userId: { in: userIds } }] : []),
       ];
+      if (has(actor, 'devices.view_ip')) {
+        or.push({ lastIpAddress: { contains: term, mode: 'insensitive' } });
+      }
+      if (userIds.length) or.push({ userId: { in: userIds } });
+      where.OR = or;
     }
 
     if (q.security === 'multi') {
@@ -491,7 +492,7 @@ export class SchoolSisDevicesService {
         description,
         ipAddress: ip ?? null,
         performedBy: actor.sub,
-        metadata: metadata ?? {},
+        metadata: (metadata ?? {}) as Prisma.InputJsonValue,
       },
     });
   }
