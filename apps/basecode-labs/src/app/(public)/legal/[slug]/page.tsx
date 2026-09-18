@@ -25,8 +25,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export async function generateStaticParams() {
-  const docs = await listLegalDocuments();
-  return docs.map((d) => ({ slug: d.slug }));
+  try {
+    const docs = await listLegalDocuments();
+    return docs.map((d) => ({ slug: d.slug }));
+  } catch {
+    return [];
+  }
 }
 
 export default async function LegalDocumentPage({ params }: Props) {

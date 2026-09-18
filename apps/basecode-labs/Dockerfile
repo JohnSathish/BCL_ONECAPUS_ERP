@@ -6,15 +6,14 @@ RUN npm install --ignore-scripts
 
 FROM node:20-alpine AS builder
 WORKDIR /app
+ENV DATABASE_URL="file:./prisma/data/build.db"
+ENV APP_URL="https://basecodelabs.com"
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate && npm run build
-
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN npx prisma generate && npm run build
+RUN mkdir -p prisma/data \
+  && npx prisma generate \
+  && npx prisma db push \
+  && npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
