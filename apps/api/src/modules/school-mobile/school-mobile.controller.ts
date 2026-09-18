@@ -889,6 +889,13 @@ export class SchoolMobileController {
     return this.inbox.patch(user, id, dto);
   }
 
+  @Delete('inbox/:id')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  inboxRemove(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.inbox.remove(user, id);
+  }
+
   @Get('transport/my-trip')
   @ApiBearerAuth()
   @RequireAnyPermission(...ACCESS, 'transport.routes.view')

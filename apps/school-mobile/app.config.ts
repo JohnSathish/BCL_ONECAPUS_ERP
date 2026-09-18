@@ -9,14 +9,15 @@ const isNativeRelease =
 
 const googleServicesLocal = './google-services.json';
 const hasGoogleServices = fs.existsSync(path.join(__dirname, googleServicesLocal));
-const googleServiceInfoLocal = './GoogleService-Info.plist';
+const googleServiceInfoLocal =
+  process.env.GOOGLE_SERVICES_INFO_PLIST || './GoogleService-Info.plist';
 const hasGoogleServiceInfo = fs.existsSync(path.join(__dirname, googleServiceInfoLocal));
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? "St. Luke's School",
   slug: 'st-lukes-school',
-  version: '1.0.1',
+  version: '1.0.2',
   scheme: 'stlukesschool',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
@@ -42,7 +43,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'in.stlukestura.school',
-    versionCode: 3,
+    versionCode: 4,
     ...(hasGoogleServices ? { googleServicesFile: googleServicesLocal } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -67,7 +68,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-notifications',
       {
-        icon: './assets/icon.png',
+        icon: './assets/notification-icon.png',
         color: '#1a237e',
         defaultChannel: 'stlukes_school_default',
       },

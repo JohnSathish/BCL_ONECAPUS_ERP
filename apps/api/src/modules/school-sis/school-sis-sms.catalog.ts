@@ -21,6 +21,7 @@ export const SMS_CATEGORIES = [
 export const SMS_KINDS = ['SERVICE', 'PROMOTIONAL'] as const;
 
 export const SMS_PROVIDERS = [
+  'APITXT',
   'MSG91',
   'TWILIO',
   'EXOTEL',

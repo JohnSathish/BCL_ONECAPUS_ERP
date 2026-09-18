@@ -1,17 +1,24 @@
 /**
- * Local native Android release APK for St. Luke's School only.
+ * Local native Android APK + Play AAB for St. Luke's School only.
  * Usage from apps/school-mobile: npm run build:apk
  *
  * Package: in.stlukestura.school  (never edu.onecampus.mobile)
  * API:     https://erp.stlukestura.in/api
+ *
+ * iOS is not built here — use EAS later: npm run build:prod:ios
  */
 const { spawnSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
 const root = path.join(__dirname, '..');
 process.chdir(root);
+
+const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const appVersion = pkg.version || '1.0.2';
+const versionCode = '4';
 
 const jdkCandidates = [
   process.env.JAVA_HOME,
@@ -25,22 +32,102 @@ if (!javaHome) {
   process.exit(1);
 }
 
-const arches = process.env.REACT_NATIVE_ARCHITECTURES || 'arm64-v8a';
+const arches = process.env.REACT_NATIVE_ARCHITECTURES || 'arm64-v8a,armeabi-v7a';
 const skipClean = process.env.SKIP_PREBUILD_CLEAN === '1';
 const googleServices = path.join(root, 'google-services.json');
+const keytool = path.join(javaHome, 'bin', 'keytool.exe');
+const credDir = path.join(root, 'credentials', 'android');
+const credJson = path.join(root, 'credentials.json');
+const keystorePath = path.join(credDir, 'stlukes-upload.jks');
+
+function ensureUploadKeystore() {
+  if (fs.existsSync(credJson) && fs.existsSync(keystorePath)) {
+    const credentials = JSON.parse(fs.readFileSync(credJson, 'utf8'));
+    const ks = credentials.android?.keystore;
+    if (ks?.keystorePassword && ks.keyAlias && ks.keyPassword) {
+      return {
+        MYAPP_UPLOAD_STORE_FILE: path.resolve(root, ks.keystorePath),
+        MYAPP_UPLOAD_STORE_PASSWORD: ks.keystorePassword,
+        MYAPP_UPLOAD_KEY_ALIAS: ks.keyAlias,
+        MYAPP_UPLOAD_KEY_PASSWORD: ks.keyPassword,
+      };
+    }
+  }
+  fs.mkdirSync(credDir, { recursive: true });
+  const storePass = crypto.randomBytes(16).toString('hex');
+  const keyPass = crypto.randomBytes(16).toString('hex');
+  const alias = 'stlukes-upload';
+  console.log('Generating St. Luke’s Play upload keystore (keep credentials/ backed up)…');
+  const r = spawnSync(
+    keytool,
+    [
+      '-genkeypair',
+      '-v',
+      '-storetype',
+      'JKS',
+      '-keystore',
+      keystorePath,
+      '-alias',
+      alias,
+      '-keyalg',
+      'RSA',
+      '-keysize',
+      '2048',
+      '-validity',
+      '10000',
+      '-storepass',
+      storePass,
+      '-keypass',
+      keyPass,
+      '-dname',
+      "CN=St Luke's School, OU=Mobile, O=St Lukes Tura, L=Tura, ST=Meghalaya, C=IN",
+    ],
+    { stdio: 'inherit' },
+  );
+  if (r.status !== 0) {
+    console.error('keytool failed; cannot sign Play AAB.');
+    process.exit(1);
+  }
+  const rel = path.posix.join('credentials', 'android', 'stlukes-upload.jks');
+  fs.writeFileSync(
+    credJson,
+    JSON.stringify(
+      {
+        android: {
+          keystore: {
+            keystorePath: rel.replace(/\\/g, '/'),
+            keystorePassword: storePass,
+            keyAlias: alias,
+            keyPassword: keyPass,
+          },
+        },
+      },
+      null,
+      2,
+    ),
+  );
+  return {
+    MYAPP_UPLOAD_STORE_FILE: keystorePath,
+    MYAPP_UPLOAD_STORE_PASSWORD: storePass,
+    MYAPP_UPLOAD_KEY_ALIAS: alias,
+    MYAPP_UPLOAD_KEY_PASSWORD: keyPass,
+  };
+}
+
+const uploadEnv = ensureUploadKeystore();
 
 const env = {
   ...process.env,
+  ...uploadEnv,
   JAVA_HOME: javaHome,
   PATH: `${path.join(javaHome, 'bin')}${path.delimiter}${process.env.PATH || ''}`,
   LOCAL_NATIVE_RELEASE: '1',
-  EAS_BUILD_PROFILE: process.env.EAS_BUILD_PROFILE || 'preview',
+  EAS_BUILD_PROFILE: process.env.EAS_BUILD_PROFILE || 'production',
   EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || 'https://erp.stlukestura.in/api',
   EXPO_PUBLIC_TENANT_SLUG: process.env.EXPO_PUBLIC_TENANT_SLUG || 'st-lukes-tura',
   EXPO_PUBLIC_APP_NAME: process.env.EXPO_PUBLIC_APP_NAME || "St. Luke's School",
   EXPO_PUBLIC_LOGIN_HOST: process.env.EXPO_PUBLIC_LOGIN_HOST || 'erp.stlukestura.in',
   ORG_GRADLE_PROJECT_reactNativeArchitectures: arches,
-  ORG_GRADLE_PROJECT_ALLOW_DEBUG_RELEASE_SIGNING: 'true',
 };
 
 if (fs.existsSync(googleServices)) {
@@ -150,10 +237,68 @@ function patchGradleProperties() {
   console.log(`Patched android/gradle.properties → architectures=${arches}, workers=2`);
 }
 
+function ensureUploadSigningInGradle() {
+  const appGradle = path.join(root, 'android', 'app', 'build.gradle');
+  if (!fs.existsSync(appGradle)) return;
+  let text = fs.readFileSync(appGradle, 'utf8');
+  if (text.includes('hasUploadKeystore')) {
+    console.log('Upload keystore signing already present in app/build.gradle');
+    return;
+  }
+  const inject = `
+def uploadStoreFile = System.getenv('MYAPP_UPLOAD_STORE_FILE')
+def uploadStorePassword = System.getenv('MYAPP_UPLOAD_STORE_PASSWORD')
+def uploadKeyAlias = System.getenv('MYAPP_UPLOAD_KEY_ALIAS')
+def uploadKeyPassword = System.getenv('MYAPP_UPLOAD_KEY_PASSWORD')
+def uploadStore = uploadStoreFile ? file(uploadStoreFile) : null
+def hasUploadKeystore = uploadStore?.exists() && uploadStorePassword && uploadKeyAlias && uploadKeyPassword
+`;
+  text = text.replace(/\ndef jscFlavor = /, `${inject}\ndef jscFlavor = `);
+  text = text.replace(/signingConfigs \{\s*debug \{[\s\S]*?\}(\s*)\}/, (block) => {
+    if (block.includes('release {')) return block;
+    return block.replace(
+      /(\s*)\}(\s*)$/,
+      `$1    release {
+$1        if (hasUploadKeystore) {
+$1            storeFile uploadStore
+$1            storePassword uploadStorePassword
+$1            keyAlias uploadKeyAlias
+$1            keyPassword uploadKeyPassword
+$1        }
+$1    }
+$1}$2`,
+    );
+  });
+  const buildTypesStart = text.indexOf('    buildTypes {');
+  const packagingOptionsStart = text.indexOf('    packagingOptions {', buildTypesStart);
+  if (buildTypesStart === -1 || packagingOptionsStart === -1) {
+    console.warn('Could not locate buildTypes; release may use debug signing.');
+    fs.writeFileSync(appGradle, text);
+    return;
+  }
+  const buildTypesBlock = text.slice(buildTypesStart, packagingOptionsStart);
+  const signedBuildTypesBlock = buildTypesBlock.replace(
+    /(\n        release \{[\s\S]*?)signingConfig signingConfigs\.debug/,
+    `$1${[
+      'if (hasUploadKeystore) {',
+      '                signingConfig signingConfigs.release',
+      "            } else if (findProperty('ALLOW_DEBUG_RELEASE_SIGNING') == 'true') {",
+      '                signingConfig signingConfigs.debug',
+      '            } else {',
+      '                throw new GradleException("Release signing requires MYAPP_UPLOAD_* env vars.")',
+      '            }',
+    ].join('\n')}`,
+  );
+  text = text.slice(0, buildTypesStart) + signedBuildTypesBlock + text.slice(packagingOptionsStart);
+  fs.writeFileSync(appGradle, text);
+  console.log('Patched app/build.gradle → St. Luke’s upload keystore');
+}
+
 console.log('JAVA_HOME =', javaHome);
 console.log('Package = in.stlukestura.school');
+console.log('Version =', appVersion, 'versionCode', versionCode);
 console.log('Architectures =', arches);
-console.log("Building St. Luke's School APK (college app untouched)…");
+console.log("Building St. Luke's School APK + AAB (college app untouched)…");
 
 const prebuildArgs = ['expo', 'prebuild', '--platform', 'android'];
 if (!skipClean) prebuildArgs.push('--clean');
@@ -161,6 +306,7 @@ run('npx', prebuildArgs);
 patchGradleProperties();
 shrinkSplashLogos();
 stripFirebaseMessagingIfNeeded();
+ensureUploadSigningInGradle();
 
 const keepDir = path.join(root, 'android', 'app', 'src', 'main', 'res', 'raw');
 fs.mkdirSync(keepDir, { recursive: true });
@@ -185,36 +331,60 @@ run(
   '.\\gradlew.bat',
   [
     'assembleRelease',
+    'bundleRelease',
     '--no-daemon',
     '--max-workers=2',
     `-PreactNativeArchitectures=${arches}`,
-    '-PALLOW_DEBUG_RELEASE_SIGNING=true',
   ],
   { cwd: path.join(root, 'android') },
 );
 
 const apkDir = path.join(root, 'android', 'app', 'build', 'outputs', 'apk', 'release');
 const apks = fs.existsSync(apkDir) ? fs.readdirSync(apkDir).filter((f) => f.endsWith('.apk')) : [];
+const aabPath = path.join(
+  root,
+  'android',
+  'app',
+  'build',
+  'outputs',
+  'bundle',
+  'release',
+  'app-release.aab',
+);
 
 const distDir = path.join(root, 'dist');
 fs.mkdirSync(distDir, { recursive: true });
-const destName = `StLukes-School-v1.0.1-${arches.replace(/,/g, '-')}.apk`;
-const dest = path.join(distDir, destName);
+const base = `StLukes-School-v${appVersion}-vc${versionCode}`;
 
-console.log('\n=== St. Luke school APK complete ===');
-if (apks.length) {
-  const src = path.join(apkDir, apks[0]);
+function copyOut(src, name) {
+  const dest = path.join(distDir, name);
   fs.copyFileSync(src, dest);
-  const desktop = path.join(os.homedir(), 'Desktop', destName);
+  const desktop = path.join(os.homedir(), 'Desktop', name);
   try {
     fs.copyFileSync(src, desktop);
     console.log('Desktop:', desktop);
   } catch (err) {
     console.log('Could not copy to Desktop:', err.message);
   }
-  console.log('APK:', src);
   console.log('Copy:', dest);
-  console.log('Android package: in.stlukestura.school');
+}
+
+console.log('\n=== St. Luke school Android release complete ===');
+if (apks.length) {
+  const src = path.join(apkDir, apks[0]);
+  console.log('APK:', src);
+  copyOut(src, `${base}.apk`);
 } else {
   console.log('Look under:', apkDir);
 }
+if (fs.existsSync(aabPath)) {
+  console.log('AAB:', aabPath);
+  copyOut(aabPath, `${base}.aab`);
+} else {
+  console.log('Expected AAB missing at', aabPath);
+  process.exit(1);
+}
+console.log('Android package: in.stlukestura.school');
+console.log('Play Console: upload the .aab. Install the .apk on devices.');
+console.log('iOS: skip for now (npm run build:prod:ios later).');
+console.log('Backup upload key: apps/school-mobile/credentials/ (not in git).');

@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Image,
+  Linking,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { apiFetch } from '@/api/client';
 import { mediaUrl } from '@/api/config';
@@ -108,6 +118,38 @@ export default function InboxDetailScreen() {
             <Text style={styles.linkText}>Open attachment</Text>
           </Pressable>
         ) : null}
+        <Pressable
+          style={styles.share}
+          onPress={() =>
+            void Share.share({ title: item.title, message: `${item.title}\n\n${item.body}` })
+          }
+        >
+          <Text style={styles.shareText}>Share</Text>
+        </Pressable>
+        <Pressable
+          style={styles.delete}
+          onPress={() => {
+            Alert.alert('Delete notification?', 'This removes it from your inbox.', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: () => {
+                  void apiFetch(`/v1/school-mobile/inbox/${item.id}`, { method: 'DELETE' })
+                    .then(() => router.back())
+                    .catch((err) =>
+                      Alert.alert(
+                        'Could not delete',
+                        err instanceof Error ? err.message : 'Try again',
+                      ),
+                    );
+                },
+              },
+            ]);
+          }}
+        >
+          <Text style={styles.deleteText}>Delete notification</Text>
+        </Pressable>
       </ScrollView>
     </Screen>
   );
@@ -139,4 +181,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   linkText: { color: '#fff', fontWeight: '800' },
+  share: {
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#dbe4f5',
+  },
+  shareText: { color: colors.navy, fontWeight: '800' },
+  delete: {
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  deleteText: { color: colors.danger, fontWeight: '800' },
 });

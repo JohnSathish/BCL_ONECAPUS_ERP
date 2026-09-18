@@ -27,9 +27,9 @@ const ANDROID_CHANNELS: Array<{
   {
     id: 'stlukes_school_default',
     name: 'General',
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: Notifications.AndroidImportance.HIGH,
   },
-  { id: 'stlukes_general', name: 'General', importance: Notifications.AndroidImportance.DEFAULT },
+  { id: 'stlukes_general', name: 'General', importance: Notifications.AndroidImportance.HIGH },
   {
     id: 'stlukes_announcements',
     name: 'Announcements',
@@ -77,9 +77,15 @@ async function savePushToken(token: string) {
 
 export async function registerSchoolPush() {
   try {
+    if (Platform.OS === 'android') {
+      const current = await Notifications.getPermissionsAsync();
+      if (current.status !== 'granted') {
+        await Notifications.requestPermissionsAsync();
+      }
+    }
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
-      await registerDevice();
+      await registerDevice({ pushCapability: false });
       return;
     }
     if (Platform.OS === 'android') {

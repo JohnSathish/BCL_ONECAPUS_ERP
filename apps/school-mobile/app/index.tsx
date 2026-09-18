@@ -42,6 +42,11 @@ export default function GateScreen() {
       if (cancelled) return;
       const restored = await restoreSchoolSession();
       if (cancelled) return;
+      if (restored.route !== '/login' && restored.route !== '/account-disabled') {
+        void import('@/services/push').then(({ registerSchoolPush }) => {
+          void registerSchoolPush();
+        });
+      }
       router.replace(restored.route);
       await SplashScreen.hideAsync().catch(() => undefined);
     })();

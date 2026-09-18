@@ -28,13 +28,18 @@
         "EXPO_PUBLIC_SUPPORT_EMAIL": "admin@stlukestura.in",
         "EAS_PROJECT_ID": "82f45116-2b82-4b43-93d3-7d7d2027b2da"
       },
-      "android": { "buildType": "app-bundle" }
+      "android": { "buildType": "app-bundle" },
+      "ios": { "distribution": "store" }
     }
   },
   "submit": {
     "production": {
       "android": {
         "track": "internal"
+      },
+      "ios": {
+        "appleId": "contact@basecodelabs.com",
+        "appleTeamId": "GW772LHWRY"
       }
     }
   }

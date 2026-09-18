@@ -388,19 +388,7 @@ export class SchoolMobileAccountAuthService {
     });
     if (mobile) {
       try {
-        await this.sms.sendCampaign(
-          tenantId,
-          {
-            name: 'Account verification',
-            smsKind: 'SERVICE',
-            body: `St. Luke's School verification code: ${otp}. Do not share this code.`,
-            audience: { mobiles: [mobile] },
-            sendNow: true,
-            idempotencyKey: `otp:${row.id}:${row.otpSendCount + 1}`,
-          },
-          row.userId,
-          ip,
-        );
+        await this.sms.sendLoginOtp(tenantId, mobile, otp);
       } catch {
         /* OTP is still valid; office can use activation code */
       }

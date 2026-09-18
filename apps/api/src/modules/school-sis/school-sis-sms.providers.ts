@@ -1,3 +1,5 @@
+import { extractOtpCode, sendApitxtOtp } from './school-sis-apitxt-otp';
+
 export type SmsSendInput = {
   to: string;
   body: string;
@@ -278,9 +280,53 @@ export const customHttpProvider: SmsGatewayProvider = {
   },
 };
 
+export const apitxtProvider: SmsGatewayProvider = {
+  id: 'APITXT',
+  async validateConfiguration(creds) {
+    return Boolean(creds.apiKey || creds.authkey);
+  },
+  async getBalance() {
+    return {};
+  },
+  async sendSms(input, creds, apiUrl) {
+    const otp = extractOtpCode(input.body);
+    if (!otp) {
+      return {
+        accepted: false,
+        status: 'FAILED',
+        errorCode: 'OTP_ONLY',
+        errorMessage:
+          'Apitxt sendOTP is for login OTP. Use a 4–8 digit code in the message, or another gateway for bulk SMS.',
+        errorClass: 'PERMANENT',
+      };
+    }
+    return sendApitxtOtp({
+      authkey: creds.apiKey || creds.authkey,
+      mobile: input.to,
+      otp,
+      channel: creds.otpChannel || creds.channel || 'sms',
+      templateId:
+        creds.otpTemplateId ||
+        creds.templateId ||
+        input.dltTemplateId ||
+        undefined,
+      templateName: creds.otpTemplateName || creds.templateName,
+      country: creds.otpCountry || creds.country || '91',
+      projectRefId: creds.projectRefId,
+      apiUrl: apiUrl || undefined,
+    });
+  },
+  async sendBulkSms(messages, creds, apiUrl) {
+    const out: SmsSendResult[] = [];
+    for (const m of messages) out.push(await this.sendSms(m, creds, apiUrl));
+    return out;
+  },
+};
+
 export function resolveSmsProvider(id: string): SmsGatewayProvider {
   const key = id.toUpperCase();
   if (key === 'TWILIO') return twilioProvider;
+  if (key === 'APITXT') return apitxtProvider;
   if (key === 'CUSTOM_HTTP' || key === 'CUSTOM_SMPP' || key === 'EXOTEL')
     return customHttpProvider;
   return msg91Provider;

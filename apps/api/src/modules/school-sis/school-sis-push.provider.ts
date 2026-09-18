@@ -35,6 +35,9 @@ export interface NotificationProvider {
 
 const APP_NAME = 'stlukes-school-sis';
 const MULTICAST_LIMIT = 500;
+/** expo-notifications plugin copies assets/notification-icon.png to this drawable. */
+const ANDROID_SMALL_ICON = 'notification_icon';
+const ANDROID_ICON_COLOR = '#1A237E';
 
 @Injectable()
 export class SchoolSisFcmProvider implements NotificationProvider {
@@ -279,10 +282,12 @@ export class SchoolSisFcmProvider implements NotificationProvider {
         },
         data,
         android: {
-          priority: high ? 'high' : 'normal',
+          priority: 'high',
           notification: {
             channelId: channel,
             sound: 'default',
+            icon: ANDROID_SMALL_ICON,
+            color: ANDROID_ICON_COLOR,
             ...(image ? { imageUrl: image } : {}),
           },
         },
@@ -410,10 +415,12 @@ export class SchoolSisFcmProvider implements NotificationProvider {
                 ]),
               ),
               android: {
-                priority: high ? 'HIGH' : 'NORMAL',
+                priority: 'HIGH',
                 notification: {
                   channelId: channel,
                   sound: 'default',
+                  icon: ANDROID_SMALL_ICON,
+                  color: ANDROID_ICON_COLOR,
                   ...(image ? { image } : {}),
                 },
               },

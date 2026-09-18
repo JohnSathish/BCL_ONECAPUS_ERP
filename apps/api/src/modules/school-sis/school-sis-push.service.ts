@@ -179,6 +179,7 @@ export class SchoolSisPushService {
       body: 'Test notification from the school office.',
       category: 'GENERAL',
       priority: 'HIGH',
+      imageUrl: this.schoolLogoPublicUrl(),
       data: { type: 'SYSTEM', deepLink: '/(tabs)', notificationId: 'test' },
     });
     if (result.invalidTokens.length) {
@@ -287,13 +288,15 @@ export class SchoolSisPushService {
     }
     if (kind === 'INDIVIDUAL_STUDENT' || kind === 'PARENT') {
       const studentIds = audience.studentIds ?? [];
+      const personTypes =
+        kind === 'PARENT'
+          ? ['GUARDIAN', 'PARENT']
+          : ['STUDENT', 'GUARDIAN', 'PARENT'];
       const accounts = await this.prisma.schoolPersonAccount.findMany({
         where: {
           tenantId,
           studentId: { in: studentIds },
-          ...(kind === 'PARENT'
-            ? { personType: 'GUARDIAN' }
-            : { personType: 'STUDENT' }),
+          personType: { in: personTypes },
         },
       });
       if (kind === 'PARENT' && !accounts.length) {
@@ -302,10 +305,14 @@ export class SchoolSisPushService {
         });
         return g.map((a) => ({ userId: a.userId, studentId: a.studentId }));
       }
-      return accounts.map((a) => ({
-        userId: a.userId,
-        studentId: a.studentId,
-      }));
+      return [
+        ...new Map(
+          accounts.map((a) => [
+            a.userId,
+            { userId: a.userId, studentId: a.studentId },
+          ]),
+        ).values(),
+      ];
     }
     if (audience.personas?.length) {
       const rows = await this.prisma.schoolMobileDevice.findMany({
@@ -702,7 +709,8 @@ export class SchoolSisPushService {
           body: campaign.body,
           category: campaign.category,
           priority: campaign.priority,
-          imageUrl: this.fcmImageUrl(campaign.imageUrl),
+          imageUrl:
+            this.fcmImageUrl(campaign.imageUrl) ?? this.schoolLogoPublicUrl(),
           data: {
             notificationId: campaign.id,
             type: campaign.category,
@@ -1112,6 +1120,19 @@ export class SchoolSisPushService {
   private fcmImageUrl(url?: string | null) {
     if (!url || this.attachmentKind(url) === 'pdf') return undefined;
     return /^https?:\/\//i.test(url) ? url : undefined;
+  }
+
+  private schoolLogoPublicUrl() {
+    const origin = (
+      this.config.get<string>('WEB_ORIGIN') ||
+      this.config.get<string>('APP_PUBLIC_URL') ||
+      this.config.get<string>('API_PUBLIC_ORIGIN') ||
+      ''
+    )
+      .replace(/\/$/, '')
+      .replace(/\/api$/i, '');
+    if (!/^https?:\/\//i.test(origin)) return undefined;
+    return `${origin}/school-sis/st-lukes-logo.png`;
   }
 
   async logs(tenantId: string) {

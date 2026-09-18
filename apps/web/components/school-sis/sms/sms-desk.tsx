@@ -588,9 +588,11 @@ function GatewayPanel({
   onTest: (id: string) => void;
   onDefault: (id: string) => void;
 }) {
-  const [name, setName] = useState('MSG91');
-  const [provider, setProvider] = useState('MSG91');
+  const [name, setName] = useState('Apitxt OTP');
+  const [provider, setProvider] = useState('APITXT');
   const [apiKey, setApiKey] = useState('');
+  const [otpTemplateId, setOtpTemplateId] = useState('');
+  const [otpChannel, setOtpChannel] = useState('sms');
   return (
     <div className="space-y-3">
       <WaCard className="grid gap-2 p-5 sm:grid-cols-2">
@@ -604,7 +606,7 @@ function GatewayPanel({
           onChange={(e) => setProvider(e.target.value)}
           className="rounded-lg border px-3 py-2"
         >
-          {['MSG91', 'TWILIO', 'EXOTEL', 'CUSTOM_HTTP'].map((p) => (
+          {['APITXT', 'MSG91', 'TWILIO', 'EXOTEL', 'CUSTOM_HTTP'].map((p) => (
             <option key={p}>{p}</option>
           ))}
         </select>
@@ -614,9 +616,36 @@ function GatewayPanel({
           placeholder="API key / authkey (stored encrypted)"
           className="rounded-lg border px-3 py-2 sm:col-span-2"
         />
+        {provider === 'APITXT' ? (
+          <>
+            <input
+              value={otpTemplateId}
+              onChange={(e) => setOtpTemplateId(e.target.value)}
+              placeholder="OTP template_id (optional)"
+              className="rounded-lg border px-3 py-2"
+            />
+            <select
+              value={otpChannel}
+              onChange={(e) => setOtpChannel(e.target.value)}
+              className="rounded-lg border px-3 py-2"
+            >
+              <option value="sms">SMS OTP</option>
+              <option value="whatsapp">WhatsApp OTP</option>
+              <option value="voice">Voice OTP</option>
+            </select>
+          </>
+        ) : null}
         <PrimaryButton
           type="button"
-          onClick={() => onSave({ name, provider, apiKey, status: 'ACTIVE' })}
+          onClick={() =>
+            onSave({
+              name,
+              provider,
+              apiKey,
+              status: 'ACTIVE',
+              ...(provider === 'APITXT' ? { otpTemplateId, otpChannel, otpCountry: '91' } : {}),
+            })
+          }
         >
           Save gateway
         </PrimaryButton>

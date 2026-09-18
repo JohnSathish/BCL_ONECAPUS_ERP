@@ -72,7 +72,8 @@ export default function RootLayout() {
       const away = Date.now() - backgroundedAt.current;
       if (!backgroundedAt.current || away < 8_000) return;
       if (OPEN_ROUTES.has(path)) return;
-      void import('@/services/push').then(({ pingDeviceHeartbeat }) => {
+      void import('@/services/push').then(({ pingDeviceHeartbeat, registerSchoolPush }) => {
+        void registerSchoolPush();
         void pingDeviceHeartbeat();
       });
       void Promise.all([isAppLockEnabled(), isBiometricLoginEnabled()]).then(([lock, bio]) => {

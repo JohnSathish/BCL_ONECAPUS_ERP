@@ -4,6 +4,8 @@ google-services.json
 GoogleService-Info.plist
 .env
 .env.local
+credentials.json
+credentials/
 *.apk
 *.aab
 android/

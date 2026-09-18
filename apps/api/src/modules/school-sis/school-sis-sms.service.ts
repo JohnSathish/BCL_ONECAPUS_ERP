@@ -5,6 +5,7 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { createHash, randomInt } from 'crypto';
@@ -27,6 +28,7 @@ import {
   renderSms,
   smsSegments,
 } from './school-sis-sms.phone';
+import { sendApitxtOtp } from './school-sis-apitxt-otp';
 import { resolveSmsProvider } from './school-sis-sms.providers';
 
 type Audience = {
@@ -56,6 +58,7 @@ export class SchoolSisSmsService implements OnModuleInit {
     private readonly sis: SchoolSisService,
     private readonly crypto: FieldEncryptionService,
     private readonly reports: SchoolReportEngineService,
+    private readonly config: ConfigService,
     @InjectQueue('school-sms') private readonly queue: Queue,
   ) {}
 
@@ -712,6 +715,11 @@ export class SchoolSisSmsService implements OnModuleInit {
       authToken: String(body.authToken || ''),
       token: String(body.token || ''),
       from: String(body.from || ''),
+      otpTemplateId: String(body.otpTemplateId || ''),
+      otpTemplateName: String(body.otpTemplateName || ''),
+      otpChannel: String(body.otpChannel || ''),
+      otpCountry: String(body.otpCountry || ''),
+      projectRefId: String(body.projectRefId || ''),
     };
     const credentialsEnc = this.crypto.encrypt(JSON.stringify(creds));
     const data = {
@@ -869,6 +877,86 @@ export class SchoolSisSmsService implements OnModuleInit {
     });
   }
 
+  async sendLoginOtp(tenantId: string, mobileRaw: string, otp: string) {
+    await this.ensure(tenantId);
+    const mobile = normalizeInMobile(mobileRaw);
+    if (!mobile) {
+      return {
+        accepted: false,
+        status: 'FAILED' as const,
+        errorMessage: 'Invalid mobile',
+      };
+    }
+    const cfg = await this.apitxtOtpConfig(tenantId);
+    if (!cfg.authkey) {
+      this.logger.warn('Login OTP skipped: Apitxt authkey is not configured');
+      return {
+        accepted: false,
+        status: 'FAILED' as const,
+        errorCode: 'NO_KEY',
+        errorMessage:
+          'Configure the Apitxt SMS gateway (or SCHOOL_APITXT_AUTHKEY) to send login OTPs.',
+      };
+    }
+    const result = await sendApitxtOtp({
+      authkey: cfg.authkey,
+      mobile,
+      otp,
+      channel: cfg.channel,
+      templateId: cfg.templateId,
+      templateName: cfg.templateName,
+      country: cfg.country,
+      projectRefId: cfg.projectRefId,
+      apiUrl: cfg.apiUrl,
+    });
+    if (!result.accepted) {
+      this.logger.warn(
+        `Apitxt login OTP failed (${result.errorCode ?? 'error'})`,
+      );
+    }
+    return result;
+  }
+
+  private async apitxtOtpConfig(tenantId: string) {
+    const envKey = this.config.get<string>('SCHOOL_APITXT_AUTHKEY')?.trim();
+    const gw = await this.prisma.schoolSmsGateway.findFirst({
+      where: { tenantId, status: 'ACTIVE', provider: 'APITXT' },
+      orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+    });
+    const creds = this.creds(gw?.credentialsEnc);
+    return {
+      authkey: creds.apiKey || creds.authkey || envKey || '',
+      channel:
+        creds.otpChannel ||
+        creds.channel ||
+        this.config.get<string>('SCHOOL_APITXT_CHANNEL') ||
+        'sms',
+      templateId:
+        creds.otpTemplateId ||
+        creds.templateId ||
+        this.config.get<string>('SCHOOL_APITXT_OTP_TEMPLATE_ID') ||
+        undefined,
+      templateName:
+        creds.otpTemplateName ||
+        creds.templateName ||
+        this.config.get<string>('SCHOOL_APITXT_TEMPLATE_NAME') ||
+        undefined,
+      country:
+        creds.otpCountry ||
+        creds.country ||
+        this.config.get<string>('SCHOOL_APITXT_COUNTRY') ||
+        '91',
+      projectRefId:
+        creds.projectRefId ||
+        this.config.get<string>('SCHOOL_APITXT_PROJECT_REF_ID') ||
+        undefined,
+      apiUrl:
+        gw?.apiUrl ||
+        this.config.get<string>('SCHOOL_APITXT_OTP_URL') ||
+        undefined,
+    };
+  }
+
   async issueOtp(tenantId: string, mobileRaw: string, purpose: string) {
     const settings = await this.ensure(tenantId);
     const mobile = normalizeInMobile(mobileRaw);
@@ -891,12 +979,12 @@ export class SchoolSisSmsService implements OnModuleInit {
         expiresAt: new Date(Date.now() + settings.otpExpiryMinutes * 60_000),
       },
     });
-    await this.sendTemplate(tenantId, {
-      templateKey: 'OTP',
-      mobile,
-      variables: { otp: code, school_name: "St. Luke's Secondary School" },
-      idempotencyKey: `otp:${purpose}:${mobile}:${Math.floor(Date.now() / 30000)}`,
-    });
+    const sent = await this.sendLoginOtp(tenantId, mobile, code);
+    if (!sent.accepted) {
+      throw new BadRequestException(
+        sent.errorMessage || 'Could not send the login OTP.',
+      );
+    }
     return { sent: true, expiresInMinutes: settings.otpExpiryMinutes };
   }
 

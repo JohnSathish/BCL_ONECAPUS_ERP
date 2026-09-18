@@ -21,7 +21,10 @@ export function Screen({
 }) {
   const router = useRouter();
   return (
-    <SafeAreaView style={[styles.safe, light && styles.safeLight]} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      style={[styles.safe, light && styles.safeLight, navy && styles.safeNavy]}
+      edges={['top', 'left', 'right']}
+    >
       {title ? (
         <View style={[styles.bar, navy && styles.barNavy]}>
           {onBack ? (
@@ -167,6 +170,7 @@ export function Row({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   safeLight: { backgroundColor: colors.paper },
+  safeNavy: { backgroundColor: colors.navy },
   bar: {
     paddingHorizontal: space.md,
     paddingBottom: space.sm,

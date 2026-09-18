@@ -79,6 +79,7 @@ export function WaBadge({ value }: { value: string }) {
     APPROVED: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
     OPTED_IN: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
     SENT: 'bg-sky-50 text-sky-800 ring-sky-200',
+    PARTIALLY_SENT: 'bg-amber-50 text-amber-800 ring-amber-200',
     DELIVERED: 'bg-indigo-50 text-indigo-800 ring-indigo-200',
     READ: 'bg-violet-50 text-violet-800 ring-violet-200',
     QUEUED: 'bg-slate-100 text-slate-700 ring-slate-200',

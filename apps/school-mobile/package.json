@@ -1,6 +1,6 @@
 {
   "name": "school-mobile",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "main": "index.js",
   "scripts": {
@@ -9,6 +9,7 @@
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
     "build:apk": "node scripts/build-local-apk.js",
+    "build:aab": "node scripts/build-local-apk.js",
     "build:preview:android": "eas build --profile preview --platform android",
     "build:prod:android": "eas build --profile production --platform android",
     "build:prod:ios": "eas build --profile production --platform ios",
