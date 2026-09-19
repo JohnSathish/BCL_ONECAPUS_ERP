@@ -1,5 +1,12 @@
 /** Published homepage catalog used when Central SQLite has not been seeded. */
 
+const PROJECT_EXTRAS = {
+  status: 'PUBLISHED',
+  technologies: null as string | null,
+  screenshot: null as string | null,
+  completedAt: null as Date | null,
+};
+
 export const FALLBACK_PROJECTS = [
   {
     id: 'salesian-province-guwahati',
@@ -11,6 +18,8 @@ export const FALLBACK_PROJECTS = [
     description:
       'Redesigned province website with improved structure and a dedicated mobile application, as described by Vice Provincial Fr. Bivan Rodriques Mukhim.',
     websiteUrl: 'https://donboscoguwahati.org/',
+    displayOrder: 1,
+    ...PROJECT_EXTRAS,
   },
   {
     id: 'dbcte-tura',
@@ -21,6 +30,8 @@ export const FALLBACK_PROJECTS = [
     services: 'Website',
     description: 'Institution website delivered for DBCTE Tura.',
     websiteUrl: 'https://dbctetura.com/',
+    displayOrder: 2,
+    ...PROJECT_EXTRAS,
   },
   {
     id: 'tura-public-school',
@@ -31,6 +42,8 @@ export const FALLBACK_PROJECTS = [
     services: 'Website',
     description: 'School website for Tura Public School.',
     websiteUrl: 'https://turapublicschool.com/',
+    displayOrder: 3,
+    ...PROJECT_EXTRAS,
   },
   {
     id: 'dbc-hss-tura',
@@ -41,6 +54,8 @@ export const FALLBACK_PROJECTS = [
     services: 'Website, ongoing updates',
     description: 'Institution website with structured navigation and ongoing updates.',
     websiteUrl: 'https://dbchsstura.in/',
+    displayOrder: 4,
+    ...PROJECT_EXTRAS,
   },
   {
     id: 'pasf-abong-noga-college',
@@ -51,6 +66,8 @@ export const FALLBACK_PROJECTS = [
     services: 'Website',
     description: 'College website serving students and parents.',
     websiteUrl: 'https://pasfanc.ac.in/',
+    displayOrder: 5,
+    ...PROJECT_EXTRAS,
   },
   {
     id: 'anita-vidyalaya-hss',
@@ -61,6 +78,8 @@ export const FALLBACK_PROJECTS = [
     services: 'Website',
     description: 'School website for parents and students, Thannipuzha, Kerala.',
     websiteUrl: 'https://anitavidyalayahss.com/',
+    displayOrder: 6,
+    ...PROJECT_EXTRAS,
   },
 ];
 

@@ -10,12 +10,15 @@ import { Ecosystem } from '@/components/public/ecosystem';
 import { SiteCta } from '@/components/ui/page-shell';
 import { FALLBACK_PRODUCTS, FALLBACK_PROJECTS, FALLBACK_SERVICES } from '@/lib/published-catalog';
 
-async function publishedOr<T>(load: () => Promise<T[]>, fallback: T[]): Promise<T[]> {
+async function publishedOr<T>(
+  load: () => Promise<T[]>,
+  fallback: readonly unknown[],
+): Promise<T[]> {
   try {
     const rows = await load();
-    return rows.length ? rows : fallback;
+    return rows.length ? rows : (fallback as T[]);
   } catch {
-    return fallback;
+    return fallback as T[];
   }
 }
 
@@ -27,7 +30,7 @@ export default async function HomePage() {
           where: { status: 'PUBLISHED' },
           orderBy: { displayOrder: 'asc' },
         }),
-      FALLBACK_PRODUCTS as never,
+      FALLBACK_PRODUCTS,
     ),
     prisma.testimonial
       .findMany({
@@ -47,7 +50,7 @@ export default async function HomePage() {
           where: { status: 'PUBLISHED' },
           orderBy: { displayOrder: 'asc' },
         }),
-      FALLBACK_SERVICES as never,
+      FALLBACK_SERVICES,
     ),
     publishedOr(
       () =>
