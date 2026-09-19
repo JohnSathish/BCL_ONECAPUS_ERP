@@ -30,6 +30,7 @@ import {
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 import { profileCompletion, studentInitials } from '@/lib/school-sis/student-profile';
+import './school-sis-students.css';
 
 const PAGE_SIZES = [10, 25, 50];
 
@@ -63,6 +64,27 @@ function enrollment(s: SchoolSisStudent) {
 function initials(name: string) {
   return studentInitials(name);
 }
+
+function displayName(name?: string | null) {
+  const value = (name ?? '').trim();
+  if (!value) return '—';
+  if (value === value.toUpperCase() && /[A-Z]/.test(value)) {
+    return value.toLowerCase().replace(/\b([a-z])/g, (letter) => letter.toUpperCase());
+  }
+  return value;
+}
+
+const COL_LABELS: Record<ColKey, string> = {
+  photo: 'Photo',
+  admission: 'Admission No.',
+  roll: 'Roll No.',
+  klass: 'Class & Section',
+  dob: 'Date of Birth',
+  guardian: 'Parent / Guardian',
+  phone: 'Phone',
+  profile: 'Profile',
+  status: 'Status',
+};
 
 function formatDob(iso?: string | null) {
   if (!iso) return '—';
@@ -103,6 +125,7 @@ export function SchoolSisStudentsDirectory() {
   const [gradeId, setGradeId] = useState(params.get('gradeId') ?? '');
   const [sectionId, setSectionId] = useState(params.get('sectionId') ?? '');
   const [incompleteOnly, setIncompleteOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
   const [advanced, setAdvanced] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
@@ -137,6 +160,7 @@ export function SchoolSisStudentsDirectory() {
       const enr = enrollment(s);
       if (gradeId && enr?.section.grade.id !== gradeId) return false;
       if (sectionId && enr?.section.id !== sectionId) return false;
+      if (statusFilter && s.status !== statusFilter) return false;
       if (incompleteOnly && profilePct(s) >= 70) return false;
       if (!needle) return true;
       const guardian = s.guardians[0]?.guardian;
@@ -155,7 +179,7 @@ export function SchoolSisStudentsDirectory() {
         .toLowerCase();
       return hay.includes(needle);
     });
-  }, [allRows, debouncedQ, gradeId, sectionId, incompleteOnly]);
+  }, [allRows, debouncedQ, gradeId, sectionId, incompleteOnly, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -185,12 +209,18 @@ export function SchoolSisStudentsDirectory() {
     return gradeId ? all.filter((s) => s.grade.id === gradeId) : all;
   }, [masters.data?.sections, gradeId]);
 
+  const statusOptions = useMemo(() => {
+    return Array.from(new Set(allRows.map((s) => s.status).filter(Boolean))).sort();
+  }, [allRows]);
+
   const clearFilters = () => {
     setQ('');
     setDebouncedQ('');
     setGradeId('');
     setSectionId('');
+    setStatusFilter('');
     setIncompleteOnly(false);
+    setAdvanced(false);
     setPage(1);
   };
 
@@ -252,7 +282,7 @@ export function SchoolSisStudentsDirectory() {
   });
 
   return (
-    <div className="sls-page space-y-5">
+    <div className="sls-page sls-register space-y-5">
       <div className="sls-page-head">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
@@ -272,7 +302,7 @@ export function SchoolSisStudentsDirectory() {
             type="button"
             disabled
             title="Office Excel import will be added here. The register was loaded from the school files."
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-400"
+            className="sls-register-ghost"
           >
             <Upload className="h-4 w-4" />
             Import Students
@@ -282,16 +312,13 @@ export function SchoolSisStudentsDirectory() {
             onClick={() =>
               exportCsv(selected.length ? allRows.filter((s) => selected.includes(s.id)) : filtered)
             }
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-sky-200"
+            className="sls-register-ghost"
           >
             <Download className="h-4 w-4" />
             Export
           </button>
           {canManage ? (
-            <Link
-              href="/admin/school-sis/students/new"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#2563eb] px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#1d4ed8]"
-            >
+            <Link href="/admin/school-sis/students/new" className="sls-register-primary">
               <UserPlus className="h-4 w-4" />
               Add Student
             </Link>
@@ -354,7 +381,7 @@ export function SchoolSisStudentsDirectory() {
             <button
               key={card.label}
               type="button"
-              className="rounded-2xl border border-slate-200/80 bg-white p-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
+              className="sls-register-stat"
               onClick={() => {
                 if (card.label === 'Incomplete Profiles') {
                   setIncompleteOnly(true);
@@ -392,12 +419,7 @@ export function SchoolSisStudentsDirectory() {
       <div className="sls-chip-row">
         <button
           type="button"
-          className={cn(
-            'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold',
-            !gradeId
-              ? 'bg-[#1a365d] text-white'
-              : 'border border-slate-200 bg-white text-slate-600 hover:border-sky-200',
-          )}
+          className={cn('sls-register-chip', !gradeId && 'is-on')}
           onClick={() => {
             setGradeId('');
             setSectionId('');
@@ -413,12 +435,7 @@ export function SchoolSisStudentsDirectory() {
           <button
             key={grade.id}
             type="button"
-            className={cn(
-              'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold',
-              gradeId === grade.id
-                ? 'bg-[#1a365d] text-white'
-                : 'border border-slate-200 bg-white text-slate-600 hover:border-sky-200',
-            )}
+            className={cn('sls-register-chip', gradeId === grade.id && 'is-on')}
             onClick={() => {
               setGradeId(grade.id);
               setSectionId('');
@@ -435,7 +452,7 @@ export function SchoolSisStudentsDirectory() {
         ))}
       </div>
 
-      <div className="sls-filter-bar flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-4 lg:flex-row lg:items-center">
+      <div className="sls-filter-bar sls-register-toolbar">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -445,24 +462,19 @@ export function SchoolSisStudentsDirectory() {
               setPage(1);
             }}
             placeholder="Search name, admission no., roll no., phone, or parent…"
-            className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-9 pr-3 text-sm outline-none focus:border-sky-300 focus:bg-white"
+            className="sls-register-search"
           />
         </div>
         <button
           type="button"
           onClick={() => setAdvanced((v) => !v)}
-          className={cn(
-            'inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-medium',
-            advanced
-              ? 'border-sky-200 bg-sky-50 text-[#1a365d]'
-              : 'border-slate-200 bg-white text-slate-600',
-          )}
+          className={cn('sls-register-ghost', advanced && 'is-on')}
         >
           <Filter className="h-4 w-4" />
-          Advanced Filters
+          Filters
         </button>
         <select
-          className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 lg:w-auto"
+          className="min-w-0 flex-none px-3 lg:w-auto"
           value={sectionId}
           onChange={(e) => {
             setSectionId(e.target.value);
@@ -476,18 +488,29 @@ export function SchoolSisStudentsDirectory() {
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={clearFilters}
-          className="inline-flex h-10 items-center gap-1 rounded-xl border border-slate-200 px-3 text-sm text-slate-500 hover:bg-slate-50"
+        <select
+          className="min-w-0 flex-none px-3 lg:w-auto"
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
         >
+          <option value="">All status</option>
+          {statusOptions.map((status) => (
+            <option key={status} value={status}>
+              {status.charAt(0) + status.slice(1).toLowerCase()}
+            </option>
+          ))}
+        </select>
+        <button type="button" onClick={clearFilters} className="sls-register-ghost">
           <X className="h-4 w-4" />
           Clear
         </button>
       </div>
 
       {advanced ? (
-        <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+        <label className="sls-register-advanced">
           <input
             type="checkbox"
             checked={incompleteOnly}
@@ -506,8 +529,8 @@ export function SchoolSisStudentsDirectory() {
         <p className="text-sm text-red-600">{apiErrorMessage(students.error)}</p>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-        <div className="sls-chip-row border-b border-slate-100 px-3 py-2.5">
+      <div className="sls-register-panel">
+        <div className="sls-chip-row sls-register-bulk">
           <label className="flex items-center gap-2 px-1 text-xs text-slate-500">
             <input
               type="checkbox"
@@ -528,7 +551,7 @@ export function SchoolSisStudentsDirectory() {
               type="button"
               disabled
               title="Coming soon"
-              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-400"
+              className="sls-register-ghost"
             >
               {label}
             </button>
@@ -561,16 +584,12 @@ export function SchoolSisStudentsDirectory() {
                   })
                   .finally(() => setRollBusy(false));
               }}
-              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:text-slate-400"
+              className="sls-register-ghost disabled:text-slate-400"
             >
               {rollBusy ? 'Assigning…' : 'Assign Roll No.'}
             </button>
           ) : (
-            <button
-              type="button"
-              disabled
-              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-400"
-            >
+            <button type="button" disabled className="sls-register-ghost">
               Assign Roll No.
             </button>
           )}
@@ -578,13 +597,13 @@ export function SchoolSisStudentsDirectory() {
             <button
               type="button"
               onClick={() => setColumnsOpen((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600"
+              className="sls-register-ghost"
             >
               <Columns3 className="h-3.5 w-3.5" />
               Columns
             </button>
             {columnsOpen ? (
-              <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+              <div className="sls-register-menu absolute right-0 z-20 mt-1 w-44 p-2">
                 {(Object.keys(cols) as ColKey[]).map((key) => (
                   <label
                     key={key}
@@ -595,7 +614,7 @@ export function SchoolSisStudentsDirectory() {
                       checked={cols[key]}
                       onChange={(e) => setCols((c) => ({ ...c, [key]: e.target.checked }))}
                     />
-                    {key}
+                    {COL_LABELS[key]}
                   </label>
                 ))}
               </div>
@@ -603,25 +622,24 @@ export function SchoolSisStudentsDirectory() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#f4f8fc] text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className="sls-register-table-wrap">
+          <table className="sls-register-table">
+            <thead>
               <tr>
-                <th className="px-3 py-3">
+                <th>
                   <span className="sr-only">Select</span>
                 </th>
-                <th className="px-2 py-3">#</th>
-                {cols.photo ? <th className="px-2 py-3">Photo</th> : null}
-                <th className="px-3 py-3">Student Name</th>
-                {cols.admission ? <th className="px-3 py-3">Admission No.</th> : null}
-                {cols.roll ? <th className="px-3 py-3">Roll No.</th> : null}
-                {cols.klass ? <th className="px-3 py-3">Class & Section</th> : null}
-                {cols.dob ? <th className="px-3 py-3">Date of Birth</th> : null}
-                {cols.guardian ? <th className="px-3 py-3">Parent / Guardian</th> : null}
-                {cols.phone ? <th className="px-3 py-3">Phone</th> : null}
-                {cols.profile ? <th className="px-3 py-3">Profile</th> : null}
-                {cols.status ? <th className="px-3 py-3">Status</th> : null}
-                <th className="px-3 py-3">Actions</th>
+                <th>#</th>
+                <th>Student</th>
+                {cols.admission ? <th>Admission No.</th> : null}
+                {cols.roll ? <th>Roll No.</th> : null}
+                {cols.klass ? <th>Class & Section</th> : null}
+                {cols.dob ? <th>Date of Birth</th> : null}
+                {cols.guardian ? <th>Parent / Guardian</th> : null}
+                {cols.phone ? <th>Phone</th> : null}
+                {cols.profile ? <th>Profile</th> : null}
+                {cols.status ? <th>Status</th> : null}
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -646,11 +664,8 @@ export function SchoolSisStudentsDirectory() {
                   const incomplete = pct < 70;
                   const idx = (safePage - 1) * pageSize + i + 1;
                   return (
-                    <tr
-                      key={s.id}
-                      className="border-t border-slate-100 odd:bg-white even:bg-slate-50/60 hover:bg-sky-50/50"
-                    >
-                      <td className="px-3 py-2.5">
+                    <tr key={s.id}>
+                      <td>
                         <input
                           type="checkbox"
                           checked={selected.includes(s.id)}
@@ -661,44 +676,36 @@ export function SchoolSisStudentsDirectory() {
                           }
                         />
                       </td>
-                      <td className="px-2 py-2.5 text-xs text-slate-400">{idx}</td>
-                      {cols.photo ? (
-                        <td className="px-2 py-2.5">
-                          {s.photoUrl ? (
-                            <img
-                              src={s.photoUrl}
-                              alt=""
-                              className="h-9 w-9 rounded-full object-cover"
-                            />
-                          ) : (
-                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-[11px] font-semibold text-sky-800">
-                              {initials(s.fullName)}
-                            </span>
-                          )}
-                        </td>
-                      ) : null}
-                      <td className="px-3 py-2.5">
-                        <Link
-                          href={`/admin/school-sis/students/${s.id}`}
-                          className="font-semibold uppercase tracking-wide text-[#1a365d] hover:underline"
-                        >
-                          {s.fullName}
-                        </Link>
+                      <td className="text-xs text-slate-400">{idx}</td>
+                      <td>
+                        <div className="sls-register-student">
+                          {cols.photo ? (
+                            s.photoUrl ? (
+                              <span className="sls-register-avatar">
+                                <img src={s.photoUrl} alt="" />
+                              </span>
+                            ) : (
+                              <span className="sls-register-avatar">{initials(s.fullName)}</span>
+                            )
+                          ) : null}
+                          <Link
+                            href={`/admin/school-sis/students/${s.id}`}
+                            className="sls-register-name"
+                          >
+                            {displayName(s.fullName)}
+                          </Link>
+                        </div>
                       </td>
                       {cols.admission ? (
-                        <td className="px-3 py-2.5 font-mono text-xs text-slate-600">
-                          {s.admissionNumber}
-                        </td>
+                        <td className="sls-register-mono">{s.admissionNumber}</td>
                       ) : null}
                       {cols.roll ? (
-                        <td className="px-3 py-2.5 font-mono text-xs text-slate-600">
-                          {enr?.rollNumber ?? '—'}
-                        </td>
+                        <td className="sls-register-mono">{enr?.rollNumber ?? '—'}</td>
                       ) : null}
                       {cols.klass ? (
-                        <td className="px-3 py-2.5">
+                        <td>
                           {enr ? (
-                            <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">
+                            <span className="sls-register-class">
                               {enr.section.grade.name} {enr.section.name}
                             </span>
                           ) : (
@@ -707,25 +714,27 @@ export function SchoolSisStudentsDirectory() {
                         </td>
                       ) : null}
                       {cols.dob ? (
-                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
+                        <td className="whitespace-nowrap text-slate-600">
                           {formatDob(s.dateOfBirth)}
                         </td>
                       ) : null}
                       {cols.guardian ? (
-                        <td className="px-3 py-2.5">
-                          <p className="text-slate-800">{guardian?.fullName ?? '—'}</p>
+                        <td>
+                          <p className="font-medium text-slate-800">
+                            {displayName(guardian?.fullName)}
+                          </p>
                           <p className="text-[11px] capitalize text-slate-400">
                             {guardian ? relation.toLowerCase() : ''}
                           </p>
                         </td>
                       ) : null}
                       {cols.phone ? (
-                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
+                        <td className="whitespace-nowrap text-slate-600">
                           {s.phone || guardian?.phone || '—'}
                         </td>
                       ) : null}
                       {cols.profile ? (
-                        <td className="px-3 py-2.5">
+                        <td>
                           <div className="flex items-center gap-2">
                             <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
                               <div
@@ -745,15 +754,15 @@ export function SchoolSisStudentsDirectory() {
                         </td>
                       ) : null}
                       {cols.status ? (
-                        <td className="px-3 py-2.5">
+                        <td>
                           <span
                             className={cn(
-                              'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                              'sls-register-status',
                               incomplete
-                                ? 'bg-rose-50 text-rose-700'
+                                ? 'is-warn'
                                 : s.status === 'ACTIVE'
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-slate-100 text-slate-600',
+                                  ? 'is-active'
+                                  : 'is-muted',
                             )}
                           >
                             {incomplete
@@ -764,7 +773,7 @@ export function SchoolSisStudentsDirectory() {
                           </span>
                         </td>
                       ) : null}
-                      <td className="relative px-3 py-2.5">
+                      <td className="relative">
                         <button
                           type="button"
                           className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
@@ -774,7 +783,7 @@ export function SchoolSisStudentsDirectory() {
                           <MoreHorizontal className="h-4 w-4" />
                         </button>
                         {menuId === s.id ? (
-                          <div className="absolute right-3 z-20 mt-1 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                          <div className="sls-register-menu absolute right-3 z-20 mt-1 w-36 overflow-hidden py-1">
                             <Link
                               href={`/admin/school-sis/students/${s.id}`}
                               className="block px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"
@@ -802,7 +811,7 @@ export function SchoolSisStudentsDirectory() {
           </table>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+        <div className="sls-register-foot">
           <p>
             {filtered.length
               ? `Showing ${start} to ${end} of ${filtered.length} students`
@@ -812,7 +821,6 @@ export function SchoolSisStudentsDirectory() {
             <label className="flex items-center gap-2">
               Rows per page
               <select
-                className="h-8 rounded-lg border border-slate-200 px-2"
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(Number(e.target.value));
@@ -826,10 +834,9 @@ export function SchoolSisStudentsDirectory() {
                 ))}
               </select>
             </label>
-            <div className="flex items-center gap-1">
+            <div className="sls-register-pager">
               <button
                 type="button"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 disabled:opacity-40"
                 disabled={safePage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 aria-label="Previous page"
@@ -844,12 +851,7 @@ export function SchoolSisStudentsDirectory() {
                     <button
                       type="button"
                       onClick={() => setPage(n)}
-                      className={cn(
-                        'h-8 min-w-8 rounded-lg px-2',
-                        n === safePage
-                          ? 'bg-[#2563eb] text-white'
-                          : 'border border-slate-200 hover:bg-slate-50',
-                      )}
+                      className={n === safePage ? 'is-on' : undefined}
                     >
                       {n}
                     </button>
@@ -858,7 +860,6 @@ export function SchoolSisStudentsDirectory() {
               })}
               <button
                 type="button"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 disabled:opacity-40"
                 disabled={safePage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 aria-label="Next page"

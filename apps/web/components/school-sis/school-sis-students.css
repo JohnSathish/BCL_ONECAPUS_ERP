@@ -1,0 +1,357 @@
+/* St. Luke's Students register — SaaS layout, not a spreadsheet. */
+
+.sls-register {
+  --sls-navy: #1a365d;
+  --sls-ink: #0f172a;
+  --sls-muted: #64748b;
+  --sls-line: rgba(15, 23, 42, 0.06);
+  --sls-soft: 0 10px 28px rgba(15, 23, 42, 0.05);
+  min-width: 0;
+}
+
+.sls-register-stat,
+.sls-register-toolbar,
+.sls-register-panel {
+  border: 0 !important;
+  background: #fff;
+  border-radius: 1.15rem;
+  box-shadow: var(--sls-soft);
+}
+
+.sls-register-stat {
+  padding: 1rem 1.05rem 1.05rem;
+  text-align: left;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sls-register-stat:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.07);
+}
+
+.sls-register-chip {
+  border: 0 !important;
+  background: #eef3f9;
+  color: #334155;
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.sls-register-chip:hover {
+  background: #e4edf7;
+}
+
+.sls-register-chip.is-on {
+  background: var(--sls-navy);
+  color: #fff;
+}
+
+.sls-register-chip.is-on span {
+  color: #c7e4fb !important;
+}
+
+.sls-register-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem;
+}
+
+.sls-register-search,
+.sls-register-toolbar select,
+.sls-register-ghost,
+.sls-register-foot select {
+  height: 2.5rem;
+  border: 0 !important;
+  border-radius: 0.8rem;
+  background: #f3f6fb !important;
+  box-shadow: none !important;
+  color: #334155;
+  font-size: 0.875rem;
+}
+
+.sls-register-search {
+  width: 100%;
+  padding-left: 2.35rem;
+  padding-right: 0.75rem;
+  outline: none;
+}
+
+.sls-register-search:focus,
+.sls-register-toolbar select:focus {
+  background: #fff !important;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.14) !important;
+}
+
+.sls-register-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.85rem;
+  font-weight: 600;
+}
+
+.sls-register-ghost:hover:not(:disabled) {
+  background: #e8eef7 !important;
+}
+
+.sls-register-ghost.is-on {
+  background: #e8f4fd !important;
+  color: #1a365d;
+}
+
+.sls-register-ghost:disabled {
+  color: #94a3b8;
+}
+
+.sls-register-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.5rem;
+  padding: 0 0.95rem;
+  border: 0 !important;
+  border-radius: 0.8rem;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
+}
+
+.sls-register-primary:hover {
+  background: #1d4ed8;
+}
+
+.sls-register-panel {
+  overflow: hidden;
+}
+
+.sls-register-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.8rem;
+  background: #f8fafc;
+  box-shadow: inset 0 -1px 0 var(--sls-line);
+}
+
+.sls-register-bulk .sls-register-ghost {
+  height: 1.9rem;
+  font-size: 0.75rem;
+  padding: 0 0.65rem;
+}
+
+.sls-register-table-wrap {
+  overflow-x: auto;
+}
+
+.sls-register-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.sls-register-table,
+.sls-register-table th,
+.sls-register-table td {
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-top: 0 !important;
+}
+
+.sls-register-table thead th {
+  border: 0 !important;
+  background: #eef4fb;
+  color: #64748b;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.85rem 0.9rem;
+  white-space: nowrap;
+}
+
+.sls-register-table tbody td {
+  border: 0 !important;
+  border-bottom: 1px solid var(--sls-line) !important;
+  background: transparent;
+  padding: 0.95rem 0.9rem;
+  vertical-align: middle;
+}
+
+.sls-register-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+.sls-register-table tbody tr:hover td {
+  background: #f4f9fd;
+}
+
+.sls-register-table thead th:first-child,
+.sls-register-table tbody td:first-child {
+  width: 2.4rem;
+  padding-left: 1rem;
+  padding-right: 0.4rem;
+}
+
+.sls-register-table tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+.sls-register-foot select {
+  padding: 0 0.45rem;
+}
+
+.sls-register-student {
+  display: flex;
+  min-width: 13rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sls-register-avatar,
+.sls-register-avatar img {
+  height: 2.55rem;
+  width: 2.55rem;
+  border-radius: 999px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.sls-register-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-size: 0.7rem;
+  font-weight: 800;
+  box-shadow: 0 0 0 3px #fff, 0 0 0 4px #e2e8f0;
+}
+
+.sls-register-name {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--sls-navy);
+  text-decoration: none;
+}
+
+.sls-register-name:hover {
+  color: #2563eb;
+}
+
+.sls-register-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.sls-register-class {
+  display: inline-flex;
+  border-radius: 999px;
+  background: #e8f3fe;
+  color: #1d4ed8;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.sls-register-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.sls-register-status.is-active {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.sls-register-status.is-warn {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.sls-register-status.is-muted {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.sls-register-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  background: #fbfcfe;
+}
+
+.sls-register-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.sls-register-pager button,
+.sls-register-foot select {
+  height: 2rem;
+  min-width: 2rem;
+  border: 0 !important;
+  border-radius: 0.55rem;
+  background: #eef2f7;
+  color: #334155;
+}
+
+.sls-register-pager button:disabled {
+  opacity: 0.4;
+}
+
+.sls-register-toolbar select {
+  padding: 0 0.75rem;
+}
+
+.sls-register-pager button.is-on {
+  background: var(--sls-navy);
+  color: #fff;
+}
+
+.sls-register-advanced {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 0.95rem;
+  border-radius: 0.95rem;
+  background: #fff;
+  box-shadow: var(--sls-soft);
+  color: #475569;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 639px) {
+  .sls-register-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sls-register-toolbar select,
+  .sls-register-toolbar .sls-register-ghost,
+  .sls-page-actions .sls-register-ghost,
+  .sls-page-actions .sls-register-primary {
+    width: 100%;
+    justify-content: center;
+  }
+}
