@@ -249,6 +249,7 @@ async function main() {
         services: 'Website',
         description: 'Institution website delivered for DBCTE Tura.',
         websiteUrl: 'https://dbctetura.com/',
+        status: 'PUBLISHED',
         displayOrder: 2,
       },
       {
@@ -259,6 +260,7 @@ async function main() {
         services: 'Website',
         description: 'School website for Tura Public School.',
         websiteUrl: 'https://turapublicschool.com/',
+        status: 'PUBLISHED',
         displayOrder: 3,
       },
       {
@@ -269,6 +271,7 @@ async function main() {
         services: 'Website, ongoing updates',
         description: 'Institution website with structured navigation and ongoing updates.',
         websiteUrl: 'https://dbchsstura.in/',
+        status: 'PUBLISHED',
         displayOrder: 4,
       },
       {
@@ -279,6 +282,7 @@ async function main() {
         services: 'Website',
         description: 'College website serving students and parents.',
         websiteUrl: 'https://pasfanc.ac.in/',
+        status: 'PUBLISHED',
         displayOrder: 5,
       },
       {
@@ -289,6 +293,7 @@ async function main() {
         services: 'Website',
         description: 'School website for parents and students, Thannipuzha, Kerala.',
         websiteUrl: 'https://anitavidyalayahss.com/',
+        status: 'PUBLISHED',
         displayOrder: 6,
       },
     ],

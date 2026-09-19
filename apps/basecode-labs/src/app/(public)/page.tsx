@@ -8,26 +8,55 @@ import { FeaturedProjectsSection } from '@/components/public/featured-projects-s
 import { TestimonialsSection } from '@/components/public/testimonials-section';
 import { Ecosystem } from '@/components/public/ecosystem';
 import { SiteCta } from '@/components/ui/page-shell';
+import { FALLBACK_PRODUCTS, FALLBACK_PROJECTS, FALLBACK_SERVICES } from '@/lib/published-catalog';
+
+async function publishedOr<T>(load: () => Promise<T[]>, fallback: T[]): Promise<T[]> {
+  try {
+    const rows = await load();
+    return rows.length ? rows : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default async function HomePage() {
   const [products, testimonials, logos, services, projects] = await Promise.all([
-    prisma.product.findMany({ where: { status: 'PUBLISHED' }, orderBy: { displayOrder: 'asc' } }),
-    prisma.testimonial.findMany({
-      where: { status: 'PUBLISHED' },
-      orderBy: { displayOrder: 'asc' },
-    }),
-    prisma.clientLogo.findMany({
-      where: { status: 'PUBLISHED' },
-      orderBy: { displayOrder: 'asc' },
-    }),
-    prisma.serviceItem.findMany({
-      where: { status: 'PUBLISHED' },
-      orderBy: { displayOrder: 'asc' },
-    }),
-    prisma.portfolioProject.findMany({
-      where: { status: 'PUBLISHED' },
-      orderBy: { displayOrder: 'asc' },
-    }),
+    publishedOr(
+      () =>
+        prisma.product.findMany({
+          where: { status: 'PUBLISHED' },
+          orderBy: { displayOrder: 'asc' },
+        }),
+      FALLBACK_PRODUCTS as never,
+    ),
+    prisma.testimonial
+      .findMany({
+        where: { status: 'PUBLISHED' },
+        orderBy: { displayOrder: 'asc' },
+      })
+      .catch(() => []),
+    prisma.clientLogo
+      .findMany({
+        where: { status: 'PUBLISHED' },
+        orderBy: { displayOrder: 'asc' },
+      })
+      .catch(() => []),
+    publishedOr(
+      () =>
+        prisma.serviceItem.findMany({
+          where: { status: 'PUBLISHED' },
+          orderBy: { displayOrder: 'asc' },
+        }),
+      FALLBACK_SERVICES as never,
+    ),
+    publishedOr(
+      () =>
+        prisma.portfolioProject.findMany({
+          where: { status: 'PUBLISHED' },
+          orderBy: { displayOrder: 'asc' },
+        }),
+      FALLBACK_PROJECTS,
+    ),
   ]);
 
   return (

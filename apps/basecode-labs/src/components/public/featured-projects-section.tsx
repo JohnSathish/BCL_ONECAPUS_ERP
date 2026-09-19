@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { COMPANY } from '@/lib/company';
+import { FALLBACK_PROJECTS } from '@/lib/published-catalog';
 import { cn } from '@/lib/cn';
 
 type Project = {
@@ -75,10 +76,11 @@ export function FeaturedProjectsSection({
   projects: Project[];
   hideIntro?: boolean;
 }) {
+  const list = projects.length ? projects : FALLBACK_PROJECTS;
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All');
   const visible = useMemo(
-    () => (filter === 'All' ? projects : projects.filter((p) => bucket(p.industry) === filter)),
-    [filter, projects],
+    () => (filter === 'All' ? list : list.filter((p) => bucket(p.industry) === filter)),
+    [filter, list],
   );
 
   return (
@@ -105,7 +107,7 @@ export function FeaturedProjectsSection({
               <span className="flex items-center gap-2">
                 <GraduationCap className="h-5 w-5 text-sky-600" />
                 <span>
-                  <span className="block font-bold text-slate-900">{projects.length}</span>
+                  <span className="block font-bold text-slate-900">{list.length}</span>
                   <span className="text-xs">Published projects</span>
                 </span>
               </span>
