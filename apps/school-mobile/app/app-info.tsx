@@ -12,7 +12,7 @@ export default function AppInfoScreen() {
         <Text style={styles.meta}>St. Luke's Secondary School, Tura</Text>
         <Text
           style={styles.link}
-          onPress={() => void Linking.openURL('https://basecodelabs.com/privacy-policy.html')}
+          onPress={() => void Linking.openURL('https://stlukestura.in/privacy-policy')}
         >
           Privacy policy
         </Text>

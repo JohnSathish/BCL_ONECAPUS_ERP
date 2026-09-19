@@ -32,6 +32,8 @@ const RESERVED = new Set([
   'events',
   'news',
   'about',
+  'privacy-policy',
+  'privacy',
 ]);
 
 export async function generateMetadata({

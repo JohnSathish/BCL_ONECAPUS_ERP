@@ -101,6 +101,8 @@ const PAGE_PARENTS: Record<string, SeoCrumb[]> = {
   events: [{ href: '/', label: 'Home' }],
   gallery: [{ href: '/', label: 'Home' }],
   contact: [{ href: '/', label: 'Home' }],
+  'privacy-policy': [{ href: '/', label: 'Home' }],
+  privacy: [{ href: '/', label: 'Home' }],
   faq: [{ href: '/', label: 'Home' }],
   'parent-corner': [{ href: '/', label: 'Home' }],
 };

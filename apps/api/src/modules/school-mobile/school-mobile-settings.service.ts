@@ -109,7 +109,7 @@ export class SchoolMobileSettingsService {
       releaseNotes: settings.releaseNotes,
       maintenanceMode: settings.maintenanceMode,
       maintenanceMessage: settings.maintenanceMessage,
-      privacyPolicyUrl: 'https://stlukestura.in/privacy',
+      privacyPolicyUrl: 'https://stlukestura.in/privacy-policy',
       supportEmail: 'admin@stlukestura.in',
       product: 'school-sis',
       features: {

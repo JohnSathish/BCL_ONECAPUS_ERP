@@ -28,6 +28,8 @@ export const PAGE_KICKERS: Record<string, string> = {
   faq: 'GUIDANCE',
   principal: 'FROM THE PRINCIPAL',
   contact: 'VISIT',
+  'privacy-policy': 'PRIVACY',
+  privacy: 'PRIVACY',
   notices: 'NEWS & NOTICES',
   news: 'NEWS',
   events: 'EVENTS',
@@ -62,6 +64,7 @@ const RELATED_BLURB: Record<string, string> = {
   '/apply': 'Submit an application when a cycle is open.',
   '/fees': 'Fee information from the school office.',
   '/contact': 'Find us at Walbakgre, Tura.',
+  '/privacy-policy': 'How the school website and app use information.',
   '/news': 'Stories published by the school.',
 };
 
@@ -126,7 +129,16 @@ export function SchoolInteriorPage({
   const year = str(extrasJson.establishedYear, '2009');
   const quote = str(extrasJson.scriptureQuote, 'Let your light shine before others.');
   const quoteBy = str(extrasJson.scriptureAttribution, 'Matthew 5:16');
-  const listing = ['notices', 'news', 'events', 'gallery', 'contact', 'apply'].includes(slug);
+  const listing = [
+    'notices',
+    'news',
+    'events',
+    'gallery',
+    'contact',
+    'apply',
+    'privacy-policy',
+    'privacy',
+  ].includes(slug);
   const prideFacts = facts?.length
     ? facts
     : listing

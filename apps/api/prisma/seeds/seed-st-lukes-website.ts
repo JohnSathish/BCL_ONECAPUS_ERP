@@ -779,6 +779,17 @@ export async function seedStLukesWebsite(
         'Where are notices and events? The notice board and events pages publish official updates from the office.',
       ],
     },
+    {
+      slug: 'privacy-policy',
+      title: 'Privacy Policy',
+      paragraphs: [
+        'This Privacy Policy is for St. Luke’s Secondary School, Walbakgre, P.O. Dakopgre, Tura – 794101, West Garo Hills, Meghalaya, India. It covers https://stlukestura.in, the school ERP at https://erp.stlukestura.in, and the official St. Luke’s School app (Android package in.stlukestura.school).',
+        'The School is the data controller. BaseCode Labs Pvt. Ltd. hosts the software as a processor. Last updated: 19 September 2026. The full public text is always at https://stlukestura.in/privacy-policy.',
+        'The app is only for people the School has given an account. We collect login and profile details, device and push-notification tokens, messages, and limited website logs. We use this to run the school app and website, not to sell data or show third-party ads.',
+        'Push alerts use Firebase Cloud Messaging (Google LLC). Face ID or fingerprint stay on the phone. You may email admin@stlukestura.in with the subject “Delete my St. Luke’s School app account” to disable mobile access.',
+        'Pupil records are processed by the School as an educational institution. We do not sell children’s information or use it for advertising.',
+      ],
+    },
   ];
 
   const pageSeo: Record<string, { title: string; description: string }> = {
@@ -831,6 +842,11 @@ export async function seedStLukesWebsite(
       title: 'Faculty | St. Luke’s Secondary School, Tura',
       description:
         'Faculty and staff at St. Luke’s Secondary School, Tura. Public profiles appear only when the office publishes them.',
+    },
+    'privacy-policy': {
+      title: 'Privacy Policy | St. Luke’s Secondary School, Tura',
+      description:
+        'How St. Luke’s Secondary School, Tura collects, uses, shares and protects information in the school website and St. Luke’s School app.',
     },
     gallery: {
       title: 'Gallery | St. Luke’s Secondary School, Tura',

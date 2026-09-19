@@ -60,7 +60,7 @@ function legalPages(bundle: FooterBundle, host?: string | null) {
     { slug: 'sitemap', label: 'Sitemap' },
   ];
   const seen = new Set<string>();
-  return wanted
+  const fromCms = wanted
     .filter((item) => bundle.pages.some((p) => p.slug === item.slug))
     .filter((item) => {
       if (seen.has(item.label)) return false;
@@ -68,6 +68,13 @@ function legalPages(bundle: FooterBundle, host?: string | null) {
       return true;
     })
     .map((item) => ({ href: schoolWebPath(`/${item.slug}`, host), label: item.label }));
+  if (!fromCms.some((item) => item.label === 'Privacy Policy')) {
+    fromCms.unshift({
+      href: schoolWebPath('/privacy-policy', host),
+      label: 'Privacy Policy',
+    });
+  }
+  return fromCms;
 }
 
 function ribbonIcon(title: string): 'book' | 'people' | 'cross' | 'pin' {

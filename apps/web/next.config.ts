@@ -74,6 +74,30 @@ const nextConfig: NextConfig = {
         destination: '/admin/reports/students',
         permanent: false,
       },
+      {
+        source: '/privacy',
+        has: [{ type: 'host', value: 'stlukestura.in' }],
+        destination: '/privacy-policy',
+        permanent: false,
+      },
+      {
+        source: '/privacy',
+        has: [{ type: 'host', value: 'www.stlukestura.in' }],
+        destination: '/privacy-policy',
+        permanent: false,
+      },
+      {
+        source: '/privacy',
+        has: [{ type: 'host', value: 'school.localhost' }],
+        destination: '/privacy-policy',
+        permanent: false,
+      },
+      {
+        source: '/privacy',
+        has: [{ type: 'host', value: 'sls.localhost' }],
+        destination: '/privacy-policy',
+        permanent: false,
+      },
     ];
   },
   images: {
