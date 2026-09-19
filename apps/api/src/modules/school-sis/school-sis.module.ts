@@ -76,6 +76,7 @@ import { SchoolSisReportsQueryService } from './school-sis-reports-query.service
 import { SchoolReportEngineService } from './report-engine/report-engine.service';
 import { SchoolReportBrandingService } from './report-engine/report-branding.service';
 import { SchoolReportPdfService } from './report-engine/report-pdf.service';
+import { SchoolReportExcelService } from './report-engine/report-excel.service';
 import { SchoolSisAppearanceService } from './school-sis-appearance.service';
 import { SchoolSisAppearanceController } from './school-sis-appearance.controller';
 
