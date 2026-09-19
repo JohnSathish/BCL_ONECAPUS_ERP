@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Component, useEffect, useState, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { PoweredByBaseCodeLabs } from '@/components/branding/powered-by-basecode-labs';
 import { useBranding } from '@/hooks/use-branding';
@@ -14,6 +15,33 @@ import { cn } from '@/utils/cn';
 import { SchoolErpSidebar } from './school-erp-sidebar';
 import { SchoolErpTopbar } from './school-erp-topbar';
 import './school-erp.css';
+
+class SchoolErpPageBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+          <p className="font-semibold">This page could not load</p>
+          <p className="mt-1 text-rose-700">{this.state.error.message}</p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold"
+            onClick={() => this.setState({ error: null })}
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function SchoolErpFooterLine() {
   const { branding, displayName } = useBranding();
@@ -46,6 +74,7 @@ function SchoolErpFooterLine() {
  *         └── Footer (after content; bottom of viewport when short)
  */
 export function SchoolErpShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(false);
   const { branding } = useBranding();
@@ -117,7 +146,7 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
       {sis && customCss ? <style>{customCss}</style> : null}
       <SchoolErpTopbar onMenu={onMenu} />
 
-      <div className="school-erp-body">
+      <div className="school-erp-body flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div
           className={cn(
             'school-erp-sidebar-slot hidden lg:flex',
@@ -149,7 +178,7 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
                   <ImpersonationBanner />
                 </div>
               ) : null}
-              {children}
+              <SchoolErpPageBoundary key={pathname}>{children}</SchoolErpPageBoundary>
             </div>
             <footer className="school-erp-page-footer">
               <SchoolErpFooterLine />

@@ -306,6 +306,15 @@
   padding: 0.55rem 1rem 0.7rem;
 }
 
+.school-erp-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
 .school-erp-shell.is-sls.is-sidebar-right .school-erp-body {
   flex-direction: row-reverse;
 }
@@ -321,6 +330,7 @@
 
 .school-erp-sidebar-slot {
   flex: 0 0 var(--school-erp-sidebar-width);
+  align-self: stretch;
   width: var(--school-erp-sidebar-width);
   min-height: 0;
   overflow: hidden;

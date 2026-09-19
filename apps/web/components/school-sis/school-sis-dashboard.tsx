@@ -4,17 +4,6 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Bar,
-  BarChart,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import {
   BookOpen,
   CalendarDays,
   CheckSquare,
@@ -106,6 +95,64 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
     >
       <polyline fill="none" stroke={color} strokeWidth="2" points={pts.join(' ')} />
       <polyline fill={`${color}22`} stroke="none" points={`0,32 ${pts.join(' ')} 100,32`} />
+    </svg>
+  );
+}
+
+function ClassBars({ rows }: { rows: { name: string; count: number }[] }) {
+  const max = Math.max(...rows.map((r) => r.count), 1);
+  return (
+    <div className="flex h-56 min-h-[224px] items-end gap-1 overflow-x-auto px-1 pb-6 pt-4">
+      {rows.map((row) => (
+        <div
+          key={row.name}
+          className="flex h-full min-w-[1.75rem] flex-1 flex-col items-center justify-end gap-1"
+        >
+          <span className="text-[10px] tabular-nums text-slate-500">{row.count}</span>
+          <div
+            className="w-full max-w-[2.5rem] rounded-t-md bg-sky-500"
+            style={{ height: `${Math.max(8, (row.count / max) * 160)}px` }}
+            title={`${row.name}: ${row.count}`}
+          />
+          <span className="max-w-full truncate text-[10px] text-slate-500">{row.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GenderDonut({
+  rows,
+  total,
+}: {
+  rows: { name: string; value: number; color: string }[];
+  total: number;
+}) {
+  const radius = 64;
+  const circ = 2 * Math.PI * radius;
+  let offset = 0;
+  return (
+    <svg viewBox="0 0 180 180" className="mx-auto h-56 w-56" aria-hidden>
+      <circle cx="90" cy="90" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="18" />
+      {rows.map((row) => {
+        const len = total ? (row.value / total) * circ : 0;
+        const el = (
+          <circle
+            key={row.name}
+            cx="90"
+            cy="90"
+            r={radius}
+            fill="none"
+            stroke={row.color}
+            strokeWidth="18"
+            strokeDasharray={`${len} ${Math.max(circ - len, 0)}`}
+            strokeDashoffset={-offset}
+            transform="rotate(-90 90 90)"
+          />
+        );
+        offset += len;
+        return el;
+      })}
     </svg>
   );
 }
@@ -463,56 +510,24 @@ export function SchoolSisDashboard() {
             </p>
           ) : (
             <div className="grid gap-6 lg:grid-cols-5">
-              <div className="h-56 min-h-[224px] min-w-0 lg:col-span-3">
+              <div className="min-h-[224px] min-w-0 lg:col-span-3">
                 {classChart.length ? (
-                  <ResponsiveContainer
-                    width="100%"
-                    height={224}
-                    minWidth={1}
-                    minHeight={1}
-                    debounce={50}
-                  >
-                    <BarChart data={classChart} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Bar dataKey="count" fill={SKY} radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <ClassBars rows={classChart} />
                 ) : (
                   <p className="text-sm text-slate-500">No class-wise enrolment yet.</p>
                 )}
               </div>
-              <div className="relative h-56 min-h-[224px] min-w-0 lg:col-span-2">
+              <div className="relative min-h-[224px] min-w-0 lg:col-span-2">
                 {genderChart.length ? (
                   <>
-                    <ResponsiveContainer
-                      width="100%"
-                      height={224}
-                      minWidth={1}
-                      minHeight={1}
-                      debounce={50}
-                    >
-                      <PieChart>
-                        <Pie
-                          data={genderChart}
-                          dataKey="value"
-                          innerRadius={52}
-                          outerRadius={78}
-                          paddingAngle={2}
-                        >
-                          {genderChart.map((entry) => (
-                            <Cell key={entry.name} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                      <p className="text-lg font-semibold text-[#1a365d]">
-                        {genderTotal || counts?.students || 0}
-                      </p>
-                      <p className="text-[11px] text-slate-400">Students</p>
+                    <div className="relative mx-auto w-56">
+                      <GenderDonut rows={genderChart} total={genderTotal} />
+                      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                        <p className="text-lg font-semibold text-[#1a365d]">
+                          {genderTotal || counts?.students || 0}
+                        </p>
+                        <p className="text-[11px] text-slate-400">Students</p>
+                      </div>
                     </div>
                     <div className="mt-1 flex justify-center gap-3 text-[11px] text-slate-500">
                       {genderChart.map((g) => (
