@@ -33,6 +33,8 @@ import {
   type AppearanceConfig,
 } from '@/lib/school-sis/appearance';
 import { appearanceCssVars } from '@/lib/school-sis/appearance-tokens';
+import { applyThemePreset, themeCardSwatches } from '@/lib/school-sis/theme-tokens';
+import { useSchoolThemeStore } from '@/store/school-theme-store';
 import {
   applyAppearanceTheme,
   deleteAppearanceTheme,
@@ -260,15 +262,24 @@ export function AppearanceStudio() {
   const [dirty, setDirty] = useState(0);
   const [themeName, setThemeName] = useState("St. Luke's Corporate Theme");
   const [msg, setMsg] = useState<string | null>(null);
+  const setPreviewTheme = useSchoolThemeStore((s) => s.setPreview);
+  const setPublishedTheme = useSchoolThemeStore((s) => s.setPublished);
+  const setThemeMode = useSchoolThemeStore((s) => s.setMode);
 
   useEffect(() => {
     if (!q.data) return;
-    setDraft(mergeAppearanceConfig(q.data.config));
+    const next = mergeAppearanceConfig(q.data.config);
+    setDraft(next);
     setMeta(q.data);
-  }, [q.data]);
+    setPreviewTheme(next, q.data.theme);
+  }, [q.data, setPreviewTheme]);
 
-  const patch = (fn: (c: AppearanceConfig) => AppearanceConfig) => {
-    setDraft((cur) => (cur ? fn(cur) : cur));
+  const patch = (fn: (c: AppearanceConfig) => AppearanceConfig, themeId?: string) => {
+    setDraft((cur) => {
+      const next = cur ? fn(cur) : cur;
+      if (next) setPreviewTheme(next, themeId || meta.theme);
+      return next;
+    });
     setDirty((n) => n + 1);
   };
 
@@ -306,10 +317,17 @@ export function AppearanceStudio() {
       await saveSchoolAppearanceDraft(payload);
       return publishSchoolAppearance();
     },
-    onSuccess: () => {
+    onSuccess: (row) => {
       void qc.invalidateQueries({ queryKey: ['school-appearance'] });
       void qc.invalidateQueries({ queryKey: ['school-appearance-published'] });
       void qc.invalidateQueries({ queryKey: ['school-appearance-versions'] });
+      if (row.config)
+        setPublishedTheme(
+          row.config,
+          row.theme,
+          (row.mode as 'light' | 'dark' | 'system') || 'system',
+          true,
+        );
       setDirty(0);
       setMsg('Published');
     },
@@ -341,7 +359,10 @@ export function AppearanceStudio() {
   return (
     <div
       className="px-4 py-6 lg:px-8"
-      style={appearanceCssVars(draft, { sidebarWidth: draft.sidebar.width })}
+      style={appearanceCssVars(draft, {
+        sidebarWidth: draft.sidebar.width,
+        themeId: meta.theme,
+      })}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -547,55 +568,82 @@ export function AppearanceStudio() {
           {section === 'theme' ? (
             <div className="rounded-2xl border border-white/70 bg-white/75 p-5 backdrop-blur">
               <h2 className="text-lg font-semibold">Theme Studio</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Select a theme to preview it on the live ERP immediately, then Apply to save it for
+                the institution.
+              </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {APPEARANCE_THEME_PRESETS.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => {
-                      setMeta((m) => ({ ...m, theme: t.id }));
-                      patch((c) => ({
-                        ...c,
-                        colors: {
-                          ...c.colors,
-                          primary: t.primary,
-                          secondary: t.secondary,
-                          accent: t.accent,
-                        },
-                      }));
-                    }}
-                    className={cn(
-                      'rounded-2xl border p-3 text-left transition hover:-translate-y-0.5',
-                      meta.theme === t.id
-                        ? 'border-[var(--school-erp-primary)] ring-2 ring-[var(--school-erp-accent)]'
-                        : 'border-slate-200',
-                    )}
-                  >
-                    <p className="text-xs font-bold uppercase tracking-wide">{t.name}</p>
-                    <div
-                      className="mt-2 h-2 rounded-full"
-                      style={{ background: `linear-gradient(90deg,${t.primary},${t.accent})` }}
-                    />
-                    <div className="mt-3 grid grid-cols-2 gap-1">
+                {APPEARANCE_THEME_PRESETS.map((t) => {
+                  const swatch = themeCardSwatches(t.id);
+                  const active = meta.theme === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setMeta((m) => ({ ...m, theme: t.id }));
+                        patch((c) => applyThemePreset(t.id, c), t.id);
+                      }}
+                      className={cn(
+                        'rounded-2xl border p-3 text-left transition hover:-translate-y-0.5',
+                        active
+                          ? 'border-[var(--school-erp-primary)] ring-2 ring-[var(--school-erp-accent)]'
+                          : 'border-slate-200',
+                      )}
+                    >
+                      <p className="text-xs font-bold uppercase tracking-wide">{t.name}</p>
                       <div
-                        className="rounded-lg bg-slate-50 p-2 text-center text-xs font-bold"
-                        style={{ color: t.primary }}
-                      >
-                        24
+                        className="mt-2 h-2 rounded-full"
+                        style={{
+                          background: `linear-gradient(90deg,${swatch.primary},${swatch.accent})`,
+                        }}
+                      />
+                      <div className="mt-3 grid grid-cols-6 gap-1">
+                        {[
+                          swatch.sidebar,
+                          swatch.sidebarActive,
+                          swatch.primary,
+                          swatch.button,
+                          swatch.accent,
+                          swatch.background,
+                        ].map((color, i) => (
+                          <span
+                            key={`${t.id}-${i}`}
+                            className="h-6 rounded-md border border-black/5"
+                            style={{ background: color }}
+                          />
+                        ))}
                       </div>
-                      <div
-                        className="rounded-lg bg-slate-50 p-2 text-center text-xs font-bold"
-                        style={{ color: t.accent }}
-                      >
-                        86
+                      <div className="mt-3 grid grid-cols-2 gap-1">
+                        <div
+                          className="rounded-lg p-2 text-center text-xs font-bold"
+                          style={{ background: swatch.sidebarActive, color: swatch.primary }}
+                        >
+                          Nav
+                        </div>
+                        <div
+                          className="rounded-lg p-2 text-center text-xs font-bold text-white"
+                          style={{ background: swatch.button }}
+                        >
+                          Button
+                        </div>
                       </div>
-                    </div>
-                    {meta.theme === t.id ? (
-                      <p className="mt-2 text-xs font-semibold text-emerald-600">✓ Active</p>
-                    ) : null}
-                  </button>
-                ))}
+                      {active ? (
+                        <p className="mt-2 text-xs font-semibold text-emerald-600">✓ Selected</p>
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
+              {manage ? (
+                <button
+                  type="button"
+                  className="mt-4 rounded-full bg-[var(--button-primary,var(--school-erp-primary))] px-4 py-2 text-sm font-semibold text-white"
+                  onClick={() => publish.mutate()}
+                >
+                  Apply theme
+                </button>
+              ) : null}
               {manage ? (
                 <div className="mt-5 flex flex-wrap gap-2">
                   <TextInput
@@ -632,9 +680,20 @@ export function AppearanceStudio() {
                           type="button"
                           className="text-[var(--school-erp-primary)]"
                           onClick={() =>
-                            void applyAppearanceTheme(t.id).then((row) =>
-                              qc.setQueryData(['school-appearance'], row),
-                            )
+                            void applyAppearanceTheme(t.id).then((row) => {
+                              qc.setQueryData(['school-appearance'], row);
+                              void qc.invalidateQueries({
+                                queryKey: ['school-appearance-published'],
+                              });
+                              if (row.config) {
+                                setPublishedTheme(
+                                  row.config,
+                                  row.theme,
+                                  (row.mode as 'light' | 'dark' | 'system') || 'system',
+                                  true,
+                                );
+                              }
+                            })
                           }
                         >
                           Apply
@@ -841,7 +900,7 @@ export function AppearanceStudio() {
                   />
                 </Field>
               </div>
-              <AppearanceLivePreview config={draft} mode="login" />
+              <AppearanceLivePreview config={draft} mode="login" themeId={meta.theme} />
             </div>
           ) : null}
 
@@ -1095,7 +1154,10 @@ export function AppearanceStudio() {
                   <button
                     key={m}
                     type="button"
-                    onClick={() => setMeta((x) => ({ ...x, mode: m }))}
+                    onClick={() => {
+                      setMeta((x) => ({ ...x, mode: m }));
+                      setThemeMode(m as 'light' | 'dark' | 'system');
+                    }}
                     className={cn(
                       'rounded-full border px-3 py-1 text-xs font-semibold capitalize',
                       meta.mode === m
@@ -1159,7 +1221,12 @@ export function AppearanceStudio() {
                   className="w-full"
                 />
               </Field>
-              <AppearanceLivePreview config={draft} mode="mobile" device="mobile" />
+              <AppearanceLivePreview
+                config={draft}
+                mode="mobile"
+                device="mobile"
+                themeId={meta.theme}
+              />
             </div>
           ) : null}
 
@@ -1182,7 +1249,7 @@ export function AppearanceStudio() {
                   </button>
                 ))}
               </div>
-              <AppearanceLivePreview config={draft} mode={device} />
+              <AppearanceLivePreview config={draft} mode={device} themeId={meta.theme} />
             </div>
           ) : null}
 
@@ -1331,7 +1398,7 @@ export function AppearanceStudio() {
               </button>
             ))}
           </div>
-          <AppearanceLivePreview config={draft} mode={device} />
+          <AppearanceLivePreview config={draft} mode={device} themeId={meta.theme} />
           <p className="text-[11px] text-slate-400">
             Last published:{' '}
             {meta.publishedAt ? new Date(meta.publishedAt).toLocaleString('en-IN') : 'Never'}

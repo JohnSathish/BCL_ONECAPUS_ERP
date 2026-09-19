@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   canAccessAdminPortal,
@@ -20,6 +20,8 @@ import type { LoginChallenge, LoginContext } from '@/types/login-context';
 import { LoginDynamicFavicon } from '@/components/branding/login-dynamic-favicon';
 import { SCHOOL_PORTAL_LOGO_SRC } from '@/lib/school-admissions-branding';
 import { getSecondarySisLoginHeroFallback, SCHOOL_SIS_LOGO_SRC } from '@/lib/school-erp/product';
+import { appearanceToCssVars, applyCssVarsToElement } from '@/lib/school-sis/theme-tokens';
+import { useSchoolThemeStore } from '@/store/school-theme-store';
 import { LoginAuthCard } from './login-auth-card';
 import { LoginAuthPanel } from './login-auth-panel';
 import { LoginHeroPanel } from './login-hero-panel';
@@ -73,6 +75,17 @@ export function LoginForm({
   const [challengeLoading, setChallengeLoading] = useState(true);
   const [apiWaiting, setApiWaiting] = useState(false);
   const [queryNextPath, setQueryNextPath] = useState<string | undefined>();
+
+  useLayoutEffect(() => {
+    if (!schoolSis) return;
+    const published = useSchoolThemeStore.getState().published;
+    const themeId = useSchoolThemeStore.getState().themeId;
+    if (!published) return;
+    applyCssVarsToElement(
+      document.documentElement,
+      appearanceToCssVars(published, { themeId, mode: 'light' }),
+    );
+  }, [schoolSis]);
 
   const startupRetryOptions = useMemo<ApiStartupRetryOptions>(
     () => ({

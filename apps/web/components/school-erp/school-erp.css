@@ -320,7 +320,7 @@
 }
 
 .school-erp-shell.is-sls.is-sidebar-glass .school-erp-sidebar {
-  background: rgba(255, 255, 255, 0.72);
+  background: color-mix(in srgb, var(--sidebar-background) 78%, transparent);
   backdrop-filter: blur(16px);
 }
 
@@ -509,63 +509,56 @@ html:has(.school-erp-shell) {
 }
 
 html:has(.school-erp-shell.is-sls) {
-  --school-erp-primary: #1a365d;
-  --school-erp-primary-deep: #12263f;
-  --school-erp-primary-hover: #163056;
-  --school-erp-accent: #0ea5e9;
+  --school-erp-primary: var(--button-primary, #1a365d);
+  --school-erp-primary-deep: var(--primary-active, #12263f);
+  --school-erp-primary-hover: var(--primary-hover, #163056);
+  --school-erp-accent: var(--accent-hex, #0ea5e9);
 }
 
-/* St. Luke's Secondary SIS — light ERP chrome (does not affect TPS KG). */
+/* St. Luke's Secondary SIS — token-driven chrome (does not affect TPS KG). */
 .school-erp-shell.is-sls {
-  --school-erp-primary: #1a365d;
-  --school-erp-primary-deep: #12263f;
-  --school-erp-primary-hover: #163056;
-  --school-erp-accent: #0ea5e9;
-  --school-erp-page: #f4f7fb;
-  --school-erp-card: #ffffff;
-  --school-erp-border: rgba(26, 54, 93, 0.1);
-  --school-erp-text: #0f172a;
-  --school-erp-muted: #64748b;
   --school-erp-sidebar-width: clamp(13.5rem, 15.5vw, 17.5rem);
+  background: var(--background-hex, var(--school-erp-page));
+  color: var(--text, var(--school-erp-text));
 }
 
 .school-erp-shell.is-sls .school-erp-sidebar {
-  background: #fff;
-  color: #0f172a;
-  border-right: 1px solid #e8eef5;
+  background: var(--sidebar-background);
+  color: var(--sidebar-foreground);
+  border-right: 1px solid var(--border-hex, var(--school-erp-border));
 }
 
 .school-erp-shell.is-sls .school-erp-sidebar-brand {
-  border-color: #e8eef5;
+  border-color: var(--border-hex, var(--school-erp-border));
 }
 
 .school-erp-shell.is-sls .school-erp-nav-group-label {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: #94a3b8;
+  color: var(--muted-foreground-hex, var(--school-erp-muted));
 }
 
 .school-erp-shell.is-sls .school-erp-nav-link {
-  color: #334155;
+  color: var(--sidebar-foreground);
   font-size: 0.8125rem;
   padding: 0.45rem 0.65rem;
   border-radius: 0.65rem;
 }
 
 .school-erp-shell.is-sls .school-erp-nav-link:hover {
-  background: #f1f7fc;
-  color: #1a365d;
+  background: var(--sidebar-hover);
+  color: var(--sidebar-active-foreground);
 }
 
 .school-erp-shell.is-sls .school-erp-nav-link.is-active {
-  background: #e8f4fd;
-  color: #1a365d;
+  background: var(--sidebar-active);
+  color: var(--sidebar-active-foreground);
   box-shadow: none;
 }
 
 .school-erp-shell.is-sls .school-erp-nav-link.is-active svg {
-  color: #0284c7;
+  color: var(--sidebar-active-foreground);
 }
 
 .school-erp-shell.is-sls .school-erp-nav-link.is-disabled {
@@ -573,23 +566,23 @@ html:has(.school-erp-shell.is-sls) {
 }
 
 .school-erp-shell.is-sls .school-erp-nav-child {
-  color: #64748b;
+  color: var(--muted-foreground-hex, var(--school-erp-muted));
   border-radius: 0.5rem;
 }
 
 .school-erp-shell.is-sls .school-erp-nav-child:hover {
-  background: #f1f7fc;
-  color: #1a365d;
+  background: var(--sidebar-hover);
+  color: var(--sidebar-active-foreground);
 }
 
 .school-erp-shell.is-sls .school-erp-nav-child.is-active {
-  background: #e8f4fd;
-  color: #1a365d;
+  background: var(--sidebar-active);
+  color: var(--sidebar-active-foreground);
 }
 
 .school-erp-shell.is-sls .school-erp-sidebar-nav {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: var(--border-hex) transparent;
 }
 
 .school-erp-shell.is-sls .school-erp-sidebar-nav::-webkit-scrollbar {
@@ -597,23 +590,24 @@ html:has(.school-erp-shell.is-sls) {
 }
 
 .school-erp-shell.is-sls .school-erp-sidebar-nav::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--border-hex);
   border-radius: 999px;
 }
 
 .school-erp-shell.is-sls .school-erp-icon-btn:hover,
 .school-erp-shell.is-sls .school-erp-profile-btn:hover,
 .school-erp-shell.is-sls .school-erp-profile-btn.is-active {
-  background: #f1f7fc;
+  background: var(--surface-hover);
 }
 
 .school-erp-shell.is-sls .school-erp-logout-btn:hover {
-  background: #e8f4fd;
-  border-color: rgba(26, 54, 93, 0.2);
+  background: var(--sidebar-hover);
+  border-color: var(--input-border);
 }
 
 .school-erp-shell.is-sls .school-erp-topbar {
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  background: var(--surface, #fff);
+  box-shadow: 0 1px 0 var(--border-hex);
 }
 
 .school-erp-shell.is-sls .school-erp-topbar-inner {
@@ -642,7 +636,7 @@ html:has(.school-erp-shell.is-sls) {
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
-  color: #0f172a;
+  color: var(--heading, #0f172a);
 }
 
 .school-erp-topbar-school-meta {
@@ -653,14 +647,14 @@ html:has(.school-erp-shell.is-sls) {
   margin-top: 0.12rem;
   overflow: hidden;
   font-size: 0.6875rem;
-  color: #64748b;
+  color: var(--muted-foreground-hex, #64748b);
 }
 
 .school-erp-topbar-motto {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #94a3b8;
+  color: var(--muted-foreground-hex, #94a3b8);
 }
 
 .school-erp-year-chip {
@@ -669,20 +663,20 @@ html:has(.school-erp-shell.is-sls) {
   align-items: center;
   gap: 0.45rem;
   border-radius: 0.8rem;
-  border: 1px solid #e2e8f0;
-  background: #fff;
+  border: 1px solid var(--input-border, #e2e8f0);
+  background: var(--surface, #fff);
   padding: 0 0.7rem 0 0.65rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--heading, #1e293b);
   white-space: nowrap;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .school-erp-year-chip:hover,
 .school-erp-year-chip.is-active {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--surface-hover, #f8fafc);
+  border-color: var(--border-hex, #cbd5e1);
 }
 
 .school-erp-shell.is-sls .school-erp-topbar-search {
@@ -691,35 +685,36 @@ html:has(.school-erp-shell.is-sls) {
 
 .school-erp-shell.is-sls .school-erp-topbar-search-input {
   height: 2.55rem;
-  border-color: #e2e8f0;
-  background: #f1f5f9;
-  color: #0f172a;
+  border-color: var(--input-border, #e2e8f0);
+  background: var(--muted-hex, #f1f5f9);
+  color: var(--text, #0f172a);
 }
 
 .school-erp-shell.is-sls .school-erp-topbar-search-input:hover,
 .school-erp-shell.is-sls .school-erp-topbar-search-input:focus {
-  background: #fff;
-  border-color: #7dd3fc;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+  background: var(--surface, #fff);
+  border-color: var(--accent-hex, #7dd3fc);
+  box-shadow: 0 0 0 3px var(--focus-ring, rgba(14, 165, 233, 0.12));
 }
 
 .school-erp-shell.is-sls .school-erp-icon-btn {
   height: 2.45rem;
   width: 2.45rem;
   border-radius: 0.8rem;
-  color: #334155;
+  color: var(--sidebar-foreground, #334155);
 }
 
 .school-erp-shell.is-sls .school-erp-icon-btn:hover,
 .school-erp-shell.is-sls .school-erp-icon-btn.is-active {
-  background: #f1f5f9;
-  border-color: #e2e8f0;
+  background: var(--surface-hover, #f1f5f9);
+  border-color: var(--border-hex, #e2e8f0);
 }
 
 .school-erp-shell.is-sls .school-erp-logout-btn {
-  border-color: #e2e8f0;
-  color: #1e293b;
+  border-color: var(--border-hex, #e2e8f0);
+  color: var(--heading, #1e293b);
   border-radius: 0.8rem;
+  background: var(--surface, #fff);
 }
 
 .school-erp-shell.is-sls .school-erp-profile-btn {
@@ -1168,4 +1163,114 @@ html:has(.school-erp-shell.is-sls) {
     padding-right: 1rem;
   }
 }
+
+/* Token-driven SIS components — future modules inherit these without per-page colors. */
+.school-erp-shell.is-sls .school-erp-sidebar .text-slate-900,
+.school-erp-shell.is-sls .school-erp-sidebar .text-slate-800 {
+  color: var(--sidebar-foreground) !important;
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar .text-slate-500,
+.school-erp-shell.is-sls .school-erp-sidebar .text-slate-400 {
+  color: color-mix(in srgb, var(--sidebar-foreground) 62%, transparent) !important;
+}
+
+.school-erp-shell.is-sls .school-erp-tenant-switch {
+  border-color: var(--border-hex) !important;
+  background: var(--sidebar-hover) !important;
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar-foot {
+  border-color: var(--border-hex) !important;
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar-foot .hover\:bg-slate-50:hover {
+  background: var(--sidebar-hover) !important;
+}
+
+.school-erp-shell.is-sls .school-erp-main-scroll,
+.school-erp-shell.is-sls .school-erp-main-inner {
+  background: var(--background-hex);
+  color: var(--text);
+}
+
+.school-erp-shell.is-sls .school-erp-page-footer {
+  color: var(--muted-foreground-hex);
+}
+
+.school-erp-shell.is-sls a {
+  color: var(--school-erp-primary);
+}
+
+.school-erp-shell.is-sls .school-erp-sidebar a,
+.school-erp-shell.is-sls .school-erp-nav-link,
+.school-erp-shell.is-sls .school-erp-nav-child {
+  color: inherit;
+}
+
+.school-erp-shell.is-sls input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
+.school-erp-shell.is-sls select,
+.school-erp-shell.is-sls textarea {
+  border-color: var(--input-border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.school-erp-shell.is-sls input:focus-visible,
+.school-erp-shell.is-sls select:focus-visible,
+.school-erp-shell.is-sls textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  border-color: var(--accent-hex);
+}
+
+.school-erp-shell.is-sls thead th {
+  color: var(--muted-foreground-hex);
+}
+
+.school-erp-shell.is-sls tbody tr:hover td {
+  background: var(--surface-hover);
+}
+
+.school-erp-shell.is-sls [class*='text-[#1a365d]'],
+.school-erp-shell.is-sls [class*='text-[#1A365D]'] {
+  color: var(--heading) !important;
+}
+
+.school-erp-shell.is-sls [class*='bg-[#2563eb]'],
+.school-erp-shell.is-sls [class*='bg-[#2563EB]'],
+.school-erp-shell.is-sls [class*='bg-[#4F46E5]'],
+.school-erp-shell.is-sls [class*='bg-[#4f46e5]'] {
+  background-color: var(--button-primary) !important;
+  color: var(--primary-foreground-hex) !important;
+}
+
+.school-erp-shell.is-sls [class*='bg-[#3B82F6]'],
+.school-erp-shell.is-sls [class*='bg-[#3b82f6]'],
+.school-erp-shell.is-sls [class*='bg-[#6366F1]'],
+.school-erp-shell.is-sls [class*='bg-[#6366f1]'] {
+  background-color: var(--button-primary) !important;
+}
+
+.school-erp-shell.is-sls .bg-blue-600,
+.school-erp-shell.is-sls .bg-indigo-600,
+.school-erp-shell.is-sls .bg-sky-600 {
+  background-color: var(--button-primary) !important;
+}
+
+.school-erp-shell.is-sls .text-blue-600,
+.school-erp-shell.is-sls .text-indigo-600,
+.school-erp-shell.is-sls .text-sky-700 {
+  color: var(--school-erp-primary) !important;
+}
+
+.school-erp-shell.is-sls .bg-white {
+  background-color: var(--surface);
+}
+
+.school-erp-shell.is-sls .school-erp-badge-primary,
+.school-erp-shell.is-sls [class*='rounded-full'][class*='bg-']:is(.bg-emerald-50, .bg-sky-50) {
+  color: inherit;
+}
+
 

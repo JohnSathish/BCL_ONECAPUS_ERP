@@ -203,6 +203,91 @@ export class SchoolSisAppearanceService {
   ): AppearanceConfig {
     const preset = APPEARANCE_THEME_PRESETS.find((t) => t.id === theme);
     if (!preset || theme === 'custom') return config;
+    const palettes: Record<
+      string,
+      {
+        background: string;
+        surface: string;
+        text: string;
+        muted: string;
+        border: string;
+        sidebar: string;
+      }
+    > = {
+      aurora: {
+        background: '#F5F3FF',
+        surface: '#FFFFFF',
+        text: '#1E1B4B',
+        muted: '#6366F1',
+        border: '#E0E7FF',
+        sidebar: '#0F1224',
+      },
+      midnight: {
+        background: '#F1F5F9',
+        surface: '#FFFFFF',
+        text: '#0F172A',
+        muted: '#64748B',
+        border: '#E2E8F0',
+        sidebar: '#020617',
+      },
+      ocean: {
+        background: '#F0F9FF',
+        surface: '#FFFFFF',
+        text: '#0C4A6E',
+        muted: '#0284C7',
+        border: '#BAE6FD',
+        sidebar: '#082F49',
+      },
+      royal: {
+        background: '#F4F7FB',
+        surface: '#FFFFFF',
+        text: '#0F172A',
+        muted: '#64748B',
+        border: '#E2E8F0',
+        sidebar: '#0F172A',
+      },
+      emerald: {
+        background: '#F0FDF4',
+        surface: '#FFFFFF',
+        text: '#064E3B',
+        muted: '#047857',
+        border: '#BBF7D0',
+        sidebar: '#022C22',
+      },
+      crimson: {
+        background: '#FFF1F2',
+        surface: '#FFFFFF',
+        text: '#4C0519',
+        muted: '#BE123C',
+        border: '#FECDD3',
+        sidebar: '#4C0519',
+      },
+      minimal: {
+        background: '#FAFAFA',
+        surface: '#FFFFFF',
+        text: '#18181B',
+        muted: '#71717A',
+        border: '#E4E4E7',
+        sidebar: '#09090B',
+      },
+      glass: {
+        background: '#F8FAFC',
+        surface: '#FFFFFF',
+        text: '#1E1B4B',
+        muted: '#6366F1',
+        border: '#E0E7FF',
+        sidebar: '#111827',
+      },
+      cyber: {
+        background: '#F8FAFC',
+        surface: '#FFFFFF',
+        text: '#0F172A',
+        muted: '#64748B',
+        border: '#E2E8F0',
+        sidebar: '#020617',
+      },
+    };
+    const extra = palettes[theme] ?? palettes.royal;
     return {
       ...config,
       colors: {
@@ -210,6 +295,16 @@ export class SchoolSisAppearanceService {
         primary: preset.primary,
         secondary: preset.secondary,
         accent: preset.accent,
+        background: extra.background,
+        surface: extra.surface,
+        text: extra.text,
+        muted: extra.muted,
+        border: extra.border,
+      },
+      dark: {
+        ...config.dark,
+        sidebar: extra.sidebar,
+        primary: preset.accent,
       },
     };
   }
@@ -412,10 +507,11 @@ export class SchoolSisAppearanceService {
     const snap = theme.snapshot as SaveAppearanceDto & {
       config?: AppearanceConfig;
     };
-    return this.saveDraft(tenantId, user, {
+    await this.saveDraft(tenantId, user, {
       ...snap,
       config: snap.config as unknown as Record<string, unknown>,
     });
+    return this.publish(tenantId, user);
   }
 
   async deleteTheme(tenantId: string, user: JwtUser, themeId: string) {

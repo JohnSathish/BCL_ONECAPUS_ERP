@@ -1,11 +1,11 @@
 /* St. Luke's Students register — SaaS layout, not a spreadsheet. */
 
 .sls-register {
-  --sls-navy: #1a365d;
-  --sls-ink: #0f172a;
-  --sls-muted: #64748b;
-  --sls-line: rgba(15, 23, 42, 0.06);
-  --sls-soft: 0 10px 28px rgba(15, 23, 42, 0.05);
+  --sls-navy: var(--heading, var(--school-erp-primary, #1a365d));
+  --sls-ink: var(--text, #0f172a);
+  --sls-muted: var(--muted-foreground-hex, #64748b);
+  --sls-line: color-mix(in srgb, var(--border-hex, #0f172a) 35%, transparent);
+  --sls-soft: 0 10px 28px color-mix(in srgb, var(--heading, #0f172a) 8%, transparent);
   min-width: 0;
 }
 
@@ -13,7 +13,7 @@
 .sls-register-toolbar,
 .sls-register-panel {
   border: 0 !important;
-  background: #fff;
+  background: var(--surface, #fff);
   border-radius: 1.15rem;
   box-shadow: var(--sls-soft);
 }
@@ -44,8 +44,8 @@
 }
 
 .sls-register-chip.is-on {
-  background: var(--sls-navy);
-  color: #fff;
+  background: var(--sidebar-active, var(--sls-navy));
+  color: var(--sidebar-active-foreground, #fff);
 }
 
 .sls-register-chip.is-on span {
@@ -99,8 +99,8 @@
 }
 
 .sls-register-ghost.is-on {
-  background: #e8f4fd !important;
-  color: #1a365d;
+  background: var(--sidebar-active, #e8f4fd) !important;
+  color: var(--sidebar-active-foreground, #1a365d);
 }
 
 .sls-register-ghost:disabled {
@@ -115,16 +115,16 @@
   padding: 0 0.95rem;
   border: 0 !important;
   border-radius: 0.8rem;
-  background: #2563eb;
-  color: #fff;
+  background: var(--button-primary, #2563eb);
+  color: var(--primary-foreground-hex, #fff);
   font-size: 0.875rem;
   font-weight: 700;
   text-decoration: none;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--button-primary, #2563eb) 22%, transparent);
 }
 
 .sls-register-primary:hover {
-  background: #1d4ed8;
+  background: var(--button-primary-hover, #1d4ed8);
 }
 
 .sls-register-panel {
@@ -231,22 +231,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #dbeafe;
-  color: #1e3a8a;
+  background: var(--sidebar-active, #dbeafe);
+  color: var(--sidebar-active-foreground, #1e3a8a);
   font-size: 0.7rem;
   font-weight: 800;
-  box-shadow: 0 0 0 3px #fff, 0 0 0 4px #e2e8f0;
+  box-shadow: 0 0 0 3px var(--surface, #fff), 0 0 0 4px var(--border-hex, #e2e8f0);
 }
 
 .sls-register-name {
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: var(--sls-navy);
+  color: var(--heading, var(--sls-navy));
   text-decoration: none;
 }
 
 .sls-register-name:hover {
-  color: #2563eb;
+  color: var(--button-primary, #2563eb);
 }
 
 .sls-register-mono {

@@ -10,11 +10,13 @@ import { useAuthStore } from '@/store/auth-store';
 import { isSecondarySchoolSisSession } from '@/lib/school-erp/product';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchPublishedAppearance } from '@/services/school-appearance';
-import { appearanceCssVars } from '@/lib/school-sis/appearance-tokens';
+import { SchoolThemeProvider, useResolvedSchoolTheme } from './school-theme-provider';
+import { useSchoolThemeStore } from '@/store/school-theme-store';
 import { cn } from '@/utils/cn';
 import { SchoolErpSidebar } from './school-erp-sidebar';
 import { SchoolErpTopbar } from './school-erp-topbar';
 import './school-erp.css';
+import '../school-sis/school-sis-surface.css';
 
 class SchoolErpPageBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -90,11 +92,25 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
     queryKey: ['school-appearance-published'],
     queryFn: fetchPublishedAppearance,
     enabled: authed && sis,
-    staleTime: 60_000,
+    staleTime: 0,
     retry: false,
   });
+  const setPublishedTheme = useSchoolThemeStore((s) => s.setPublished);
+  const { vars: liveVars, mode: liveMode } = useResolvedSchoolTheme(
+    look.data?.config,
+    look.data?.theme,
+  );
   const customCss =
     look.data?.customCss && !/<\/style/i.test(look.data.customCss) ? look.data.customCss : '';
+
+  useEffect(() => {
+    if (!sis || !look.data?.config) return;
+    setPublishedTheme(
+      look.data.config,
+      look.data.theme,
+      (look.data.mode as 'light' | 'dark' | 'system') || 'system',
+    );
+  }, [sis, look.data, setPublishedTheme]);
 
   useEffect(() => {
     const title = look.data?.config?.identity?.browserTitle;
@@ -128,64 +144,63 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div
-      className={cn(
-        'school-erp-shell',
-        sis && 'is-sls',
-        sis && look.data?.sidebarPosition === 'right' && 'is-sidebar-right',
-        sis && look.data?.sidebarStyle === 'glass' && 'is-sidebar-glass',
-        sis && look.data?.sidebarStyle === 'compact' && 'is-sidebar-compact',
-        look.data?.config?.a11y?.reducedMotion && 'motion-reduce',
-      )}
-      style={
-        sis
-          ? appearanceCssVars(look.data?.config, { sidebarWidth: look.data?.sidebarWidth })
-          : undefined
-      }
-    >
-      {sis && customCss ? <style>{customCss}</style> : null}
-      <SchoolErpTopbar onMenu={onMenu} />
+    <SchoolThemeProvider enabled={sis} config={look.data?.config} themeId={look.data?.theme}>
+      <div
+        className={cn(
+          'school-erp-shell',
+          sis && 'is-sls',
+          sis && liveMode === 'dark' && 'is-dark',
+          sis && look.data?.sidebarPosition === 'right' && 'is-sidebar-right',
+          sis && look.data?.sidebarStyle === 'glass' && 'is-sidebar-glass',
+          sis && look.data?.sidebarStyle === 'compact' && 'is-sidebar-compact',
+          look.data?.config?.a11y?.reducedMotion && 'motion-reduce',
+        )}
+        style={sis ? liveVars : undefined}
+      >
+        {sis && customCss ? <style>{customCss}</style> : null}
+        <SchoolErpTopbar onMenu={onMenu} />
 
-      <div className="school-erp-body flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        <div
-          className={cn(
-            'school-erp-sidebar-slot hidden lg:flex',
-            sis && desktopNavCollapsed && 'is-collapsed',
-          )}
-        >
-          <SchoolErpSidebar />
-        </div>
+        <div className="school-erp-body flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div
+            className={cn(
+              'school-erp-sidebar-slot hidden lg:flex',
+              sis && desktopNavCollapsed && 'is-collapsed',
+            )}
+          >
+            <SchoolErpSidebar />
+          </div>
 
-        {mobileOpen ? (
-          <>
-            <button
-              type="button"
-              className="school-erp-backdrop lg:hidden"
-              aria-label="Close navigation"
-              onClick={() => setMobileOpen(false)}
-            />
-            <div className="lg:hidden">
-              <SchoolErpSidebar open onClose={() => setMobileOpen(false)} />
-            </div>
-          </>
-        ) : null}
+          {mobileOpen ? (
+            <>
+              <button
+                type="button"
+                className="school-erp-backdrop lg:hidden"
+                aria-label="Close navigation"
+                onClick={() => setMobileOpen(false)}
+              />
+              <div className="lg:hidden">
+                <SchoolErpSidebar open onClose={() => setMobileOpen(false)} />
+              </div>
+            </>
+          ) : null}
 
-        <div className="school-erp-main-column">
-          <main className="school-erp-main-scroll">
-            <div className="school-erp-main-inner">
-              {impersonating ? (
-                <div className="mb-3 px-4 pt-3">
-                  <ImpersonationBanner />
-                </div>
-              ) : null}
-              <SchoolErpPageBoundary key={pathname}>{children}</SchoolErpPageBoundary>
-            </div>
-            <footer className="school-erp-page-footer">
-              <SchoolErpFooterLine />
-            </footer>
-          </main>
+          <div className="school-erp-main-column">
+            <main className="school-erp-main-scroll">
+              <div className="school-erp-main-inner">
+                {impersonating ? (
+                  <div className="mb-3 px-4 pt-3">
+                    <ImpersonationBanner />
+                  </div>
+                ) : null}
+                <SchoolErpPageBoundary key={pathname}>{children}</SchoolErpPageBoundary>
+              </div>
+              <footer className="school-erp-page-footer">
+                <SchoolErpFooterLine />
+              </footer>
+            </main>
+          </div>
         </div>
       </div>
-    </div>
+    </SchoolThemeProvider>
   );
 }

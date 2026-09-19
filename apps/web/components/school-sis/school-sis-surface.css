@@ -1,0 +1,141 @@
+/* St. Luke's SIS — professional surfaces for every module (not TPS / college). */
+
+.school-erp-shell.is-sls {
+  --sls-hairline: color-mix(in srgb, var(--heading, #0f172a) 7%, transparent);
+  --sls-soft-shadow: 0 10px 28px color-mix(in srgb, var(--heading, #0f172a) 7%, transparent);
+  --sls-fill: color-mix(in srgb, var(--school-erp-primary, #1a365d) 5.5%, var(--surface, #fff));
+}
+
+/* Soft cards / panels instead of outlined boxes. Keep alert colours. */
+.school-erp-shell.is-sls .school-erp-main-inner [class*='border-slate-200'],
+.school-erp-shell.is-sls .school-erp-main-inner [class*='border-slate-100'],
+.school-erp-shell.is-sls .school-erp-main-inner [class*='border-white/70'] {
+  border-color: transparent !important;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner [class*='border-rose-'],
+.school-erp-shell.is-sls .school-erp-main-inner [class*='border-emerald-'],
+.school-erp-shell.is-sls .school-erp-main-inner [class*='border-amber-'],
+.school-erp-shell.is-sls .school-erp-main-inner [class*='border-red-'] {
+  border-color: inherit !important;
+  box-shadow: none !important;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner .rounded-2xl,
+.school-erp-shell.is-sls .school-erp-main-inner .rounded-3xl,
+.school-erp-shell.is-sls .school-erp-main-inner section.rounded-xl,
+.school-erp-shell.is-sls .school-erp-main-inner .p-4.rounded-xl,
+.school-erp-shell.is-sls .school-erp-main-inner .p-5.rounded-xl {
+  box-shadow: var(--sls-soft-shadow);
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner [class*='ring-slate-'] {
+  --tw-ring-color: transparent !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+}
+
+/* Filter / search bars: filled, not outlined. */
+.school-erp-shell.is-sls .school-erp-main-inner input:not([type='checkbox']):not([type='radio']):not([type='hidden']):not([type='range']):not([type='file']),
+.school-erp-shell.is-sls .school-erp-main-inner select,
+.school-erp-shell.is-sls .school-erp-main-inner textarea {
+  border: 0 !important;
+  background: var(--sls-fill) !important;
+  box-shadow: none !important;
+  color: var(--text, #334155);
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner input:focus-visible,
+.school-erp-shell.is-sls .school-erp-main-inner select:focus-visible,
+.school-erp-shell.is-sls .school-erp-main-inner textarea:focus-visible {
+  background: var(--surface, #fff) !important;
+  box-shadow: 0 0 0 3px var(--focus-ring, rgba(14, 165, 233, 0.16)) !important;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner button[class*='border-slate'],
+.school-erp-shell.is-sls .school-erp-main-inner a[class*='border-slate'] {
+  border-color: transparent !important;
+  background: var(--sls-fill);
+}
+
+/* Data tables: SaaS register, not a spreadsheet. Keep timetable grids. */
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) {
+  width: 100%;
+  border: 0 !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  background: transparent;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) th,
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) td {
+  border: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-top: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) thead th {
+  background: color-mix(in srgb, var(--school-erp-primary, #1a365d) 7%, var(--surface, #fff)) !important;
+  color: var(--muted-foreground-hex, #64748b);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.85rem 0.95rem;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) tbody td {
+  border-bottom: 1px solid var(--sls-hairline) !important;
+  background: transparent;
+  padding: 0.95rem 0.95rem;
+  vertical-align: middle;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) tbody tr {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) tbody tr:nth-child(even) td {
+  background: transparent;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) tbody tr:hover td {
+  background: color-mix(in srgb, var(--school-erp-primary, #1a365d) 5%, var(--surface, #fff));
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) tbody tr[class*='border'] {
+  border: 0 !important;
+}
+
+/* Table shells */
+.school-erp-shell.is-sls .school-erp-main-inner .overflow-hidden[class*='rounded'],
+.school-erp-shell.is-sls .school-erp-main-inner .overflow-x-auto[class*='rounded'],
+.school-erp-shell.is-sls .school-erp-main-inner .overflow-auto[class*='rounded'] {
+  background: var(--surface, #fff);
+  border: 0 !important;
+  box-shadow: var(--sls-soft-shadow);
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner .sls-register-panel,
+.school-erp-shell.is-sls .school-erp-main-inner .sls-register-table-wrap {
+  box-shadow: none;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table) a {
+  color: var(--heading, var(--school-erp-primary)) !important;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table) a:hover {
+  color: var(--button-primary, #2563eb) !important;
+}

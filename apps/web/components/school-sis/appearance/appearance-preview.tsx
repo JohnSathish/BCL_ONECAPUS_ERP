@@ -7,51 +7,63 @@ export function AppearanceLivePreview({
   config,
   mode,
   device,
+  themeId,
 }: {
   config: AppearanceConfig;
   mode: 'desktop' | 'tablet' | 'mobile' | 'login';
   device?: string;
+  themeId?: string;
 }) {
-  const vars = appearanceCssVars(config);
+  const vars = appearanceCssVars(config, { themeId, sidebarWidth: config.sidebar.width });
   if (mode === 'login') {
     return (
       <div
-        className="overflow-hidden rounded-2xl border border-white/60 bg-slate-900 shadow-xl"
-        style={{ minHeight: 320 }}
+        className="overflow-hidden rounded-2xl border shadow-xl"
+        style={{ ...vars, minHeight: 320, borderColor: 'var(--border-hex)' }}
       >
         <div
           className="flex h-full min-h-[320px]"
           style={{
             background:
               config.login.background === 'solid'
-                ? config.colors.primary
-                : `linear-gradient(135deg, ${config.colors.primary}, ${config.colors.secondary})`,
+                ? 'var(--button-primary)'
+                : `linear-gradient(135deg, var(--button-primary), var(--secondary-hex))`,
           }}
         >
           {config.login.layout === 'split' ? <div className="hidden w-1/2 md:block" /> : null}
           <div className="flex flex-1 items-center justify-center p-6">
             <div
-              className="w-full max-w-sm border border-white/20 bg-white/90 p-6 shadow-2xl backdrop-blur"
+              className="w-full max-w-sm border p-6 shadow-2xl"
               style={{
                 borderRadius: config.login.cardRadius,
                 width: Math.min(config.login.cardWidth, 360),
+                background: 'var(--surface)',
+                borderColor: 'var(--border-hex)',
+                color: 'var(--text)',
               }}
             >
-              <p className="text-lg font-semibold" style={{ color: config.colors.primary }}>
+              <p className="text-lg font-semibold" style={{ color: 'var(--heading)' }}>
                 {config.login.welcome}
               </p>
-              <p className="mt-1 text-xs text-slate-500">{config.login.subtitle}</p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground-hex)' }}>
+                {config.login.subtitle}
+              </p>
               <div className="mt-4 space-y-2">
-                <div className="h-9 rounded-lg bg-slate-100" />
-                <div className="h-9 rounded-lg bg-slate-100" />
+                <div className="h-9 rounded-lg" style={{ background: 'var(--muted-hex)' }} />
+                <div className="h-9 rounded-lg" style={{ background: 'var(--muted-hex)' }} />
                 <div
-                  className="h-9 rounded-lg text-center text-xs font-semibold leading-9 text-white"
-                  style={{ background: config.colors.primary }}
+                  className="h-9 rounded-lg text-center text-xs font-semibold leading-9"
+                  style={{
+                    background: 'var(--button-primary)',
+                    color: 'var(--primary-foreground-hex)',
+                  }}
                 >
                   {config.login.buttonLabel}
                 </div>
               </div>
-              <p className="mt-3 text-[10px] text-slate-400">{config.login.forgotLabel}</p>
+              <p className="mt-3 text-[10px]" style={{ color: 'var(--muted-foreground-hex)' }}>
+                {config.login.forgotLabel}
+              </p>
             </div>
           </div>
         </div>
@@ -62,55 +74,86 @@ export function AppearanceLivePreview({
   const width = mode === 'mobile' ? 280 : mode === 'tablet' ? 420 : '100%';
   return (
     <div
-      className="overflow-hidden border border-slate-200 bg-white shadow-xl"
+      className="school-erp-shell is-sls overflow-hidden border shadow-xl"
       style={{
         ...vars,
         width,
         maxWidth: '100%',
         borderRadius: config.components.cardRadius,
         margin: '0 auto',
+        position: 'relative',
+        height: 'auto',
+        inset: 'auto',
+        display: 'block',
+        borderColor: 'var(--border-hex)',
       }}
     >
       <div
-        className="flex h-9 items-center gap-2 px-3 text-[10px] text-white"
-        style={{ background: config.colors.primary }}
+        className="flex h-9 items-center gap-2 px-3 text-[10px]"
+        style={{
+          background: 'var(--surface)',
+          color: 'var(--heading)',
+          borderBottom: '1px solid var(--border-hex)',
+        }}
       >
         <span className="font-semibold">{config.identity.shortName}</span>
-        <span className="opacity-70">ERP</span>
+        <span style={{ color: 'var(--muted-foreground-hex)' }}>ERP</span>
       </div>
       <div className="flex min-h-[240px]">
         {mode !== 'mobile' ? (
           <aside
-            className="border-r border-slate-100 bg-white p-2 text-[10px]"
-            style={{ width: Math.min(96, config.sidebar.width / 3) }}
+            className="school-erp-sidebar p-2 text-[10px]"
+            style={{
+              width: Math.min(110, config.sidebar.width / 2.2),
+              height: 'auto',
+              background: 'var(--sidebar-background)',
+              color: 'var(--sidebar-foreground)',
+            }}
           >
-            <p className="font-semibold" style={{ color: config.colors.primary }}>
-              Home
+            <p className="school-erp-nav-group-label px-1">Home</p>
+            <p
+              className="school-erp-nav-link is-active mt-1"
+              style={{
+                background: 'var(--sidebar-active)',
+                color: 'var(--sidebar-active-foreground)',
+              }}
+            >
+              Dashboard
             </p>
-            <p className="mt-1 text-slate-400">Students</p>
-            <p className="text-slate-400">Fees</p>
+            <p className="school-erp-nav-link mt-0.5">Students</p>
+            <p className="school-erp-nav-link">Fees</p>
           </aside>
         ) : null}
-        <div className="flex-1 p-3" style={{ background: config.colors.background }}>
-          <p className="text-sm font-semibold" style={{ color: config.colors.text }}>
+        <div className="flex-1 p-3" style={{ background: 'var(--background-hex)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--heading)' }}>
             Dashboard
           </p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {['248', '96%'].map((n) => (
               <div
                 key={n}
-                className="bg-white p-2 text-[10px] shadow-sm"
-                style={{ borderRadius: config.components.cardRadius / 2 }}
+                className="p-2 text-[10px] shadow-sm"
+                style={{
+                  borderRadius: config.components.cardRadius / 2,
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                }}
               >
-                <p className="text-slate-400">Metric</p>
-                <p className="text-lg font-bold" style={{ color: config.colors.primary }}>
+                <p style={{ color: 'var(--muted-foreground-hex)' }}>Metric</p>
+                <p className="text-lg font-bold" style={{ color: 'var(--heading)' }}>
                   {n}
                 </p>
               </div>
             ))}
           </div>
           {device === 'mobile' || mode === 'mobile' ? (
-            <div className="mt-4 flex justify-around border-t border-slate-200 pt-2 text-[9px] text-slate-500">
+            <div
+              className="mt-4 flex justify-around border-t pt-2 text-[9px]"
+              style={{
+                borderColor: 'var(--border-hex)',
+                color: 'var(--muted-foreground-hex)',
+              }}
+            >
               <span>Home</span>
               <span>Messages</span>
               <span>More</span>
