@@ -8,7 +8,8 @@ import { FeaturedProjectsSection } from '@/components/public/featured-projects-s
 import { TestimonialsSection } from '@/components/public/testimonials-section';
 import { Ecosystem } from '@/components/public/ecosystem';
 import { SiteCta } from '@/components/ui/page-shell';
-import { FALLBACK_PRODUCTS, FALLBACK_PROJECTS, FALLBACK_SERVICES } from '@/lib/published-catalog';
+import { FALLBACK_PROJECTS, FALLBACK_SERVICES } from '@/lib/published-catalog';
+import { ensureCatalog, fallbackProducts, fallbackTestimonials } from '@/lib/catalog';
 
 async function publishedOr<T>(
   load: () => Promise<T[]>,
@@ -23,6 +24,7 @@ async function publishedOr<T>(
 }
 
 export default async function HomePage() {
+  await ensureCatalog();
   const [products, testimonials, logos, services, projects] = await Promise.all([
     publishedOr(
       () =>
@@ -30,14 +32,16 @@ export default async function HomePage() {
           where: { status: 'PUBLISHED' },
           orderBy: { displayOrder: 'asc' },
         }),
-      FALLBACK_PRODUCTS,
+      fallbackProducts(),
     ),
-    prisma.testimonial
-      .findMany({
-        where: { status: 'PUBLISHED' },
-        orderBy: { displayOrder: 'asc' },
-      })
-      .catch(() => []),
+    publishedOr(
+      () =>
+        prisma.testimonial.findMany({
+          where: { status: 'PUBLISHED' },
+          orderBy: { displayOrder: 'asc' },
+        }),
+      fallbackTestimonials(),
+    ),
     prisma.clientLogo
       .findMany({
         where: { status: 'PUBLISHED' },

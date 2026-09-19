@@ -6,6 +6,7 @@ import { EmptyState, SiteCta } from '@/components/ui/page-shell';
 import { ProductsSection } from '@/components/public/products-section';
 import { COMPANY } from '@/lib/company';
 import { GST_BILLING_URL } from '@/lib/products-display';
+import { ensureCatalog, fallbackProducts } from '@/lib/catalog';
 
 export const metadata: Metadata = {
   title: { absolute: 'Products | BaseCode Labs Pvt. Ltd.' },
@@ -50,11 +51,15 @@ const AUDIENCE = [
   },
 ];
 
+export const dynamic = 'force-dynamic';
+
 export default async function ProductsPage() {
-  const products = await prisma.product.findMany({
+  await ensureCatalog();
+  const dbProducts = await prisma.product.findMany({
     where: { status: 'PUBLISHED' },
     orderBy: { displayOrder: 'asc' },
   });
+  const products = dbProducts.length ? dbProducts : fallbackProducts();
 
   return (
     <main className="overflow-hidden bg-[#eef3f9]">

@@ -269,6 +269,9 @@ if [[ "${SEED_BCL:-1}" == "1" ]]; then
   echo "Publishing legal policy pages…"
   "${BCL_COMPOSE[@]}" exec -T basecode-labs npx tsx prisma/seed-legal.ts || \
     echo "WARN: legal seed failed — run: docker exec -it basecode-labs npx tsx prisma/seed-legal.ts"
+  echo "Publishing products and testimonials…"
+  "${BCL_COMPOSE[@]}" exec -T basecode-labs npx tsx prisma/seed-catalog.ts || \
+    echo "WARN: catalog seed failed — run: docker exec -it basecode-labs npx tsx prisma/seed-catalog.ts"
 fi
 
 echo
