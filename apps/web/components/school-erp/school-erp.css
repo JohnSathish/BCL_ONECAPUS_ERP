@@ -518,6 +518,7 @@ html:has(.school-erp-shell.is-sls) {
 /* St. Luke's Secondary SIS — token-driven chrome (does not affect TPS KG). */
 .school-erp-shell.is-sls {
   --school-erp-sidebar-width: clamp(13.5rem, 15.5vw, 17.5rem);
+  --sidebar-hover-foreground: var(--sidebar-foreground, #fff);
   background: var(--background-hex, var(--school-erp-page));
   color: var(--text, var(--school-erp-text));
 }
@@ -536,7 +537,7 @@ html:has(.school-erp-shell.is-sls) {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: var(--muted-foreground-hex, var(--school-erp-muted));
+  color: color-mix(in srgb, var(--sidebar-foreground) 72%, transparent);
 }
 
 .school-erp-shell.is-sls .school-erp-nav-link {
@@ -546,9 +547,9 @@ html:has(.school-erp-shell.is-sls) {
   border-radius: 0.65rem;
 }
 
-.school-erp-shell.is-sls .school-erp-nav-link:hover {
-  background: var(--sidebar-hover);
-  color: var(--sidebar-active-foreground);
+.school-erp-shell.is-sls .school-erp-nav-link:hover:not(.is-active) {
+  background: color-mix(in srgb, var(--sidebar-foreground) 22%, transparent) !important;
+  color: var(--sidebar-foreground) !important;
 }
 
 .school-erp-shell.is-sls .school-erp-nav-link.is-active {
@@ -566,13 +567,13 @@ html:has(.school-erp-shell.is-sls) {
 }
 
 .school-erp-shell.is-sls .school-erp-nav-child {
-  color: var(--muted-foreground-hex, var(--school-erp-muted));
+  color: color-mix(in srgb, var(--sidebar-foreground) 82%, transparent);
   border-radius: 0.5rem;
 }
 
-.school-erp-shell.is-sls .school-erp-nav-child:hover {
-  background: var(--sidebar-hover);
-  color: var(--sidebar-active-foreground);
+.school-erp-shell.is-sls .school-erp-nav-child:hover:not(.is-active) {
+  background: color-mix(in srgb, var(--sidebar-foreground) 22%, transparent) !important;
+  color: var(--sidebar-foreground) !important;
 }
 
 .school-erp-shell.is-sls .school-erp-nav-child.is-active {
@@ -1203,13 +1204,37 @@ html:has(.school-erp-shell.is-sls) {
 }
 
 .school-erp-shell.is-sls a {
+  color: inherit;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner a:not([class*='bg-']):not(.sls-cta):not(.sls-kpi) {
   color: var(--school-erp-primary);
 }
 
 .school-erp-shell.is-sls .school-erp-sidebar a,
 .school-erp-shell.is-sls .school-erp-nav-link,
 .school-erp-shell.is-sls .school-erp-nav-child {
-  color: inherit;
+  color: var(--sidebar-foreground);
+}
+
+.school-erp-shell.is-sls .school-erp-nav-link:hover:not(.is-active),
+.school-erp-shell.is-sls .school-erp-nav-child:hover:not(.is-active) {
+  background: color-mix(in srgb, var(--sidebar-foreground) 22%, transparent) !important;
+  color: var(--sidebar-foreground) !important;
+}
+
+.school-erp-shell.is-sls .school-erp-nav-link.is-active,
+.school-erp-shell.is-sls .school-erp-nav-child.is-active,
+.school-erp-shell.is-sls .school-erp-nav-link.is-active svg {
+  color: var(--sidebar-active-foreground) !important;
+}
+
+.school-erp-shell.is-sls .sls-cta,
+.school-erp-shell.is-sls a.sls-cta,
+.school-erp-shell.is-sls a[class*='text-white'],
+.school-erp-shell.is-sls button[class*='text-white'],
+.school-erp-shell.is-sls summary[class*='text-white'] {
+  color: var(--primary-foreground-hex, #fff) !important;
 }
 
 .school-erp-shell.is-sls input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
@@ -1260,6 +1285,7 @@ html:has(.school-erp-shell.is-sls) {
 .school-erp-shell.is-sls .bg-indigo-600,
 .school-erp-shell.is-sls .bg-sky-600 {
   background-color: var(--button-primary) !important;
+  color: var(--primary-foreground-hex, #fff) !important;
 }
 
 .school-erp-shell.is-sls .text-blue-600,

@@ -365,7 +365,7 @@ export function buildThemeTokens(
           sidebarHover: mixHex(
             mode === 'dark' ? cfg.dark.sidebar : cfg.colors.surface,
             primary,
-            0.08,
+            0.22,
           ),
           sidebarActive: mixHex(
             mode === 'dark' ? cfg.dark.sidebar : cfg.colors.surface,
@@ -487,8 +487,9 @@ export function themeTokensToCssVars(
     '--sidebar-background': tokens.sidebarBackground,
     '--sidebar-foreground': tokens.sidebarForeground,
     '--sidebar-hover': tokens.sidebarHover,
+    '--sidebar-hover-foreground': foregroundOn(tokens.sidebarHover),
     '--sidebar-active': tokens.sidebarActive,
-    '--sidebar-active-foreground': tokens.sidebarActiveForeground,
+    '--sidebar-active-foreground': foregroundOn(tokens.sidebarActive),
     '--border-hex': tokens.border,
     '--input-border': tokens.inputBorder,
     '--muted-hex': tokens.muted,
