@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   Bus,
@@ -45,9 +45,16 @@ import { cn } from '@/utils/cn';
 
 function isoDate(value?: string | Date | null) {
   if (!value) return '';
+  if (typeof value === 'string') {
+    const ymd = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (ymd) return ymd[1];
+  }
   const d = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return String(value).slice(0, 10);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function addr(raw: unknown): SchoolAddressForm {
@@ -320,6 +327,7 @@ const inputClass = 'h-10 w-full rounded-md border border-slate-200 bg-white px-3
 
 export function StudentMasterForm({ studentId }: { studentId?: string }) {
   const router = useRouter();
+  const qc = useQueryClient();
   const enabled = useAuthQueryEnabled();
   const [id, setId] = useState(studentId);
   const [form, setForm] = useState<StudentMasterFormState>(() => blankStudentMaster());
@@ -336,6 +344,7 @@ export function StudentMasterForm({ studentId }: { studentId?: string }) {
   const snapshot = useRef<string>('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idRef = useRef(id);
+  const loadedId = useRef<string | null>(null);
   idRef.current = id;
 
   const masters = useQuery({
@@ -386,13 +395,17 @@ export function StudentMasterForm({ studentId }: { studentId?: string }) {
 
   useEffect(() => {
     if (!existing.data || !masters.data) return;
+    const key = studentId ?? 'new';
+    const alreadyLoaded = loadedId.current === key;
+    if (alreadyLoaded && (dirty || saving)) return;
+    loadedId.current = key;
     const next = hydrate(existing.data as Record<string, unknown>, masters.data.academicYear.id);
     setForm(next);
     setDocs(((existing.data as { documents?: typeof docs }).documents ?? []) as typeof docs);
     snapshot.current = JSON.stringify(next);
     setDirty(false);
-    setSaveNote('Loaded');
-  }, [existing.data, masters.data]);
+    setSaveNote((prev) => (prev === 'Saved' || prev.startsWith('Auto-saved') ? prev : 'Loaded'));
+  }, [existing.data, masters.data, studentId, dirty, saving]);
 
   useEffect(() => {
     const onLeave = (e: BeforeUnloadEvent) => {
@@ -429,26 +442,23 @@ export function StudentMasterForm({ studentId }: { studentId?: string }) {
           idRef.current = row.id;
           router.replace(`/admin/school-sis/students/${row.id}/edit`);
         }
-        setForm((prev) => ({
-          ...prev,
-          admissionNumber: row.admissionNumber,
-          enrollmentLocked: Boolean(prev.sectionId) || prev.enrollmentLocked,
-        }));
-        snapshot.current = JSON.stringify({
-          ...form,
-          admissionNumber: row.admissionNumber,
-          enrollmentLocked: Boolean(form.sectionId) || form.enrollmentLocked,
-        });
+        const yearId = masters.data?.academicYear?.id || form.academicYearId;
+        const next = hydrate(row as Record<string, unknown>, yearId);
+        setForm(next);
+        snapshot.current = JSON.stringify(next);
+        qc.setQueryData(['school-sis-student', row.id], row);
+        void qc.invalidateQueries({ queryKey: ['school-sis-students'] });
         setDirty(false);
         setSaveNote(autosave ? `Auto-saved ${new Date().toLocaleTimeString()}` : 'Saved');
       } catch (err) {
-        if (!autosave) setError(apiErrorMessage(err));
-        else setSaveNote('Auto-save waiting for required fields');
+        const message = apiErrorMessage(err);
+        setError(message);
+        if (autosave) setSaveNote('Could not auto-save');
       } finally {
         setSaving(false);
       }
     },
-    [form, router],
+    [form, router, qc, masters.data?.academicYear?.id],
   );
 
   useEffect(() => {

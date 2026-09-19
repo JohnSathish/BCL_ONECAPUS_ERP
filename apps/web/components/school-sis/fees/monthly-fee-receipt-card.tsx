@@ -74,7 +74,15 @@ export function MonthlyFeeReceiptCard({
   return (
     <article className="flex min-h-[32rem] flex-col rounded-xl border-[1.5px] border-[#1a365d] bg-white p-4 text-[#1a365d] shadow-sm print:shadow-none">
       <header className="mb-3 flex items-center gap-3">
-        <img src={logoUrl || DEFAULT_LOGO} alt="" className="h-14 w-14 object-contain" />
+        <img
+          src={logoUrl || DEFAULT_LOGO}
+          alt=""
+          className="h-14 w-14 shrink-0 object-contain"
+          onError={(event) => {
+            if (event.currentTarget.src.endsWith(DEFAULT_LOGO)) return;
+            event.currentTarget.src = DEFAULT_LOGO;
+          }}
+        />
         <div>
           <h2 className="text-[17px] font-bold leading-tight">{schoolName}</h2>
           <p className="text-[11px] text-slate-600">{schoolAddress}</p>

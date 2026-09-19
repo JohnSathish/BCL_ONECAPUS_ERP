@@ -460,12 +460,13 @@ export class SchoolGuardianPersonDto {
   phone?: string;
 
   @IsOptional()
+  @ValidateIf((_, value) => value != null && value !== '')
   @IsEmail()
   email?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(240)
+  @MaxLength(2048)
   photoUrl?: string;
 
   @IsOptional()
@@ -626,6 +627,7 @@ export class SaveSchoolStudentMasterDto {
   aadhaarNumber?: string;
 
   @IsOptional()
+  @ValidateIf((_, value) => value != null && value !== '')
   @IsEmail()
   email?: string;
 
@@ -636,7 +638,7 @@ export class SaveSchoolStudentMasterDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(240)
+  @MaxLength(2048)
   photoUrl?: string;
 
   @IsOptional()

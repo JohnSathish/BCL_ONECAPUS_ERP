@@ -12,6 +12,10 @@
       {
         "include": "modules/school-admissions/assets/**/*",
         "watchAssets": true
+      },
+      {
+        "include": "modules/school-sis/assets/**/*",
+        "watchAssets": true
       }
     ]
   }

@@ -24,18 +24,38 @@ function esc(value: string | null | undefined) {
     .replace(/>/g, '&gt;');
 }
 
-export function schoolLogoDataUri() {
+const LOGO_FILE = 'st-lukes-logo.png';
+
+export function schoolLogoFilePath() {
   const candidates = [
-    join(process.cwd(), 'apps/web/public/school-sis/st-lukes-logo.png'),
-    join(process.cwd(), '../web/public/school-sis/st-lukes-logo.png'),
-    join(process.cwd(), '../../apps/web/public/school-sis/st-lukes-logo.png'),
+    join(__dirname, 'assets', LOGO_FILE),
+    join(__dirname, '..', 'assets', LOGO_FILE),
+    join(process.cwd(), 'src/modules/school-sis/assets', LOGO_FILE),
+    join(process.cwd(), 'dist/modules/school-sis/assets', LOGO_FILE),
+    join(process.cwd(), 'apps/api/src/modules/school-sis/assets', LOGO_FILE),
+    join(process.cwd(), 'apps/api/dist/modules/school-sis/assets', LOGO_FILE),
+    join(process.cwd(), 'apps/web/public/school-sis', LOGO_FILE),
+    join(process.cwd(), '../web/public/school-sis', LOGO_FILE),
+    join(process.cwd(), '../../apps/web/public/school-sis', LOGO_FILE),
   ];
-  for (const file of candidates) {
-    if (!existsSync(file)) continue;
-    const buf = readFileSync(file);
-    return `data:image/png;base64,${buf.toString('base64')}`;
+  return candidates.find((file) => existsSync(file)) ?? null;
+}
+
+export function schoolLogoDataUri() {
+  const file = schoolLogoFilePath();
+  if (!file) return null;
+  return `data:image/png;base64,${readFileSync(file).toString('base64')}`;
+}
+
+function receiptLogoSrc(logoUrl?: string | null) {
+  if (
+    logoUrl?.startsWith('data:image/png') ||
+    logoUrl?.startsWith('data:image/jpeg') ||
+    logoUrl?.startsWith('data:image/webp')
+  ) {
+    return logoUrl;
   }
-  return null;
+  return schoolLogoDataUri();
 }
 
 export type MonthlyFeeReceiptView = {
@@ -104,7 +124,7 @@ function slip(
   <article class="slip">
     <header>
       <div class="brand">
-        ${logoSrc ? `<img class="crest" src="${esc(logoSrc)}" alt="" />` : '<div class="crest-fallback">SLS</div>'}
+        ${logoSrc ? `<img class="crest" src="${logoSrc}" alt="" />` : '<div class="crest-fallback">SLS</div>'}
         <div>
           <h1>${esc(view.schoolName)}</h1>
           <p class="addr">${esc(view.schoolAddress)}</p>
@@ -156,11 +176,7 @@ function slip(
 }
 
 export function monthlyFeeReceiptHtml(view: MonthlyFeeReceiptView) {
-  const logoSrc = view.logoUrl?.startsWith('data:')
-    ? view.logoUrl
-    : view.logoUrl && view.logoUrl.startsWith('http')
-      ? view.logoUrl
-      : schoolLogoDataUri() || view.logoUrl || null;
+  const logoSrc = receiptLogoSrc(view.logoUrl);
   return `<!doctype html>
 <html>
 <head>
@@ -173,7 +189,7 @@ export function monthlyFeeReceiptHtml(view: MonthlyFeeReceiptView) {
     .sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .slip { background: #fff; border: 1.5px solid #1a365d; border-radius: 10px; padding: 14px 16px 10px; min-height: 178mm; display: flex; flex-direction: column; }
     .brand { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-    .crest { width: 52px; height: 52px; object-fit: contain; }
+    .crest { width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }
     .crest-fallback { width: 52px; height: 52px; border-radius: 50%; background: #1a365d; color: #c5a572; display: flex; align-items: center; justify-content: center; font-weight: 700; }
     h1 { margin: 0; font-size: 16px; color: #1a365d; }
     .addr { margin: 2px 0 0; font-size: 11px; color: #334155; }
