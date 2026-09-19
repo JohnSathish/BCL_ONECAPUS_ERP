@@ -62,7 +62,10 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
     queryFn: fetchPublishedAppearance,
     enabled: authed && sis,
     staleTime: 60_000,
+    retry: false,
   });
+  const customCss =
+    look.data?.customCss && !/<\/style/i.test(look.data.customCss) ? look.data.customCss : '';
 
   useEffect(() => {
     const title = look.data?.config?.identity?.browserTitle;
@@ -111,7 +114,7 @@ export function SchoolErpShell({ children }: { children: React.ReactNode }) {
           : undefined
       }
     >
-      {sis && look.data?.customCss ? <style>{look.data.customCss}</style> : null}
+      {sis && customCss ? <style>{customCss}</style> : null}
       <SchoolErpTopbar onMenu={onMenu} />
 
       <div className="school-erp-body">

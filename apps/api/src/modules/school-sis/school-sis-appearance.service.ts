@@ -146,29 +146,55 @@ export class SchoolSisAppearanceService {
   }
 
   async published(tenantId: string) {
-    const row = await this.row(tenantId);
-    const snap = this.snapshot(row);
-    return {
-      theme: snap.theme,
-      mode: snap.mode,
-      primaryColor: snap.primaryColor,
-      secondaryColor: snap.secondaryColor,
-      accentColor: snap.accentColor,
-      fontFamily: snap.fontFamily,
-      logoUrl: snap.logoUrl,
-      darkLogoUrl: snap.darkLogoUrl,
-      mobileLogoUrl: snap.mobileLogoUrl,
-      faviconUrl: snap.faviconUrl,
-      sidebarStyle: snap.sidebarStyle,
-      sidebarWidth: snap.sidebarWidth,
-      sidebarPosition: snap.sidebarPosition,
-      borderRadius: snap.borderRadius,
-      cardStyle: snap.cardStyle,
-      loginLayout: snap.loginLayout,
-      config: snap.config,
-      customCss: snap.customCss,
-      identity: snap.config.identity,
-    };
+    await this.sis.assertSecondarySisTenant(tenantId);
+    try {
+      const row = await this.row(tenantId);
+      const snap = this.snapshot(row);
+      return {
+        theme: snap.theme,
+        mode: snap.mode,
+        primaryColor: snap.primaryColor,
+        secondaryColor: snap.secondaryColor,
+        accentColor: snap.accentColor,
+        fontFamily: snap.fontFamily,
+        logoUrl: snap.logoUrl,
+        darkLogoUrl: snap.darkLogoUrl,
+        mobileLogoUrl: snap.mobileLogoUrl,
+        faviconUrl: snap.faviconUrl,
+        sidebarStyle: snap.sidebarStyle,
+        sidebarWidth: snap.sidebarWidth || 260,
+        sidebarPosition: snap.sidebarPosition,
+        borderRadius: snap.borderRadius,
+        cardStyle: snap.cardStyle,
+        loginLayout: snap.loginLayout,
+        config: snap.config,
+        customCss: snap.customCss,
+        identity: snap.config.identity,
+      };
+    } catch {
+      const config = DEFAULT_APPEARANCE_CONFIG;
+      return {
+        theme: 'royal',
+        mode: 'system',
+        primaryColor: '#1A365D',
+        secondaryColor: '#2B4C7E',
+        accentColor: '#0EA5E9',
+        fontFamily: 'Inter',
+        logoUrl: null,
+        darkLogoUrl: null,
+        mobileLogoUrl: null,
+        faviconUrl: null,
+        sidebarStyle: 'classic',
+        sidebarWidth: 260,
+        sidebarPosition: 'left',
+        borderRadius: 16,
+        cardStyle: 'elevated',
+        loginLayout: 'split',
+        config,
+        customCss: '',
+        identity: config.identity,
+      };
+    }
   }
 
   private applyPreset(

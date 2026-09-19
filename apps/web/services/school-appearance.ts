@@ -41,7 +41,10 @@ export const fetchSchoolAppearance = () =>
   api.get<SchoolAppearanceDto>('/v1/school-sis/appearance').then((r) => r.data);
 
 export const fetchPublishedAppearance = () =>
-  api.get<SchoolAppearanceDto>('/v1/school-sis/appearance/published').then((r) => r.data);
+  api
+    .get<SchoolAppearanceDto>('/v1/school-sis/appearance/published')
+    .then((r) => r.data)
+    .catch(() => null);
 
 export const saveSchoolAppearanceDraft = (payload: Record<string, unknown>) =>
   api.post<SchoolAppearanceDto>('/v1/school-sis/appearance/draft', payload).then((r) => r.data);

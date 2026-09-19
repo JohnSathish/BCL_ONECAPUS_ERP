@@ -66,7 +66,7 @@ function statusTone(status: string) {
 }
 
 function formatDay(iso?: string | null) {
-  if (!iso) return 'â€”';
+  if (!iso) return '-';
   return new Date(iso).toLocaleDateString('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -96,7 +96,14 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
     return `${x},${y}`;
   });
   return (
-    <svg viewBox="0 0 100 32" className="h-10 w-full" preserveAspectRatio="none" aria-hidden>
+    <svg
+      viewBox="0 0 100 32"
+      width="100%"
+      height="40"
+      className="h-10 w-full"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
       <polyline fill="none" stroke={color} strokeWidth="2" points={pts.join(' ')} />
       <polyline fill={`${color}22`} stroke="none" points={`0,32 ${pts.join(' ')} 100,32`} />
     </svg>
@@ -314,9 +321,7 @@ export function SchoolSisDashboard() {
               value={data?.academicYear.id ?? ''}
               disabled
             >
-              <option value={data?.academicYear.id ?? ''}>
-                {data?.academicYear.name ?? 'â€”'}
-              </option>
+              <option value={data?.academicYear.id ?? ''}>{data?.academicYear.name ?? '-'}</option>
             </select>
           </label>
           {canManage ? (
@@ -364,7 +369,7 @@ export function SchoolSisDashboard() {
                 {card.label}
               </p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-[#1a365d]">
-                {overview.isLoading ? 'â€”' : (card.value ?? 0)}
+                {overview.isLoading ? '-' : (card.value ?? 0)}
               </p>
               <p className="mt-1 text-xs text-slate-400">{card.hint}</p>
               {card.spark.some((n) => n > 0) ? (
@@ -402,16 +407,16 @@ export function SchoolSisDashboard() {
             <p className="text-xs text-slate-400">Bell periods for this school day</p>
           </div>
           <Link href="/admin/school-sis/timetable" className="text-xs font-semibold text-sky-700">
-            Open module â†’
+            Open module {'->'}
           </Link>
         </div>
         {todayTt.isLoading ? (
-          <p className="text-sm text-slate-500">Loading timetableâ€¦</p>
+          <p className="text-sm text-slate-500">Loading timetable...</p>
         ) : todayTt.data?.weekend ? (
           <div className="flex flex-col items-center justify-center rounded-xl bg-slate-50 py-10 text-center">
             <CalendarDays className="h-8 w-8 text-slate-300" />
             <p className="mt-2 text-sm font-medium text-slate-600">
-              Weekend â€” no teaching periods.
+              Weekend - no teaching periods.
             </p>
             <p className="text-xs text-slate-400">Enjoy your weekend.</p>
           </div>
@@ -431,7 +436,7 @@ export function SchoolSisDashboard() {
               >
                 <p className="font-semibold uppercase tracking-wide">{row.bell.label}</p>
                 <p>
-                  {row.bell.startTime}â€“{row.bell.endTime}
+                  {row.bell.startTime}-{row.bell.endTime}
                 </p>
                 {row.state === 'current' ? <p>Now</p> : null}
                 {row.state === 'upcoming' && todayTt.data?.next?.bell?.id === row.bell.id ? (
@@ -450,7 +455,7 @@ export function SchoolSisDashboard() {
             <span className="text-xs text-slate-400">{data?.academicYear.name}</span>
           </div>
           {overview.isLoading ? (
-            <p className="text-sm text-slate-500">Loading enrolmentâ€¦</p>
+            <p className="text-sm text-slate-500">Loading enrolment...</p>
           ) : classChart.length === 0 && genderChart.length === 0 ? (
             <p className="text-sm text-slate-500">
               No enrolment figures for this year yet. Add students and enrol them in a class and
@@ -458,9 +463,15 @@ export function SchoolSisDashboard() {
             </p>
           ) : (
             <div className="grid gap-6 lg:grid-cols-5">
-              <div className="h-56 lg:col-span-3">
+              <div className="h-56 min-h-[224px] min-w-0 lg:col-span-3">
                 {classChart.length ? (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer
+                    width="100%"
+                    height={224}
+                    minWidth={1}
+                    minHeight={1}
+                    debounce={50}
+                  >
                     <BarChart data={classChart} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
@@ -472,10 +483,16 @@ export function SchoolSisDashboard() {
                   <p className="text-sm text-slate-500">No class-wise enrolment yet.</p>
                 )}
               </div>
-              <div className="relative h-56 lg:col-span-2">
+              <div className="relative h-56 min-h-[224px] min-w-0 lg:col-span-2">
                 {genderChart.length ? (
                   <>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer
+                      width="100%"
+                      height={224}
+                      minWidth={1}
+                      minHeight={1}
+                      debounce={50}
+                    >
                       <PieChart>
                         <Pie
                           data={genderChart}
@@ -518,7 +535,7 @@ export function SchoolSisDashboard() {
                       href="/admin/school-sis/students"
                       className="mt-3 text-xs font-semibold text-sky-700"
                     >
-                      Update student profiles â†’
+                      Update student profiles {'->'}
                     </Link>
                   </div>
                 )}
@@ -535,7 +552,7 @@ export function SchoolSisDashboard() {
             </Link>
           </div>
           {overview.isLoading ? (
-            <p className="text-sm text-slate-500">Loadingâ€¦</p>
+            <p className="text-sm text-slate-500">Loading...</p>
           ) : !data?.notices.length ? (
             <p className="text-sm text-slate-500">No published notices yet.</p>
           ) : (
@@ -583,7 +600,7 @@ export function SchoolSisDashboard() {
             </Link>
           </div>
           {overview.isLoading ? (
-            <p className="text-sm text-slate-500">Loadingâ€¦</p>
+            <p className="text-sm text-slate-500">Loading...</p>
           ) : !data?.events.length ? (
             <p className="text-sm text-slate-500">No upcoming published events.</p>
           ) : (
@@ -602,7 +619,7 @@ export function SchoolSisDashboard() {
                     <p className="text-sm font-medium text-slate-800">{event.title}</p>
                     <p className="text-xs text-slate-500">
                       {formatTime(event.startsAt)}
-                      {event.venue ? ` Â· ${event.venue}` : ''}
+                      {event.venue ? ` · ${event.venue}` : ''}
                     </p>
                   </div>
                 </li>
@@ -622,7 +639,7 @@ export function SchoolSisDashboard() {
             </Link>
           </div>
           {overview.isLoading ? (
-            <p className="text-sm text-slate-500">Loadingâ€¦</p>
+            <p className="text-sm text-slate-500">Loading...</p>
           ) : !data?.recentApplications.length ? (
             <p className="text-sm text-slate-500">No admission applications yet.</p>
           ) : (
@@ -694,7 +711,7 @@ export function SchoolSisDashboard() {
           <div>
             <p className="text-[11px] uppercase tracking-wide text-slate-400">School Year</p>
             <p className="font-medium text-[#1a365d]">
-              {data?.academicYear.name ?? 'â€”'}
+              {data?.academicYear.name ?? '-'}
               {data?.academicYear.status === 'CURRENT' ? (
                 <span className="ml-2 text-xs font-normal text-emerald-600">Active</span>
               ) : null}
@@ -703,16 +720,16 @@ export function SchoolSisDashboard() {
           <div>
             <p className="text-[11px] uppercase tracking-wide text-slate-400">Enrolment</p>
             <p className="font-medium text-[#1a365d]">
-              {counts?.enrollments ?? 'â€”'} of {counts?.students ?? 'â€”'} students
+              {counts?.enrollments ?? '-'} of {counts?.students ?? '-'} students
             </p>
           </div>
           <div>
             <p className="text-[11px] uppercase tracking-wide text-slate-400">Open applications</p>
-            <p className="font-medium text-[#1a365d]">{counts?.openApplications ?? 'â€”'}</p>
+            <p className="font-medium text-[#1a365d]">{counts?.openApplications ?? '-'}</p>
           </div>
           <div>
             <p className="text-[11px] uppercase tracking-wide text-slate-400">Users</p>
-            <p className="font-medium text-[#1a365d]">{counts?.users ?? 'â€”'} active accounts</p>
+            <p className="font-medium text-[#1a365d]">{counts?.users ?? '-'} active accounts</p>
           </div>
           <div className="flex items-center gap-2">
             <span
