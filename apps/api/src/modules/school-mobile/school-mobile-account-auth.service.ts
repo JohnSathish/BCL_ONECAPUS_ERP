@@ -14,10 +14,12 @@ import { SchoolSisService } from '../school-sis/school-sis.service';
 import { SchoolSisLicenseService } from '../school-sis/school-sis-license.service';
 import { SchoolSisSmsService } from '../school-sis/school-sis-sms.service';
 import {
-  maskMobile,
-  normalizeInMobile,
-} from '../school-sis/school-sis-sms.phone';
+  isSchoolPlaceholderEmail,
+  pickSchoolActivationContact,
+  realSchoolEmail,
+} from '../school-sis/school-sis-activation-contact';
 import { resolveSchoolPortalUserId } from '../school-sis/school-sis-login-lookup';
+import { SchoolWebMailService } from '../school-web/school-web-mail.service';
 import { SCHOOL_MOBILE_DEFAULT_PASSWORD } from './school-mobile.constants';
 
 const GENERIC_NEXT =
@@ -37,12 +39,6 @@ function sha(value: string) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function maskEmail(email: string) {
-  const [user, domain] = email.split('@');
-  if (!user || !domain) return '*****';
-  return `${user.slice(0, 1)}*****@${domain}`;
-}
-
 @Injectable()
 export class SchoolMobileAccountAuthService {
   constructor(
@@ -51,6 +47,7 @@ export class SchoolMobileAccountAuthService {
     private readonly sis: SchoolSisService,
     private readonly licenses: SchoolSisLicenseService,
     private readonly sms: SchoolSisSmsService,
+    private readonly mail: SchoolWebMailService,
   ) {}
 
   async settings(tenantId: string) {
@@ -296,7 +293,7 @@ export class SchoolMobileAccountAuthService {
     if (purpose === 'ACTIVATE' && activated) return generic;
     if (purpose === 'RESET' && !activated) return generic;
 
-    const contact = this.pickContact(user);
+    const contact = await this.loadActivationContact(tenantId, user);
     const channel =
       contact && settings.otpEnabled
         ? contact.kind
@@ -343,11 +340,19 @@ export class SchoolMobileAccountAuthService {
         message: GENERIC_NEXT,
         resendSeconds: settings.otpResendSeconds,
       };
-    if (!settings.otpEnabled || row.channel === 'CODE') {
+    const user = await this.prisma.user.findFirst({
+      where: { id: row.userId, tenantId, deletedAt: null },
+    });
+    const contact = user
+      ? await this.loadActivationContact(tenantId, user)
+      : null;
+    const channel = contact?.kind ?? row.channel;
+    if (!settings.otpEnabled || channel === 'CODE' || !contact) {
       return {
         message: GENERIC_NEXT,
         resendSeconds: settings.otpResendSeconds,
         channel: 'CODE',
+        masked: contact?.masked ?? row.contactMasked,
       };
     }
     const recent = await this.prisma.schoolAuthChallenge.count({
@@ -369,16 +374,20 @@ export class SchoolMobileAccountAuthService {
           (Date.now() - row.otpSentAt.getTime())) /
           1000,
       );
-      return { message: GENERIC_NEXT, resendSeconds: wait };
+      return {
+        message: GENERIC_NEXT,
+        resendSeconds: wait,
+        masked: contact.masked,
+        channel: contact.kind,
+      };
     }
     const otp = String(randomInt(0, 1_000_000)).padStart(6, '0');
-    const user = await this.prisma.user.findFirst({
-      where: { id: row.userId },
-    });
-    const mobile = normalizeInMobile(user?.phone ?? '');
     await this.prisma.schoolAuthChallenge.update({
       where: { id: row.id },
       data: {
+        channel: contact.kind,
+        contactMasked: contact.masked,
+        contactKind: contact.kind,
         otpHash: sha(`${tenantId}:${otp}:${row.id}`),
         otpExpiresAt: new Date(Date.now() + settings.otpTtlSeconds * 1000),
         otpSentAt: new Date(),
@@ -386,19 +395,24 @@ export class SchoolMobileAccountAuthService {
         otpSendCount: { increment: 1 },
       },
     });
-    if (mobile) {
-      try {
-        await this.sms.sendLoginOtp(tenantId, mobile, otp);
-      } catch {
-        /* OTP is still valid; office can use activation code */
+    try {
+      if (contact.kind === 'SMS' && contact.mobile) {
+        await this.sms.sendLoginOtp(tenantId, contact.mobile, otp);
+      } else if (contact.kind === 'EMAIL' && contact.email) {
+        await this.mail.sendLoginOtp(contact.email, otp);
       }
+    } catch {
+      /* OTP is still valid; office can use activation code */
     }
-    await this.recordEvent(tenantId, row.userId, 'OTP_REQUESTED', { ip });
+    await this.recordEvent(tenantId, row.userId, 'OTP_REQUESTED', {
+      ip,
+      channel: contact.kind,
+    });
     return {
       message: GENERIC_NEXT,
       resendSeconds: settings.otpResendSeconds,
-      masked: row.contactMasked,
-      channel: row.channel,
+      masked: contact.masked,
+      channel: contact.kind,
     };
   }
 
@@ -628,17 +642,56 @@ export class SchoolMobileAccountAuthService {
     return Boolean(student);
   }
 
-  private pickContact(user: { phone?: string | null; email?: string | null }) {
-    const mobile = normalizeInMobile(user.phone ?? '');
-    if (mobile) return { kind: 'SMS' as const, masked: maskMobile(mobile) };
-    if (
-      user.email &&
-      !user.email.includes('@invalid.') &&
-      user.email.includes('@')
-    ) {
-      return { kind: 'EMAIL' as const, masked: maskEmail(user.email) };
+  private async loadActivationContact(
+    tenantId: string,
+    user: { id: string; phone?: string | null; email?: string | null },
+  ) {
+    const link = await this.prisma.schoolPersonAccount.findFirst({
+      where: { tenantId, userId: user.id, personType: 'STUDENT' },
+      select: {
+        student: { select: { phone: true, email: true } },
+      },
+    });
+    const student = link?.student;
+    if (student) {
+      await this.syncLoginContactFromStudent(tenantId, user, student);
     }
-    return null;
+    return pickSchoolActivationContact({
+      studentPhone: student?.phone,
+      studentEmail: student?.email,
+      userPhone: user.phone,
+      userEmail: user.email,
+    });
+  }
+
+  private async syncLoginContactFromStudent(
+    tenantId: string,
+    user: { id: string; phone?: string | null; email?: string | null },
+    student: { phone?: string | null; email?: string | null },
+  ) {
+    const data: { phone?: string | null; email?: string } = {};
+    if (student.phone != null && student.phone !== (user.phone ?? '')) {
+      data.phone = student.phone;
+      user.phone = student.phone;
+    }
+    const nextEmail = realSchoolEmail(student.email);
+    if (nextEmail && isSchoolPlaceholderEmail(user.email ?? '')) {
+      const taken = await this.prisma.user.findFirst({
+        where: {
+          tenantId,
+          email: nextEmail,
+          deletedAt: null,
+          NOT: { id: user.id },
+        },
+        select: { id: true },
+      });
+      if (!taken) {
+        data.email = nextEmail;
+        user.email = nextEmail;
+      }
+    }
+    if (Object.keys(data).length === 0) return;
+    await this.prisma.user.update({ where: { id: user.id }, data });
   }
 
   private async loadOpenChallenge(tenantId: string, challengeId: string) {

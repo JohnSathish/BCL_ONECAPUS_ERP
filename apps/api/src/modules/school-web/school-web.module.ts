@@ -27,6 +27,7 @@ import { SchoolWebMailService } from './school-web-mail.service';
     SchoolWebService,
     SchoolWebPresenceService,
     SchoolWebGalleryService,
+    SchoolWebMailService,
   ],
 })
 export class SchoolWebModule {}

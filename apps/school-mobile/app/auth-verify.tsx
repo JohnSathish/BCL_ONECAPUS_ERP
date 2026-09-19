@@ -23,11 +23,15 @@ export default function AuthVerifyScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wait, setWait] = useState(Number(params.resendSeconds || 0));
+  const [masked, setMasked] = useState(params.masked || 'your registered contact');
 
   useEffect(() => {
     if (!challengeId || params.channel === 'CODE') return;
     void sendOtp(challengeId, purpose)
-      .then((res) => setWait(res.resendSeconds ?? 45))
+      .then((res) => {
+        setWait(res.resendSeconds ?? 45);
+        if (res.masked) setMasked(res.masked);
+      })
       .catch(() => undefined);
   }, [challengeId, params.channel, purpose]);
 
@@ -37,7 +41,6 @@ export default function AuthVerifyScreen() {
     return () => clearInterval(t);
   }, [wait]);
 
-  const masked = params.masked || 'your registered contact';
   const title = purpose === 'RESET' ? 'Reset Password' : 'Verify Your Account';
 
   const requestOtp = async () => {
@@ -47,6 +50,7 @@ export default function AuthVerifyScreen() {
     try {
       const res = await sendOtp(challengeId, purpose);
       setWait(res.resendSeconds ?? 45);
+      if (res.masked) setMasked(res.masked);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Too many attempts. Please try again later.');
     } finally {

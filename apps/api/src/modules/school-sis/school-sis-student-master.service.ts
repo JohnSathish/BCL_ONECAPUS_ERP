@@ -16,6 +16,7 @@ import { SCHOOL_ADMISSION_NUMBER_PREFIX } from './school-sis.constants';
 import { resolveSchoolEnrollmentRollNumber } from './school-sis-roll-number';
 import type { SaveSchoolStudentMasterDto } from './dto/school-sis.dto';
 import { SchoolSisService } from './school-sis.service';
+import { isSchoolPlaceholderEmail } from './school-sis-activation-contact';
 
 const PHONE_RE = /^(?:\+?91[-\s]?)?[6-9]\d{9}$/;
 const PIN_RE = /^\d{6}$/;
@@ -526,6 +527,13 @@ export class SchoolSisStudentMasterService {
         await this.syncGuardians(tx, tenantId, studentId, dto);
         await this.syncSiblings(tx, tenantId, studentId, dto);
         await this.syncPreviousSchool(tx, tenantId, studentId, dto);
+        await this.syncLinkedLoginContact(
+          tx,
+          tenantId,
+          studentId,
+          identity.phone,
+          identity.email,
+        );
         return studentId;
       });
 
@@ -693,6 +701,44 @@ export class SchoolSisStudentMasterService {
         },
       });
     }
+  }
+
+  private async syncLinkedLoginContact(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    studentId: string,
+    phone: string | null,
+    email: string | null,
+  ) {
+    const link = await tx.schoolPersonAccount.findFirst({
+      where: { tenantId, studentId, personType: 'STUDENT' },
+      select: { userId: true },
+    });
+    if (!link) return;
+    const user = await tx.user.findFirst({
+      where: { id: link.userId, tenantId, deletedAt: null },
+      select: { id: true, email: true },
+    });
+    if (!user) return;
+    const data: { phone: string | null; email?: string } = { phone };
+    const nextEmail = email?.trim().toLowerCase() ?? '';
+    if (
+      nextEmail.includes('@') &&
+      nextEmail !== user.email.trim().toLowerCase() &&
+      !isSchoolPlaceholderEmail(nextEmail)
+    ) {
+      const taken = await tx.user.findFirst({
+        where: {
+          tenantId,
+          email: nextEmail,
+          deletedAt: null,
+          NOT: { id: user.id },
+        },
+        select: { id: true },
+      });
+      if (!taken) data.email = nextEmail;
+    }
+    await tx.user.update({ where: { id: user.id }, data });
   }
 
   private async upsertGuardian(

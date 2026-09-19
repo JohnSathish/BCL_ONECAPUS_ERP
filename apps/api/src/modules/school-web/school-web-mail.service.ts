@@ -16,6 +16,15 @@ export class SchoolWebMailService {
     );
   }
 
+  async sendLoginOtp(to: string, otp: string) {
+    const code = otp.replace(/\D/g, '').slice(0, 8);
+    return this.send({
+      to,
+      subject: "Your St. Luke's verification code",
+      html: `<p>Your St. Luke's Secondary School verification code is <strong>${code}</strong>.</p><p>It expires in a few minutes. Do not share this code with anyone.</p>`,
+    });
+  }
+
   async notifyEnquiry(input: {
     schoolName: string;
     name: string;
