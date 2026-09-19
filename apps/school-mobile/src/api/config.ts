@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { getDeviceId } from '@/auth/device';
 import { getActiveChild } from '@/auth/session';
 
-export const APP_VERSION = '1.0.1';
+export const APP_VERSION = '1.0.7';
 
 export function getApiBase() {
   return (process.env.EXPO_PUBLIC_API_URL?.trim() || 'https://erp.stlukestura.in/api').replace(

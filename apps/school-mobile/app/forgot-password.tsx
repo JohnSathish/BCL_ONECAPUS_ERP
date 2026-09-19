@@ -43,7 +43,7 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <Screen title="Forgot Password" onBack light>
+    <Screen title="Forgot Password" onBack light insetBottom>
       <View style={styles.box}>
         <Text style={styles.lead}>
           Enter your admission or roll number. If the account information is valid, verification

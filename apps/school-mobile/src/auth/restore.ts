@@ -14,9 +14,10 @@ import {
   refreshAccessToken,
   SessionExpiredError,
 } from '@/auth/token-refresh';
+import { HOME_PATH } from '@/services/notification-path';
 
 export type AuthRoute =
-  | '/(tabs)'
+  | typeof HOME_PATH
   | '/welcome'
   | '/login'
   | '/unlock'
@@ -29,7 +30,7 @@ export async function routeAfterPasswordLogin(firstLogin?: boolean) {
   if (cap.available && !(await isBiometricLoginEnabled()) && !(await wasBiometricPrompted())) {
     return '/biometric-setup' as const;
   }
-  return '/(tabs)' as const;
+  return HOME_PATH;
 }
 
 export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
@@ -51,13 +52,13 @@ export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
     const access = await getAccessToken();
     if (access && !accessTokenLooksExpired(access)) {
       const user = await getUser();
-      return { route: user?.firstLogin ? '/welcome' : '/(tabs)' };
+      return { route: user?.firstLogin ? '/welcome' : HOME_PATH };
     }
 
     try {
       await refreshAccessToken();
       const user = await getUser();
-      return { route: user?.firstLogin ? '/welcome' : '/(tabs)' };
+      return { route: user?.firstLogin ? '/welcome' : HOME_PATH };
     } catch (err) {
       if (err instanceof AccountDisabledError) {
         return { route: '/account-disabled' };
@@ -67,7 +68,7 @@ export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
       }
       const offline = err instanceof Error && err.message.toLowerCase().includes('offline');
       if (offline && refresh) {
-        return { route: '/(tabs)' };
+        return { route: HOME_PATH };
       }
       return { route: '/login' };
     }

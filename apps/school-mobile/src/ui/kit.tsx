@@ -11,6 +11,7 @@ export function Screen({
   onBack,
   light,
   navy,
+  insetBottom,
 }: {
   children: ReactNode;
   title?: string;
@@ -18,12 +19,13 @@ export function Screen({
   onBack?: boolean;
   light?: boolean;
   navy?: boolean;
+  insetBottom?: boolean;
 }) {
   const router = useRouter();
   return (
     <SafeAreaView
       style={[styles.safe, light && styles.safeLight, navy && styles.safeNavy]}
-      edges={['top', 'left', 'right']}
+      edges={insetBottom ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
     >
       {title ? (
         <View style={[styles.bar, navy && styles.barNavy]}>

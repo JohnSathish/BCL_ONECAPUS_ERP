@@ -2,9 +2,14 @@ import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getUser } from '@/auth/session';
 import { appMode, type AppMode } from '@/persona';
 import { colors } from '@/theme/tokens';
+
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
 
 function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return <Text style={{ fontSize: 18, opacity: focused ? 1 : 0.4 }}>{emoji}</Text>;
@@ -20,6 +25,7 @@ function ReportsIcon({ focused }: { focused: boolean }) {
 
 export default function TabsLayout() {
   const [mode, setMode] = useState<AppMode>('student');
+  const insets = useSafeAreaInsets();
 
   useFocusEffect(
     useCallback(() => {
@@ -29,6 +35,7 @@ export default function TabsLayout() {
 
   const office = mode === 'office';
   const staff = mode === 'staff';
+  const bottom = Math.max(insets.bottom, 8);
 
   return (
     <Tabs
@@ -40,8 +47,8 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: '#fff',
           borderTopColor: '#edf0f7',
-          height: office ? 72 : 64,
-          paddingBottom: 8,
+          height: (office ? 64 : 56) + bottom,
+          paddingBottom: bottom,
           paddingTop: office ? 10 : 6,
         },
       }}

@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { getUser, saveUser } from '@/auth/session';
 import { routeAfterPasswordLogin } from '@/auth/restore';
+import { replaceWithNotificationOr } from '@/services/notification-open';
+import { isHomePath } from '@/services/notification-path';
 import { NavyButton, Screen } from '@/ui/kit';
 import { colors, space } from '@/theme/tokens';
 
@@ -20,11 +22,13 @@ export default function WelcomeScreen() {
   const continueNext = async () => {
     const user = await getUser();
     if (user) await saveUser({ ...user, firstLogin: false });
-    router.replace(await routeAfterPasswordLogin(false));
+    const next = await routeAfterPasswordLogin(false);
+    if (isHomePath(next)) replaceWithNotificationOr(router);
+    else router.replace(next);
   };
 
   return (
-    <Screen title="Welcome" light>
+    <Screen title="Welcome" light insetBottom>
       <View style={styles.box}>
         <Text style={styles.hello}>Welcome, {name}!</Text>
         <Text style={styles.lead}>Your account has been successfully activated.</Text>

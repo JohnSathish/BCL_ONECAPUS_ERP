@@ -1,5 +1,10 @@
 import { secureGet, secureSet } from '@/auth/secure-storage';
-import { HOME_PATH, MESSAGES_PATH, notificationPath } from '@/services/notification-path';
+import {
+  HOME_PATH,
+  MESSAGES_PATH,
+  notificationPath,
+  resolveAppHref,
+} from '@/services/notification-path';
 
 export { HOME_PATH, MESSAGES_PATH };
 
@@ -43,7 +48,7 @@ export function replaceWithNotificationOr(
   router: { replace: (href: never) => void },
   fallback: string = HOME_PATH,
 ) {
-  router.replace((takeNotificationDestination() || fallback) as never);
+  router.replace(resolveAppHref(takeNotificationDestination(), fallback) as never);
 }
 
 function fingerprint(response: NotificationResponseLike) {

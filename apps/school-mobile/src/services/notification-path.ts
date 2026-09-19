@@ -1,16 +1,33 @@
+export const HOME_PATH = '/(tabs)/index';
+export const MESSAGES_PATH = '/(tabs)/messages';
+
+export function isHomePath(href: string) {
+  return href === '/' || href === '/(tabs)' || href === '/(tabs)/' || href === '/(tabs)/index';
+}
+
+function isInboxLink(href: string) {
+  return href === '/inbox' || href === '/(tabs)/messages';
+}
+
+export function resolveAppHref(href?: string | null, fallback: string = HOME_PATH) {
+  const dest = href || fallback;
+  return isHomePath(dest) ? HOME_PATH : dest;
+}
+
 export function notificationPath(data?: Record<string, unknown> | null) {
-  const attach = String(data?.attachmentUrl || data?.imageUrl || data?.path || '').trim();
+  const attach = String(data?.attachmentUrl || data?.imageUrl || '').trim();
   const kind = String(data?.attachmentType || '').toLowerCase();
   const pdf = kind === 'pdf' || attach.toLowerCase().includes('.pdf');
   if (pdf && /^https?:\/\//i.test(attach)) {
     return `/media-view?url=${encodeURIComponent(attach)}&title=${encodeURIComponent('Document')}`;
   }
-  if (attach && /^https?:\/\//i.test(attach) && /\.(png|jpe?g|webp|gif)($|\?)/i.test(attach)) {
-    return `/media-view?url=${encodeURIComponent(attach)}&title=${encodeURIComponent('Photo')}`;
-  }
-  const rawLink = String(data?.deepLink || data?.path || '').trim();
+  const rawLink = String(data?.deepLink || '').trim();
   if (/^https?:\/\//i.test(rawLink)) return rawLink;
-  if (rawLink.startsWith('/')) return rawLink;
+  if (rawLink.startsWith('/')) {
+    if (isInboxLink(rawLink)) return MESSAGES_PATH;
+    if (isHomePath(rawLink)) return HOME_PATH;
+    return rawLink;
+  }
   if (rawLink.startsWith('notification://')) {
     const rest = rawLink.replace('notification://', '').split('/')[0]?.toLowerCase();
     if (rest === 'document' && /^https?:\/\//i.test(attach)) {
@@ -26,7 +43,13 @@ export function notificationPath(data?: Record<string, unknown> | null) {
   if (type === 'document' && /^https?:\/\//i.test(attach)) {
     return `/media-view?url=${encodeURIComponent(attach)}&title=${encodeURIComponent('Document')}`;
   }
-  return mapType(type);
+  const mapped = mapType(type);
+  if (mapped !== MESSAGES_PATH) return mapped;
+  const screen = String(data?.screen || data?.path || '').trim();
+  if (screen.startsWith('/') && !isHomePath(screen) && !/^https?:\/\//i.test(screen)) {
+    return isInboxLink(screen) ? MESSAGES_PATH : screen;
+  }
+  return MESSAGES_PATH;
 }
 
 function mapType(type?: string) {
@@ -42,27 +65,27 @@ function mapType(type?: string) {
     case 'academic_calendar':
       return '/calendar';
     case 'notices':
-    case 'announcement':
       return '/(tabs)/notices';
     case 'event':
       return '/(tabs)/events';
-    case 'dashboard':
-    case 'general':
-    case 'system':
-      return '/(tabs)';
     case 'examination':
     case 'result':
     case 'exam':
       return '/examinations';
     case 'transport':
       return '/transport';
-    case 'library':
-      return '/';
     case 'student':
       return '/profile';
     case 'document':
-      return '/inbox';
+      return MESSAGES_PATH;
+    case 'announcement':
+    case 'dashboard':
+    case 'general':
+    case 'system':
+    case 'library':
+    case 'none':
+    case '':
     default:
-      return '/inbox';
+      return MESSAGES_PATH;
   }
 }

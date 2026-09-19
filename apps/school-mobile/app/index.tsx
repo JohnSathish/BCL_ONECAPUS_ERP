@@ -5,6 +5,7 @@ import { apiFetch } from '@/api/client';
 import { APP_VERSION } from '@/api/config';
 import { restoreSchoolSession, type AuthRoute } from '@/auth/restore';
 import { captureLaunchNotification, replaceWithNotificationOr } from '@/services/notification-open';
+import { isHomePath } from '@/services/notification-path';
 import { LaunchSplash } from '@/screens/launch-splash';
 
 const MIN_SPLASH_MS = 2200;
@@ -64,7 +65,7 @@ export default function GateScreen() {
           void registerSchoolPush();
         });
       }
-      if (restored.route === '/(tabs)') {
+      if (isHomePath(restored.route)) {
         replaceWithNotificationOr(router);
       } else {
         router.replace(restored.route);

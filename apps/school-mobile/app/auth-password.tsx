@@ -50,7 +50,7 @@ export default function AuthPasswordScreen() {
   };
 
   return (
-    <Screen title="Create Your Password" onBack light>
+    <Screen title="Create Your Password" onBack light insetBottom>
       <View style={styles.box}>
         <Text style={styles.req}>Minimum 8 characters. Do not use your admission number.</Text>
         <View style={styles.passwordWrap}>

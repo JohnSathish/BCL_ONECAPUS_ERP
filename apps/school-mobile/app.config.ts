@@ -17,7 +17,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? "St. Luke's School",
   slug: 'st-lukes-school',
-  version: '1.0.6',
+  version: '1.0.7',
   scheme: 'stlukesschool',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
@@ -26,15 +26,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   splash: {
     image: './assets/splash-icon.png',
     resizeMode: 'contain',
-    backgroundColor: '#0a2cb8',
+    backgroundColor: '#ffffff',
   },
   androidStatusBar: {
-    backgroundColor: '#0a2cb8',
-    barStyle: 'light-content',
+    backgroundColor: '#ffffff',
+    barStyle: 'dark-content',
   },
   androidNavigationBar: {
-    backgroundColor: '#04125a',
-    barStyle: 'light-content',
+    backgroundColor: '#ffffff',
+    barStyle: 'dark-content',
   },
   ios: {
     supportsTablet: true,
@@ -51,7 +51,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'in.stlukestura.school',
-    versionCode: 9,
+    versionCode: 10,
     allowBackup: false,
     ...(hasGoogleServices ? { googleServicesFile: googleServicesLocal } : {}),
     adaptiveIcon: {
@@ -69,7 +69,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-splash-screen',
       {
         image: './assets/splash-icon.png',
-        backgroundColor: '#0a2cb8',
+        backgroundColor: '#ffffff',
         imageWidth: 180,
         resizeMode: 'contain',
       },
@@ -84,6 +84,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     'expo-asset',
     'expo-router',
+    'expo-system-ui',
     [
       'expo-secure-store',
       {

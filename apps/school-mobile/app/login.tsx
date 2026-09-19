@@ -16,6 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CREST, SCHOOL } from '@/brand';
 import { login } from '@/auth/account';
 import { routeAfterPasswordLogin } from '@/auth/restore';
+import { replaceWithNotificationOr } from '@/services/notification-open';
+import { isHomePath } from '@/services/notification-path';
 import { APP_VERSION } from '@/api/config';
 import { Screen } from '@/ui/kit';
 import { colors, radii, space } from '@/theme/tokens';
@@ -41,7 +43,9 @@ export default function LoginScreen() {
     setError(null);
     try {
       const session = await login(id, password);
-      router.replace(await routeAfterPasswordLogin(session.firstLogin));
+      const next = await routeAfterPasswordLogin(session.firstLogin);
+      if (isHomePath(next)) replaceWithNotificationOr(router);
+      else router.replace(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not sign in');
     } finally {
@@ -50,7 +54,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <Screen light>
+    <Screen light insetBottom>
       <LinearGradient colors={['#dce6fb', '#eef3fc', '#ffffff']} style={styles.flex}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -155,7 +159,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: space.lg,
     paddingTop: 28,
-    paddingBottom: 20,
+    paddingBottom: 32,
     alignItems: 'center',
   },
   crest: { width: 168, height: 168, marginBottom: 4 },

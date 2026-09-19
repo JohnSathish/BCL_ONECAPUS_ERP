@@ -45,27 +45,33 @@ export async function authenticateWithBiometrics(prompt: string) {
   if (!cap.available) {
     return { ok: false as const, reason: 'unavailable' as const };
   }
-  const result = await LocalAuthentication.authenticateAsync({
-    promptMessage: prompt,
-    cancelLabel: 'Cancel',
-    fallbackLabel: 'Use password',
-    disableDeviceFallback: true,
-    requireConfirmation: false,
-  });
-  if (result.success) return { ok: true as const };
-  return { ok: false as const, reason: 'failed' as const };
+  const message = String(prompt || 'Unlock your school account');
+  try {
+    const result =
+      Platform.OS === 'android'
+        ? await LocalAuthentication.authenticateAsync({ promptMessage: message })
+        : await LocalAuthentication.authenticateAsync({
+            promptMessage: message,
+            fallbackLabel: 'Use password',
+            disableDeviceFallback: true,
+          });
+    if (result.success) return { ok: true as const };
+    return { ok: false as const, reason: 'failed' as const };
+  } catch {
+    return { ok: false as const, reason: 'failed' as const };
+  }
 }
 
 export async function enableBiometricLogin() {
   const cap = await biometricCapability();
   if (!cap.available) {
-    throw new Error('Biometrics are not available on this device.');
+    throw new Error('Fingerprint is not set up on this phone.');
   }
   const auth = await authenticateWithBiometrics(
     'Confirm to enable fingerprint or Face ID for this school account.',
   );
   if (!auth.ok) {
-    throw new Error('Biometric confirmation was cancelled.');
+    throw new Error('Could not verify fingerprint. You can skip and use your password.');
   }
   await setBiometricLoginEnabled(true, cap.enrolledLevel);
 }

@@ -181,7 +181,12 @@ export class SchoolSisPushService {
       category: 'GENERAL',
       priority: 'HIGH',
       imageUrl: this.schoolLogoPublicUrl(),
-      data: { type: 'SYSTEM', deepLink: '/(tabs)', notificationId: 'test' },
+      data: {
+        type: 'SYSTEM',
+        deepLink: '/(tabs)/messages',
+        screen: '/(tabs)/messages',
+        notificationId: 'test',
+      },
     });
     if (result.invalidTokens.length) {
       await this.prisma.schoolMobileDevice.updateMany({
@@ -1139,6 +1144,7 @@ export class SchoolSisPushService {
               this.attachmentKind(campaign.imageUrl) === 'pdf'
                 ? (campaign.imageUrl ?? '')
                 : '',
+            screen: '/(tabs)/messages',
           },
         })
       : {

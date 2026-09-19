@@ -9,7 +9,7 @@ export default function AuthSuccessScreen() {
   const reset = params.purpose === 'RESET';
 
   return (
-    <Screen title={reset ? 'Password Updated' : 'Account Activated Successfully'} light>
+    <Screen title={reset ? 'Password Updated' : 'Account Activated Successfully'} light insetBottom>
       <View style={styles.box}>
         <Text style={styles.lead}>
           {reset

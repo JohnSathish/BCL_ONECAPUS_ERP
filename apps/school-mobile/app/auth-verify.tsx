@@ -91,7 +91,7 @@ export default function AuthVerifyScreen() {
   const digits = useMemo(() => otp.replace(/\D/g, '').slice(0, 6), [otp]);
 
   return (
-    <Screen title={title} onBack light>
+    <Screen title={title} onBack light insetBottom>
       <View style={styles.box}>
         {!useCode ? (
           <>

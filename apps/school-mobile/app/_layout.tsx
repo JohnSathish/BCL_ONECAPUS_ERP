@@ -1,15 +1,22 @@
 import { useEffect, useRef } from 'react';
 import { AppState, Linking, type AppStateStatus } from 'react-native';
-import { Stack, usePathname, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import * as SystemUI from 'expo-system-ui';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setAuthFailureHandler } from '@/api/client';
 import { isAppLockEnabled, isBiometricLoginEnabled } from '@/auth/session';
-import { notificationPath } from '@/services/notification-path';
+import {
+  consumeNotificationResponse,
+  takeNotificationDestination,
+  wasOpenedFromNotificationRecently,
+} from '@/services/notification-open';
+import { resolveAppHref } from '@/services/notification-path';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
-const OPEN_ROUTES = new Set([
+const AUTH_HOLD = new Set([
   '/login',
   '/activate',
   '/forgot-password',
@@ -21,13 +28,27 @@ const OPEN_ROUTES = new Set([
   '/session-ended',
   '/device-blocked',
   '/biometric-setup',
-  '/',
+  '/welcome',
 ]);
 
 export default function RootLayout() {
   const router = useRouter();
   const path = usePathname();
+  const segments = useSegments();
   const backgroundedAt = useRef(0);
+  const pathRef = useRef(path);
+  const segmentsRef = useRef(segments);
+  pathRef.current = path;
+  segmentsRef.current = segments;
+
+  const onAuthHold = () => {
+    const segs = segmentsRef.current;
+    if (!segs.length) return true;
+    if (segs[0] === '(tabs)') return false;
+    const current = pathRef.current;
+    if (AUTH_HOLD.has(current)) return true;
+    return current === '/' || segs[0] === 'index';
+  };
 
   useEffect(() => {
     setAuthFailureHandler((kind) => {
@@ -44,12 +65,17 @@ export default function RootLayout() {
           void import('@/services/push').then(({ markNotificationOpened }) => {
             void markNotificationOpened(String(data?.notificationId || ''));
           });
-          const dest = notificationPath(data);
-          if (/^https?:\/\//i.test(dest)) {
-            void Linking.openURL(dest);
-            return;
-          }
-          router.push(dest as never);
+          void consumeNotificationResponse(response).then((dest) => {
+            if (!dest) return;
+            if (/^https?:\/\//i.test(dest)) {
+              takeNotificationDestination();
+              void Linking.openURL(dest);
+              return;
+            }
+            if (onAuthHold()) return;
+            takeNotificationDestination();
+            router.navigate(resolveAppHref(dest) as never);
+          });
         });
       })
       .catch(() => undefined);
@@ -71,7 +97,8 @@ export default function RootLayout() {
       if (state !== 'active') return;
       const away = Date.now() - backgroundedAt.current;
       if (!backgroundedAt.current || away < 8_000) return;
-      if (OPEN_ROUTES.has(path)) return;
+      if (wasOpenedFromNotificationRecently()) return;
+      if (AUTH_HOLD.has(path) || path === '/') return;
       void import('@/services/push').then(({ pingDeviceHeartbeat, registerSchoolPush }) => {
         void registerSchoolPush();
         void pingDeviceHeartbeat();
@@ -84,55 +111,14 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [path, router]);
 
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync('#ffffff');
+  }, []);
+
   return (
     <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="activate" />
-        <Stack.Screen name="forgot-password" />
-        <Stack.Screen name="auth-verify" />
-        <Stack.Screen name="auth-password" />
-        <Stack.Screen name="auth-success" />
-        <Stack.Screen name="welcome" />
-        <Stack.Screen name="biometric-setup" />
-        <Stack.Screen name="unlock" />
-        <Stack.Screen name="account-disabled" />
-        <Stack.Screen name="session-ended" />
-        <Stack.Screen name="device-blocked" />
-        <Stack.Screen name="password" />
-        <Stack.Screen name="security" />
-        <Stack.Screen name="update" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="notice/[slug]" />
-        <Stack.Screen name="event/[slug]" />
-        <Stack.Screen name="gallery/[slug]" />
-        <Stack.Screen name="page/[slug]" />
-        <Stack.Screen name="prayer" />
-        <Stack.Screen name="inbox" />
-        <Stack.Screen name="inbox/[id]" />
-        <Stack.Screen name="media-view" />
-        <Stack.Screen name="timetable" />
-        <Stack.Screen name="fees" />
-        <Stack.Screen name="fees-history" />
-        <Stack.Screen name="attendance" />
-        <Stack.Screen name="profile" />
-        <Stack.Screen name="profile-personal" />
-        <Stack.Screen name="profile-guardians" />
-        <Stack.Screen name="academics" />
-        <Stack.Screen name="homework" />
-        <Stack.Screen name="leave" />
-        <Stack.Screen name="lesson-plan" />
-        <Stack.Screen name="calendar" />
-        <Stack.Screen name="school" />
-        <Stack.Screen name="feedback" />
-        <Stack.Screen name="examinations" />
-        <Stack.Screen name="study-material" />
-        <Stack.Screen name="lunch" />
-        <Stack.Screen name="transport" />
-        <Stack.Screen name="stationery" />
-        <Stack.Screen name="app-info" />
-      </Stack>
+      <StatusBar style="dark" backgroundColor="#ffffff" />
+      <Stack screenOptions={{ headerShown: false }} />
     </SafeAreaProvider>
   );
 }

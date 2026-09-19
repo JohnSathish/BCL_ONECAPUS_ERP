@@ -6,6 +6,7 @@ import { getUser } from '@/auth/session';
 import { refreshAccessToken } from '@/auth/token-refresh';
 import { CREST, SCHOOL } from '@/brand';
 import { Screen } from '@/ui/kit';
+import { replaceWithNotificationOr } from '@/services/notification-open';
 import { colors, radii, space } from '@/theme/tokens';
 
 export default function UnlockScreen() {
@@ -33,7 +34,7 @@ export default function UnlockScreen() {
         return;
       }
       await refreshAccessToken({ biometricUnlock: true });
-      router.replace('/(tabs)');
+      replaceWithNotificationOr(router);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (msg === 'ACCOUNT_DISABLED') {
@@ -41,7 +42,7 @@ export default function UnlockScreen() {
         return;
       }
       if (msg.toLowerCase().includes('offline')) {
-        router.replace('/(tabs)');
+        replaceWithNotificationOr(router);
         return;
       }
       setError('Session could not be renewed. Sign in with your password.');
@@ -55,7 +56,7 @@ export default function UnlockScreen() {
   }, []);
 
   return (
-    <Screen light>
+    <Screen light insetBottom>
       <View style={styles.box}>
         <Image source={CREST} style={styles.crest} resizeMode="contain" />
         <Text style={styles.school}>{SCHOOL.legalName}</Text>

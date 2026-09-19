@@ -40,7 +40,7 @@ export default function ActivateScreen() {
   };
 
   return (
-    <Screen title="Activate Your Account" onBack light>
+    <Screen title="Activate Your Account" onBack light insetBottom>
       <View style={styles.box}>
         <Text style={styles.lead}>Enter your admission or roll number to get started.</Text>
         <TextInput

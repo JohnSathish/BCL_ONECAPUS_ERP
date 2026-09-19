@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { biometricCapability, enableBiometricLogin } from '@/auth/biometric';
 import { setBiometricPrompted } from '@/auth/session';
+import { replaceWithNotificationOr } from '@/services/notification-open';
 import { NavyButton, Screen } from '@/ui/kit';
 import { colors, space } from '@/theme/tokens';
 
@@ -16,7 +17,7 @@ export default function BiometricSetupScreen() {
     void biometricCapability().then((cap) => {
       if (!cap.available) {
         void setBiometricPrompted(true);
-        router.replace('/(tabs)');
+        replaceWithNotificationOr(router);
         return;
       }
       setLabel(cap.label.replace('Unlock with ', ''));
@@ -25,7 +26,7 @@ export default function BiometricSetupScreen() {
 
   const skip = async () => {
     await setBiometricPrompted(true);
-    router.replace('/(tabs)');
+    replaceWithNotificationOr(router);
   };
 
   const enable = async () => {
@@ -35,7 +36,7 @@ export default function BiometricSetupScreen() {
     try {
       await enableBiometricLogin();
       await setBiometricPrompted(true);
-      router.replace('/(tabs)');
+      replaceWithNotificationOr(router);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not enable biometric login.');
     } finally {
@@ -44,7 +45,7 @@ export default function BiometricSetupScreen() {
   };
 
   return (
-    <Screen title="Enable Biometric Login?" light>
+    <Screen title="Enable Biometric Login?" light insetBottom>
       <View style={styles.box}>
         <Text style={styles.lead}>
           Use your fingerprint or Face ID to quickly access your school account. Your password is
