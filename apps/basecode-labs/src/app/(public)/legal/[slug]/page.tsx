@@ -11,6 +11,9 @@ import { CookieSettings } from '@/components/legal/cookie-banner';
 
 type Props = { params: Promise<{ slug: string }> };
 
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const doc = await getLegalDocument(slug);
@@ -22,15 +25,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: { canonical: `/legal/${doc.slug}` },
     openGraph: { title, description: doc.shortDescription },
   };
-}
-
-export async function generateStaticParams() {
-  try {
-    const docs = await listLegalDocuments();
-    return docs.map((d) => ({ slug: d.slug }));
-  } catch {
-    return [];
-  }
 }
 
 export default async function LegalDocumentPage({ params }: Props) {

@@ -260,12 +260,15 @@ if [[ "${SEED_BCL:-1}" == "1" ]]; then
     const p=new PrismaClient();
     p.user.count().then((c)=>process.exit(c>0?0:2)).finally(()=>p.\$disconnect());
   "; then
-    echo "Admin user already present — skip seed"
+    echo "Admin user already present — skip full seed"
   else
     "${BCL_COMPOSE[@]}" exec -T basecode-labs npx tsx prisma/seed.ts || \
       "${BCL_COMPOSE[@]}" exec -T basecode-labs node prisma/ensure-admin.cjs || \
       echo "WARN: seed failed — run: docker exec -it basecode-labs npx tsx prisma/seed.ts"
   fi
+  echo "Publishing legal policy pages…"
+  "${BCL_COMPOSE[@]}" exec -T basecode-labs npx tsx prisma/seed-legal.ts || \
+    echo "WARN: legal seed failed — run: docker exec -it basecode-labs npx tsx prisma/seed-legal.ts"
 fi
 
 echo
@@ -273,6 +276,10 @@ echo "--- BaseCode Labs checks ---"
 for url in \
   "https://${SITE_HOST}/" \
   "https://${WWW_HOST}/" \
+  "https://${SITE_HOST}/legal" \
+  "https://${SITE_HOST}/legal/privacy-policy" \
+  "https://${SITE_HOST}/privacy-policy.html" \
+  "https://${SITE_HOST}/terms-and-conditions.html" \
   "https://${SITE_HOST}/admin/login"
 do
   code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 20 "$url" || echo 000)"

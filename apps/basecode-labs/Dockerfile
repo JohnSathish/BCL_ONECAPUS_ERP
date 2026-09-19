@@ -27,4 +27,4 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 RUN mkdir -p /app/prisma/data
 EXPOSE 1610
-CMD ["sh", "-c", "mkdir -p prisma/data && npx prisma db push && node prisma/ensure-admin.cjs && npx next start -H 0.0.0.0 -p 1610"]
+CMD ["sh", "-c", "mkdir -p prisma/data && npx prisma db push && node prisma/ensure-admin.cjs && (npx tsx prisma/seed-legal.ts || echo 'WARN: legal seed skipped') && npx next start -H 0.0.0.0 -p 1610"]

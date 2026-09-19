@@ -526,10 +526,9 @@ We build websites, BCL OneCampus ERP, Android applications and digital infrastru
   const { LEGAL_SEEDS } = await import('./legal-content');
   const publishedAt = new Date('2026-09-18T00:00:00.000Z');
   for (const policy of LEGAL_SEEDS) {
-    const existing = await prisma.legalDocument.findUnique({ where: { slug: policy.slug } });
-    if (existing) continue;
-    const doc = await prisma.legalDocument.create({
-      data: {
+    const doc = await prisma.legalDocument.upsert({
+      where: { slug: policy.slug },
+      create: {
         slug: policy.slug,
         title: policy.title,
         shortDescription: policy.shortDescription,
@@ -541,17 +540,31 @@ We build websites, BCL OneCampus ERP, Android applications and digital infrastru
         contentHtml: policy.contentHtml,
         displayOrder: policy.displayOrder,
       },
-    });
-    await prisma.legalDocumentVersion.create({
-      data: {
-        documentId: doc.id,
-        version: '1.0',
+      update: {
+        title: policy.title,
+        shortDescription: policy.shortDescription,
+        icon: policy.icon,
+        status: 'PUBLISHED',
         contentHtml: policy.contentHtml,
-        changeSummary: policy.changeSummary,
-        publishedBy: 'BaseCode Labs Pvt. Ltd.',
-        publishedAt,
+        displayOrder: policy.displayOrder,
+        lastUpdated: publishedAt,
       },
     });
+    const versionCount = await prisma.legalDocumentVersion.count({
+      where: { documentId: doc.id, version: '1.0' },
+    });
+    if (!versionCount) {
+      await prisma.legalDocumentVersion.create({
+        data: {
+          documentId: doc.id,
+          version: '1.0',
+          contentHtml: policy.contentHtml,
+          changeSummary: policy.changeSummary,
+          publishedBy: 'BaseCode Labs Pvt. Ltd.',
+          publishedAt,
+        },
+      });
+    }
   }
 
   console.log('Seeded BaseCode Central with live-site testimonials and CMS content.');

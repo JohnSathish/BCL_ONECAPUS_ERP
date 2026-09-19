@@ -43,6 +43,17 @@ export const metadata: Metadata = {
     description: COMPANY.subheading,
   },
   robots: { index: true, follow: true },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '48x48' },
+      { url: '/favicon-32.png', type: 'image/png', sizes: '32x32' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
+    shortcut: ['/favicon.ico'],
+  },
+  manifest: '/site.webmanifest',
   verification: {
     google: 'aT9Dgcn7v8Qz0mSvKt8TfV9nrkrbjEA7g5VCwWhMuWg',
   },
@@ -54,6 +65,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     '@type': 'Organization',
     name: COMPANY.legalName,
     url: COMPANY.website,
+    logo: `${COMPANY.website}/icon-512.png`,
+    image: `${COMPANY.website}/brand/bcl-logo-official.jpg`,
     email: COMPANY.email,
     telephone: COMPANY.phoneDisplay,
     slogan: COMPANY.tagline,

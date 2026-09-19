@@ -1,7 +1,7 @@
 'use client';
 
 import { Bell, CalendarDays, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const SEARCH = [
@@ -17,16 +17,17 @@ const SEARCH = [
 export function AdminHeader({ name, email }: { name: string; email: string }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const date = useMemo(
-    () =>
+  const [date, setDate] = useState('');
+  useEffect(() => {
+    setDate(
       new Date().toLocaleDateString('en-GB', {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
         year: 'numeric',
       }),
-    [],
-  );
+    );
+  }, []);
   const initial = (name || 'A').slice(0, 1).toUpperCase();
   const matches = query.trim()
     ? SEARCH.filter((s) => s.q.includes(query.trim().toLowerCase()))

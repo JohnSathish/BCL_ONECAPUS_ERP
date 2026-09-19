@@ -4,6 +4,8 @@ import { ArrowRight } from 'lucide-react';
 import { listLegalDocuments } from '@/lib/legal';
 import { LegalArticleFrame, LegalIcon, LegalReviewBanner } from '@/components/legal/legal-ui';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: { absolute: 'Legal & Policies | BaseCode Labs Pvt. Ltd.' },
   description:

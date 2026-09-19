@@ -397,4 +397,22 @@ ${CONTACT}
 ${CONTACT}
 `,
   },
+  {
+    slug: 'account-deletion',
+    title: 'Account deletion',
+    shortDescription:
+      'How to request deletion of a BaseCode Labs, OneCampus or school-app account.',
+    icon: 'UserRoundCog',
+    displayOrder: 18,
+    changeSummary: 'Play Console and product account-deletion instructions.',
+    contentHtml: `
+<h2 id="how">How to request deletion</h2>
+<p>Email <a href="mailto:contact@basecodelabs.com?subject=Delete%20my%20account">contact@basecodelabs.com</a> with the subject “Delete my account”. Include the product (website, BCL OneCampus ERP, or school app), the login or admission number, and the institution name if it is a school or college account.</p>
+<h2 id="what">What we delete</h2>
+<p>We disable the login and remove or anonymise account data we control, subject to legal retention (invoices, security logs) and the institution’s role as controller of student or staff records. School and college records are deleted or retained according to that institution’s instructions.</p>
+<h2 id="time">Timing</h2>
+<p>We aim to complete account-deletion requests within 30 days. The institution may need extra time if the request is for a student or staff record they administer.</p>
+${CONTACT}
+`,
+  },
 ];

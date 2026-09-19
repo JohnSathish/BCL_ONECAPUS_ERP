@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { prisma } from '@/lib/prisma';
+import { listLegalDocuments } from '@/lib/legal';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,9 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/contact',
     '/legal',
   ];
-  const legal = await prisma.legalDocument
-    .findMany({ where: { status: 'PUBLISHED' }, select: { slug: true, lastUpdated: true } })
-    .catch(() => []);
+  const legal = await listLegalDocuments();
   const products = await prisma.product
     .findMany({ where: { status: 'PUBLISHED' }, select: { slug: true } })
     .catch(() => []);
