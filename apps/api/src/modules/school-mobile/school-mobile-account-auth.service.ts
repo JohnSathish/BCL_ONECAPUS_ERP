@@ -406,7 +406,7 @@ export class SchoolMobileAccountAuthService {
     }
     await this.recordEvent(tenantId, row.userId, 'OTP_REQUESTED', {
       ip,
-      channel: contact.kind,
+      reason: contact.kind,
     });
     return {
       message: GENERIC_NEXT,
