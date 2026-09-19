@@ -72,12 +72,12 @@ export function AttendanceDesk() {
         </p>
       ) : null}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-        <AttCard label="Total students" value={t?.students ?? '—'} />
-        <AttCard label="Present" value={t?.present ?? '—'} />
-        <AttCard label="Absent" value={t?.absent ?? '—'} />
-        <AttCard label="Late" value={t?.late ?? '—'} />
-        <AttCard label="On leave" value={t?.leave ?? '—'} />
-        <AttCard label="Attendance %" value={t ? `${t.percent}%` : '—'} />
+        <AttCard tone="sky" label="Total students" value={t?.students ?? '—'} />
+        <AttCard tone="emerald" label="Present" value={t?.present ?? '—'} />
+        <AttCard tone="rose" label="Absent" value={t?.absent ?? '—'} />
+        <AttCard tone="amber" label="Late" value={t?.late ?? '—'} />
+        <AttCard tone="violet" label="On leave" value={t?.leave ?? '—'} />
+        <AttCard tone="cyan" label="Attendance %" value={t ? `${t.percent}%` : '—'} />
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:col-span-2">

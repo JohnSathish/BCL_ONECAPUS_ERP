@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { FileCheck, Inbox, Search, UserPlus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import {
   convertSchoolSisApplication,
@@ -15,6 +14,14 @@ import {
   patchSchoolSisApplicationStatus,
 } from '@/services/school-sis';
 import { apiErrorMessage } from '@/utils/api-error';
+import { SlsKpiCard, SlsPill, SlsToolbar } from '@/components/school-sis/school-sis-saas';
+
+function statusTone(status: string): 'ok' | 'amber' | 'muted' | 'warn' {
+  if (status === 'ENROLLED' || status === 'OFFERED') return 'ok';
+  if (status === 'REJECTED') return 'warn';
+  if (status === 'WAITLIST' || status === 'UNDER_REVIEW') return 'amber';
+  return 'muted';
+}
 
 export default function SchoolSisAdmissionsPage() {
   const enabled = useAuthQueryEnabled();
@@ -22,6 +29,8 @@ export default function SchoolSisAdmissionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [cycleName, setCycleName] = useState('Admission window');
   const [sectionByApp, setSectionByApp] = useState<Record<string, string>>({});
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('');
   const cycles = useQuery({
     queryKey: ['school-sis-cycles'],
     queryFn: fetchSchoolSisAdmissionCycles,
@@ -52,73 +61,158 @@ export default function SchoolSisAdmissionsPage() {
     onError: (err) => setError(apiErrorMessage(err)),
   });
 
+  const rows = applications.data ?? [];
+  const stats = useMemo(() => {
+    return {
+      total: rows.length,
+      new: rows.filter((a) => a.status === 'SUBMITTED').length,
+      offered: rows.filter((a) => a.status === 'OFFERED').length,
+      enrolled: rows.filter((a) => a.status === 'ENROLLED').length,
+    };
+  }, [rows]);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((app) => {
+      if (status && app.status !== status) return false;
+      if (!needle) return true;
+      return [app.applicationNumber, app.fullName, app.guardianName, app.guardianPhone]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(needle);
+    });
+  }, [rows, q, status]);
+
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold">Online admission</h1>
-        <p className="text-sm text-slate-500">
-          Public form: /school-sis-portal/apply on this school host. Convert offered applications
-          into a student master and this year’s enrollment.
-        </p>
+    <div className="sls-page space-y-5">
+      <div className="sls-page-head">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--heading,#1a365d)]">
+            Applications
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">
+            Public form: /school-sis-portal/apply on this school host. Convert offered applications
+            into a student master and this year’s enrollment.
+          </p>
+        </div>
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
+      <div className="sls-stat-grid is-4">
+        <SlsKpiCard
+          tone="sky"
+          icon={Inbox}
+          label="All applications"
+          value={stats.total}
+          hint="School SIS applications only"
+          loading={applications.isLoading}
+          onClick={() => setStatus('')}
+        />
+        <SlsKpiCard
+          tone="amber"
+          icon={Users}
+          label="New"
+          value={stats.new}
+          hint="Submitted, awaiting review"
+          loading={applications.isLoading}
+          onClick={() => setStatus('SUBMITTED')}
+        />
+        <SlsKpiCard
+          tone="emerald"
+          icon={FileCheck}
+          label="Offered"
+          value={stats.offered}
+          hint="Ready to convert"
+          loading={applications.isLoading}
+          onClick={() => setStatus('OFFERED')}
+        />
+        <SlsKpiCard
+          tone="violet"
+          icon={UserPlus}
+          label="Enrolled"
+          value={stats.enrolled}
+          hint="Converted to student master"
+          loading={applications.isLoading}
+          onClick={() => setStatus('ENROLLED')}
+        />
+      </div>
+
       <form
-        className="flex flex-wrap items-end gap-2 rounded-2xl border bg-white p-4"
+        className="sls-toolbar"
         onSubmit={(e) => {
           e.preventDefault();
           createCycle.mutate();
         }}
       >
-        <div>
-          <Label>New cycle name</Label>
-          <Input
-            className="mt-1"
-            value={cycleName}
-            onChange={(e) => setCycleName(e.target.value)}
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search applicant, guardian, or application no…"
           />
         </div>
-        <Button type="submit" disabled={createCycle.isPending}>
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All status</option>
+          {['SUBMITTED', 'UNDER_REVIEW', 'WAITLIST', 'OFFERED', 'REJECTED', 'ENROLLED'].map(
+            (st) => (
+              <option key={st} value={st}>
+                {st.replace(/_/g, ' ')}
+              </option>
+            ),
+          )}
+        </select>
+        <input
+          value={cycleName}
+          onChange={(e) => setCycleName(e.target.value)}
+          placeholder="New cycle name"
+          aria-label="New cycle name"
+        />
+        <button type="submit" className="sls-cta" disabled={createCycle.isPending}>
           Open cycle
-        </Button>
+        </button>
       </form>
 
-      <div className="rounded-2xl border bg-white p-4 text-sm">
-        <h2 className="font-medium">Cycles</h2>
-        <ul className="mt-2 space-y-1">
-          {(cycles.data ?? []).map((c) => (
-            <li key={c.id}>
-              {c.name} · {c.status} · {new Date(c.opensAt).toLocaleDateString()}–
-              {new Date(c.closesAt).toLocaleDateString()}
-            </li>
-          ))}
-        </ul>
-      </div>
+      {(cycles.data ?? []).length ? (
+        <p className="text-xs text-slate-500">
+          {(cycles.data ?? [])
+            .map(
+              (c) =>
+                `${c.name} · ${c.status} · ${new Date(c.opensAt).toLocaleDateString()}–${new Date(c.closesAt).toLocaleDateString()}`,
+            )
+            .join('  ·  ')}
+        </p>
+      ) : null}
 
-      <div className="overflow-x-auto rounded-2xl border bg-white">
+      <div className="sls-saas-panel overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left">
+          <thead className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-4 py-2">No.</th>
-              <th className="px-4 py-2">Applicant</th>
-              <th className="px-4 py-2">Guardian</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Actions</th>
+              <th className="px-4 py-3">No.</th>
+              <th className="px-4 py-3">Applicant</th>
+              <th className="px-4 py-3">Guardian</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {(applications.data ?? []).map((app) => (
-              <tr key={app.id} className="border-t">
-                <td className="px-4 py-2 font-mono text-xs">{app.applicationNumber}</td>
-                <td className="px-4 py-2">{app.fullName}</td>
-                <td className="px-4 py-2">
+            {filtered.map((app) => (
+              <tr key={app.id}>
+                <td className="px-4 py-3 font-mono text-xs">{app.applicationNumber}</td>
+                <td className="px-4 py-3 font-semibold text-[var(--heading,#1a365d)]">
+                  {app.fullName}
+                </td>
+                <td className="px-4 py-3">
                   {app.guardianName}
                   {app.guardianPhone ? ` · ${app.guardianPhone}` : ''}
                 </td>
-                <td className="px-4 py-2">{app.status}</td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-3">
+                  <SlsPill tone={statusTone(app.status)}>{app.status.replace(/_/g, ' ')}</SlsPill>
+                </td>
+                <td className="px-4 py-3">
                   {app.status === 'ENROLLED' ? (
-                    <span>Admitted {app.student?.admissionNumber}</span>
+                    <span className="text-slate-500">Admitted {app.student?.admissionNumber}</span>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {['UNDER_REVIEW', 'OFFERED', 'WAITLIST', 'REJECTED'].map((st) => (
@@ -135,11 +229,11 @@ export default function SchoolSisAdmissionsPage() {
                               .catch((err) => setError(apiErrorMessage(err)))
                           }
                         >
-                          {st}
+                          {st.replace(/_/g, ' ')}
                         </Button>
                       ))}
                       <select
-                        className="h-8 rounded border px-2"
+                        className="h-8 rounded-lg px-2"
                         value={sectionByApp[app.id] ?? ''}
                         onChange={(e) =>
                           setSectionByApp((m) => ({ ...m, [app.id]: e.target.value }))

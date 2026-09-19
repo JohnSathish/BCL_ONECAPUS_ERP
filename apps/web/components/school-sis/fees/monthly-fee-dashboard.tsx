@@ -6,6 +6,8 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recha
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchMonthlyFeeDashboard } from '@/services/school-sis';
 import { MonthlyFeeSubnav, rs } from './monthly-fee-ui';
+import { SlsKpiCard } from '@/components/school-sis/school-sis-saas';
+import { AlertTriangle, IndianRupee, Receipt, Wallet } from 'lucide-react';
 
 export function MonthlyFeeDashboard() {
   const enabled = useAuthQueryEnabled();
@@ -15,28 +17,6 @@ export function MonthlyFeeDashboard() {
     enabled,
   });
   const d = query.data;
-  const cards = [
-    {
-      label: "Today's collection",
-      value: rs(d?.todayCollection ?? 0),
-      hint: `${d?.todayCount ?? 0} receipts`,
-    },
-    {
-      label: "This month's collection",
-      value: rs(d?.monthCollection ?? 0),
-      hint: `${d?.monthPaid ?? 0} students paid`,
-    },
-    {
-      label: 'Total pending fees',
-      value: rs(d?.pendingFees ?? 0),
-      hint: `${d?.monthPending ?? 0} students pending`,
-    },
-    {
-      label: 'Late payments',
-      value: String(d?.latePayments ?? 0),
-      hint: `${d?.enrolled ?? 0} enrolled Nursery–X`,
-    },
-  ];
   return (
     <div className="space-y-5">
       <MonthlyFeeSubnav />
@@ -50,18 +30,39 @@ export function MonthlyFeeDashboard() {
         </p>
       </div>
       {query.isLoading ? <p className="text-sm text-slate-500">Loading dashboard…</p> : null}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map((c) => (
-          <div key={c.label} className="rounded-2xl border bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {c.label}
-            </p>
-            <p className="mt-2 text-2xl font-semibold tabular-nums text-[var(--school-erp-primary)]">
-              {c.value}
-            </p>
-            <p className="text-xs text-slate-400">{c.hint}</p>
-          </div>
-        ))}
+      <div className="sls-stat-grid is-4">
+        <SlsKpiCard
+          tone="sky"
+          icon={Receipt}
+          label="Today's collection"
+          value={rs(d?.todayCollection ?? 0)}
+          hint={`${d?.todayCount ?? 0} receipts`}
+          loading={query.isLoading}
+        />
+        <SlsKpiCard
+          tone="emerald"
+          icon={Wallet}
+          label="This month's collection"
+          value={rs(d?.monthCollection ?? 0)}
+          hint={`${d?.monthPaid ?? 0} students paid`}
+          loading={query.isLoading}
+        />
+        <SlsKpiCard
+          tone="amber"
+          icon={IndianRupee}
+          label="Total pending fees"
+          value={rs(d?.pendingFees ?? 0)}
+          hint={`${d?.monthPending ?? 0} students pending`}
+          loading={query.isLoading}
+        />
+        <SlsKpiCard
+          tone="rose"
+          icon={AlertTriangle}
+          label="Late payments"
+          value={String(d?.latePayments ?? 0)}
+          hint={`${d?.enrolled ?? 0} enrolled Nursery–X`}
+          loading={query.isLoading}
+        />
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <section className="rounded-2xl border bg-white p-4">

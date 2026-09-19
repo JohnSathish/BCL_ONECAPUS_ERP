@@ -70,16 +70,20 @@ export function AttCard({
   label,
   value,
   hint,
+  tone = 'sky',
 }: {
   label: string;
   value: string | number;
   hint?: string;
+  tone?: 'sky' | 'emerald' | 'amber' | 'rose' | 'violet' | 'cyan';
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
-      {hint ? <p className="mt-0.5 text-xs text-slate-500">{hint}</p> : null}
+    <div className={`sls-kpi is-${tone}`}>
+      <p className="sls-kpi-label" style={{ marginTop: 0 }}>
+        {label}
+      </p>
+      <p className="sls-kpi-value">{value}</p>
+      {hint ? <p className="sls-kpi-hint">{hint}</p> : null}
     </div>
   );
 }

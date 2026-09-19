@@ -30,6 +30,7 @@ import {
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 import { profileCompletion, studentInitials } from '@/lib/school-sis/student-profile';
+import { SlsCta, SlsKpiCard } from '@/components/school-sis/school-sis-saas';
 import './school-sis-students.css';
 
 const PAGE_SIZES = [10, 25, 50];
@@ -318,102 +319,83 @@ export function SchoolSisStudentsDirectory() {
             Export
           </button>
           {canManage ? (
-            <Link href="/admin/school-sis/students/new" className="sls-register-primary">
+            <SlsCta href="/admin/school-sis/students/new">
               <UserPlus className="h-4 w-4" />
               Add Student
-            </Link>
+            </SlsCta>
           ) : null}
         </div>
       </div>
 
       <div className="sls-stat-grid">
-        {[
-          {
-            label: 'Total Students',
-            value: stats.total,
-            hint: 'On the school register',
-            icon: Users,
-            wrap: 'bg-sky-50 text-sky-700',
-          },
-          {
-            label: 'Active Students',
-            value: stats.active,
-            hint: stats.total ? `${Math.round((stats.active / stats.total) * 100)}% of total` : '—',
-            icon: Users,
-            wrap: 'bg-emerald-50 text-emerald-700',
-          },
-          {
-            label: 'Enrolled this year',
-            value: stats.enrolled,
-            hint: masters.data?.academicYear.name ?? 'Current session',
-            icon: GraduationCap,
-            wrap: 'bg-amber-50 text-amber-700',
-          },
-          {
-            label: 'Boys',
-            value: stats.boys,
-            hint: stats.gendered
+        <SlsKpiCard
+          tone="sky"
+          icon={Users}
+          label="Total Students"
+          value={stats.total}
+          hint="On the school register"
+          loading={students.isLoading}
+        />
+        <SlsKpiCard
+          tone="emerald"
+          icon={Users}
+          label="Active Students"
+          value={stats.active}
+          hint={stats.total ? `${Math.round((stats.active / stats.total) * 100)}% of total` : '—'}
+          trend={stats.total ? `${Math.round((stats.active / stats.total) * 100)}%` : '0%'}
+          trendLabel="of register"
+          loading={students.isLoading}
+        />
+        <SlsKpiCard
+          tone="amber"
+          icon={GraduationCap}
+          label="Enrolled this year"
+          value={stats.enrolled}
+          hint={masters.data?.academicYear.name ?? 'Current session'}
+          loading={students.isLoading}
+        />
+        <SlsKpiCard
+          tone="cyan"
+          icon={Users}
+          label="Boys"
+          value={stats.boys}
+          hint={
+            stats.gendered
               ? `${Math.round((stats.boys / stats.gendered) * 100)}% of recorded gender`
-              : 'Gender not recorded yet',
-            icon: Users,
-            wrap: 'bg-blue-50 text-blue-700',
-          },
-          {
-            label: 'Girls',
-            value: stats.girls,
-            hint: stats.gendered
+              : 'Gender not recorded yet'
+          }
+          trend={stats.gendered ? `${Math.round((stats.boys / stats.gendered) * 100)}%` : '0%'}
+          trendLabel="recorded"
+          loading={students.isLoading}
+        />
+        <SlsKpiCard
+          tone="rose"
+          icon={Users}
+          label="Girls"
+          value={stats.girls}
+          hint={
+            stats.gendered
               ? `${Math.round((stats.girls / stats.gendered) * 100)}% of recorded gender`
-              : 'Gender not recorded yet',
-            icon: Users,
-            wrap: 'bg-pink-50 text-pink-700',
-          },
-          {
-            label: 'Incomplete Profiles',
-            value: stats.incomplete,
-            hint: 'Need attention',
-            icon: Filter,
-            wrap: 'bg-violet-50 text-violet-700',
-            alert: stats.incomplete > 0,
-          },
-        ].map((card) => {
-          const Icon = card.icon;
-          return (
-            <button
-              key={card.label}
-              type="button"
-              className="sls-register-stat"
-              onClick={() => {
-                if (card.label === 'Incomplete Profiles') {
-                  setIncompleteOnly(true);
-                  setPage(1);
-                }
-              }}
-            >
-              <span
-                className={cn(
-                  'inline-flex h-9 w-9 items-center justify-center rounded-xl',
-                  card.wrap,
-                )}
-              >
-                <Icon className="h-4 w-4" />
-              </span>
-              <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                {card.label}
-              </p>
-              <p className="mt-1 text-2xl font-semibold text-[#1a365d]">
-                {students.isLoading ? '—' : card.value}
-              </p>
-              <p
-                className={cn(
-                  'mt-1 text-xs',
-                  card.alert ? 'font-medium text-rose-600' : 'text-slate-400',
-                )}
-              >
-                {card.hint}
-              </p>
-            </button>
-          );
-        })}
+              : 'Gender not recorded yet'
+          }
+          trend={stats.gendered ? `${Math.round((stats.girls / stats.gendered) * 100)}%` : '0%'}
+          trendLabel="recorded"
+          loading={students.isLoading}
+        />
+        <SlsKpiCard
+          tone="violet"
+          icon={Filter}
+          label="Incomplete Profiles"
+          value={stats.incomplete}
+          hint="Need attention"
+          trend={stats.total ? `${Math.round((stats.incomplete / stats.total) * 100)}%` : '0%'}
+          trendLabel="of register"
+          loading={students.isLoading}
+          onClick={() => {
+            setIncompleteOnly(true);
+            setPage(1);
+          }}
+        />
       </div>
 
       <div className="sls-chip-row">
@@ -452,7 +434,7 @@ export function SchoolSisStudentsDirectory() {
         ))}
       </div>
 
-      <div className="sls-filter-bar sls-register-toolbar">
+      <div className="sls-filter-bar sls-toolbar">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input

@@ -16,6 +16,8 @@ import {
 } from '@/services/school-sis';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+import { BookOpen, CheckCircle2, Layers, PieChart, Timer, Users } from 'lucide-react';
+import { SlsKpiCard, SlsToolbar } from '@/components/school-sis/school-sis-saas';
 import {
   Dialog,
   DialogContent,
@@ -298,77 +300,23 @@ export function AcademicStaffPanel() {
         </p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {[
-          {
-            label: 'Total Teachers',
-            value: kpis.teachers,
-            wrap: 'bg-blue-50/80',
-            icon: 'bg-blue-100 text-blue-700',
-            path: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
-          },
-          {
-            label: 'Class Teachers',
-            value: kpis.classTeachers,
-            wrap: 'bg-emerald-50/80',
-            icon: 'bg-emerald-100 text-emerald-700',
-            path: 'M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3',
-          },
-          {
-            label: 'Subject Teachers',
-            value: kpis.subjectTeachers,
-            wrap: 'bg-violet-50/80',
-            icon: 'bg-violet-100 text-violet-700',
-            path: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',
-          },
-          {
-            label: 'Assigned Sections',
-            value: kpis.assigned,
-            wrap: 'bg-amber-50/80',
-            icon: 'bg-amber-100 text-amber-700',
-            path: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',
-          },
-          {
-            label: 'Workload (Periods/Week)',
-            value: kpis.periods,
-            wrap: 'bg-rose-50/80',
-            icon: 'bg-rose-100 text-rose-700',
-            path: 'M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z',
-          },
-          {
-            label: 'Coverage',
-            value: `${kpis.coverage}%`,
-            wrap: 'bg-emerald-50/80',
-            icon: 'bg-emerald-100 text-emerald-700',
-            path: 'M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3',
-          },
-        ].map((card) => (
-          <div
-            key={card.label}
-            className={cn('rounded-2xl border border-white/70 p-3 shadow-sm', card.wrap)}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[11px] font-medium text-slate-500">{card.label}</p>
-              <span
-                className={cn('flex h-8 w-8 items-center justify-center rounded-xl', card.icon)}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                >
-                  <path d={card.path} />
-                </svg>
-              </span>
-            </div>
-            <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-              {card.value}
-            </p>
-          </div>
-        ))}
+      <div className="sls-stat-grid">
+        <SlsKpiCard tone="sky" icon={Users} label="Total Teachers" value={kpis.teachers} />
+        <SlsKpiCard
+          tone="emerald"
+          icon={CheckCircle2}
+          label="Class Teachers"
+          value={kpis.classTeachers}
+        />
+        <SlsKpiCard
+          tone="violet"
+          icon={BookOpen}
+          label="Subject Teachers"
+          value={kpis.subjectTeachers}
+        />
+        <SlsKpiCard tone="amber" icon={Layers} label="Assigned Sections" value={kpis.assigned} />
+        <SlsKpiCard tone="rose" icon={Timer} label="Workload (Periods/Week)" value={kpis.periods} />
+        <SlsKpiCard tone="cyan" icon={PieChart} label="Coverage" value={`${kpis.coverage}%`} />
       </div>
 
       {canManage ? (
@@ -551,8 +499,8 @@ export function AcademicStaffPanel() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3">
+      <div className="overflow-hidden sls-saas-panel">
+        <SlsToolbar className="rounded-none shadow-none">
           <div className="relative min-w-[16rem] flex-1">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
               <svg
@@ -623,7 +571,7 @@ export function AcademicStaffPanel() {
           >
             Export CSV
           </button>
-        </div>
+        </SlsToolbar>
         {more ? (
           <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-3 py-2 text-sm">
             <label className="inline-flex items-center gap-2">

@@ -26,8 +26,8 @@ import { SchoolLicenseStatusCard } from '@/components/school-sis/license/license
 import { canManageSchoolSis } from '@/lib/school-sis/permissions';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+import { SlsKpiCard, type SlsKpiTone } from '@/components/school-sis/school-sis-saas';
 
-const SKY = '#0ea5e9';
 const GENDER_COLORS = { male: '#2563eb', female: '#ec4899', other: '#94a3b8' };
 
 function applicationStatusLabel(status: string) {
@@ -75,28 +75,6 @@ function noticeDot(category: string) {
   if (c.includes('EVENT')) return 'bg-violet-500';
   if (c.includes('EXAM')) return 'bg-rose-500';
   return 'bg-sky-500';
-}
-
-function Sparkline({ values, color }: { values: number[]; color: string }) {
-  const max = Math.max(...values, 1);
-  const pts = values.map((v, i) => {
-    const x = values.length <= 1 ? 0 : (i / (values.length - 1)) * 100;
-    const y = 28 - (v / max) * 22;
-    return `${x},${y}`;
-  });
-  return (
-    <svg
-      viewBox="0 0 100 32"
-      width="100%"
-      height="40"
-      className="h-10 w-full"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      <polyline fill="none" stroke={color} strokeWidth="2" points={pts.join(' ')} />
-      <polyline fill={`${color}22`} stroke="none" points={`0,32 ${pts.join(' ')} 100,32`} />
-    </svg>
-  );
 }
 
 function ClassBars({ rows }: { rows: { name: string; count: number }[] }) {
@@ -209,16 +187,21 @@ export function SchoolSisDashboard() {
   });
   const timeLabel = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-  const stats = [
+  const stats: Array<{
+    label: string;
+    value: number | undefined;
+    hint: string;
+    href: string;
+    icon: typeof GraduationCap;
+    tone: SlsKpiTone;
+  }> = [
     {
       label: 'Total Students',
       value: counts?.students,
       hint: `${counts?.enrollments ?? 0} enrolled this year`,
       href: '/admin/school-sis/students',
       icon: GraduationCap,
-      tone: 'bg-sky-50 text-sky-700',
-      spark: classChart.map((r) => r.count),
-      sparkColor: SKY,
+      tone: 'sky',
     },
     {
       label: 'Teachers',
@@ -226,9 +209,7 @@ export function SchoolSisDashboard() {
       hint: `${counts?.staff ?? 0} staff in total`,
       href: '/admin/school-sis/staff',
       icon: Users,
-      tone: 'bg-emerald-50 text-emerald-700',
-      spark: [counts?.teachingStaff ?? 0, counts?.nonTeachingStaff ?? 0, counts?.staff ?? 0],
-      sparkColor: '#10b981',
+      tone: 'emerald',
     },
     {
       label: 'Non-Teaching Staff',
@@ -236,9 +217,7 @@ export function SchoolSisDashboard() {
       hint: 'Office and support staff',
       href: '/admin/school-sis/staff',
       icon: Users,
-      tone: 'bg-violet-50 text-violet-700',
-      spark: [0, counts?.nonTeachingStaff ?? 0, counts?.staff ?? 0],
-      sparkColor: '#8b5cf6',
+      tone: 'violet',
     },
     {
       label: 'Classes',
@@ -246,9 +225,7 @@ export function SchoolSisDashboard() {
       hint: `${counts?.sections ?? 0} sections this year`,
       href: '/admin/school-sis/academic/classes',
       icon: BookOpen,
-      tone: 'bg-orange-50 text-orange-700',
-      spark: classChart.map((r) => r.count || 1),
-      sparkColor: '#f97316',
+      tone: 'amber',
     },
     {
       label: 'Upcoming Events',
@@ -256,23 +233,15 @@ export function SchoolSisDashboard() {
       hint: 'Published on the school website',
       href: '/admin/school-sis/website',
       icon: CalendarDays,
-      tone: 'bg-pink-50 text-pink-700',
-      spark: [
-        counts?.eventsUpcoming ?? 0,
-        counts?.eventsUpcoming ?? 0,
-        counts?.eventsUpcoming ?? 0,
-      ],
-      sparkColor: '#ec4899',
+      tone: 'rose',
     },
     {
       label: 'New Enquiries',
       value: counts?.newEnquiries,
       hint: `${counts?.openApplications ?? 0} open applications`,
-      href: '/admin/school-sis/website',
+      href: '/admin/school-sis/admissions',
       icon: Megaphone,
-      tone: 'bg-cyan-50 text-cyan-700',
-      spark: [0, counts?.openApplications ?? 0, counts?.newEnquiries ?? 0],
-      sparkColor: '#06b6d4',
+      tone: 'cyan',
     },
   ];
 
@@ -401,50 +370,18 @@ export function SchoolSisDashboard() {
       <SchoolLicenseStatusCard variant="banner" />
 
       <div className="sls-stat-grid">
-        {stats.map((card) => {
-          const Icon = card.icon;
-          const inner = (
-            <>
-              <div className="flex items-start justify-between gap-2">
-                <span
-                  className={cn('flex h-9 w-9 items-center justify-center rounded-xl', card.tone)}
-                >
-                  <Icon className="h-4 w-4" />
-                </span>
-              </div>
-              <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                {card.label}
-              </p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-[#1a365d]">
-                {overview.isLoading ? '-' : (card.value ?? 0)}
-              </p>
-              <p className="mt-1 text-xs text-slate-400">{card.hint}</p>
-              {card.spark.some((n) => n > 0) ? (
-                <div className="mt-2">
-                  <Sparkline values={card.spark} color={card.sparkColor} />
-                </div>
-              ) : null}
-            </>
-          );
-          const className =
-            'min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]';
-          if (card.href) {
-            return (
-              <Link
-                key={card.label}
-                href={card.href}
-                className={cn(className, 'hover:border-sky-200')}
-              >
-                {inner}
-              </Link>
-            );
-          }
-          return (
-            <div key={card.label} className={className}>
-              {inner}
-            </div>
-          );
-        })}
+        {stats.map((card) => (
+          <SlsKpiCard
+            key={card.label}
+            tone={card.tone}
+            icon={card.icon}
+            label={card.label}
+            value={card.value ?? 0}
+            hint={card.hint}
+            href={card.href}
+            loading={overview.isLoading}
+          />
+        ))}
       </div>
 
       <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
