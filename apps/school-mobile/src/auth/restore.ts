@@ -3,7 +3,6 @@ import {
   getAccessToken,
   getRefreshToken,
   getUser,
-  hasPersistedSession,
   isAppLockEnabled,
   isBiometricLoginEnabled,
   setBiometricLoginEnabled,
@@ -34,42 +33,45 @@ export async function routeAfterPasswordLogin(firstLogin?: boolean) {
 }
 
 export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
-  const refresh = await getRefreshToken();
-  if (!refresh) return { route: '/login' };
-
-  if (await biometricEnrollmentChanged()) {
-    await setBiometricLoginEnabled(false);
-  }
-
-  if (await isAppLockEnabled()) {
-    const cap = await biometricCapability();
-    if (cap.available && (await isBiometricLoginEnabled())) {
-      return { route: '/unlock' };
-    }
-  }
-
-  const access = await getAccessToken();
-  if (access && !accessTokenLooksExpired(access)) {
-    const user = await getUser();
-    return { route: user?.firstLogin ? '/welcome' : '/(tabs)' };
-  }
-
   try {
-    await refreshAccessToken();
-    const user = await getUser();
-    return { route: user?.firstLogin ? '/welcome' : '/(tabs)' };
-  } catch (err) {
-    if (err instanceof AccountDisabledError) {
-      return { route: '/account-disabled' };
+    const refresh = await getRefreshToken();
+    if (!refresh) return { route: '/login' };
+
+    if (await biometricEnrollmentChanged()) {
+      await setBiometricLoginEnabled(false);
     }
-    const offline = err instanceof Error && err.message.toLowerCase().includes('offline');
-    if (offline && (await hasPersistedSession())) {
-      return { route: '/(tabs)' };
+
+    if (await isAppLockEnabled()) {
+      const cap = await biometricCapability();
+      if (cap.available && (await isBiometricLoginEnabled())) {
+        return { route: '/unlock' };
+      }
     }
-    if (err instanceof SessionExpiredError) {
+
+    const access = await getAccessToken();
+    if (access && !accessTokenLooksExpired(access)) {
+      const user = await getUser();
+      return { route: user?.firstLogin ? '/welcome' : '/(tabs)' };
+    }
+
+    try {
+      await refreshAccessToken();
+      const user = await getUser();
+      return { route: user?.firstLogin ? '/welcome' : '/(tabs)' };
+    } catch (err) {
+      if (err instanceof AccountDisabledError) {
+        return { route: '/account-disabled' };
+      }
+      if (err instanceof SessionExpiredError) {
+        return { route: '/login' };
+      }
+      const offline = err instanceof Error && err.message.toLowerCase().includes('offline');
+      if (offline && refresh) {
+        return { route: '/(tabs)' };
+      }
       return { route: '/login' };
     }
-    if (await hasPersistedSession()) return { route: '/(tabs)' };
+  } catch {
     return { route: '/login' };
   }
 }

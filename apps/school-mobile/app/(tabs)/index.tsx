@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { fetchHome, switchChild } from '@/auth/login';
-import { getActiveChild, getUser, saveUser } from '@/auth/session';
+import { getActiveChild, getRefreshToken, getUser, saveUser } from '@/auth/session';
 import { mediaUrl } from '@/api/config';
 import { CAMPUS, CREST, SCHOOL } from '@/brand';
 import { isPrincipalUser, isStaffUser } from '@/persona';
@@ -52,6 +52,11 @@ export default function HomeScreen() {
 
   const load = useCallback(async () => {
     try {
+      const refresh = await getRefreshToken();
+      if (!refresh) {
+        router.replace('/login');
+        return;
+      }
       const childId = await getActiveChild();
       const home = await fetchHome(childId);
       setData(home);
@@ -64,9 +69,14 @@ export default function HomeScreen() {
       });
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load home');
+      const msg = err instanceof Error ? err.message : '';
+      if (/SecureStore|getValueWithKeyAsync|NullPointerException|unauthor|401|session/i.test(msg)) {
+        router.replace('/login');
+        return;
+      }
+      setError('Could not load home. Please try again.');
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     void load();
@@ -76,6 +86,17 @@ export default function HomeScreen() {
     return (
       <Screen>
         <Loader />
+      </Screen>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Screen>
+        <EmptyState title="Couldn't load home" body={error || 'Please try again.'} />
+        <Pressable onPress={() => void load()} style={styles.retry}>
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
       </Screen>
     );
   }
@@ -248,7 +269,6 @@ export default function HomeScreen() {
         {!events.length ? (
           <EmptyState title="No upcoming events" body="Published school events will show here." />
         ) : null}
-        {error ? <Text style={styles.warn}>{error}</Text> : null}
       </Feed>
     </Screen>
   );
@@ -367,5 +387,13 @@ const styles = StyleSheet.create({
   eventTitle: { fontWeight: '800', color: colors.ink },
   eventWhen: { color: colors.muted, fontSize: 12, marginTop: 2 },
   chev: { color: colors.muted, fontSize: 22 },
-  warn: { color: colors.danger, fontSize: 12 },
+  retry: {
+    alignSelf: 'center',
+    marginTop: space.md,
+    backgroundColor: colors.navy,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: radii.pill,
+  },
+  retryText: { color: '#fff', fontWeight: '700' },
 });

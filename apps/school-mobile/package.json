@@ -1,6 +1,6 @@
 {
   "name": "school-mobile",
-  "version": "1.0.2",
+  "version": "1.0.6",
   "private": true,
   "main": "index.js",
   "scripts": {

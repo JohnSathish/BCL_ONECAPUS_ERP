@@ -1,12 +1,12 @@
-import * as SecureStore from 'expo-secure-store';
 import * as Device from 'expo-device';
+import { secureGet, secureSet } from '@/auth/secure-storage';
 
 const KEY = 'sls_device_id';
 
 export async function getDeviceId() {
-  const existing = await SecureStore.getItemAsync(KEY);
+  const existing = await secureGet(KEY);
   if (existing) return existing;
   const id = `${Device.osName ?? 'device'}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  await SecureStore.setItemAsync(KEY, id);
+  await secureSet(KEY, id);
   return id;
 }

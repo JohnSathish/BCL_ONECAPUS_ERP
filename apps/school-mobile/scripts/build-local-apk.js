@@ -17,8 +17,8 @@ const root = path.join(__dirname, '..');
 process.chdir(root);
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const appVersion = pkg.version || '1.0.2';
-const versionCode = '4';
+const appVersion = pkg.version || '1.0.6';
+const versionCode = '9';
 
 const jdkCandidates = [
   process.env.JAVA_HOME,
@@ -132,8 +132,14 @@ const env = {
 
 if (fs.existsSync(googleServices)) {
   env.GOOGLE_SERVICES_JSON = process.env.GOOGLE_SERVICES_JSON || googleServices;
+  console.log(
+    'Firebase google-services.json found (st-lukes-school-6f471) — FCM will be included.',
+  );
 } else {
-  console.log('No google-services.json — building without Firebase (push optional).');
+  console.error(
+    'Missing apps/school-mobile/google-services.json. Download it from Firebase project st-lukes-school-6f471 for package in.stlukestura.school, then retry.',
+  );
+  process.exit(1);
 }
 
 function run(cmd, args, opts = {}) {
@@ -210,6 +216,119 @@ function stripFirebaseMessagingIfNeeded() {
   }
 }
 
+function patchAndroidSdkGradleFiles() {
+  const files = [
+    path.join(root, 'android', 'build.gradle'),
+    path.join(root, 'android', 'app', 'build.gradle'),
+  ];
+  for (const file of files) {
+    if (!fs.existsSync(file)) continue;
+    const before = fs.readFileSync(file, 'utf8');
+    const after = before
+      .replace(
+        /findProperty\('android\.compileSdkVersion'\)\s*\?:\s*'\d+'/g,
+        "findProperty('android.compileSdkVersion') ?: '36'",
+      )
+      .replace(
+        /findProperty\('android\.targetSdkVersion'\)\s*\?:\s*'\d+'/g,
+        "findProperty('android.targetSdkVersion') ?: '36'",
+      )
+      .replace(
+        /findProperty\('android\.buildToolsVersion'\)\s*\?:\s*'[\d.]+'/g,
+        "findProperty('android.buildToolsVersion') ?: '36.0.0'",
+      );
+    if (after !== before) {
+      fs.writeFileSync(file, after);
+      console.log(`Patched ${path.relative(root, file)} → SDK 36 defaults`);
+    }
+  }
+}
+
+function verifyReleaseManifest() {
+  const candidates = [
+    path.join(
+      root,
+      'android',
+      'app',
+      'build',
+      'intermediates',
+      'merged_manifests',
+      'release',
+      'AndroidManifest.xml',
+    ),
+    path.join(
+      root,
+      'android',
+      'app',
+      'build',
+      'intermediates',
+      'merged_manifests',
+      'release',
+      'processReleaseManifest',
+      'AndroidManifest.xml',
+    ),
+    path.join(
+      root,
+      'android',
+      'app',
+      'build',
+      'intermediates',
+      'packaged_manifests',
+      'release',
+      'AndroidManifest.xml',
+    ),
+  ];
+  const manifest = candidates.find((p) => fs.existsSync(p));
+  if (!manifest) {
+    console.warn('Could not find merged release manifest to verify targetSdk.');
+    return;
+  }
+  const xml = fs.readFileSync(manifest, 'utf8');
+  const target = (xml.match(/android:targetSdkVersion="(\d+)"/) || [])[1];
+  const compileHint = (xml.match(/android:compileSdkVersion="(\d+)"/) || [])[1];
+  const pkg = (xml.match(/package="([^"]+)"/) || [])[1];
+  const vc = (xml.match(/android:versionCode="(\d+)"/) || [])[1];
+  const vn = (xml.match(/android:versionName="([^"]+)"/) || [])[1];
+  console.log(
+    `Release manifest → package=${pkg || 'in.stlukestura.school'} versionName=${vn || appVersion} versionCode=${vc || versionCode} compileSdk=${compileHint || 'n/a'} targetSdk=${target || 'unset'}`,
+  );
+  if (Number(target) < 36) {
+    throw new Error(`Release manifest still targets API ${target}. Play Console requires 36+.`);
+  }
+}
+
+function copyMappingFile(distDir, base) {
+  const mapping = path.join(
+    root,
+    'android',
+    'app',
+    'build',
+    'outputs',
+    'mapping',
+    'release',
+    'mapping.txt',
+  );
+  if (!fs.existsSync(mapping)) {
+    console.log('No R8 mapping.txt found (Play deobfuscation upload optional).');
+    return;
+  }
+  copyOut(mapping, `${base}-mapping.txt`);
+}
+
+function assertTargetSdk36() {
+  const gp = path.join(root, 'android', 'gradle.properties');
+  const text = fs.existsSync(gp) ? fs.readFileSync(gp, 'utf8') : '';
+  const target = (text.match(/^android\.targetSdkVersion=(\d+)/m) || [])[1];
+  const compile = (text.match(/^android\.compileSdkVersion=(\d+)/m) || [])[1];
+  if (Number(target) < 36 || Number(compile) < 36) {
+    throw new Error(
+      `Play Console requires API 36+. Found android.targetSdkVersion=${target || 'unset'} ` +
+        `android.compileSdkVersion=${compile || 'unset'} in android/gradle.properties.`,
+    );
+  }
+  console.log(`Android SDK OK → compileSdk ${compile}, targetSdk ${target}`);
+}
+
 function patchGradleProperties() {
   const gp = path.join(root, 'android', 'gradle.properties');
   if (!fs.existsSync(gp)) return;
@@ -233,8 +352,24 @@ function patchGradleProperties() {
   } else {
     text = text.replace(/^org\.gradle\.workers\.max=.*$/m, 'org.gradle.workers.max=2');
   }
+  const sdkProps = {
+    'android.compileSdkVersion': '36',
+    'android.targetSdkVersion': '36',
+    'android.buildToolsVersion': '36.0.0',
+    'android.enableProguardInReleaseBuilds': 'true',
+  };
+  for (const [key, value] of Object.entries(sdkProps)) {
+    const line = `${key}=${value}`;
+    if (new RegExp(`^${key.replace(/\./g, '\\.')}=`, 'm').test(text)) {
+      text = text.replace(new RegExp(`^${key.replace(/\./g, '\\.')}=.*$`, 'm'), line);
+    } else {
+      text += `\n${line}\n`;
+    }
+  }
   fs.writeFileSync(gp, text);
-  console.log(`Patched android/gradle.properties → architectures=${arches}, workers=2`);
+  console.log(
+    `Patched android/gradle.properties → architectures=${arches}, workers=2, targetSdk=36`,
+  );
 }
 
 function ensureUploadSigningInGradle() {
@@ -304,6 +439,8 @@ const prebuildArgs = ['expo', 'prebuild', '--platform', 'android'];
 if (!skipClean) prebuildArgs.push('--clean');
 run('npx', prebuildArgs);
 patchGradleProperties();
+patchAndroidSdkGradleFiles();
+assertTargetSdk36();
 shrinkSplashLogos();
 stripFirebaseMessagingIfNeeded();
 ensureUploadSigningInGradle();
@@ -338,6 +475,8 @@ run(
   ],
   { cwd: path.join(root, 'android') },
 );
+
+verifyReleaseManifest();
 
 const apkDir = path.join(root, 'android', 'app', 'build', 'outputs', 'apk', 'release');
 const apks = fs.existsSync(apkDir) ? fs.readdirSync(apkDir).filter((f) => f.endsWith('.apk')) : [];
@@ -380,6 +519,7 @@ if (apks.length) {
 if (fs.existsSync(aabPath)) {
   console.log('AAB:', aabPath);
   copyOut(aabPath, `${base}.aab`);
+  copyMappingFile(distDir, base);
 } else {
   console.log('Expected AAB missing at', aabPath);
   process.exit(1);

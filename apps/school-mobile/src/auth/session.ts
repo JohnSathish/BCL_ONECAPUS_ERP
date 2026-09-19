@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { secureDel, secureGet, secureSet } from '@/auth/secure-storage';
 
 const ACCESS = 'sls_access_token';
 const REFRESH = 'sls_refresh_token';
@@ -9,10 +9,6 @@ const APP_LOCK = 'sls_app_lock';
 const BIOMETRIC_LEVEL = 'sls_biometric_level';
 const BIOMETRIC_PROMPTED = 'sls_biometric_prompted';
 
-const SECURE: SecureStore.SecureStoreOptions = {
-  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
-};
-
 export type StoredUser = {
   permissions?: string[];
   roles?: string[];
@@ -22,17 +18,9 @@ export type StoredUser = {
   firstLogin?: boolean;
 };
 
-async function setSecure(key: string, value: string) {
-  await SecureStore.setItemAsync(key, value, SECURE);
-}
-
-async function getSecure(key: string) {
-  return SecureStore.getItemAsync(key, SECURE);
-}
-
-async function delSecure(key: string) {
-  await SecureStore.deleteItemAsync(key, SECURE);
-}
+const setSecure = secureSet;
+const getSecure = secureGet;
+const delSecure = secureDel;
 
 export async function saveSession(accessToken: string, refreshToken: string) {
   await setSecure(ACCESS, accessToken);

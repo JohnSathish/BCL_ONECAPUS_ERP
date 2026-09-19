@@ -17,7 +17,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? "St. Luke's School",
   slug: 'st-lukes-school',
-  version: '1.0.2',
+  version: '1.0.6',
   scheme: 'stlukesschool',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
@@ -26,7 +26,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   splash: {
     image: './assets/splash-icon.png',
     resizeMode: 'contain',
-    backgroundColor: '#1a237e',
+    backgroundColor: '#0a2cb8',
+  },
+  androidStatusBar: {
+    backgroundColor: '#0a2cb8',
+    barStyle: 'light-content',
+  },
+  androidNavigationBar: {
+    backgroundColor: '#04125a',
+    barStyle: 'light-content',
   },
   ios: {
     supportsTablet: true,
@@ -43,7 +51,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'in.stlukestura.school',
-    versionCode: 4,
+    versionCode: 9,
+    allowBackup: false,
     ...(hasGoogleServices ? { googleServicesFile: googleServicesLocal } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
@@ -60,8 +69,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-splash-screen',
       {
         image: './assets/splash-icon.png',
-        backgroundColor: '#1a237e',
-        imageWidth: 128,
+        backgroundColor: '#0a2cb8',
+        imageWidth: 180,
         resizeMode: 'contain',
       },
     ],
@@ -75,7 +84,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     'expo-asset',
     'expo-router',
-    'expo-secure-store',
+    [
+      'expo-secure-store',
+      {
+        configureAndroidBackup: true,
+      },
+    ],
     [
       'expo-local-authentication',
       {
@@ -84,12 +98,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     'expo-font',
+    './plugins/with-android-target-sdk-36',
   ],
   experiments: { typedRoutes: true },
   extra: {
     appDisplayName: process.env.EXPO_PUBLIC_APP_NAME ?? "St. Luke's School",
     privacyPolicyUrl:
-      process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://basecodelabs.com/privacy-policy.html',
+      process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://stlukestura.in/privacy-policy',
     termsUrl:
       process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://basecodelabs.com/terms-and-conditions.html',
     supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'admin@stlukestura.in',
