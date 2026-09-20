@@ -12,6 +12,7 @@ import { SchoolSisService } from './school-sis.service';
 import { SchoolSisCalendarService } from './school-sis-calendar.service';
 import { SchoolSisEventBus } from './school-sis-event-bus.service';
 import { resolveSchoolStaffIdForUser } from './school-sis-staff-lookup';
+import { istDayKey } from './school-sis-timetable-bells';
 import {
   attendancePercent,
   bandForPercent,
@@ -338,7 +339,7 @@ export class SchoolSisAttendanceService {
   ) {
     const year = await this.year(tenantId, q.academicYearId);
     const settings = await this.ensureSetup(tenantId, year.id);
-    const date = q.date ? dayKey(q.date) : dayKey(new Date());
+    const date = q.date ? dayKey(q.date) : istDayKey();
     const sectionWhere: Prisma.SchoolSectionWhereInput = {
       tenantId,
       academicYearId: year.id,
@@ -1533,7 +1534,7 @@ export class SchoolSisAttendanceService {
     },
   ) {
     const year = await this.year(tenantId, q.academicYearId);
-    const date = q.date ? dayKey(q.date) : dayKey(new Date());
+    const date = q.date ? dayKey(q.date) : istDayKey();
     const codes = q.status ? [q.status] : ['ABSENT', 'LATE', 'LEAVE'];
     const rows = await this.prisma.schoolAttendanceRecord.findMany({
       where: {
@@ -1596,7 +1597,7 @@ export class SchoolSisAttendanceService {
     const working = await this.calendar.workingDaysInRange(
       tenantId,
       dayKey(year.startDate),
-      dayKey(new Date()),
+      istDayKey(),
       year.id,
     );
     const enrolls = await this.prisma.schoolEnrollment.findMany({
@@ -1779,13 +1780,13 @@ export class SchoolSisAttendanceService {
     const monthly = await this.monthly(tenantId, {
       academicYearId: year.id,
       sectionId: enroll.sectionId,
-      month: dayKey(new Date()).slice(0, 7),
+      month: istDayKey().slice(0, 7),
     });
     const me = monthly.students.find((s) => s.studentId === studentId);
     const yearWorking = await this.calendar.workingDaysInRange(
       tenantId,
       dayKey(year.startDate),
-      dayKey(new Date() > year.endDate ? year.endDate : new Date()),
+      istDayKey() > dayKey(year.endDate) ? dayKey(year.endDate) : istDayKey(),
       year.id,
     );
     const recs = await this.prisma.schoolAttendanceRecord.findMany({
@@ -1864,7 +1865,7 @@ export class SchoolSisAttendanceService {
   async teacherToday(tenantId: string, userId: string, date?: string) {
     const year = await this.sis.currentYear(tenantId);
     const settings = await this.ensureSetup(tenantId, year.id);
-    const day = date ? dayKey(date) : dayKey(new Date());
+    const day = date ? dayKey(date) : istDayKey();
     const jsDay = parseDay(day).getUTCDay();
     const staffId = await resolveSchoolStaffIdForUser(this.prisma, tenantId, {
       sub: userId,
@@ -2044,7 +2045,7 @@ export class SchoolSisAttendanceService {
 
   async bulkNotify(tenantId: string, dto: BulkNotifyDto) {
     for (const studentId of dto.studentIds) {
-      const key = `bulk:${dto.channel ?? 'PUSH'}:${studentId}:${dayKey(new Date())}:${createHash(
+      const key = `bulk:${dto.channel ?? 'PUSH'}:${studentId}:${istDayKey()}:${createHash(
         'sha1',
       )
         .update(dto.message ?? 'absent')
@@ -2102,7 +2103,7 @@ export class SchoolSisAttendanceService {
   ) {
     const year = await this.year(tenantId, filters.academicYearId);
     const settings = await this.ensureSetup(tenantId, year.id);
-    const date = filters.dateFrom || dayKey(new Date());
+    const date = filters.dateFrom || istDayKey();
     if (key === 'attendance_daily' || key === 'attendance_absentees_daily') {
       const rows = await this.absentees(tenantId, {
         date,

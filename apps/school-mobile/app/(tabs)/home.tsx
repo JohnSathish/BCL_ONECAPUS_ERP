@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { fetchHome, switchChild } from '@/auth/login';
 import { getActiveChild, getRefreshToken, getUser, saveUser } from '@/auth/session';
@@ -100,9 +101,11 @@ export default function HomeScreen() {
     }
   }, [router]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   if (!data && !error) {
     return (

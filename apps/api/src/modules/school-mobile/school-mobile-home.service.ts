@@ -16,12 +16,13 @@ import { SchoolMobileInboxService } from './school-mobile-inbox.service';
 import { SchoolMobilePrayerService } from './school-mobile-prayer.service';
 import { homeworkListStatus } from '../school-sis/school-sis-homework.status';
 import {
+  istDayKey,
   istNowParts,
   toMinutes,
 } from '../school-sis/school-sis-timetable-bells';
 
 function greeting(now = new Date()) {
-  const hour = now.getHours();
+  const hour = Math.floor(istNowParts(now).minutes / 60);
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
@@ -399,7 +400,8 @@ export class SchoolMobileHomeService {
         slots = [];
       }
     }
-    const { dayOfWeek, minutes } = istNowParts();
+    const { dayOfWeek } = istNowParts();
+    const todayKey = istDayKey();
     const [assignments, subjectAssignments] = await Promise.all([
       this.prisma.schoolClassTeacherAssignment.findMany({
         where: { tenantId, staffId, deletedAt: null },
@@ -447,11 +449,44 @@ export class SchoolMobileHomeService {
           (a.bell?.sortOrder ?? toMinutes(a.bell?.startTime ?? '00:00')) -
           (b.bell?.sortOrder ?? toMinutes(b.bell?.startTime ?? '00:00')),
       );
-    const todayDone = todaySlots.filter((slot) => {
-      const end = slot.bell?.endTime;
-      return end ? toMinutes(end) <= minutes : false;
-    }).length;
-    const year = new Date().getFullYear();
+    const attBySection = new Map<
+      string,
+      {
+        percent: number | null;
+        present: number;
+        absent: number;
+        late: number;
+        submitted: boolean;
+      }
+    >();
+    if (sectionIds.length) {
+      try {
+        const att = await this.attendanceSvc.dashboard(tenantId, {
+          sectionIds,
+          date: todayKey,
+        });
+        for (const row of att.byClass) {
+          const submitted =
+            row.status !== 'NOT_SUBMITTED' && row.status !== 'DRAFT';
+          attBySection.set(row.sectionId, {
+            percent: submitted ? row.percent : null,
+            present: row.present,
+            absent: row.absent,
+            late: row.late,
+            submitted,
+          });
+        }
+      } catch {
+        /* optional */
+      }
+    }
+    const todayDone = todaySlots.length
+      ? todaySlots.filter(
+          (slot) => attBySection.get(slot.section?.id ?? '')?.submitted,
+        ).length
+      : [...sectionMap.keys()].filter((id) => attBySection.get(id)?.submitted)
+          .length;
+    const year = Number(todayKey.slice(0, 4));
     const balances = await this.prisma.schoolHrLeaveBalance.findMany({
       where: { tenantId, staffId, year },
     });
@@ -460,28 +495,6 @@ export class SchoolMobileHomeService {
         sum + Number(row.opening) + Number(row.accrued) - Number(row.taken),
       0,
     );
-    const attBySection = new Map<
-      string,
-      { percent: number; present: number; absent: number; late: number }
-    >();
-    if (sectionIds.length) {
-      try {
-        const att = await this.attendanceSvc.dashboard(tenantId, {
-          sectionIds,
-        });
-        for (const row of att.byClass) {
-          attBySection.set(row.sectionId, {
-            percent: row.percent,
-            present: row.present,
-            absent: row.absent,
-            late: row.late,
-          });
-        }
-      } catch {
-        /* optional */
-      }
-    }
-    const todayKey = new Date().toISOString().slice(0, 10);
     const [homeworkRows, pendingExamRows] = await Promise.all([
       this.prisma.schoolHomework.findMany({
         where: { tenantId, staffId, deletedAt: null },
@@ -528,7 +541,7 @@ export class SchoolMobileHomeService {
       classCount: sectionMap.size,
       classLabels: [...sectionMap.values()].map((row) => row.label).slice(0, 6),
       studentCount: [...countMap.values()].reduce((n, v) => n + v, 0),
-      todayTotal: todaySlots.length,
+      todayTotal: todaySlots.length || sectionMap.size,
       todayDone,
       leaveRemaining: Math.max(0, Math.round(leaveRemaining)),
       homeworkActive: homework.filter(

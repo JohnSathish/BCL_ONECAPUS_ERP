@@ -118,6 +118,16 @@ export function dayName(day: number) {
   );
 }
 
+/** Calendar YYYY-MM-DD in Asia/Kolkata — never UTC `toISOString()` for “today”. */
+export function istDayKey(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
 export function istNowParts(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kolkata',
