@@ -1,4 +1,5 @@
 import { getApiBase, schoolHeaders } from '@/api/config';
+import { justDidPasswordLogin } from '@/auth/password-gate';
 import { clearSession, getRefreshToken, saveSession } from '@/auth/session';
 
 export class AccountDisabledError extends Error {
@@ -53,18 +54,18 @@ export async function refreshAccessToken(opts?: { biometricUnlock?: boolean }) {
   const message = `${data.message || ''} ${(json as { message?: string }).message || ''}`;
   if (res.status === 401 || res.status === 403) {
     if (/DEVICE_BLOCKED/i.test(message)) {
-      await clearSession();
+      if (!justDidPasswordLogin()) await clearSession();
       throw new DeviceBlockedError();
     }
     if (/SESSION_REVOKED/i.test(message)) {
-      await clearSession();
+      if (!justDidPasswordLogin()) await clearSession();
       throw new SessionRevokedError();
     }
     if (/ACCOUNT_DISABLED|disabled/i.test(message)) {
-      await clearSession();
+      if (!justDidPasswordLogin()) await clearSession();
       throw new AccountDisabledError();
     }
-    await clearSession();
+    if (!justDidPasswordLogin()) await clearSession();
     throw new SessionExpiredError(data.message || 'Session expired');
   }
   if (!res.ok || !data.accessToken || !data.refreshToken) {

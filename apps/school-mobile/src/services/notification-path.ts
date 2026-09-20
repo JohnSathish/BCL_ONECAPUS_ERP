@@ -1,12 +1,18 @@
-export const HOME_PATH = '/(tabs)/index';
-export const MESSAGES_PATH = '/(tabs)/messages';
+export const HOME_PATH = '/home';
+export const MESSAGES_PATH = '/messages';
 
 export function isHomePath(href: string) {
-  return href === '/' || href === '/(tabs)' || href === '/(tabs)/' || href === '/(tabs)/index';
+  return (
+    href === '/home' ||
+    href === '/(tabs)/home' ||
+    href === '/(tabs)/index' ||
+    href === '/(tabs)' ||
+    href === '/(tabs)/'
+  );
 }
 
 function isInboxLink(href: string) {
-  return href === '/inbox' || href === '/(tabs)/messages';
+  return href === '/inbox' || href === '/messages' || href === '/(tabs)/messages';
 }
 
 export function resolveAppHref(href?: string | null, fallback: string = HOME_PATH) {

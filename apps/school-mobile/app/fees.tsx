@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetch } from '@/api/client';
+import { mediaUrl } from '@/api/config';
 import { initials, inr, monthTitle } from '@/fees/format';
 import { EmptyState, Loader } from '@/ui/kit';
 import { colors } from '@/theme/tokens';
@@ -31,7 +32,12 @@ type FeesPayload = {
   } | null;
   monthly?: {
     academicYear?: { name?: string };
-    student?: { fullName?: string; admissionNumber?: string; phone?: string | null };
+    student?: {
+      fullName?: string;
+      admissionNumber?: string;
+      phone?: string | null;
+      photoUrl?: string | null;
+    };
     className?: string;
     sectionName?: string;
     currentMonth?: string;
@@ -48,6 +54,7 @@ type FeesPayload = {
     email?: string | null;
     address?: string | null;
     academicYearName?: string | null;
+    photoUrl?: string | null;
     guardians?: Guardian[];
   } | null;
 };
@@ -57,6 +64,26 @@ function currentMonthLabel(iso?: string) {
   const [y, m] = iso.split('-').map(Number);
   if (!y || !m) return iso;
   return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+}
+
+function StudentPhoto({ uri, name }: { uri?: string | null; name: string }) {
+  const [broken, setBroken] = useState(false);
+  const src = mediaUrl(uri);
+  if (!src || broken) {
+    return (
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{initials(name)}</Text>
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri: src }}
+      style={styles.avatarPhoto}
+      resizeMode="cover"
+      onError={() => setBroken(true)}
+    />
+  );
 }
 
 export default function FeesScreen() {
@@ -89,6 +116,7 @@ export default function FeesScreen() {
     [monthly?.className, monthly?.sectionName].filter(Boolean).join(' ') ||
     null;
   const year = monthly?.academicYear?.name || data?.profile?.academicYearName || '';
+  const photo = data?.profile?.photoUrl || monthly?.student?.photoUrl || null;
   const admLine = data?.structure?.lines?.find(
     (l) => l.code === 'ADM' || /admission/i.test(l.label),
   );
@@ -130,9 +158,7 @@ export default function FeesScreen() {
 
         <View style={styles.card}>
           <View style={styles.who}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials(name)}</Text>
-            </View>
+            <StudentPhoto uri={photo} name={name} />
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{name}</Text>
               <Text style={styles.meta}>
@@ -394,6 +420,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#eef2ff',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarPhoto: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#eef2ff',
   },
   avatarText: { color: colors.navy, fontWeight: '800' },
   name: { fontWeight: '800', color: colors.ink, fontSize: 15, textTransform: 'uppercase' },

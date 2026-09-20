@@ -598,6 +598,7 @@ export class SchoolSisMonthlyFeesService {
         fullName: enrollment.student.fullName,
         admissionNumber: enrollment.student.admissionNumber,
         phone: enrollment.student.phone,
+        photoUrl: enrollment.student.photoUrl,
       },
       className: enrollment.section.grade.name,
       sectionName: enrollment.section.name,

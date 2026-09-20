@@ -1,5 +1,6 @@
 const {
   withAndroidManifest,
+  withAndroidStyles,
   withAppBuildGradle,
   withGradleProperties,
   withProjectBuildGradle,
@@ -61,7 +62,41 @@ module.exports = function withAndroidTargetSdk36(config) {
     if (application?.$) {
       application.$['android:allowBackup'] = 'false';
       application.$['android:fullBackupOnly'] = 'false';
+      application.$['android:enableOnBackInvokedCallback'] = 'false';
     }
+    const activities = application?.activity || [];
+    for (const activity of activities) {
+      const name = String(activity.$?.['android:name'] || '');
+      if (name.endsWith('MainActivity') || name === '.MainActivity') {
+        activity.$['android:enableOnBackInvokedCallback'] = 'false';
+      }
+    }
+    return cfg;
+  });
+  config = withAndroidStyles(config, (cfg) => {
+    const styles = cfg.modResults.resources.style || [];
+    for (const style of styles) {
+      const name = style.$?.name;
+      if (name !== 'AppTheme' && name !== 'Theme.App.SplashScreen') continue;
+      const items = Array.isArray(style.item) ? style.item : [];
+      const keep = items.filter((item) => {
+        const key = item.$?.name;
+        return (
+          key !== 'android:navigationBarColor' &&
+          key !== 'android:windowLightNavigationBar' &&
+          key !== 'android:enforceNavigationBarContrast' &&
+          key !== 'android:statusBarColor'
+        );
+      });
+      keep.push({ $: { name: 'android:navigationBarColor' }, _: '#FFFFFF' });
+      keep.push({ $: { name: 'android:windowLightNavigationBar' }, _: 'true' });
+      keep.push({ $: { name: 'android:enforceNavigationBarContrast' }, _: 'false' });
+      if (name === 'AppTheme') {
+        keep.push({ $: { name: 'android:statusBarColor' }, _: '#FFFFFF' });
+      }
+      style.item = keep;
+    }
+    cfg.modResults.resources.style = styles;
     return cfg;
   });
   return config;

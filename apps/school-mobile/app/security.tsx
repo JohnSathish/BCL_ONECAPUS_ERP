@@ -10,7 +10,12 @@ import {
   signOutMyDevice,
   signOutOtherDevices,
 } from '@/auth/account';
-import { biometricCapability, disableBiometricLogin, enableBiometricLogin } from '@/auth/biometric';
+import {
+  biometricCapability,
+  biometricFailMessage,
+  disableBiometricLogin,
+  enableBiometricLogin,
+} from '@/auth/biometric';
 import { confirmLogout } from '@/auth/logout';
 import { isAppLockEnabled, isBiometricLoginEnabled, setAppLockEnabled } from '@/auth/session';
 import { Card, Loader, Screen } from '@/ui/kit';
@@ -53,7 +58,7 @@ export default function SecurityScreen() {
     void isBiometricLoginEnabled().then(setBiometric);
     void isAppLockEnabled().then(setAppLock);
     void biometricCapability().then((cap) => {
-      setCanBiometric(cap.available);
+      setCanBiometric(cap.hasHardware);
       setBioLabel(cap.label.replace('Unlock with ', ''));
     });
   }, []);
@@ -74,7 +79,7 @@ export default function SecurityScreen() {
     <Screen title="Security" onBack>
       <View style={styles.box}>
         <Card>
-          <Text style={styles.rowTitle}>Biometric Login</Text>
+          <Text style={styles.rowTitle}>Fingerprint Login</Text>
           <Text style={styles.rowHint}>
             Use {bioLabel} for faster access. Your password is never stored.
           </Text>
@@ -84,15 +89,23 @@ export default function SecurityScreen() {
             onValueChange={(on) => {
               void (async () => {
                 try {
-                  if (on) await enableBiometricLogin();
-                  else await disableBiometricLogin();
-                  setBiometric(on);
-                  if (!on) setAppLock(false);
-                } catch (err) {
-                  Alert.alert(
-                    'Biometric login',
-                    err instanceof Error ? err.message : 'Could not update biometric login.',
-                  );
+                  if (on) {
+                    const result = await enableBiometricLogin();
+                    if (!result.ok) {
+                      const message = biometricFailMessage(result.reason);
+                      if (message) {
+                        Alert.alert('Fingerprint login', message);
+                      }
+                      return;
+                    }
+                    setBiometric(true);
+                    return;
+                  }
+                  await disableBiometricLogin();
+                  setBiometric(false);
+                  setAppLock(false);
+                } catch {
+                  Alert.alert('Fingerprint login', 'Could not update fingerprint login.');
                 }
               })();
             }}
@@ -110,13 +123,17 @@ export default function SecurityScreen() {
               void (async () => {
                 if (on && !biometric) {
                   try {
-                    await enableBiometricLogin();
+                    const result = await enableBiometricLogin();
+                    if (!result.ok) {
+                      const message = biometricFailMessage(result.reason);
+                      if (message) {
+                        Alert.alert('App lock', message);
+                      }
+                      return;
+                    }
                     setBiometric(true);
-                  } catch (err) {
-                    Alert.alert(
-                      'App lock',
-                      err instanceof Error ? err.message : 'Enable biometric login first.',
-                    );
+                  } catch {
+                    Alert.alert('App lock', 'Enable fingerprint login first.');
                     return;
                   }
                 }

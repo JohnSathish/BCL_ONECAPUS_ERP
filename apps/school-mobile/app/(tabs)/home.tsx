@@ -4,12 +4,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { fetchHome, switchChild } from '@/auth/login';
 import { getActiveChild, getRefreshToken, getUser, saveUser } from '@/auth/session';
+import { justDidPasswordLogin } from '@/auth/password-gate';
 import { mediaUrl } from '@/api/config';
 import { CAMPUS, CREST, SCHOOL } from '@/brand';
 import { isPrincipalUser, isStaffUser } from '@/persona';
 import { PrincipalHome } from '@/screens/principal-home';
 import { StaffHome } from '@/screens/staff-home';
-import { EmptyState, Feed, Loader, Screen } from '@/ui/kit';
+import { EmptyState, Feed, Screen } from '@/ui/kit';
 import { colors, radii, space } from '@/theme/tokens';
 
 type Child = {
@@ -54,14 +55,27 @@ export default function HomeScreen() {
     try {
       const refresh = await getRefreshToken();
       if (!refresh) {
+        if (justDidPasswordLogin()) {
+          setError('Could not load home. Please try again.');
+          return;
+        }
         router.replace('/login');
         return;
       }
-      const childId = await getActiveChild();
-      const home = await fetchHome(childId);
+      const [childId, cached] = await Promise.all([getActiveChild(), getUser()]);
+      const office = isPrincipalUser(cached) || isStaffUser(cached);
+      if (!office) {
+        setData(
+          (prev) => prev ?? { me: { displayName: cached?.displayName, persona: cached?.persona } },
+        );
+      }
+      const home = await Promise.race([
+        fetchHome(childId),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+      ]);
       setData(home);
       const me = (home.me ?? {}) as { persona?: string; displayName?: string };
-      const user = await getUser();
+      const user = cached ?? (await getUser());
       await saveUser({
         ...user,
         persona: me.persona,
@@ -70,7 +84,10 @@ export default function HomeScreen() {
       setError(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
-      if (/SecureStore|getValueWithKeyAsync|NullPointerException|unauthor|401|session/i.test(msg)) {
+      if (
+        !justDidPasswordLogin() &&
+        /SecureStore|getValueWithKeyAsync|NullPointerException|unauthor|401/i.test(msg)
+      ) {
         router.replace('/login');
         return;
       }
@@ -84,8 +101,12 @@ export default function HomeScreen() {
 
   if (!data && !error) {
     return (
-      <Screen>
-        <Loader />
+      <Screen light>
+        <View style={styles.boot}>
+          <Image source={CREST} style={styles.crest} resizeMode="contain" />
+          <Text style={styles.school}>{SCHOOL.shortName}</Text>
+          <Text style={styles.motto}>Loading your dashboard…</Text>
+        </View>
       </Screen>
     );
   }
@@ -396,4 +417,5 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
   },
   retryText: { color: '#fff', fontWeight: '700' },
+  boot: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: space.xl },
 });

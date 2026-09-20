@@ -8,6 +8,7 @@ credentials.json
 credentials/
 *.apk
 *.aab
-android/
-ios/
+/android/
+/ios/
 node_modules/
+modules/**/android/build/

@@ -1,33 +1,32 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { apiFetch } from '@/api/client';
 import { APP_VERSION } from '@/api/config';
-import { restoreSchoolSession, type AuthRoute } from '@/auth/restore';
-import { captureLaunchNotification, replaceWithNotificationOr } from '@/services/notification-open';
-import { isHomePath } from '@/services/notification-path';
+import { restoreSchoolSession } from '@/auth/restore';
+import { captureLaunchNotification } from '@/services/notification-open';
+import { HOME_PATH } from '@/services/notification-path';
 import { LaunchSplash } from '@/screens/launch-splash';
 
-const MIN_SPLASH_MS = 2200;
+const MIN_SPLASH_MS = 2400;
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function restoreOrLogin(): Promise<{ route: AuthRoute }> {
-  try {
-    return await restoreSchoolSession();
-  } catch {
-    return { route: '/login' };
-  }
-}
-
 export default function GateScreen() {
   const router = useRouter();
+  const painted = useRef(false);
+
+  const hideNativeSplash = () => {
+    if (painted.current) return;
+    painted.current = true;
+    void SplashScreen.hideAsync().catch(() => undefined);
+  };
 
   useEffect(() => {
     let cancelled = false;
-    void SplashScreen.hideAsync().catch(() => undefined);
+    const failsafe = setTimeout(hideNativeSplash, 2500);
 
     (async () => {
       const started = Date.now();
@@ -41,6 +40,7 @@ export default function GateScreen() {
         }>(`/v1/school-mobile/bootstrap?appVersion=${APP_VERSION}`, { skipAuth: true });
         if (cancelled) return;
         if (boot.forceUpdate || boot.maintenanceMode) {
+          hideNativeSplash();
           router.replace({
             pathname: '/update',
             params: {
@@ -56,25 +56,29 @@ export default function GateScreen() {
       }
       if (cancelled) return;
       await captureLaunchNotification();
-      const restored = await restoreOrLogin();
+      let next: '/login' | '/welcome' | '/account-disabled' | typeof HOME_PATH | '/unlock' =
+        '/login';
+      try {
+        const restored = await restoreSchoolSession();
+        next = restored.route === HOME_PATH ? HOME_PATH : restored.route;
+      } catch {
+        next = '/login';
+      }
       const remaining = MIN_SPLASH_MS - (Date.now() - started);
       if (remaining > 0) await wait(remaining);
       if (cancelled) return;
-      if (restored.route !== '/login' && restored.route !== '/account-disabled') {
-        void import('@/services/push').then(({ registerSchoolPush }) => {
-          void registerSchoolPush();
-        });
+      hideNativeSplash();
+      if (next === HOME_PATH) {
+        router.replace('/home');
+        return;
       }
-      if (isHomePath(restored.route)) {
-        replaceWithNotificationOr(router);
-      } else {
-        router.replace(restored.route);
-      }
+      router.replace(next);
     })();
     return () => {
       cancelled = true;
+      clearTimeout(failsafe);
     };
   }, [router]);
 
-  return <LaunchSplash />;
+  return <LaunchSplash onReady={hideNativeSplash} />;
 }

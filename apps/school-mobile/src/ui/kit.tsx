@@ -30,7 +30,14 @@ export function Screen({
       {title ? (
         <View style={[styles.bar, navy && styles.barNavy]}>
           {onBack ? (
-            <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
+            <Pressable
+              onPress={() => {
+                if (router.canGoBack()) router.back();
+                else router.navigate('/home');
+              }}
+              hitSlop={12}
+              style={styles.back}
+            >
               <Text style={[styles.backText, navy && styles.navyInk]}>‹</Text>
             </Pressable>
           ) : (

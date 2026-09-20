@@ -7,6 +7,9 @@ import * as SystemUI from 'expo-system-ui';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setAuthFailureHandler } from '@/api/client';
 import { isAppLockEnabled, isBiometricLoginEnabled } from '@/auth/session';
+import { justDidPasswordLogin } from '@/auth/password-gate';
+import { ExitAppDialog } from '@/components/exit-app-dialog';
+import { useSchoolAndroidBack } from '@/navigation/use-android-back';
 import {
   consumeNotificationResponse,
   takeNotificationDestination,
@@ -27,7 +30,6 @@ const AUTH_HOLD = new Set([
   '/account-disabled',
   '/session-ended',
   '/device-blocked',
-  '/biometric-setup',
   '/welcome',
 ]);
 
@@ -40,6 +42,7 @@ export default function RootLayout() {
   const segmentsRef = useRef(segments);
   pathRef.current = path;
   segmentsRef.current = segments;
+  useSchoolAndroidBack();
 
   const onAuthHold = () => {
     const segs = segmentsRef.current;
@@ -52,6 +55,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     setAuthFailureHandler((kind) => {
+      if (kind === 'expired' && justDidPasswordLogin()) return;
       if (kind === 'disabled') router.replace('/account-disabled');
       else if (kind === 'blocked') router.replace('/device-blocked');
       else if (kind === 'revoked') router.replace('/session-ended');
@@ -90,7 +94,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     const onChange = (state: AppStateStatus) => {
-      if (state === 'background' || state === 'inactive') {
+      if (state === 'background') {
         backgroundedAt.current = Date.now();
         return;
       }
@@ -104,6 +108,7 @@ export default function RootLayout() {
         void pingDeviceHeartbeat();
       });
       void Promise.all([isAppLockEnabled(), isBiometricLoginEnabled()]).then(([lock, bio]) => {
+        if (justDidPasswordLogin()) return;
         if (lock && bio) router.replace('/unlock');
       });
     };
@@ -115,10 +120,36 @@ export default function RootLayout() {
     void SystemUI.setBackgroundColorAsync('#ffffff');
   }, []);
 
+  const splash = !path || path === '/';
+
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" backgroundColor="#ffffff" />
-      <Stack screenOptions={{ headerShown: false }} />
+      <StatusBar
+        style={splash ? 'light' : 'dark'}
+        backgroundColor={splash ? '#0b2db8' : '#ffffff'}
+      />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          animationTypeForReplace: 'push',
+          gestureEnabled: true,
+          contentStyle: { backgroundColor: splash ? '#0b2db8' : '#ffffff' },
+        }}
+      >
+        <Stack.Screen name="index" options={{ contentStyle: { backgroundColor: '#0b2db8' } }} />
+        <Stack.Screen
+          name="login"
+          options={{ contentStyle: { backgroundColor: '#ffffff' }, animation: 'fade' }}
+        />
+        <Stack.Screen name="welcome" options={{ contentStyle: { backgroundColor: '#ffffff' } }} />
+        <Stack.Screen
+          name="(tabs)"
+          options={{ contentStyle: { backgroundColor: '#f4f6fb' }, animation: 'fade' }}
+        />
+        <Stack.Screen name="unlock" options={{ contentStyle: { backgroundColor: '#ffffff' } }} />
+      </Stack>
+      <ExitAppDialog />
     </SafeAreaProvider>
   );
 }

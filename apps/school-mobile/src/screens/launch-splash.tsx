@@ -6,11 +6,16 @@ import { CREST } from '@/brand';
 
 const { width, height } = Dimensions.get('window');
 
-export function LaunchSplash() {
+export function LaunchSplash({ onReady }: { onReady?: () => void }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+      onLayout={() => {
+        onReady?.();
+      }}
+    >
       <StatusBar style="light" />
       <LinearGradient
         colors={['#071a78', '#0b2db8', '#163ee0', '#0a248e']}

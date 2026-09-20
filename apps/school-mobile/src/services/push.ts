@@ -53,6 +53,7 @@ const ANDROID_CHANNELS: Array<{
 async function registerDevice(extra?: Record<string, unknown>) {
   await apiFetch('/v1/school-mobile/devices/register', {
     method: 'POST',
+    ignoreAuthFailure: true,
     body: JSON.stringify({
       deviceId: await getDeviceId(),
       platform: Platform.OS === 'ios' ? 'ios' : 'android',
@@ -132,6 +133,7 @@ export async function pingDeviceHeartbeat() {
   try {
     await apiFetch('/v1/school-mobile/devices/heartbeat', {
       method: 'POST',
+      ignoreAuthFailure: true,
       body: JSON.stringify({ deviceId: await getDeviceId() }),
     });
   } catch {

@@ -2,9 +2,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { getUser, saveUser } from '@/auth/session';
-import { routeAfterPasswordLogin } from '@/auth/restore';
-import { replaceWithNotificationOr } from '@/services/notification-open';
-import { isHomePath } from '@/services/notification-path';
+import { markPasswordLogin } from '@/auth/password-gate';
+import { HOME_PATH } from '@/services/notification-path';
 import { NavyButton, Screen } from '@/ui/kit';
 import { colors, space } from '@/theme/tokens';
 
@@ -22,9 +21,8 @@ export default function WelcomeScreen() {
   const continueNext = async () => {
     const user = await getUser();
     if (user) await saveUser({ ...user, firstLogin: false });
-    const next = await routeAfterPasswordLogin(false);
-    if (isHomePath(next)) replaceWithNotificationOr(router);
-    else router.replace(next);
+    markPasswordLogin();
+    router.replace(HOME_PATH);
   };
 
   return (

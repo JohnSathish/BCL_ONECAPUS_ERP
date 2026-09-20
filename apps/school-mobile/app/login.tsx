@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Keyboard,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -15,9 +16,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CREST, SCHOOL } from '@/brand';
 import { login } from '@/auth/account';
-import { routeAfterPasswordLogin } from '@/auth/restore';
-import { replaceWithNotificationOr } from '@/services/notification-open';
-import { isHomePath } from '@/services/notification-path';
+import { markPasswordLogin } from '@/auth/password-gate';
 import { APP_VERSION } from '@/api/config';
 import { Screen } from '@/ui/kit';
 import { colors, radii, space } from '@/theme/tokens';
@@ -43,9 +42,13 @@ export default function LoginScreen() {
     setError(null);
     try {
       const session = await login(id, password);
-      const next = await routeAfterPasswordLogin(session.firstLogin);
-      if (isHomePath(next)) replaceWithNotificationOr(router);
-      else router.replace(next);
+      markPasswordLogin();
+      Keyboard.dismiss();
+      if (session.firstLogin) {
+        router.replace('/welcome');
+        return;
+      }
+      router.replace('/home');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not sign in');
     } finally {

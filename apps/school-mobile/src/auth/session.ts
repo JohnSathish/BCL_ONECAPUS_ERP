@@ -23,6 +23,9 @@ const getSecure = secureGet;
 const delSecure = secureDel;
 
 export async function saveSession(accessToken: string, refreshToken: string) {
+  if (!accessToken || !refreshToken) {
+    throw new Error('Login did not return a session. Please try again.');
+  }
   await setSecure(ACCESS, accessToken);
   await setSecure(REFRESH, refreshToken);
 }

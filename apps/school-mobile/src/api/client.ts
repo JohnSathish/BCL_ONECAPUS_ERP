@@ -1,5 +1,6 @@
 import { getApiBase, schoolHeaders } from '@/api/config';
 import { getAccessToken } from '@/auth/session';
+import { justDidPasswordLogin } from '@/auth/password-gate';
 import {
   AccountDisabledError,
   DeviceBlockedError,
@@ -15,7 +16,11 @@ export function setAuthFailureHandler(
   onAuthFailure = handler;
 }
 
-type Options = RequestInit & { skipAuth?: boolean; _retried?: boolean };
+type Options = RequestInit & {
+  skipAuth?: boolean;
+  _retried?: boolean;
+  ignoreAuthFailure?: boolean;
+};
 
 function unwrap<T>(json: unknown): T {
   if (json && typeof json === 'object' && 'data' in json) {
@@ -48,15 +53,15 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   const json = await res.json().catch(() => ({}));
   const combined = `${messageOf(json, '')}`;
   if ((res.status === 401 || res.status === 403) && /DEVICE_BLOCKED/i.test(combined)) {
-    onAuthFailure?.('blocked');
+    if (!options.ignoreAuthFailure) onAuthFailure?.('blocked');
     throw new DeviceBlockedError();
   }
   if ((res.status === 401 || res.status === 403) && /SESSION_REVOKED/i.test(combined)) {
-    onAuthFailure?.('revoked');
+    if (!options.ignoreAuthFailure) onAuthFailure?.('revoked');
     throw new SessionRevokedError();
   }
   if ((res.status === 401 || res.status === 403) && /ACCOUNT_DISABLED/i.test(combined)) {
-    onAuthFailure?.('disabled');
+    if (!options.ignoreAuthFailure) onAuthFailure?.('disabled');
     throw new AccountDisabledError();
   }
   if (res.status === 401 && !options.skipAuth && !options._retried) {
@@ -65,15 +70,15 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
       return apiFetch<T>(path, { ...options, _retried: true });
     } catch (err) {
       if (err instanceof AccountDisabledError) {
-        onAuthFailure?.('disabled');
+        if (!options.ignoreAuthFailure) onAuthFailure?.('disabled');
         throw err;
       }
       if (err instanceof DeviceBlockedError) {
-        onAuthFailure?.('blocked');
+        if (!options.ignoreAuthFailure) onAuthFailure?.('blocked');
         throw err;
       }
       if (err instanceof SessionRevokedError) {
-        onAuthFailure?.('revoked');
+        if (!options.ignoreAuthFailure) onAuthFailure?.('revoked');
         throw err;
       }
       const msg = err instanceof Error ? err.message : '';
@@ -81,7 +86,7 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
         throw err instanceof Error ? err : new Error(msg);
       }
       if (err instanceof SessionExpiredError) {
-        onAuthFailure?.('expired');
+        if (!options.ignoreAuthFailure && !justDidPasswordLogin()) onAuthFailure?.('expired');
         throw new Error('Please sign in again.');
       }
       throw err instanceof Error ? err : new Error(msg);

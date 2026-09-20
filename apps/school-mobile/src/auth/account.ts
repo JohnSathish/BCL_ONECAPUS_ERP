@@ -1,5 +1,6 @@
 import { apiFetch } from '@/api/client';
 import { getDeviceId } from '@/auth/device';
+import { markPasswordLogin } from '@/auth/password-gate';
 import { getRefreshToken, saveSession, saveUser } from '@/auth/session';
 import { registerSchoolPush } from '@/services/push';
 import { isPrincipalUser, isStaffUser } from '@/persona';
@@ -48,8 +49,10 @@ export async function login(identifier: string, password: string) {
     }),
   });
   await saveSession(session.accessToken, session.refreshToken);
+  markPasswordLogin();
   await saveUser({
-    ...session.user,
+    displayName: session.user.displayName,
+    roles: session.user.roles,
     mustResetPassword: false,
     firstLogin: Boolean(session.firstLogin),
     persona: isPrincipalUser(session.user)
@@ -58,11 +61,10 @@ export async function login(identifier: string, password: string) {
         ? 'teacher'
         : undefined,
   });
-  try {
+  void (async () => {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
     await registerSchoolPush();
-  } catch {
-    /* login still succeeds */
-  }
+  })().catch(() => undefined);
   return session;
 }
 

@@ -17,16 +17,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? "St. Luke's School",
   slug: 'st-lukes-school',
-  version: '1.0.7',
+  version: '1.0.15',
   scheme: 'stlukesschool',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   icon: './assets/icon.png',
   splash: {
-    image: './assets/splash-icon.png',
+    image: './assets/crest.png',
     resizeMode: 'contain',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#0b2db8',
   },
   androidStatusBar: {
     backgroundColor: '#ffffff',
@@ -39,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'in.stlukestura.school',
-    buildNumber: '1',
+    buildNumber: '18',
     ...(hasGoogleServiceInfo ? { googleServicesFile: googleServiceInfoLocal } : {}),
     infoPlist: {
       NSFaceIDUsageDescription:
@@ -51,14 +51,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'in.stlukestura.school',
-    versionCode: 10,
+    versionCode: 18,
     allowBackup: false,
     ...(hasGoogleServices ? { googleServicesFile: googleServicesLocal } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#FFFFFF',
     },
-    permissions: ['INTERNET', 'RECEIVE_BOOT_COMPLETED', 'VIBRATE', 'POST_NOTIFICATIONS'],
+    permissions: [
+      'INTERNET',
+      'RECEIVE_BOOT_COMPLETED',
+      'VIBRATE',
+      'POST_NOTIFICATIONS',
+      'USE_BIOMETRIC',
+      'USE_FINGERPRINT',
+    ],
     blockedPermissions: [
       'android.permission.RECORD_AUDIO',
       'android.permission.SYSTEM_ALERT_WINDOW',
@@ -68,8 +75,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        image: './assets/splash-icon.png',
-        backgroundColor: '#ffffff',
+        image: './assets/crest.png',
+        backgroundColor: '#0b2db8',
         imageWidth: 180,
         resizeMode: 'contain',
       },

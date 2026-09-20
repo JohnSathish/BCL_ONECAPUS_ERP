@@ -24,7 +24,14 @@ export function OfficeShell({
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.bar}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) router.back();
+            else router.navigate('/home');
+          }}
+          hitSlop={10}
+          style={styles.back}
+        >
           <Text style={styles.backText}>‹</Text>
         </Pressable>
         <View style={{ flex: 1 }}>
