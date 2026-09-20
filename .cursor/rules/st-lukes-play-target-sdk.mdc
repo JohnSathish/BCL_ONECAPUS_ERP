@@ -14,3 +14,4 @@ When rebuilding the school AAB/APK:
 - Bump `android.versionCode` (and `scripts/build-local-apk.js`) for every Play upload. Current source is 19.
 - Sign with the St. Luke's upload keystore only. Do not use the college app keystore or college `apps/mobile` config.
 - After a successful local AAB, copy the signed file to Desktop as `StLukes-School-v*-vc*.aab`.
+- App Store iOS builds must use EAS image `macos-sequoia-15.6-xcode-26.2` (Xcode 26 / iOS 26 SDK). Apple rejects iOS 18.5 SDK binaries (ITMS-90725).

@@ -29,7 +29,10 @@
         "EAS_PROJECT_ID": "82f45116-2b82-4b43-93d3-7d7d2027b2da"
       },
       "android": { "buildType": "app-bundle" },
-      "ios": { "distribution": "store" }
+      "ios": {
+        "distribution": "store",
+        "image": "macos-sequoia-15.6-xcode-26.2"
+      }
     }
   },
   "submit": {
