@@ -25,6 +25,7 @@ import {
   preferredSchoolLoginUsername,
   compactSchoolLoginId,
 } from './school-sis-login-lookup';
+import { generateSchoolPortalTempPassword } from './school-sis-iam.password';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 
 function sha(token: string) {
@@ -489,7 +490,9 @@ export class SchoolSisIamService implements OnModuleInit {
       username: body.username,
       phone: body.phone,
       roleSlugs: body.roleSlugs,
-      password: body.password,
+      password:
+        body.password?.trim() ||
+        (body.invite ? undefined : generateSchoolPortalTempPassword()),
       accountStatus: body.invite ? 'invited' : (body.accountStatus ?? 'active'),
       mustResetPassword: body.mustResetPassword ?? true,
       actorUserId: actor.sub,
@@ -633,10 +636,7 @@ export class SchoolSisIamService implements OnModuleInit {
     }
     const temporaryPassword = custom
       ? custom
-      : `Sl.${randomBytes(5)
-          .toString('base64url')
-          .replace(/[^a-zA-Z0-9]/g, 'x')
-          .slice(0, 8)}9A`;
+      : generateSchoolPortalTempPassword();
     const passwordHash = await bcrypt.hash(temporaryPassword, 12);
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({

@@ -1810,7 +1810,7 @@ export function UsersDesk() {
                 {
                   id: 'default' as const,
                   title: 'Unique generated password',
-                  body: 'A one-time password is created. Students should use Activate Your Account in the app instead.',
+                  body: 'A 6-digit one-time PIN is created. Copy it once; they must change it on first login.',
                 },
                 {
                   id: 'invite' as const,
@@ -2228,11 +2228,13 @@ export function UsersDesk() {
             ) : null}
             <p>
               <span className="text-slate-500">Password</span>{' '}
-              <span className="font-mono text-base font-semibold">{revealed?.password}</span>
+              <span className="inline-block font-mono text-2xl font-semibold tracking-[0.28em] text-slate-900">
+                {revealed?.password}
+              </span>
             </p>
-            {revealed?.defaultUsed ? (
-              <p className="text-xs text-slate-500">This is the school default portal password.</p>
-            ) : null}
+            <p className="text-xs text-slate-500">
+              6-digit one-time PIN. They must change it on next login.
+            </p>
           </div>
           <DialogFooter>
             <GhostButton
