@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -18,6 +19,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { canManageSchoolSis } from '@/lib/school-sis/permissions';
 import { formatSchoolDate } from '@/lib/school-sis/student-profile';
 import { staffInitials, staffProfileCompletion } from '@/lib/school-sis/staff-profile';
+import { schoolPeopleNav } from '@/lib/school-sis/people-routes';
 import { fetchSchoolSisStaff, type SchoolSisStaff } from '@/services/school-sis';
 import { apiErrorMessage } from '@/utils/api-error';
 import { SlsCta, SlsKpiCard, SlsPill, SlsToolbar } from '@/components/school-sis/school-sis-saas';
@@ -32,8 +34,9 @@ export function SchoolSisStaffDirectory() {
   const enabled = useAuthQueryEnabled();
   const user = useAuthStore((s) => s.session?.user);
   const canManage = canManageSchoolSis(user?.permissions);
+  const { teachers, base, title } = schoolPeopleNav(usePathname());
   const [q, setQ] = useState('');
-  const [type, setType] = useState('');
+  const [type, setType] = useState(teachers ? 'TEACHING' : '');
   const [incompleteOnly, setIncompleteOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -91,35 +94,38 @@ export function SchoolSisStaffDirectory() {
       <div className="sls-page-head">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--heading,#1a365d)]">
-            Staff
+            {title}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            Teaching register imported from the school list. Blank fields stay blank until the
-            office fills them.
+            {teachers
+              ? 'Teaching staff for classes, subjects, and timetable assignment.'
+              : 'Office and support staff. Teaching staff live under Teachers.'}
           </p>
         </div>
         {canManage ? (
-          <SlsCta href="/admin/school-sis/staff/new">
+          <SlsCta href={`${base}/new`}>
             <UserPlus className="h-4 w-4" />
-            Add staff
+            {teachers ? 'Add teacher' : 'Add staff'}
           </SlsCta>
         ) : null}
       </div>
 
-      <div className="sls-stat-grid is-4">
-        <SlsKpiCard
-          tone="sky"
-          icon={Users}
-          label="All staff"
-          value={stats.total}
-          hint="School SIS records only"
-          loading={staff.isLoading}
-          onClick={() => {
-            setType('');
-            setIncompleteOnly(false);
-            resetPage();
-          }}
-        />
+      <div className={teachers ? 'sls-stat-grid' : 'sls-stat-grid is-4'}>
+        {teachers ? null : (
+          <SlsKpiCard
+            tone="sky"
+            icon={Users}
+            label="All staff"
+            value={stats.total}
+            hint="School SIS records only"
+            loading={staff.isLoading}
+            onClick={() => {
+              setType('');
+              setIncompleteOnly(false);
+              resetPage();
+            }}
+          />
+        )}
         <SlsKpiCard
           tone="emerald"
           icon={GraduationCap}
@@ -127,23 +133,30 @@ export function SchoolSisStaffDirectory() {
           value={stats.teaching}
           hint="From the teaching register"
           loading={staff.isLoading}
-          onClick={() => {
-            setType('TEACHING');
-            resetPage();
-          }}
+          href={teachers ? undefined : '/admin/school-sis/teachers'}
+          onClick={
+            teachers
+              ? () => {
+                  setType('TEACHING');
+                  resetPage();
+                }
+              : undefined
+          }
         />
-        <SlsKpiCard
-          tone="amber"
-          icon={Users}
-          label="Non-teaching"
-          value={stats.nonTeaching}
-          hint="Add when records are available"
-          loading={staff.isLoading}
-          onClick={() => {
-            setType('NON_TEACHING');
-            resetPage();
-          }}
-        />
+        {teachers ? null : (
+          <SlsKpiCard
+            tone="amber"
+            icon={Users}
+            label="Non-teaching"
+            value={stats.nonTeaching}
+            hint="Office and support staff"
+            loading={staff.isLoading}
+            onClick={() => {
+              setType('NON_TEACHING');
+              resetPage();
+            }}
+          />
+        )}
         <SlsKpiCard
           tone="rose"
           icon={FileWarning}
@@ -170,17 +183,19 @@ export function SchoolSisStaffDirectory() {
             placeholder="Search name, staff ID, class, or qualification…"
           />
         </div>
-        <select
-          value={type}
-          onChange={(e) => {
-            setType(e.target.value);
-            resetPage();
-          }}
-        >
-          <option value="">All types</option>
-          <option value="TEACHING">Teaching</option>
-          <option value="NON_TEACHING">Non-teaching</option>
-        </select>
+        {teachers ? null : (
+          <select
+            value={type}
+            onChange={(e) => {
+              setType(e.target.value);
+              resetPage();
+            }}
+          >
+            <option value="">All types</option>
+            <option value="TEACHING">Teaching</option>
+            <option value="NON_TEACHING">Non-teaching</option>
+          </select>
+        )}
         <label>
           <input
             type="checkbox"
@@ -228,7 +243,7 @@ export function SchoolSisStaffDirectory() {
                   </td>
                 </tr>
               ) : (
-                pageRows.map((s) => <StaffRow key={s.id} staff={s} />)
+                pageRows.map((s) => <StaffRow key={s.id} staff={s} base={base} />)
               )}
             </tbody>
           </table>
@@ -291,7 +306,7 @@ export function SchoolSisStaffDirectory() {
   );
 }
 
-function StaffRow({ staff }: { staff: SchoolSisStaff }) {
+function StaffRow({ staff, base }: { staff: SchoolSisStaff; base: string }) {
   const pct = staffProfileCompletion(staff).percent;
   const active = (staff.status || 'ACTIVE').toUpperCase() === 'ACTIVE';
   return (
@@ -306,7 +321,7 @@ function StaffRow({ staff }: { staff: SchoolSisStaff }) {
             </span>
           )}
           <div>
-            <Link href={`/admin/school-sis/staff/${staff.id}`}>{staff.fullName}</Link>
+            <Link href={`${base}/${staff.id}`}>{staff.fullName}</Link>
             <p className="text-xs text-slate-400">{typeLabel(staff.staffType)}</p>
           </div>
         </div>
@@ -324,7 +339,7 @@ function StaffRow({ staff }: { staff: SchoolSisStaff }) {
       </td>
       <td className="px-4 py-3 text-right">
         <Link
-          href={`/admin/school-sis/staff/${staff.id}`}
+          href={`${base}/${staff.id}`}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           aria-label={`Open ${staff.fullName}`}
         >

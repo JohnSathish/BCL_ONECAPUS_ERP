@@ -38,11 +38,17 @@ const soon = (id: string, label: string, extra?: Partial<SchoolErpNavLink>): Sch
   ...extra,
 });
 
-const live = (id: string, label: string, href: string): SchoolErpNavLink => ({
+const live = (
+  id: string,
+  label: string,
+  href: string,
+  extra?: Partial<SchoolErpNavLink>,
+): SchoolErpNavLink => ({
   id,
   label,
   href,
   status: 'active',
+  ...extra,
 });
 
 /** St. Luke's secondary SIS navigation — grouped ERP modules, not TPS KG. */
@@ -121,8 +127,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         icon: Users as LucideIcon,
         status: 'active',
         children: [
-          live('teacher-list', 'Teacher List', '/admin/school-sis/staff'),
-          live('teacher-profiles', 'Teacher Profiles', '/admin/school-sis/staff'),
+          live('teacher-list', 'Teacher List', '/admin/school-sis/teachers'),
           live('teacher-assignments', 'Teacher Assignments', '/admin/school-sis/allocation'),
         ],
       },
@@ -148,10 +153,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         label: 'Staff',
         icon: UserCog as LucideIcon,
         status: 'active',
-        children: [
-          live('staff-list', 'Staff List', '/admin/school-sis/staff'),
-          live('staff-profiles', 'Staff Profiles', '/admin/school-sis/staff'),
-        ],
+        children: [live('staff-list', 'Staff List', '/admin/school-sis/staff')],
       },
       {
         id: 'users',
@@ -597,19 +599,19 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         icon: Smartphone as LucideIcon,
         status: 'active',
         children: [
-          live('sms-dash', 'Dashboard', '/admin/school-sis/sms'),
-          live('sms-send', 'Send SMS', '/admin/school-sis/sms/send'),
-          live('sms-templates', 'SMS Templates', '/admin/school-sis/sms/templates'),
-          live('sms-campaigns', 'SMS Campaigns', '/admin/school-sis/sms/campaigns'),
-          live('sms-sched', 'Scheduled SMS', '/admin/school-sis/sms/scheduled'),
-          live('sms-delivery', 'Delivery Reports', '/admin/school-sis/sms/delivery'),
-          live('sms-history', 'SMS History', '/admin/school-sis/sms/history'),
-          live('sms-failed', 'Failed Messages', '/admin/school-sis/sms/failed'),
+          live('sms-dash', 'Dashboard', '/admin/school-sis/sms', { exact: true }),
+          live('sms-send', 'Send', '/admin/school-sis/sms/send'),
+          live('sms-templates', 'Templates', '/admin/school-sis/sms/templates'),
+          live('sms-campaigns', 'Campaigns', '/admin/school-sis/sms/campaigns'),
+          live('sms-sched', 'Scheduled', '/admin/school-sis/sms/scheduled'),
+          live('sms-delivery', 'Delivery', '/admin/school-sis/sms/delivery'),
+          live('sms-history', 'History', '/admin/school-sis/sms/history'),
+          live('sms-failed', 'Failed', '/admin/school-sis/sms/failed'),
           live('sms-contacts', 'Contacts / Recipients', '/admin/school-sis/sms/contacts'),
-          live('sms-dlt', 'DLT Management', '/admin/school-sis/sms/dlt'),
-          live('sms-gw', 'SMS Gateway Integration', '/admin/school-sis/sms/gateways'),
-          live('sms-credits', 'SMS Credits / Balance', '/admin/school-sis/sms/credits'),
-          live('sms-set', 'SMS Settings', '/admin/school-sis/sms/settings'),
+          live('sms-dlt', 'DLT', '/admin/school-sis/sms/dlt'),
+          live('sms-gw', 'Gateways', '/admin/school-sis/sms/gateways'),
+          live('sms-credits', 'Credits', '/admin/school-sis/sms/credits'),
+          live('sms-set', 'Settings', '/admin/school-sis/sms/settings'),
         ],
       },
       {
@@ -618,7 +620,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         icon: Megaphone as LucideIcon,
         status: 'active',
         children: [
-          live('wa-dashboard', 'Dashboard', '/admin/school-sis/whatsapp'),
+          live('wa-dashboard', 'Dashboard', '/admin/school-sis/whatsapp', { exact: true }),
           live('wa-inbox', 'Inbox', '/admin/school-sis/whatsapp/inbox'),
           live('wa-contacts', 'Contacts', '/admin/school-sis/whatsapp/contacts'),
           live('wa-templates', 'Templates', '/admin/school-sis/whatsapp/templates'),
@@ -626,12 +628,12 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
           live('wa-messaging', 'Messaging', '/admin/school-sis/whatsapp/messaging'),
           live('wa-automation', 'Automation', '/admin/school-sis/whatsapp/automation'),
           live('wa-status', 'Delivery Status', '/admin/school-sis/whatsapp/delivery'),
-          live('wa-scheduled', 'Scheduled Messages', '/admin/school-sis/whatsapp/scheduled'),
-          live('wa-media', 'Media Library', '/admin/school-sis/whatsapp/media'),
-          live('wa-flows', 'WhatsApp Flows', '/admin/school-sis/whatsapp/flows'),
+          live('wa-scheduled', 'Scheduled', '/admin/school-sis/whatsapp/scheduled'),
+          live('wa-media', 'Media', '/admin/school-sis/whatsapp/media'),
+          live('wa-flows', 'Flows', '/admin/school-sis/whatsapp/flows'),
           live('wa-analytics', 'Analytics', '/admin/school-sis/whatsapp/analytics'),
-          live('wa-optin', 'Opt-in / Consent', '/admin/school-sis/whatsapp/opt-in'),
-          live('wa-gateway', 'Gateway / API Settings', '/admin/school-sis/whatsapp/settings'),
+          live('wa-optin', 'Opt-in', '/admin/school-sis/whatsapp/opt-in'),
+          live('wa-gateway', 'Gateway', '/admin/school-sis/whatsapp/settings'),
           live('wa-logs', 'Logs', '/admin/school-sis/whatsapp/logs'),
         ],
       },
@@ -641,7 +643,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         icon: Megaphone as LucideIcon,
         status: 'active',
         children: [
-          live('push', 'Push Notifications', '/admin/school-sis/notifications'),
+          live('push', 'Push Notifications', '/admin/school-sis/notifications', { exact: true }),
           live(
             'push-templates',
             'Notification Templates',
@@ -673,7 +675,9 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         icon: Sparkles as LucideIcon,
         status: 'active',
         children: [
-          live('auto-dash', 'Automation Dashboard', '/admin/school-sis/automation'),
+          live('auto-dash', 'Automation Dashboard', '/admin/school-sis/automation', {
+            exact: true,
+          }),
           live('auto-workflows', 'Workflows', '/admin/school-sis/automation/workflows'),
           live('auto-scheduled', 'Scheduled Tasks', '/admin/school-sis/automation/scheduled'),
           live('auto-rules', 'Rules & Triggers', '/admin/school-sis/automation/rules'),
@@ -682,6 +686,22 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
           live('auto-failed', 'Failed Jobs', '/admin/school-sis/automation/failed'),
           live('auto-reports', 'Automation Reports', '/admin/school-sis/automation/reports'),
           live('auto-settings', 'Automation Settings', '/admin/school-sis/automation/settings'),
+        ],
+      },
+      {
+        id: 'communication-settings',
+        label: 'Communication Settings',
+        icon: Settings as LucideIcon,
+        status: 'active',
+        children: [
+          soon('comm-email-settings', 'Email'),
+          live('comm-sms-settings', 'SMS', '/admin/school-sis/sms/settings'),
+          live('comm-wa-settings', 'WhatsApp', '/admin/school-sis/whatsapp/settings'),
+          live(
+            'comm-push-settings',
+            'Push notifications',
+            '/admin/school-sis/notifications/settings',
+          ),
         ],
       },
     ],
@@ -832,18 +852,6 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         ],
       },
       {
-        id: 'settings-communication',
-        label: 'Communication',
-        icon: Megaphone as LucideIcon,
-        status: 'coming_soon',
-        children: [
-          soon('email-settings', 'Email'),
-          live('sms-settings', 'SMS', '/admin/school-sis/sms/settings'),
-          soon('wa-settings', 'WhatsApp'),
-          live('push-settings', 'Push notifications', '/admin/school-sis/notifications/settings'),
-        ],
-      },
-      {
         id: 'localization',
         label: 'Localization',
         icon: Settings as LucideIcon,
@@ -863,7 +871,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         children: [
           soon('payment-gateway', 'Payment Gateway'),
           soon('email-api', 'Email'),
-          live('sms-api', 'SMS', '/admin/school-sis/sms/gateways'),
+          soon('sms-api', 'SMS'),
           soon('wa-api', 'WhatsApp'),
           soon('maps', 'Maps'),
           soon('storage', 'Storage'),

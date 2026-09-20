@@ -207,7 +207,7 @@ export function SchoolSisDashboard() {
       label: 'Teachers',
       value: counts?.teachingStaff,
       hint: `${counts?.staff ?? 0} staff in total`,
-      href: '/admin/school-sis/staff',
+      href: '/admin/school-sis/teachers',
       icon: Users,
       tone: 'emerald',
     },

@@ -30,6 +30,7 @@ export type SchoolErpNavLink = {
   href?: string;
   status: SchoolErpNavStatus;
   description?: string;
+  exact?: boolean;
   children?: SchoolErpNavLink[];
 };
 
@@ -39,6 +40,8 @@ export type SchoolErpNavModule = {
   href?: string;
   icon: LucideIcon;
   status: SchoolErpNavStatus;
+  description?: string;
+  exact?: boolean;
   /** Highlight as the current primary product focus */
   primary?: boolean;
   children?: SchoolErpNavLink[];
@@ -239,7 +242,11 @@ export const SCHOOL_ERP_ROLE_LABELS = [
 
 export const SCHOOL_ERP_SESSION_LABEL = 'Academic Session 2027';
 
-export function isSchoolErpNavActive(pathname: string | null | undefined, href?: string): boolean {
+export function isSchoolErpNavActive(
+  pathname: string | null | undefined,
+  href?: string,
+  exact?: boolean,
+): boolean {
   if (!pathname || !href) return false;
   if (href === '/admin') return pathname === '/admin';
   if (href === '/admin/school-admissions') {
@@ -254,6 +261,7 @@ export function isSchoolErpNavActive(pathname: string | null | undefined, href?:
       Boolean(pathname.match(/^\/admin\/school-sis\/students\/(?!new(?:\/|$))/))
     );
   }
+  if (exact) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

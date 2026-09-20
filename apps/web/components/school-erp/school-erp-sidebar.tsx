@@ -46,7 +46,7 @@ function NestedChildren({
       )}
     >
       {items.map((child) => {
-        const active = isSchoolErpNavActive(pathname, child.href);
+        const active = isSchoolErpNavActive(pathname, child.href, child.exact);
         if (child.status === 'active' && child.href) {
           return (
             <Link
@@ -96,8 +96,8 @@ function NavChildItem({
   onNavigate?: () => void;
   light?: boolean;
 }) {
-  const nestedActive = child.children?.some((c) => isSchoolErpNavActive(pathname, c.href));
-  const active = isSchoolErpNavActive(pathname, child.href) || Boolean(nestedActive);
+  const nestedActive = child.children?.some((c) => isSchoolErpNavActive(pathname, c.href, c.exact));
+  const active = isSchoolErpNavActive(pathname, child.href, child.exact) || Boolean(nestedActive);
   const [open, setOpen] = useState(active);
 
   useEffect(() => {
@@ -161,10 +161,11 @@ function ModuleBlock({
   const Icon = module.icon;
   const childActive = module.children?.some(
     (c) =>
-      isSchoolErpNavActive(pathname, c.href) ||
-      c.children?.some((n) => isSchoolErpNavActive(pathname, n.href)),
+      isSchoolErpNavActive(pathname, c.href, c.exact) ||
+      c.children?.some((n) => isSchoolErpNavActive(pathname, n.href, n.exact)),
   );
-  const selfActive = isSchoolErpNavActive(pathname, module.href) || Boolean(childActive);
+  const selfActive =
+    isSchoolErpNavActive(pathname, module.href, module.exact) || Boolean(childActive);
   const [open, setOpen] = useState(selfActive || (!light && Boolean(module.primary)));
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -30,6 +30,7 @@ import {
   staffProfileCompletion,
   type StaffExtras,
 } from '@/lib/school-sis/staff-profile';
+import { schoolPeopleNav } from '@/lib/school-sis/people-routes';
 import {
   createSchoolSisStaff,
   fetchSchoolSisMasters,
@@ -304,6 +305,7 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
   const isNew = staffId === 'new';
   const enabled = useAuthQueryEnabled();
   const router = useRouter();
+  const { teachers, base, title } = schoolPeopleNav(usePathname());
   const qc = useQueryClient();
   const user = useAuthStore((s) => s.session?.user);
   const canManage = canManageSchoolSis(user?.permissions);
@@ -311,7 +313,9 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
   const resumeRef = useRef<HTMLInputElement>(null);
   const letterRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY);
+  const [form, setForm] = useState<FormState>(() =>
+    teachers ? EMPTY : { ...EMPTY, staffType: 'NON_TEACHING', designation: '' },
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -363,7 +367,7 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
     onSuccess: (row) => {
       setError(null);
       void qc.invalidateQueries({ queryKey: ['school-sis-staff'] });
-      if (isNew && row?.id) router.replace(`/admin/school-sis/staff/${row.id}`);
+      if (isNew && row?.id) router.replace(`${base}/${row.id}`);
     },
     onError: (err) => setError(apiErrorMessage(err)),
   });
@@ -443,8 +447,8 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-slate-400">
-            <Link href="/admin/school-sis/staff" className="hover:text-[#1a365d]">
-              Staff
+            <Link href={base} className="hover:text-[#1a365d]">
+              {title}
             </Link>
             <span className="px-1.5">/</span>
             <span>My Profile</span>
@@ -452,7 +456,7 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
             <span className="text-[#2563eb]">Edit Profile</span>
           </p>
           <h1 className="mt-1 text-2xl font-semibold text-[#1a365d]">
-            {isNew ? 'Add staff' : 'Edit Profile'}
+            {isNew ? (teachers ? 'Add teacher' : 'Add staff') : 'Edit Profile'}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
             Keep your information up to date. This information may be visible to authorized staff
@@ -462,7 +466,7 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
         </div>
         {!isNew ? (
           <Link
-            href="/admin/school-sis/staff"
+            href={base}
             className="inline-flex h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-[#1a365d]"
           >
             View Profile
@@ -747,7 +751,7 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
       {canManage ? (
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Link
-            href="/admin/school-sis/staff"
+            href={base}
             className="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-medium text-slate-600"
           >
             Cancel
@@ -758,7 +762,13 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
             className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#2563eb] px-5 text-sm font-semibold text-white disabled:opacity-60"
           >
             <Save className="h-4 w-4" />
-            {save.isPending ? 'Saving…' : isNew ? 'Save staff' : 'Save Changes'}
+            {save.isPending
+              ? 'Saving…'
+              : isNew
+                ? teachers
+                  ? 'Save teacher'
+                  : 'Save staff'
+                : 'Save Changes'}
           </button>
         </div>
       ) : null}
