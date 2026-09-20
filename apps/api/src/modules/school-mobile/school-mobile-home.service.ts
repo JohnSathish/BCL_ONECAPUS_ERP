@@ -14,6 +14,7 @@ import {
 } from './school-mobile-access.service';
 import { SchoolMobileInboxService } from './school-mobile-inbox.service';
 import { SchoolMobilePrayerService } from './school-mobile-prayer.service';
+import { homeworkListStatus } from '../school-sis/school-sis-homework.status';
 import {
   istNowParts,
   toMinutes,
@@ -380,6 +381,7 @@ export class SchoolMobileHomeService {
     type Slot = {
       id: string;
       dayOfWeek?: number;
+      roomLabel?: string | null;
       subject?: { name?: string } | null;
       section?: { id?: string; name?: string; grade?: { name?: string } };
       bell?: { startTime?: string; endTime?: string; sortOrder?: number };
@@ -458,19 +460,70 @@ export class SchoolMobileHomeService {
         sum + Number(row.opening) + Number(row.accrued) - Number(row.taken),
       0,
     );
-    const attBySection = new Map<string, number>();
+    const attBySection = new Map<
+      string,
+      { percent: number; present: number; absent: number; late: number }
+    >();
     if (sectionIds.length) {
       try {
         const att = await this.attendanceSvc.dashboard(tenantId, {
           sectionIds,
         });
         for (const row of att.byClass) {
-          attBySection.set(row.sectionId, row.percent);
+          attBySection.set(row.sectionId, {
+            percent: row.percent,
+            present: row.present,
+            absent: row.absent,
+            late: row.late,
+          });
         }
       } catch {
         /* optional */
       }
     }
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const [homeworkRows, pendingExamRows] = await Promise.all([
+      this.prisma.schoolHomework.findMany({
+        where: { tenantId, staffId, deletedAt: null },
+        include: { section: { include: { grade: true } }, subject: true },
+        orderBy: { dueDate: 'asc' },
+        take: 16,
+      }),
+      sectionIds.length
+        ? this.prisma.schoolExamMark.groupBy({
+            by: ['examId'],
+            where: {
+              tenantId,
+              entryStatus: 'DRAFT',
+              student: {
+                enrollments: {
+                  some: {
+                    tenantId,
+                    sectionId: { in: sectionIds },
+                    status: 'ACTIVE',
+                    deletedAt: null,
+                  },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+    const homework = homeworkRows.map((row) => {
+      const listStatus = homeworkListStatus({
+        status: row.status,
+        dueDate: row.dueDate,
+        today: todayKey,
+      });
+      return {
+        id: row.id,
+        title: row.title,
+        subjectName: row.subject?.name ?? 'Subject',
+        classLabel: `${row.section.grade.name} ${row.section.name}`.trim(),
+        dueDate: row.dueDate.toISOString().slice(0, 10),
+        listStatus,
+      };
+    });
     return {
       classCount: sectionMap.size,
       classLabels: [...sectionMap.values()].map((row) => row.label).slice(0, 6),
@@ -478,21 +531,37 @@ export class SchoolMobileHomeService {
       todayTotal: todaySlots.length,
       todayDone,
       leaveRemaining: Math.max(0, Math.round(leaveRemaining)),
+      homeworkActive: homework.filter(
+        (row) => row.listStatus === 'active' || row.listStatus === 'pending',
+      ).length,
+      pendingMarkEntry: pendingExamRows.length,
       todaySchedule: todaySlots.map((slot) => ({
         id: slot.id,
-        start: this.clockLabel(slot.bell?.startTime),
-        end: this.clockLabel(slot.bell?.endTime),
+        start: (slot.bell?.startTime ?? '').slice(0, 5),
+        end: (slot.bell?.endTime ?? '').slice(0, 5),
         classLabel:
           `${slot.section?.grade?.name ?? ''} ${slot.section?.name ?? ''}`.trim() ||
           'Class',
         subject: slot.subject?.name ?? 'Period',
+        room: slot.roomLabel?.trim() || '',
       })),
-      classes: [...sectionMap.values()].map((row) => ({
-        id: row.id,
-        label: row.label,
-        students: countMap.get(row.id) ?? 0,
-        percent: attBySection.get(row.id) ?? null,
-      })),
+      classes: [...sectionMap.values()].map((row) => {
+        const att = attBySection.get(row.id);
+        return {
+          id: row.id,
+          label: row.label,
+          students: countMap.get(row.id) ?? 0,
+          percent: att?.percent ?? null,
+          present: att?.present ?? 0,
+          absent: att?.absent ?? 0,
+          late: att?.late ?? 0,
+        };
+      }),
+      recentHomework: homework
+        .filter(
+          (row) => row.listStatus !== 'draft' && row.listStatus !== 'completed',
+        )
+        .slice(0, 6),
     };
   }
 

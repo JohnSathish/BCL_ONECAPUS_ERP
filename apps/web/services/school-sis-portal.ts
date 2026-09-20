@@ -170,3 +170,73 @@ export async function logoutSchoolPortalAll() {
   const { data } = await api.post('/v1/school-mobile/auth/logout-all');
   return data;
 }
+
+export async function fetchSchoolHomeworkOptions() {
+  const { data } = await api.get('/v1/school-mobile/homework/options');
+  return data as Record<string, unknown>;
+}
+
+export async function fetchSchoolHomeworkList() {
+  const { data } = await api.get('/v1/school-mobile/homework');
+  return data as Record<string, unknown>;
+}
+
+export async function fetchSchoolHomeworkReports() {
+  const { data } = await api.get('/v1/school-mobile/homework/reports');
+  return data as Record<string, unknown>;
+}
+
+export async function saveSchoolHomework(body: FormData, id?: string) {
+  const { data } = id
+    ? await api.patch(`/v1/school-mobile/homework/${id}`, body)
+    : await api.post('/v1/school-mobile/homework', body);
+  return data as Record<string, unknown>;
+}
+
+export async function duplicateSchoolHomework(id: string) {
+  const { data } = await api.post(`/v1/school-mobile/homework/${id}/duplicate`);
+  return data as Record<string, unknown>;
+}
+
+export async function deleteSchoolHomework(id: string) {
+  const { data } = await api.delete(`/v1/school-mobile/homework/${id}`);
+  return data as Record<string, unknown>;
+}
+
+export async function fetchSchoolExamMarkOptions() {
+  const { data } = await api.get('/v1/school-mobile/exams/marks/options');
+  return data as Record<string, unknown>;
+}
+
+export async function fetchSchoolExamMarkRoster(params: {
+  examId: string;
+  sectionId: string;
+  componentId: string;
+}) {
+  const { data } = await api.get('/v1/school-mobile/exams/marks/roster', { params });
+  return data as Record<string, unknown>;
+}
+
+export async function fetchSchoolExamMarkHistory(params: {
+  examId: string;
+  sectionId: string;
+  componentId: string;
+}) {
+  const { data } = await api.get('/v1/school-mobile/exams/marks/history', { params });
+  return data as Record<string, unknown>;
+}
+
+export async function saveSchoolPortalExamMarks(payload: {
+  examId: string;
+  componentId: string;
+  submit?: boolean;
+  rows: Array<{
+    studentId: string;
+    marks?: number | null;
+    status?: string;
+    remarks?: string;
+  }>;
+}) {
+  const { data } = await api.post('/v1/school-mobile/exams/marks', payload);
+  return data as Record<string, unknown>;
+}

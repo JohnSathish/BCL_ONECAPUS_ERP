@@ -77,6 +77,7 @@ import { SchoolReportEngineService } from './report-engine/report-engine.service
 import { SchoolReportBrandingService } from './report-engine/report-branding.service';
 import { SchoolReportPdfService } from './report-engine/report-pdf.service';
 import { SchoolReportExcelService } from './report-engine/report-excel.service';
+import { SchoolSisHomeworkService } from './school-sis-homework.service';
 import { SchoolSisAppearanceService } from './school-sis-appearance.service';
 import { SchoolSisAppearanceController } from './school-sis-appearance.controller';
 
@@ -158,6 +159,7 @@ import { SchoolSisAppearanceController } from './school-sis-appearance.controlle
     SchoolSisOpsMetrics,
     SchoolSisDevicesService,
     SchoolSisAppearanceService,
+    SchoolSisHomeworkService,
     { provide: APP_INTERCEPTOR, useClass: SchoolSisOpsInterceptor },
     { provide: APP_GUARD, useClass: SchoolLicenseGuard },
     { provide: APP_GUARD, useClass: SchoolMaintenanceGuard },
@@ -202,6 +204,7 @@ import { SchoolSisAppearanceController } from './school-sis-appearance.controlle
     SchoolSisAccountSecurityService,
     SchoolSisReportsService,
     SchoolReportEngineService,
+    SchoolSisHomeworkService,
   ],
 })
 export class SchoolSisModule {}

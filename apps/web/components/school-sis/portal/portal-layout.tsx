@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, LogOut, Menu, Smartphone, X } from 'lucide-react';
+import { Bell, LogOut, Menu, Search, Smartphone, X } from 'lucide-react';
 import { BrandingLogoImage } from '@/components/branding/branding-logo-image';
 import { useAuth } from '@/hooks/use-auth';
 import { logout } from '@/services/auth';
@@ -66,12 +66,20 @@ function Header({ onMenu, title }: { onMenu: () => void; title: string }) {
         <Menu className="h-5 w-5" />
       </button>
       <BrandingLogoImage src={logo} alt={schoolName} className="h-9 w-9 object-contain" />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-[var(--heading,#0f172a)]">{schoolName}</p>
         <p className="truncate text-[0.7rem] uppercase tracking-[0.14em] text-[var(--muted-foreground,#64748b)]">
           {title} portal
         </p>
       </div>
+      {title === 'Staff' ? (
+        <label className="sls-dash-search">
+          <Search className="h-4 w-4" />
+          <input type="search" placeholder="Search students, classes, notices..." />
+        </label>
+      ) : (
+        <div className="min-w-0 flex-1" />
+      )}
       {children.length > 1 ? (
         <select
           className="hidden h-9 max-w-[10rem] rounded-lg border border-[var(--border-color,#e2e8f0)] bg-[var(--control-background,#fff)] px-2 text-xs sm:block"
@@ -110,6 +118,16 @@ function Header({ onMenu, title }: { onMenu: () => void; title: string }) {
           <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[var(--danger,#e11d48)]" />
         ) : null}
       </Link>
+      {title === 'Staff' ? (
+        <div className="hidden text-right sm:block">
+          <p className="truncate text-sm font-semibold text-[var(--heading,#0f172a)]">
+            {portalDisplayName(home)}
+          </p>
+          <p className="truncate text-[0.7rem] text-[var(--muted-foreground,#64748b)]">
+            {asText(asRecord(me.staff).designation, 'Teacher')}
+          </p>
+        </div>
+      ) : null}
       <PortalAvatar
         src={asText(student.photoUrl || asRecord(me.staff).photoUrl, '') || null}
         name={portalDisplayName(home)}

@@ -16618,6 +16618,7 @@ model SchoolAcademicYear {
   transportCalendar    SchoolTransportCalendarEvent[]
   attendanceSessions   SchoolAttendanceSession[]
   attendanceSettings   SchoolAttendanceSettings[]
+  homework             SchoolHomework[]
 
   @@unique([tenantId, name])
   @@index([tenantId, status])
@@ -16687,6 +16688,7 @@ model SchoolSection {
   examSchedules      SchoolExamSchedule[]
   attendanceSessions SchoolAttendanceSession[]
   attendanceSubs     SchoolAttendanceSubstitute[]
+  homework           SchoolHomework[]
 
   @@unique([tenantId, academicYearId, gradeId, name])
   @@index([tenantId, academicYearId])
@@ -16738,6 +16740,7 @@ model SchoolSubject {
   examSubjects       SchoolExamSubject[]
   examSchedules      SchoolExamSchedule[]
   examResultSubjects SchoolExamResultSubject[]
+  homework           SchoolHomework[]
 
   @@unique([tenantId, code])
   @@index([tenantId, active])
@@ -16960,6 +16963,7 @@ model SchoolStudent {
   transportRequests      SchoolTransportRequest[]
   whatsappContacts       SchoolWhatsappContact[]
   libraryMembers         SchoolLibMember[]
+  homeworkSubmissions    SchoolHomeworkSubmission[]
 
   @@unique([tenantId, admissionNumber])
   @@index([tenantId, status])
@@ -17369,6 +17373,7 @@ model SchoolStaff {
   hrTimeline                SchoolHrTimelineEvent[]
   departmentsHeaded         SchoolHrDepartment[] @relation("HrDeptHead")
   libraryMembers            SchoolLibMember[]
+  homeworkAssigned          SchoolHomework[]
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId, staffType, status])
@@ -17415,6 +17420,72 @@ model SchoolSubjectTeacherAssignment {
   @@unique([tenantId, academicYearId, sectionId, subjectId])
   @@index([tenantId, staffId])
   @@map("school_subject_teacher_assignments")
+  @@schema("school")
+}
+
+model SchoolHomework {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  academicYearId String    @map("academic_year_id") @db.Uuid
+  sectionId      String    @map("section_id") @db.Uuid
+  subjectId      String?   @map("subject_id") @db.Uuid
+  staffId        String    @map("staff_id") @db.Uuid
+  title          String
+  body           String    @default("") @db.Text
+  assignDate     DateTime  @map("assign_date") @db.Date
+  dueDate        DateTime  @map("due_date") @db.Date
+  status         String    @default("DRAFT")
+  visibleTo      String    @default("STUDENTS") @map("visible_to")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  academicYear SchoolAcademicYear         @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  section      SchoolSection              @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject      SchoolSubject?             @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  staff        SchoolStaff                @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  files        SchoolHomeworkFile[]
+  submissions  SchoolHomeworkSubmission[]
+
+  @@index([tenantId, staffId, assignDate])
+  @@index([tenantId, sectionId, dueDate])
+  @@map("school_homework")
+  @@schema("school")
+}
+
+model SchoolHomeworkFile {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  homeworkId String   @map("homework_id") @db.Uuid
+  fileName   String   @map("file_name")
+  mimeType   String   @map("mime_type")
+  sizeBytes  Int      @map("size_bytes")
+  storageKey String   @map("storage_key")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  homework SchoolHomework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, homeworkId])
+  @@map("school_homework_files")
+  @@schema("school")
+}
+
+model SchoolHomeworkSubmission {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  homeworkId  String    @map("homework_id") @db.Uuid
+  studentId   String    @map("student_id") @db.Uuid
+  status      String    @default("SUBMITTED")
+  submittedAt DateTime  @default(now()) @map("submitted_at")
+  reviewedAt  DateTime? @map("reviewed_at")
+  remark      String?
+
+  homework SchoolHomework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  student  SchoolStudent  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, homeworkId, studentId])
+  @@index([tenantId, studentId])
+  @@map("school_homework_submissions")
   @@schema("school")
 }
 

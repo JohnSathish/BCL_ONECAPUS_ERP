@@ -139,3 +139,2304 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* Staff timetable */
+.school-sis-portal .sls-tt {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.school-sis-portal .sls-tt-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.school-sis-portal .sls-tt-head h1 {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--heading, #0f172a);
+}
+
+.school-sis-portal .sls-tt-head p {
+  margin-top: 0.15rem;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.875rem;
+}
+
+.school-sis-portal .sls-tt-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.school-sis-portal .sls-tt-date,
+.school-sis-portal .sls-tt-tools select,
+.school-sis-portal .sls-tt-views,
+.school-sis-portal .sls-att-toolbar input,
+.school-sis-portal .sls-att-toolbar select,
+.school-sis-portal .sls-att-table-tools select,
+.school-sis-portal .sls-att-pager select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.35rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  color: var(--heading, #0f172a);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.school-sis-portal .sls-tt-date input,
+.school-sis-portal .sls-att-field input {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.school-sis-portal .sls-tt-views {
+  padding: 0.2rem;
+  gap: 0.2rem;
+}
+
+.school-sis-portal .sls-tt-views button {
+  height: 1.95rem;
+  padding: 0 0.85rem;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-tt-views button.is-on {
+  background: var(--button-primary, #1a365d);
+  color: #fff;
+}
+
+.school-sis-portal .sls-tt-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.35rem;
+  border-radius: 20px;
+  background: linear-gradient(90deg, #eef6ff 0%, #f7fbff 55%, #eef4ff 100%);
+  border: 1px solid #e3edf8;
+}
+
+.school-sis-portal .sls-tt-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--heading, #0f172a);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-tt-when {
+  margin-top: 0.2rem;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.82rem;
+}
+
+.school-sis-portal .sls-tt-class-pill {
+  display: inline-flex;
+  margin-top: 0.45rem;
+  padding: 0.15rem 0.65rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-tt-quote {
+  max-width: 18rem;
+  color: #7c93b2;
+  font-size: 0.92rem;
+  font-style: italic;
+  text-align: right;
+}
+
+.school-sis-portal .sls-tt-hero-art {
+  display: grid;
+  place-items: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 1rem;
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.school-sis-portal .sls-tt-today {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  gap: 0.75rem;
+}
+
+.school-sis-portal .sls-tt-period {
+  display: flex;
+  gap: 0.7rem;
+  min-height: 7.2rem;
+  padding: 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 5%);
+}
+
+.school-sis-portal .sls-tt-period.is-current {
+  box-shadow: 0 10px 24px rgb(16 185 129 / 18%);
+}
+
+.school-sis-portal .sls-tt-num {
+  display: grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--sls-tt-dot, #2563eb);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.school-sis-portal .sls-tt-period h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--heading, #0f172a);
+}
+
+.school-sis-portal .sls-tt-live {
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: #10b981;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-tt-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.75rem;
+}
+
+.school-sis-portal .sls-tt-subj-ico {
+  width: 1.35rem;
+  height: 1.35rem;
+  margin-left: auto;
+  opacity: 0.45;
+}
+
+.school-sis-portal .sls-tt-tone-emerald {
+  background: #ecfdf5;
+  color: #059669;
+  --sls-tt-dot: #059669;
+}
+.school-sis-portal .sls-tt-tone-blue {
+  background: #eff6ff;
+  color: #2563eb;
+  --sls-tt-dot: #2563eb;
+}
+.school-sis-portal .sls-tt-tone-violet {
+  background: #f5f3ff;
+  color: #7c3aed;
+  --sls-tt-dot: #7c3aed;
+}
+.school-sis-portal .sls-tt-tone-amber {
+  background: #fffbeb;
+  color: #d97706;
+  --sls-tt-dot: #d97706;
+}
+.school-sis-portal .sls-tt-tone-cyan {
+  background: #ecfeff;
+  color: #0891b2;
+  --sls-tt-dot: #0891b2;
+}
+.school-sis-portal .sls-tt-tone-orange {
+  background: #fff7ed;
+  color: #ea580c;
+  --sls-tt-dot: #ea580c;
+}
+.school-sis-portal .sls-tt-tone-rose {
+  background: #fff1f2;
+  color: #e11d48;
+  --sls-tt-dot: #e11d48;
+}
+
+.school-sis-portal .sls-tt-week {
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.school-sis-portal .sls-tt-week-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.school-sis-portal .sls-tt-week-head h2 {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-tt-week-head p {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.78rem;
+}
+
+.school-sis-portal .sls-tt-chip {
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-tt-week-head button {
+  display: grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.school-sis-portal .sls-tt-grid-wrap {
+  overflow-x: auto;
+}
+
+.school-sis-portal table.sls-tt-grid {
+  width: 100%;
+  min-width: 52rem;
+  border-collapse: separate;
+  border-spacing: 0.4rem;
+}
+
+.school-sis-portal table.sls-tt-grid th {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.school-sis-portal table.sls-tt-grid th em {
+  display: block;
+  font-style: normal;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.school-sis-portal table.sls-tt-grid th.is-today {
+  color: #2563eb;
+}
+
+.school-sis-portal table.sls-tt-grid tbody th {
+  width: 6.5rem;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: left;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.school-sis-portal .sls-tt-cell {
+  min-height: 3.2rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+}
+
+.school-sis-portal .sls-tt-cell strong,
+.school-sis-portal .sls-tt-cell span {
+  display: block;
+}
+
+.school-sis-portal .sls-tt-cell strong {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-tt-cell span {
+  margin-top: 0.1rem;
+  font-size: 0.65rem;
+  opacity: 0.8;
+}
+
+.school-sis-portal .sls-tt-cell-emerald {
+  background: #d1fae5;
+  color: #047857;
+}
+.school-sis-portal .sls-tt-cell-blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.school-sis-portal .sls-tt-cell-violet {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+.school-sis-portal .sls-tt-cell-amber {
+  background: #fef3c7;
+  color: #b45309;
+}
+.school-sis-portal .sls-tt-cell-cyan {
+  background: #cffafe;
+  color: #0e7490;
+}
+.school-sis-portal .sls-tt-cell-orange {
+  background: #ffedd5;
+  color: #c2410c;
+}
+.school-sis-portal .sls-tt-cell-rose {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.school-sis-portal .sls-tt-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+
+.school-sis-portal .sls-tt-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--border-subtle, #e8edf5);
+  box-shadow: 0 8px 20px rgb(15 23 42 / 4%);
+}
+
+.school-sis-portal .sls-tt-stat p {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.75rem;
+}
+
+.school-sis-portal .sls-tt-stat strong {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.school-sis-portal .sls-tt-stat em {
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 0.7rem;
+  font-style: normal;
+}
+
+.school-sis-portal .sls-tt-stat-ico {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+}
+
+.school-sis-portal .sls-tt-stat-blue {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.school-sis-portal .sls-tt-stat-green {
+  background: #d1fae5;
+  color: #059669;
+}
+.school-sis-portal .sls-tt-stat-navy {
+  background: #1a365d;
+  color: #fff;
+}
+
+.school-sis-portal .sls-tt-stat-quote {
+  justify-content: space-between;
+  background: linear-gradient(90deg, #eff6ff, #e0f2fe);
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-style: italic;
+  font-weight: 600;
+}
+
+/* Staff mark attendance */
+.school-sis-portal .sls-att {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.school-sis-portal .sls-att-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.school-sis-portal .sls-att-title-ico {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+}
+
+.school-sis-portal .sls-att-head h1 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--heading, #0f172a);
+}
+
+.school-sis-portal .sls-att-head p {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.84rem;
+}
+
+.school-sis-portal .sls-att-crumb {
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 0.78rem;
+}
+
+.school-sis-portal .sls-att-crumb a {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.school-sis-portal .sls-att-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 0.9rem;
+}
+
+.school-sis-portal .sls-att-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  flex: 1 1 16rem;
+  min-width: 12rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.school-sis-portal .sls-att-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.school-sis-portal .sls-att-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2.15rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--heading, #0f172a);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-att-ghost.is-present {
+  color: #059669;
+  border-color: #a7f3d0;
+}
+.school-sis-portal .sls-att-ghost.is-absent {
+  color: #e11d48;
+  border-color: #fecdd3;
+}
+
+.school-sis-portal .sls-att-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 0.65rem;
+}
+
+.school-sis-portal .sls-att-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--border-subtle, #e8edf5);
+}
+
+.school-sis-portal .sls-att-kpi p {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.school-sis-portal .sls-att-kpi strong {
+  display: block;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.school-sis-portal .sls-att-kpi em {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-att-kpi-ico {
+  display: grid;
+  place-items: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 999px;
+}
+
+.school-sis-portal .sls-att-kpi.is-navy {
+  background: #eff6ff;
+}
+.school-sis-portal .sls-att-kpi.is-navy .sls-att-kpi-ico {
+  background: #1d4ed8;
+  color: #fff;
+}
+.school-sis-portal .sls-att-kpi.is-navy strong {
+  color: #1e3a8a;
+}
+.school-sis-portal .sls-att-kpi.is-green {
+  background: #ecfdf5;
+}
+.school-sis-portal .sls-att-kpi.is-green .sls-att-kpi-ico {
+  background: #10b981;
+  color: #fff;
+}
+.school-sis-portal .sls-att-kpi.is-green strong,
+.school-sis-portal .sls-att-kpi.is-green em {
+  color: #059669;
+}
+.school-sis-portal .sls-att-kpi.is-rose {
+  background: #fff1f2;
+}
+.school-sis-portal .sls-att-kpi.is-rose .sls-att-kpi-ico {
+  background: #f43f5e;
+  color: #fff;
+}
+.school-sis-portal .sls-att-kpi.is-rose strong,
+.school-sis-portal .sls-att-kpi.is-rose em {
+  color: #e11d48;
+}
+.school-sis-portal .sls-att-kpi.is-amber {
+  background: #fffbeb;
+}
+.school-sis-portal .sls-att-kpi.is-amber .sls-att-kpi-ico {
+  background: #f59e0b;
+  color: #fff;
+}
+.school-sis-portal .sls-att-kpi.is-amber strong,
+.school-sis-portal .sls-att-kpi.is-amber em {
+  color: #d97706;
+}
+.school-sis-portal .sls-att-kpi.is-violet {
+  background: #f5f3ff;
+}
+.school-sis-portal .sls-att-kpi.is-violet .sls-att-kpi-ico {
+  background: #8b5cf6;
+  color: #fff;
+}
+.school-sis-portal .sls-att-kpi.is-violet strong,
+.school-sis-portal .sls-att-kpi.is-violet em {
+  color: #7c3aed;
+}
+
+.school-sis-portal .sls-att-table-card {
+  overflow: hidden;
+}
+
+.school-sis-portal .sls-att-table-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 0.9rem;
+}
+
+.school-sis-portal .sls-att-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 16rem;
+  flex: 1;
+  height: 2.35rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  color: #94a3b8;
+}
+
+.school-sis-portal .sls-att-search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--heading, #0f172a);
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.school-sis-portal .sls-att-view {
+  display: inline-flex;
+  padding: 0.18rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.school-sis-portal .sls-att-view button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.9rem;
+  padding: 0 0.7rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-att-view button.is-on {
+  background: var(--button-primary, #1a365d);
+  color: #fff;
+}
+
+.school-sis-portal table.sls-att-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.school-sis-portal table.sls-att-table th,
+.school-sis-portal table.sls-att-table td {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle, #e8edf5);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.school-sis-portal table.sls-att-table th {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #f8fafc;
+}
+
+.school-sis-portal .sls-att-chips {
+  display: inline-flex;
+  gap: 0.28rem;
+}
+
+.school-sis-portal .sls-att-chip {
+  display: grid;
+  place-items: center;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.school-sis-portal .sls-att-chip.is-present.is-on {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
+}
+.school-sis-portal .sls-att-chip.is-absent.is-on {
+  background: #f43f5e;
+  border-color: #f43f5e;
+  color: #fff;
+}
+.school-sis-portal .sls-att-chip.is-late.is-on {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #fff;
+}
+.school-sis-portal .sls-att-chip.is-half.is-on {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  color: #fff;
+}
+.school-sis-portal .sls-att-chip.is-leave.is-on {
+  background: #64748b;
+  border-color: #64748b;
+  color: #fff;
+}
+
+.school-sis-portal .sls-att-remark-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 10rem;
+  color: #94a3b8;
+}
+
+.school-sis-portal .sls-att-remark {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.school-sis-portal .sls-att-row-acts {
+  display: inline-flex;
+  gap: 0.45rem;
+  color: #94a3b8;
+}
+
+.school-sis-portal .sls-att-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.7rem;
+  padding: 0.85rem;
+}
+
+.school-sis-portal .sls-att-card {
+  padding: 0.85rem;
+  border: 1px solid var(--border-subtle, #e8edf5);
+  border-radius: 14px;
+}
+
+.school-sis-portal .sls-att-card strong {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.school-sis-portal .sls-att-card em {
+  display: block;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.school-sis-portal .sls-att-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-top: 1px solid var(--border-subtle, #e8edf5);
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.75rem;
+}
+
+.school-sis-portal .sls-att-pager button {
+  display: grid;
+  place-items: center;
+  min-width: 1.85rem;
+  height: 1.85rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-att-pager button.is-on {
+  background: var(--button-primary, #1a365d);
+  border-color: var(--button-primary, #1a365d);
+  color: #fff;
+}
+
+.school-sis-portal .sls-att-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.9rem;
+}
+
+.school-sis-portal .sls-att-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.school-sis-portal .sls-att-bulk button {
+  height: 1.85rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-att-bulk button:nth-of-type(1) {
+  color: #059669;
+}
+.school-sis-portal .sls-att-bulk button:nth-of-type(2) {
+  color: #e11d48;
+}
+.school-sis-portal .sls-att-bulk button:nth-of-type(3) {
+  color: #d97706;
+}
+
+@media (max-width: 767px) {
+  .school-sis-portal .sls-tt-quote,
+  .school-sis-portal .sls-tt-hero-art {
+    display: none;
+  }
+
+  .school-sis-portal .sls-att-foot .ml-auto {
+    width: 100%;
+  }
+
+  .school-sis-portal .sls-att-foot .sls-btn-primary {
+    width: 100%;
+  }
+}
+
+.school-sis-portal .sls-hw {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.school-sis-portal .sls-hw-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.school-sis-portal .sls-hw-title-ico {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+}
+
+.school-sis-portal .sls-hw-head h1 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--heading, #0f172a);
+}
+
+.school-sis-portal .sls-hw-head p {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.84rem;
+}
+
+.school-sis-portal .sls-hw-head-right {
+  display: grid;
+  justify-items: end;
+  gap: 0.45rem;
+}
+
+.school-sis-portal .sls-hw-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2.15rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--heading, #0f172a);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-hw-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.school-sis-portal .sls-hw-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+}
+
+.school-sis-portal .sls-hw-kpi strong {
+  display: block;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.school-sis-portal .sls-hw-kpi p {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.school-sis-portal .sls-hw-kpi-ico {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  color: #fff;
+}
+
+.school-sis-portal .sls-hw-kpi.is-violet {
+  background: #f5f3ff;
+}
+.school-sis-portal .sls-hw-kpi.is-violet .sls-hw-kpi-ico {
+  background: #8b5cf6;
+}
+.school-sis-portal .sls-hw-kpi.is-violet strong {
+  color: #6d28d9;
+}
+
+.school-sis-portal .sls-hw-kpi.is-green {
+  background: #ecfdf5;
+}
+.school-sis-portal .sls-hw-kpi.is-green .sls-hw-kpi-ico {
+  background: #10b981;
+}
+.school-sis-portal .sls-hw-kpi.is-green strong {
+  color: #059669;
+}
+
+.school-sis-portal .sls-hw-kpi.is-amber {
+  background: #fffbeb;
+}
+.school-sis-portal .sls-hw-kpi.is-amber .sls-hw-kpi-ico {
+  background: #f59e0b;
+}
+.school-sis-portal .sls-hw-kpi.is-amber strong {
+  color: #d97706;
+}
+
+.school-sis-portal .sls-hw-kpi.is-rose {
+  background: #fff1f2;
+}
+.school-sis-portal .sls-hw-kpi.is-rose .sls-hw-kpi-ico {
+  background: #f43f5e;
+}
+.school-sis-portal .sls-hw-kpi.is-rose strong {
+  color: #e11d48;
+}
+
+.school-sis-portal .sls-hw-form,
+.school-sis-portal .sls-hw-list {
+  padding: 1rem 1.05rem 1.05rem;
+}
+
+.school-sis-portal .sls-hw-form-head,
+.school-sis-portal .sls-hw-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.85rem;
+}
+
+.school-sis-portal .sls-hw-form h2,
+.school-sis-portal .sls-hw-list h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #2563eb;
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.school-sis-portal .sls-hw-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem 0.85rem;
+}
+
+.school-sis-portal .sls-hw-grid > label,
+.school-sis-portal .sls-hw-grid > fieldset {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--heading, #0f172a);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-hw-grid input,
+.school-sis-portal .sls-hw-grid select,
+.school-sis-portal .sls-hw-grid textarea {
+  width: 100%;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--heading, #0f172a);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.school-sis-portal .sls-hw-grid input,
+.school-sis-portal .sls-hw-grid select {
+  height: 2.45rem;
+  padding: 0 0.7rem;
+}
+
+.school-sis-portal .sls-hw-grid textarea {
+  min-height: 8.5rem;
+  padding: 0.7rem 0.75rem;
+  resize: vertical;
+}
+
+.school-sis-portal .sls-hw-span {
+  grid-column: 1 / span 2;
+  grid-row: span 2;
+}
+
+.school-sis-portal .sls-hw-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.school-sis-portal .sls-hw-toolbar button {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 6px;
+  background: #fff;
+  color: #475569;
+}
+
+.school-sis-portal .sls-hw-hint {
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.school-sis-portal .sls-hw-grid fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.school-sis-portal .sls-hw-grid legend {
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-hw-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 1.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--heading, #0f172a);
+}
+
+.school-sis-portal .sls-hw-radio input {
+  width: auto;
+  height: auto;
+}
+
+.school-sis-portal .sls-hw-form-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+.school-sis-portal .sls-hw-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  margin-bottom: 0.7rem;
+  border-bottom: 1px solid var(--border-subtle, #e8edf5);
+}
+
+.school-sis-portal .sls-hw-tabs button {
+  height: 2.1rem;
+  padding: 0 0.85rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-hw-tabs button.is-on {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+.school-sis-portal .sls-hw-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.school-sis-portal .sls-hw-table th,
+.school-sis-portal .sls-hw-table td {
+  padding: 0.7rem 0.55rem;
+  border-bottom: 1px solid var(--border-subtle, #eef2f7);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.school-sis-portal .sls-hw-table th {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.school-sis-portal .sls-hw-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-hw-status::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.school-sis-portal .sls-hw-status.is-active {
+  color: #059669;
+}
+.school-sis-portal .sls-hw-status.is-pending {
+  color: #d97706;
+}
+.school-sis-portal .sls-hw-status.is-completed {
+  color: #2563eb;
+}
+.school-sis-portal .sls-hw-status.is-draft {
+  color: #64748b;
+}
+
+.school-sis-portal .sls-hw-acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.school-sis-portal .sls-hw-acts button {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+}
+
+.school-sis-portal .sls-hw-acts button.is-danger {
+  color: #e11d48;
+}
+
+@media (max-width: 1100px) {
+  .school-sis-portal .sls-hw-kpis,
+  .school-sis-portal .sls-hw-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .school-sis-portal .sls-hw-span {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 767px) {
+  .school-sis-portal .sls-hw-kpis,
+  .school-sis-portal .sls-hw-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .school-sis-portal .sls-hw-head-right {
+    justify-items: start;
+    width: 100%;
+  }
+}
+
+.school-sis-portal .sls-dash-search {
+  display: none;
+  flex: 1 1 16rem;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 28rem;
+  margin: 0 auto;
+  height: 2.35rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+@media (min-width: 900px) {
+  .school-sis-portal .sls-dash-search {
+    display: flex;
+  }
+}
+
+.school-sis-portal .sls-dash-search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-size: 0.82rem;
+  color: var(--heading, #0f172a);
+}
+
+.school-sis-portal .sls-dash {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.school-sis-portal .sls-dash-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto minmax(11rem, 0.7fr) minmax(12rem, 0.85fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-radius: 22px;
+  background: linear-gradient(90deg, #f8fbff 0%, #eef6ff 100%);
+  border: 1px solid #e4eef8;
+}
+
+.school-sis-portal .sls-dash-hello {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.school-sis-portal .sls-dash-hello img,
+.school-sis-portal .sls-dash-hello span {
+  border-radius: 999px;
+}
+
+.school-sis-portal .sls-dash-greet {
+  color: var(--heading, #0f172a);
+  font-size: 1.35rem;
+}
+
+.school-sis-portal .sls-dash-role {
+  margin-top: 0.1rem;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.school-sis-portal .sls-dash-motto {
+  margin-top: 0.35rem;
+  color: #7c93b2;
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
+.school-sis-portal .sls-dash-art {
+  width: 11rem;
+  height: 5.5rem;
+}
+
+.school-sis-portal .sls-dash-date {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 12rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgb(15 23 42 / 6%);
+}
+
+.school-sis-portal .sls-dash-date-ico {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #fff;
+}
+
+.school-sis-portal .sls-dash-date strong {
+  display: block;
+  font-size: 0.84rem;
+}
+
+.school-sis-portal .sls-dash-date p {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.74rem;
+}
+
+.school-sis-portal .sls-dash-quote {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.school-sis-portal .sls-dash-quote span {
+  display: block;
+  color: #93c5fd;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.school-sis-portal .sls-dash-quote cite {
+  display: block;
+  margin-top: 0.35rem;
+  color: #2563eb;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-dash-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.school-sis-portal .sls-dash-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 18px;
+  text-decoration: none;
+}
+
+.school-sis-portal .sls-dash-kpi strong {
+  display: block;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.school-sis-portal .sls-dash-kpi p {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--heading, #0f172a);
+}
+
+.school-sis-portal .sls-dash-kpi em {
+  display: block;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.7rem;
+  font-style: normal;
+}
+
+.school-sis-portal .sls-dash-kpi-ico {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  color: #fff;
+}
+
+.school-sis-portal .sls-dash-kpi-go {
+  margin-left: auto;
+  color: #94a3b8;
+  font-size: 1.2rem;
+}
+
+.school-sis-portal .sls-dash-kpi.is-sky { background: #eff6ff; }
+.school-sis-portal .sls-dash-kpi.is-sky .sls-dash-kpi-ico { background: #2563eb; }
+.school-sis-portal .sls-dash-kpi.is-sky strong { color: #1d4ed8; }
+.school-sis-portal .sls-dash-kpi.is-emerald { background: #ecfdf5; }
+.school-sis-portal .sls-dash-kpi.is-emerald .sls-dash-kpi-ico { background: #10b981; }
+.school-sis-portal .sls-dash-kpi.is-emerald strong { color: #059669; }
+.school-sis-portal .sls-dash-kpi.is-violet { background: #f5f3ff; }
+.school-sis-portal .sls-dash-kpi.is-violet .sls-dash-kpi-ico { background: #8b5cf6; }
+.school-sis-portal .sls-dash-kpi.is-violet strong { color: #7c3aed; }
+.school-sis-portal .sls-dash-kpi.is-amber { background: #fffbeb; }
+.school-sis-portal .sls-dash-kpi.is-amber .sls-dash-kpi-ico { background: #f59e0b; }
+.school-sis-portal .sls-dash-kpi.is-amber strong { color: #d97706; }
+.school-sis-portal .sls-dash-kpi.is-rose { background: #fff1f2; }
+.school-sis-portal .sls-dash-kpi.is-rose .sls-dash-kpi-ico { background: #f43f5e; }
+.school-sis-portal .sls-dash-kpi.is-rose strong { color: #e11d48; }
+
+.school-sis-portal .sls-dash-grid {
+  display: grid;
+  grid-template-columns: 1.12fr 1.05fr 0.9fr;
+  gap: 0.85rem;
+}
+
+.school-sis-portal .sls-dash-card {
+  padding: 0.95rem 1rem 1rem;
+}
+
+.school-sis-portal .sls-dash-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.school-sis-portal .sls-dash-card-head h2 {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.school-sis-portal .sls-dash-card-head a,
+.school-sis-portal .sls-dash-cal-nav a {
+  color: #2563eb;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.school-sis-portal .sls-dash-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.school-sis-portal .sls-dash-action {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem 0.4rem;
+  border-radius: 16px;
+  background: #f8fafc;
+  color: var(--heading, #0f172a);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
+.school-sis-portal .sls-dash-action span {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 12px;
+  color: #fff;
+}
+
+.school-sis-portal .sls-dash-action.is-emerald span { background: #10b981; }
+.school-sis-portal .sls-dash-action.is-sky span { background: #2563eb; }
+.school-sis-portal .sls-dash-action.is-violet span { background: #8b5cf6; }
+.school-sis-portal .sls-dash-action.is-orange span { background: #f97316; }
+.school-sis-portal .sls-dash-action.is-amber span { background: #f59e0b; }
+.school-sis-portal .sls-dash-action.is-rose span { background: #f43f5e; }
+
+.school-sis-portal .sls-dash-periods,
+.school-sis-portal .sls-dash-hw,
+.school-sis-portal .sls-dash-notices {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.school-sis-portal .sls-dash-periods li,
+.school-sis-portal .sls-dash-hw li,
+.school-sis-portal .sls-dash-notices li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.school-sis-portal .sls-dash-period-n,
+.school-sis-portal .sls-dash-hw-ico {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.school-sis-portal .sls-dash-period-n.is-sky,
+.school-sis-portal .sls-dash-hw-ico.is-sky { background: #2563eb; }
+.school-sis-portal .sls-dash-period-n.is-emerald,
+.school-sis-portal .sls-dash-hw-ico.is-emerald { background: #10b981; }
+.school-sis-portal .sls-dash-period-n.is-violet,
+.school-sis-portal .sls-dash-hw-ico.is-violet { background: #8b5cf6; }
+.school-sis-portal .sls-dash-period-n.is-amber,
+.school-sis-portal .sls-dash-hw-ico.is-amber { background: #f59e0b; }
+.school-sis-portal .sls-dash-period-n.is-orange,
+.school-sis-portal .sls-dash-hw-ico.is-orange { background: #f97316; }
+.school-sis-portal .sls-dash-period-n.is-rose,
+.school-sis-portal .sls-dash-hw-ico.is-rose { background: #f43f5e; }
+
+.school-sis-portal .sls-dash-periods strong,
+.school-sis-portal .sls-dash-hw strong,
+.school-sis-portal .sls-dash-notices strong {
+  display: block;
+  font-size: 0.8rem;
+}
+
+.school-sis-portal .sls-dash-periods p,
+.school-sis-portal .sls-dash-hw p,
+.school-sis-portal .sls-dash-notices p {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.72rem;
+}
+
+.school-sis-portal .sls-dash-period-meta,
+.school-sis-portal .sls-dash-hw-meta,
+.school-sis-portal .sls-dash-notices time {
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.school-sis-portal .sls-dash-hw-meta {
+  display: grid;
+  justify-items: end;
+  gap: 0.15rem;
+}
+
+.school-sis-portal .sls-dash-hw-meta b {
+  color: #2563eb;
+  font-size: 0.68rem;
+}
+
+.school-sis-portal .sls-dash-hw-meta em {
+  color: #f97316;
+  font-style: normal;
+}
+
+.school-sis-portal .sls-dash-cal-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.school-sis-portal .sls-dash-cal-nav button {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+}
+
+.school-sis-portal .sls-dash-cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.2rem;
+  text-align: center;
+  font-size: 0.7rem;
+}
+
+.school-sis-portal .sls-dash-cal .is-head {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-dash-cal .is-day {
+  display: grid;
+  place-items: center;
+  height: 1.7rem;
+  border-radius: 999px;
+}
+
+.school-sis-portal .sls-dash-cal .is-today {
+  background: #2563eb;
+  color: #fff;
+  font-weight: 800;
+}
+
+.school-sis-portal .sls-dash-cal .is-event:not(.is-today) {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-dash-perf {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+}
+
+.school-sis-portal .sls-dash-ring {
+  display: grid;
+  place-items: center;
+  width: 8.2rem;
+  height: 8.2rem;
+  border-radius: 999px;
+  background: conic-gradient(#10b981 calc(var(--pct) * 1%), #e2e8f0 0);
+}
+
+.school-sis-portal .sls-dash-ring::before {
+  content: '';
+  position: absolute;
+  width: 6.1rem;
+  height: 6.1rem;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.school-sis-portal .sls-dash-ring {
+  position: relative;
+}
+
+.school-sis-portal .sls-dash-ring strong,
+.school-sis-portal .sls-dash-ring span {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.school-sis-portal .sls-dash-ring strong {
+  font-size: 1.35rem;
+}
+
+.school-sis-portal .sls-dash-ring span {
+  position: absolute;
+  bottom: 1.7rem;
+  width: 5.4rem;
+  color: #94a3b8;
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.school-sis-portal .sls-dash-perf-side select {
+  width: 100%;
+  height: 2.2rem;
+  margin-bottom: 0.55rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-dash-perf-side li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.28rem 0;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.75rem;
+}
+
+.school-sis-portal .sls-dash-perf-side b {
+  color: var(--heading, #0f172a);
+}
+
+.school-sis-portal .sls-dash-perf-side .is-present b { color: #059669; }
+.school-sis-portal .sls-dash-perf-side .is-absent b { color: #e11d48; }
+.school-sis-portal .sls-dash-perf-side .is-late b { color: #d97706; }
+
+.school-sis-portal .sls-dash-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 1.35rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.school-sis-portal .sls-dash-chip.is-sky { background: #dbeafe; color: #1d4ed8; }
+.school-sis-portal .sls-dash-chip.is-emerald { background: #d1fae5; color: #047857; }
+.school-sis-portal .sls-dash-chip.is-amber { background: #ffedd5; color: #c2410c; }
+
+.school-sis-portal .sls-dash-notices li {
+  align-items: start;
+}
+
+.school-sis-portal .sls-dash-foot {
+  margin: 0.2rem 0 0.4rem;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-style: italic;
+  text-align: center;
+}
+
+.school-sis-portal .sls-dash-foot cite {
+  color: #2563eb;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+  .school-sis-portal .sls-dash-hero,
+  .school-sis-portal .sls-dash-kpis,
+  .school-sis-portal .sls-dash-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .school-sis-portal .sls-dash-hello {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 767px) {
+  .school-sis-portal .sls-dash-hero,
+  .school-sis-portal .sls-dash-kpis,
+  .school-sis-portal .sls-dash-grid,
+  .school-sis-portal .sls-dash-actions,
+  .school-sis-portal .sls-dash-perf {
+    grid-template-columns: 1fr;
+  }
+
+  .school-sis-portal .sls-dash-art,
+  .school-sis-portal .sls-dash-quote {
+    display: none;
+  }
+}
+
+.school-sis-portal .sls-me {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.school-sis-portal .sls-me-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.school-sis-portal .sls-me-title-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 12px;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.school-sis-portal .sls-me-head h1 {
+  color: var(--heading, #0f172a);
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.school-sis-portal .sls-me-head p {
+  margin-top: 0.15rem;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.82rem;
+}
+
+.school-sis-portal .sls-me-head-right {
+  display: grid;
+  justify-items: end;
+  gap: 0.45rem;
+}
+
+.school-sis-portal .sls-me-assigned {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-me-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(11rem, 0.9fr);
+  gap: 0.75rem;
+  padding: 0.95rem 1rem;
+  align-items: end;
+}
+
+.school-sis-portal .sls-me-filters label {
+  display: grid;
+  gap: 0.28rem;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-me-filters select {
+  height: 2.45rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--heading, #0f172a);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.school-sis-portal .sls-me-max {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-height: 4.4rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+}
+
+.school-sis-portal .sls-me-max p {
+  color: #334155;
+}
+
+.school-sis-portal .sls-me-max strong {
+  color: #1e3a8a;
+}
+
+.school-sis-portal .sls-me-desk {
+  overflow: hidden;
+}
+
+.school-sis-portal .sls-me-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.55rem 0.9rem 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.school-sis-portal .sls-me-tablist {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.school-sis-portal .sls-me-tablist button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2.45rem;
+  padding: 0 0.75rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-me-tablist button.is-on {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+.school-sis-portal .sls-me-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-bottom: 0.45rem;
+}
+
+.school-sis-portal .sls-me-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2.15rem;
+  padding: 0 0.7rem;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-me-ghost.is-blue {
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+}
+
+.school-sis-portal .sls-me-ghost.is-green {
+  border: 1px solid #bbf7d0;
+  color: #059669;
+}
+
+.school-sis-portal .sls-me-ghost.is-violet {
+  border: 1px solid #ddd6fe;
+  color: #7c3aed;
+}
+
+.school-sis-portal .sls-me-ghost.is-rose {
+  border: 1px solid #fecdd3;
+  color: #e11d48;
+}
+
+.school-sis-portal .sls-me-ghost:disabled {
+  opacity: 0.5;
+}
+
+.school-sis-portal .sls-me-table-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 0.9rem;
+}
+
+.school-sis-portal .sls-me-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  background: #fff;
+  color: #64748b;
+}
+
+.school-sis-portal .sls-me-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.school-sis-portal .sls-me-toggle input {
+  width: 2.1rem;
+  height: 1.15rem;
+  appearance: none;
+  border-radius: 999px;
+  background: #cbd5e1;
+  position: relative;
+  cursor: pointer;
+}
+
+.school-sis-portal .sls-me-toggle input::after {
+  content: '';
+  position: absolute;
+  top: 0.12rem;
+  left: 0.12rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+
+.school-sis-portal .sls-me-toggle input:checked {
+  background: #2563eb;
+}
+
+.school-sis-portal .sls-me-toggle input:checked::after {
+  transform: translateX(0.9rem);
+}
+
+.school-sis-portal .sls-me-stats {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.school-sis-portal .sls-me-stats strong {
+  color: var(--heading, #0f172a);
+}
+
+.school-sis-portal .sls-me-stats i {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.28rem;
+  border-radius: 999px;
+  background: #22c55e;
+}
+
+.school-sis-portal .sls-me-stats i.is-absent {
+  background: #f43f5e;
+}
+
+.school-sis-portal table.sls-me-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.school-sis-portal table.sls-me-table th,
+.school-sis-portal table.sls-me-table td {
+  padding: 0.65rem 0.75rem;
+  border-top: 1px solid #eef2f7;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.school-sis-portal table.sls-me-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-top: 0;
+}
+
+.school-sis-portal table.sls-me-table tr.is-absent {
+  background: #fff8f8;
+}
+
+.school-sis-portal .sls-me-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  height: 1.55rem;
+  padding: 0 0.55rem;
+  border: 0;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.school-sis-portal .sls-me-status::before {
+  font-size: 0.72rem;
+}
+
+.school-sis-portal .sls-me-status.is-present::before {
+  content: '✓';
+}
+
+.school-sis-portal .sls-me-status.is-absent::before {
+  content: '✕';
+}
+
+.school-sis-portal .sls-me-status.is-present {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.school-sis-portal .sls-me-status.is-absent {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
+.school-sis-portal .sls-me-marks,
+.school-sis-portal .sls-me-remark {
+  height: 2.05rem;
+  padding: 0 0.55rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--heading, #0f172a);
+}
+
+.school-sis-portal .sls-me-marks {
+  width: 5.2rem;
+}
+
+.school-sis-portal .sls-me-remark {
+  width: 100%;
+  min-width: 8rem;
+}
+
+.school-sis-portal .sls-me-marks:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.school-sis-portal .sls-me-pop {
+  position: absolute;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 9.5rem;
+  padding: 0.3rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.school-sis-portal .sls-me-pop button {
+  height: 2rem;
+  padding: 0 0.55rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.school-sis-portal .sls-me-pop button.is-on,
+.school-sis-portal .sls-me-pop button:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.school-sis-portal .sls-me-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 0.95rem;
+  border-top: 1px solid #eef2f7;
+  background: #f8fbff;
+}
+
+.school-sis-portal .sls-me-foot > p {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  max-width: 38rem;
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.school-sis-portal .sls-me-foot-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.school-sis-portal .sls-me-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.7rem;
+  padding: 1rem;
+}
+
+.school-sis-portal .sls-me-summary article {
+  padding: 0.85rem;
+  border: 1px solid #eef2f7;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.school-sis-portal .sls-me-summary p {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-me-summary strong {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--heading, #0f172a);
+  font-size: 1.25rem;
+}
+
+.school-sis-portal .sls-me-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.school-sis-portal .sls-me-modal-card {
+  width: min(32rem, 100%);
+  padding: 1.1rem 1.2rem;
+}
+
+.school-sis-portal .sls-me-modal-card h2 {
+  color: var(--heading, #0f172a);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.school-sis-portal .sls-me-modal-card ul {
+  margin: 0.75rem 0 1rem;
+  padding-left: 1.1rem;
+  color: #475569;
+  font-size: 0.82rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+@media (max-width: 1100px) {
+  .school-sis-portal .sls-me-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .school-sis-portal .sls-me-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .school-sis-portal .sls-me-filters,
+  .school-sis-portal .sls-me-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .school-sis-portal .sls-me-head-right,
+  .school-sis-portal .sls-me-stats,
+  .school-sis-portal .sls-me-foot-acts {
+    justify-items: start;
+    margin-left: 0;
+    width: 100%;
+  }
+}

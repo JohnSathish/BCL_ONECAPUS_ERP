@@ -97,7 +97,7 @@ export const STAFF_PORTAL_NAV: PortalNavGroup[] = [
   },
   {
     id: 'class',
-    label: 'Classroom',
+    label: 'Teaching',
     items: [
       { id: 'timetable', label: 'Timetable', href: `${T}/timetable`, icon: CalendarDays },
       { id: 'attendance', label: 'Attendance', href: `${T}/attendance`, icon: ClipboardCheck },
@@ -110,13 +110,32 @@ export const STAFF_PORTAL_NAV: PortalNavGroup[] = [
     ],
   },
   {
-    id: 'office',
-    label: 'Office',
+    id: 'comms',
+    label: 'Communication',
     items: [
       { id: 'notices', label: 'Notices', href: `${T}/notices`, icon: Megaphone },
       { id: 'messages', label: 'Messages', href: `${T}/messages`, icon: MessageSquare },
-      { id: 'leave', label: 'Leave', href: `${T}/leave`, icon: ClipboardList },
+    ],
+  },
+  {
+    id: 'hr',
+    label: 'Leave & HR',
+    items: [
+      { id: 'leave', label: 'Apply leave', href: `${T}/leave`, icon: ClipboardList },
+      {
+        id: 'leave-history',
+        label: 'Leave history',
+        href: `${T}/leave#history`,
+        icon: CalendarDays,
+      },
+    ],
+  },
+  {
+    id: 'events',
+    label: 'Events',
+    items: [
       { id: 'calendar', label: 'Events', href: `${T}/calendar`, icon: CalendarDays },
+      { id: 'calendar-month', label: 'Calendar', href: `${T}/calendar#month`, icon: CalendarDays },
     ],
   },
   {

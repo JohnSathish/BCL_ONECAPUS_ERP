@@ -10,6 +10,7 @@ import { SchoolSisService } from './school-sis.service';
 import { SchoolSisCalendarService } from './school-sis-calendar.service';
 import { SchoolSisPushService } from './school-sis-push.service';
 import { SchoolSisEventBus } from './school-sis-event-bus.service';
+import { resolveSchoolStaffIdForUser } from './school-sis-staff-lookup';
 import {
   DEFAULT_EXAM_TYPES,
   DEFAULT_GRADE_BANDS,
@@ -205,15 +206,192 @@ export class SchoolSisExamsService {
     });
   }
 
-  async teacherStaff(tenantId: string, email?: string) {
-    if (!email) return null;
+  async teacherStaff(tenantId: string, actor: ExamActor) {
+    const staffId = await resolveSchoolStaffIdForUser(this.prisma, tenantId, {
+      sub: actor.userId,
+      email: actor.email,
+    });
+    if (!staffId) return null;
     return this.prisma.schoolStaff.findFirst({
-      where: {
-        tenantId,
-        deletedAt: null,
-        email: { equals: email, mode: 'insensitive' },
+      where: { id: staffId, tenantId, deletedAt: null },
+    });
+  }
+
+  async staffMarkOptions(tenantId: string, actor: ExamActor) {
+    await this.ensureSetup(tenantId);
+    const year = await this.year(tenantId);
+    const staff = actor.manage
+      ? null
+      : await this.teacherStaff(tenantId, actor);
+    if (!actor.manage && !staff) {
+      throw new ForbiddenException('No staff profile is linked to this login');
+    }
+    const [classRows, subjectRows, exams, sections] = await Promise.all([
+      staff
+        ? this.prisma.schoolClassTeacherAssignment.findMany({
+            where: { tenantId, staffId: staff.id, deletedAt: null },
+            select: { sectionId: true },
+          })
+        : Promise.resolve([]),
+      staff
+        ? this.prisma.schoolSubjectTeacherAssignment.findMany({
+            where: {
+              tenantId,
+              staffId: staff.id,
+              academicYearId: year.id,
+              deletedAt: null,
+            },
+            select: { sectionId: true, subjectId: true },
+          })
+        : Promise.resolve([]),
+      this.prisma.schoolExam.findMany({
+        where: {
+          tenantId,
+          academicYearId: year.id,
+          deletedAt: null,
+          status: { not: 'ARCHIVED' },
+        },
+        include: {
+          subjects: {
+            include: {
+              subject: true,
+              grade: true,
+              components: { orderBy: { sortOrder: 'asc' } },
+            },
+          },
+        },
+        orderBy: [{ startDate: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.schoolSection.findMany({
+        where: {
+          tenantId,
+          academicYearId: year.id,
+          deletedAt: null,
+          active: true,
+        },
+        include: { grade: true },
+        orderBy: [{ grade: { sortOrder: 'asc' } }, { name: 'asc' }],
+      }),
+    ]);
+    const allowedSections = actor.manage
+      ? null
+      : new Set(
+          [...classRows, ...subjectRows]
+            .map((row) => row.sectionId)
+            .filter(Boolean),
+        );
+    const taughtSubjects = actor.manage
+      ? null
+      : new Set(subjectRows.map((row) => row.subjectId));
+    const visibleSections = sections.filter((section) =>
+      allowedSections ? allowedSections.has(section.id) : true,
+    );
+    const grades = new Map<
+      string,
+      {
+        name: string;
+        gradeId: string;
+        sections: { id: string; name: string }[];
+      }
+    >();
+    for (const section of visibleSections) {
+      const row = grades.get(section.grade.name) ?? {
+        name: section.grade.name,
+        gradeId: section.gradeId,
+        sections: [],
+      };
+      row.sections.push({ id: section.id, name: section.name });
+      grades.set(section.grade.name, row);
+    }
+    return {
+      classes: [...grades.values()],
+      exams: exams.map((exam) => ({
+        id: exam.id,
+        name: exam.name,
+        status: exam.status,
+        subjects: exam.subjects
+          .filter((row) =>
+            taughtSubjects && taughtSubjects.size
+              ? taughtSubjects.has(row.subjectId)
+              : true,
+          )
+          .map((row) => ({
+            id: row.subjectId,
+            examSubjectId: row.id,
+            name: row.subject.name,
+            gradeId: row.gradeId,
+            gradeName: row.grade.name,
+            maxTotal: n(row.maxTotal),
+            passTotal: n(row.passTotal),
+            components: row.components.map((c) => ({
+              id: c.id,
+              name: c.name,
+              code: c.code,
+              maxMarks: n(c.maxMarks),
+              passMarks: n(c.passMarks),
+            })),
+          })),
+      })),
+    };
+  }
+
+  async marksHistory(
+    tenantId: string,
+    examId: string,
+    sectionId: string,
+    componentId: string,
+    actor: ExamActor,
+  ) {
+    await this.assertMarksAccess(tenantId, examId, sectionId, actor);
+    const component = await this.prisma.schoolExamComponent.findFirst({
+      where: { id: componentId, tenantId },
+      include: {
+        examSubject: {
+          include: { components: { orderBy: { sortOrder: 'asc' } } },
+        },
       },
     });
+    if (!component)
+      throw new NotFoundException('Assessment component not found');
+    const comps = component.examSubject.components;
+    const roster = await this.marksRoster(
+      tenantId,
+      examId,
+      sectionId,
+      componentId,
+      actor,
+    );
+    const marks = await this.prisma.schoolExamMark.findMany({
+      where: {
+        tenantId,
+        examId,
+        componentId: { in: comps.map((c) => c.id) },
+      },
+    });
+    const byKey = new Map(
+      marks.map((m) => [`${m.studentId}:${m.componentId}`, m]),
+    );
+    return {
+      components: comps.map((c) => ({
+        id: c.id,
+        name: c.name,
+        maxMarks: n(c.maxMarks),
+      })),
+      rows: roster.rows.map((row) => ({
+        studentId: row.studentId,
+        fullName: row.fullName,
+        admissionNumber: row.admissionNumber,
+        scores: comps.map((c) => {
+          const m = byKey.get(`${row.studentId}:${c.id}`);
+          return {
+            componentId: c.id,
+            marks: m?.marks == null ? null : n(m.marks),
+            status: m?.status ?? '',
+            entryStatus: m?.entryStatus ?? '',
+          };
+        }),
+      })),
+    };
   }
 
   async listTypes(tenantId: string) {
@@ -661,6 +839,8 @@ export class SchoolSisExamsService {
     return {
       component,
       maxMarks: n(component.maxMarks),
+      passMarks: n(component.passMarks),
+      subjectName: component.examSubject.subject.name,
       rows: students.map((en) => {
         const m = byStudent.get(en.studentId);
         return {
@@ -684,7 +864,7 @@ export class SchoolSisExamsService {
     actor: ExamActor,
   ) {
     if (actor.manage) return;
-    const staff = await this.teacherStaff(tenantId, actor.email);
+    const staff = await this.teacherStaff(tenantId, actor);
     if (!staff)
       throw new ForbiddenException('No staff profile linked to this account');
     const year = await this.year(tenantId);
@@ -699,7 +879,11 @@ export class SchoolSisExamsService {
         },
       },
     );
-    if (!assigned)
+    const classTeacher =
+      await this.prisma.schoolClassTeacherAssignment.findFirst({
+        where: { tenantId, sectionId, staffId: staff.id, deletedAt: null },
+      });
+    if (!assigned && !classTeacher)
       throw new ForbiddenException('You are not assigned to this class');
     void examId;
   }

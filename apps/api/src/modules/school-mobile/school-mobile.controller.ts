@@ -10,7 +10,11 @@ import {
   Post,
   Query,
   Req,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import type { Request } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ClsService } from 'nestjs-cls';
@@ -36,7 +40,10 @@ import { SchoolSisAccessService } from '../school-sis/school-sis-access.service'
 import { SchoolSisLibraryService } from '../school-sis/school-sis-library.service';
 import { SchoolSisCalendarService } from '../school-sis/school-sis-calendar.service';
 import { SchoolSisPaymentGatewaysService } from '../school-sis/school-sis-payment-gateways.service';
+import { SchoolSisHomeworkService } from '../school-sis/school-sis-homework.service';
+import { SaveSchoolHomeworkDto } from '../school-sis/dto/school-homework.dto';
 import { SubmitAttendanceDto } from '../school-sis/dto/school-attendance.dto';
+import { SaveExamMarksDto } from '../school-sis/dto/school-exams.dto';
 import {
   GpsPingDto,
   MobileBoardingDto,
@@ -119,6 +126,7 @@ export class SchoolMobileController {
     private readonly gateways: SchoolSisPaymentGatewaysService,
     private readonly library: SchoolSisLibraryService,
     private readonly principal: SchoolMobilePrincipalService,
+    private readonly homework: SchoolSisHomeworkService,
   ) {}
 
   private async tenantFromHost(
@@ -135,6 +143,32 @@ export class SchoolMobileController {
       loginHost || host || 'erp.stlukestura.in',
     );
     return resolved.id;
+  }
+
+  private homeworkActor(user: JwtUser) {
+    const perms = user.permissions ?? [];
+    return {
+      userId: user.sub,
+      email: user.email,
+      manage:
+        perms.includes('*') ||
+        perms.includes(SCHOOL_SIS_PERMISSION_MANAGE) ||
+        perms.includes(SCHOOL_MOBILE_PERMISSION_MANAGE),
+    };
+  }
+
+  private examActor(user: JwtUser) {
+    const perms = user.permissions ?? [];
+    const manage =
+      perms.includes('*') ||
+      perms.includes(SCHOOL_SIS_PERMISSION_MANAGE) ||
+      perms.includes(SCHOOL_MOBILE_PERMISSION_MANAGE);
+    return {
+      userId: user.sub,
+      email: user.email,
+      manage,
+      teacher: !manage,
+    };
   }
 
   @Public()
@@ -677,6 +711,215 @@ export class SchoolMobileController {
   @RequireAnyPermission(...ACCESS, 'attendance.view', 'attendance.create')
   teacherToday(@CurrentUser() user: JwtUser, @Query('date') date?: string) {
     return this.attendance.teacherToday(user.tid, user.sub, date);
+  }
+
+  @Get('exams/marks/options')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+    'exams.marks.enter',
+    'exams.view',
+  )
+  examMarkOptions(@CurrentUser() user: JwtUser) {
+    return this.exams.staffMarkOptions(user.tid, this.examActor(user));
+  }
+
+  @Get('exams/marks/roster')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+    'exams.marks.enter',
+    'exams.view',
+  )
+  examMarkRoster(
+    @CurrentUser() user: JwtUser,
+    @Query('examId') examId: string,
+    @Query('sectionId') sectionId: string,
+    @Query('componentId') componentId: string,
+  ) {
+    return this.exams.marksRoster(
+      user.tid,
+      examId,
+      sectionId,
+      componentId,
+      this.examActor(user),
+    );
+  }
+
+  @Get('exams/marks/history')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+    'exams.marks.enter',
+    'exams.view',
+  )
+  examMarkHistory(
+    @CurrentUser() user: JwtUser,
+    @Query('examId') examId: string,
+    @Query('sectionId') sectionId: string,
+    @Query('componentId') componentId: string,
+  ) {
+    return this.exams.marksHistory(
+      user.tid,
+      examId,
+      sectionId,
+      componentId,
+      this.examActor(user),
+    );
+  }
+
+  @Post('exams/marks')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+    'exams.marks.enter',
+  )
+  examSaveMarks(@CurrentUser() user: JwtUser, @Body() dto: SaveExamMarksDto) {
+    return this.exams.saveMarks(user.tid, dto, this.examActor(user));
+  }
+
+  @Get('homework/options')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  homeworkOptions(@CurrentUser() user: JwtUser) {
+    return this.homework.options(user.tid, this.homeworkActor(user));
+  }
+
+  @Get('homework')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  homeworkList(@CurrentUser() user: JwtUser) {
+    return this.homework.list(user.tid, this.homeworkActor(user));
+  }
+
+  @Get('homework/reports')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  homeworkReports(@CurrentUser() user: JwtUser) {
+    return this.homework.reports(user.tid, this.homeworkActor(user));
+  }
+
+  @Get('homework/mine')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  async homeworkMine(
+    @CurrentUser() user: JwtUser,
+    @Query('childId') childId?: string,
+  ) {
+    const studentId = await this.access.resolveStudentId(
+      user.tid,
+      user,
+      childId,
+    );
+    if (!studentId) return { items: [] };
+    return this.homework.studentList(user.tid, studentId);
+  }
+
+  @Post('homework')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  @UseInterceptors(
+    FilesInterceptor('files', 8, {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  createHomework(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SaveSchoolHomeworkDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.homework.save(
+      user.tid,
+      this.homeworkActor(user),
+      dto,
+      files ?? [],
+    );
+  }
+
+  @Patch('homework/:id')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  @UseInterceptors(
+    FilesInterceptor('files', 8, {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  updateHomework(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: SaveSchoolHomeworkDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.homework.save(
+      user.tid,
+      this.homeworkActor(user),
+      dto,
+      files ?? [],
+      id,
+    );
+  }
+
+  @Post('homework/:id/duplicate')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  duplicateHomework(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.homework.duplicate(user.tid, this.homeworkActor(user), id);
+  }
+
+  @Delete('homework/:id')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  deleteHomework(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.homework.remove(user.tid, this.homeworkActor(user), id);
   }
 
   @Get('hr/me')

@@ -11,6 +11,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
 import { SchoolSisCalendarService } from './school-sis-calendar.service';
 import { SchoolSisEventBus } from './school-sis-event-bus.service';
+import { resolveSchoolStaffIdForUser } from './school-sis-staff-lookup';
 import {
   attendancePercent,
   bandForPercent,
@@ -1865,16 +1866,16 @@ export class SchoolSisAttendanceService {
     const settings = await this.ensureSetup(tenantId, year.id);
     const day = date ? dayKey(date) : dayKey(new Date());
     const jsDay = parseDay(day).getUTCDay();
-    const staff = await this.prisma.schoolPersonAccount.findFirst({
-      where: { tenantId, userId, personType: 'STAFF', staffId: { not: null } },
+    const staffId = await resolveSchoolStaffIdForUser(this.prisma, tenantId, {
+      sub: userId,
     });
-    const slots = staff?.staffId
+    const slots = staffId
       ? await this.prisma.schoolTimetableSlot.findMany({
           where: {
             tenantId,
-            staffId: staff.staffId,
+            staffId,
             dayOfWeek: jsDay === 0 ? 7 : jsDay,
-            plan: { academicYearId: year.id, status: 'PUBLISHED' },
+            plan: { academicYearId: year.id },
           },
           include: {
             section: { include: { grade: true } },
@@ -1884,20 +1885,20 @@ export class SchoolSisAttendanceService {
           orderBy: { bell: { sortOrder: 'asc' } },
         })
       : [];
-    const classTeacher = staff?.staffId
+    const classTeacher = staffId
       ? await this.prisma.schoolClassTeacherAssignment.findMany({
           where: {
             tenantId,
-            staffId: staff.staffId,
+            staffId,
             academicYearId: year.id,
             deletedAt: null,
           },
           include: { section: { include: { grade: true } } },
         })
       : [];
-    const subs = staff?.staffId
+    const subs = staffId
       ? await this.prisma.schoolAttendanceSubstitute.findMany({
-          where: { tenantId, staffId: staff.staffId, date: parseDay(day) },
+          where: { tenantId, staffId, date: parseDay(day) },
           include: { section: { include: { grade: true } } },
         })
       : [];
@@ -1910,6 +1911,28 @@ export class SchoolSisAttendanceService {
       },
     });
     const sessMap = new Map(sessions.map((s) => [s.sectionId, s]));
+    const classRows = new Map<
+      string,
+      { sectionId: string; label: string; status: string }
+    >();
+    for (const c of [
+      ...classTeacher,
+      ...subs.map((x) => ({ section: x.section })),
+    ]) {
+      classRows.set(c.section.id, {
+        sectionId: c.section.id,
+        label: `${c.section.grade.name} ${c.section.name}`,
+        status: sessMap.get(c.section.id)?.status ?? 'NOT_SUBMITTED',
+      });
+    }
+    for (const s of slots) {
+      if (classRows.has(s.sectionId)) continue;
+      classRows.set(s.sectionId, {
+        sectionId: s.sectionId,
+        label: `${s.section.grade.name} ${s.section.name}`,
+        status: sessMap.get(s.sectionId)?.status ?? 'NOT_SUBMITTED',
+      });
+    }
     return {
       date: day,
       settings,
@@ -1921,14 +1944,7 @@ export class SchoolSisAttendanceService {
         periodKey: s.bellId,
         submitted: sessMap.get(s.sectionId)?.status,
       })),
-      classes: [
-        ...classTeacher,
-        ...subs.map((x) => ({ section: x.section })),
-      ].map((c) => ({
-        sectionId: c.section.id,
-        label: `${c.section.grade.name} ${c.section.name}`,
-        status: sessMap.get(c.section.id)?.status ?? 'NOT_SUBMITTED',
-      })),
+      classes: [...classRows.values()],
     };
   }
 

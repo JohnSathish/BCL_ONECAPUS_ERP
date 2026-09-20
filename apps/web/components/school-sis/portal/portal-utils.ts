@@ -59,4 +59,23 @@ export function weekdayName(day?: number) {
   );
 }
 
+export function clock12(hhmm?: string | null) {
+  if (!hhmm) return '—';
+  const [h, m] = hhmm.split(':').map(Number);
+  if (Number.isNaN(h)) return hhmm;
+  const am = h < 12;
+  const hr = h % 12 || 12;
+  return `${hr}:${String(m ?? 0).padStart(2, '0')} ${am ? 'AM' : 'PM'}`;
+}
+
+export function clockRange(start?: string | null, end?: string | null) {
+  return `${clock12(start)} – ${clock12(end)}`;
+}
+
+export function hhmmToMinutes(hhmm?: string | null) {
+  if (!hhmm) return 0;
+  const [h, m] = hhmm.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
 export const CHILD_STORAGE_KEY = 'sls-portal-child';

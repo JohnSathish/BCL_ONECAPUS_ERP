@@ -7,23 +7,21 @@ import {
   fetchHrLeaveRequests,
   fetchHrLeaveTypes,
   fetchSchoolExamDashboard,
-  fetchSchoolExamMarksRoster,
-  saveSchoolExamMarks,
   requestHrLeave,
 } from '@/services/school-sis';
 import {
   fetchSchoolPortalInbox,
   fetchSchoolPortalNotices,
-  fetchSchoolPortalTimetable,
-  fetchSchoolTeacherToday,
   fetchSchoolPortalHrMe,
-  fetchSchoolPortalRoster,
-  submitSchoolPortalAttendance,
   markSchoolPortalInboxReadAll,
 } from '@/services/school-sis-portal';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { apiErrorMessage } from '@/utils/api-error';
-import { DashboardCard, NotificationPanel, PortalAvatar, TimetableWidget } from './portal-widgets';
+import { DashboardCard, NotificationPanel, PortalAvatar } from './portal-widgets';
+import { StaffAttendanceMarkPage } from './staff-attendance-mark-page';
+import { StaffHomeworkPage } from './staff-homework-page';
+import { StaffMarksPage } from './staff-marks-page';
+import { StaffTimetablePage } from './staff-timetable-page';
 import { usePortalData, portalDisplayName, portalMe } from './portal-data';
 import { asList, asNumber, asRecord, asText, formatDay } from './portal-utils';
 
@@ -36,118 +34,7 @@ function Title({ title, hint }: { title: string; hint?: string }) {
   );
 }
 
-export function StaffAttendanceMarkPage() {
-  const authed = useAuthQueryEnabled();
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
-  const [sectionId, setSectionId] = useState('');
-  const tasks = useQuery({
-    queryKey: ['teacher-today', date],
-    queryFn: () => fetchSchoolTeacherToday(date),
-    enabled: authed,
-  });
-  const roster = useQuery({
-    queryKey: ['portal-roster', date, sectionId],
-    queryFn: () => fetchSchoolPortalRoster({ date, sectionId }),
-    enabled: authed && Boolean(sectionId),
-  });
-  const periodRows = asList(asRecord(tasks.data).periods).map(asRecord);
-  const classRows = asList(asRecord(tasks.data).classes).map(asRecord);
-  const seen = new Set<string>();
-  const sections = [...classRows, ...periodRows].filter((row) => {
-    const id = asText(row.sectionId ?? row.id);
-    if (!id || seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-  const students = asList(asRecord(roster.data).students ?? asRecord(roster.data).rows).map(
-    asRecord,
-  );
-  const academicYearId = asText(asRecord(asRecord(roster.data).academicYear).id, '');
-  const [marks, setMarks] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
-  const save = useMutation({
-    mutationFn: () =>
-      submitSchoolPortalAttendance({
-        academicYearId,
-        date,
-        sectionId,
-        records: students.map((row) => ({
-          studentId: asText(row.studentId ?? row.id),
-          statusCode: marks[asText(row.studentId ?? row.id)] || asText(row.status, 'PRESENT'),
-        })),
-      }),
-    onError: (err) => setError(apiErrorMessage(err)),
-    onSuccess: () => setError(null),
-  });
-
-  return (
-    <div className="space-y-4">
-      <Title title="Mark student attendance" hint="Same live register used by the mobile app." />
-      <div className="flex flex-wrap gap-2">
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-          <option value="">Select class</option>
-          {sections.map((row) => (
-            <option key={asText(row.sectionId ?? row.id)} value={asText(row.sectionId ?? row.id)}>
-              {asText(row.label ?? row.name ?? row.classLabel)}
-            </option>
-          ))}
-        </select>
-      </div>
-      {!sections.length ? (
-        <p className="portal-empty portal-card">No attendance tasks for this date.</p>
-      ) : null}
-      {students.length ? (
-        <DashboardCard title="Roster">
-          <div className="overflow-x-auto">
-            <table className="portal-table">
-              <thead>
-                <tr>
-                  <th>Student</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((row) => {
-                  const id = asText(row.studentId ?? row.id);
-                  return (
-                    <tr key={id}>
-                      <td>{asText(row.fullName ?? asRecord(row.student).fullName)}</td>
-                      <td>
-                        <select
-                          value={marks[id] || asText(row.status, 'PRESENT')}
-                          onChange={(e) => setMarks((m) => ({ ...m, [id]: e.target.value }))}
-                        >
-                          {['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'LEAVE', 'EXCUSED'].map(
-                            (code) => (
-                              <option key={code} value={code}>
-                                {code.replace('_', ' ')}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null}
-          <button
-            type="button"
-            className="sls-btn-primary mt-3"
-            onClick={() => save.mutate()}
-            disabled={save.isPending}
-          >
-            Submit attendance
-          </button>
-        </DashboardCard>
-      ) : null}
-    </div>
-  );
-}
+export { StaffAttendanceMarkPage };
 
 export function StaffLeavePage() {
   const authed = useAuthQueryEnabled();
@@ -256,97 +143,6 @@ export function StaffLeavePage() {
   );
 }
 
-export function StaffMarksPage() {
-  const authed = useAuthQueryEnabled();
-  const { home } = usePortalData();
-  const classes = asList(asRecord(home?.desk).classes).map(asRecord);
-  const exams = useQuery({
-    queryKey: ['exam-dashboard'],
-    queryFn: fetchSchoolExamDashboard,
-    enabled: authed,
-    retry: false,
-  });
-  const examList = asList(asRecord(exams.data).exams ?? exams.data).map(asRecord);
-  const [examId, setExamId] = useState('');
-  const [sectionId, setSectionId] = useState('');
-  const [componentId, setComponentId] = useState('');
-  const roster = useQuery({
-    queryKey: ['marks-roster', examId, sectionId, componentId],
-    queryFn: () => fetchSchoolExamMarksRoster({ examId, sectionId, componentId }),
-    enabled: authed && Boolean(examId && sectionId && componentId),
-    retry: false,
-  });
-  const rows = asList(asRecord(roster.data).students ?? asRecord(roster.data).rows).map(asRecord);
-  const [scores, setScores] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
-  const save = useMutation({
-    mutationFn: () =>
-      saveSchoolExamMarks({
-        examId,
-        sectionId,
-        componentId,
-        marks: rows.map((row) => ({
-          studentId: asText(row.studentId ?? row.id),
-          score: Number(scores[asText(row.studentId ?? row.id)] || row.score || 0),
-        })),
-      }),
-    onError: (err) => setError(apiErrorMessage(err)),
-  });
-  return (
-    <div className="space-y-4">
-      <Title title="Mark entry" hint="Enter marks for classes you are authorised to manage." />
-      <div className="flex flex-wrap gap-2">
-        <select value={examId} onChange={(e) => setExamId(e.target.value)}>
-          <option value="">Exam</option>
-          {examList.map((row) => (
-            <option key={asText(row.id)} value={asText(row.id)}>
-              {asText(row.name)}
-            </option>
-          ))}
-        </select>
-        <select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-          <option value="">Class</option>
-          {classes.map((row) => (
-            <option key={asText(row.id)} value={asText(row.id)}>
-              {asText(row.label)}
-            </option>
-          ))}
-        </select>
-        <input
-          placeholder="Component ID"
-          value={componentId}
-          onChange={(e) => setComponentId(e.target.value)}
-        />
-      </div>
-      {rows.length ? (
-        <DashboardCard title="Roster">
-          {rows.map((row) => {
-            const id = asText(row.studentId ?? row.id);
-            return (
-              <div key={id} className="flex items-center justify-between gap-2 py-2 text-sm">
-                <span>{asText(row.fullName ?? asRecord(row.student).fullName)}</span>
-                <input
-                  className="w-24"
-                  value={scores[id] ?? asText(row.score, '')}
-                  onChange={(e) => setScores((s) => ({ ...s, [id]: e.target.value }))}
-                />
-              </div>
-            );
-          })}
-          {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-          <button type="button" className="sls-btn-primary mt-2" onClick={() => save.mutate()}>
-            Save marks
-          </button>
-        </DashboardCard>
-      ) : (
-        <p className="portal-empty portal-card">
-          Choose an exam and class to load the mark roster.
-        </p>
-      )}
-    </div>
-  );
-}
-
 export function StaffSection({ section }: { section: string }) {
   const authed = useAuthQueryEnabled();
   const { home } = usePortalData();
@@ -358,15 +154,7 @@ export function StaffSection({ section }: { section: string }) {
   if (section === 'leave') return <StaffLeavePage />;
   if (section === 'marks') return <StaffMarksPage />;
 
-  if (section === 'timetable') {
-    return (
-      <div>
-        <Title title="Timetable" />
-        <TimetableWidget slots={asRecord(home?.desk).todaySchedule} />
-        <StaffTimetableGrid enabled={authed} />
-      </div>
-    );
-  }
+  if (section === 'timetable') return <StaffTimetablePage />;
   if (section === 'attendance') {
     return (
       <div>
@@ -400,17 +188,7 @@ export function StaffSection({ section }: { section: string }) {
       </div>
     );
   }
-  if (section === 'homework') {
-    return (
-      <div>
-        <Title title="Homework" hint="Create and review assignments for your classes." />
-        <p className="portal-empty portal-card">
-          No homework has been posted yet. New assignments will appear here for the same classes as
-          the mobile app.
-        </p>
-      </div>
-    );
-  }
+  if (section === 'homework') return <StaffHomeworkPage />;
   if (section === 'exams' || section === 'performance') {
     return (
       <StaffExams
@@ -436,43 +214,6 @@ export function StaffSection({ section }: { section: string }) {
     );
   }
   return <p className="portal-empty">This section is not available.</p>;
-}
-
-function StaffTimetableGrid({ enabled }: { enabled: boolean }) {
-  const q = useQuery({
-    queryKey: ['staff-tt'],
-    queryFn: () => fetchSchoolPortalTimetable(),
-    enabled,
-  });
-  const slots = asList(asRecord(q.data).slots).map(asRecord);
-  return (
-    <div className="mt-4 overflow-x-auto portal-card">
-      <table className="portal-table min-w-[36rem]">
-        <thead>
-          <tr>
-            <th>Day</th>
-            <th>Class</th>
-            <th>Subject</th>
-            <th>Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {slots.map((slot) => (
-            <tr key={asText(slot.id)}>
-              <td>{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][Number(slot.dayOfWeek)]}</td>
-              <td>
-                {`${asText(asRecord(asRecord(slot.section).grade).name)} ${asText(asRecord(slot.section).name)}`.trim()}
-              </td>
-              <td>{asText(asRecord(slot.subject).name)}</td>
-              <td>
-                {asText(asRecord(slot.bell).startTime)}–{asText(asRecord(slot.bell).endTime)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 function StaffInbox({ onRead }: { onRead: () => void }) {
