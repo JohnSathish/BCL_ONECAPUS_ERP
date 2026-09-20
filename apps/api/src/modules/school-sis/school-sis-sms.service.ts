@@ -21,6 +21,7 @@ import {
   SMS_PROVIDERS,
 } from './school-sis-sms.catalog';
 import {
+  displayInMobile,
   hashOtp,
   maskMobile,
   missingVariables,
@@ -30,6 +31,13 @@ import {
 } from './school-sis-sms.phone';
 import { sendApitxtOtp } from './school-sis-apitxt-otp';
 import { resolveSmsProvider } from './school-sis-sms.providers';
+import {
+  collectGatewayConfigIssues,
+  enrollmentSearchWhere,
+  formatClassLabel,
+  providerSendsTransactionalSms,
+  sanitizeSmsError,
+} from './school-sis-sms.search';
 
 type Audience = {
   type?: string;
@@ -235,13 +243,211 @@ export class SchoolSisSmsService implements OnModuleInit {
     };
   }
 
+  async searchStudents(tenantId: string, q: string, recipient = 'PARENT') {
+    await this.ensure(tenantId);
+    const term = q.trim();
+    if (term.length < 2) return { items: [] };
+    const year = await this.sis.currentYear(tenantId);
+    const searchWhere = enrollmentSearchWhere(term);
+    if (!searchWhere) return { items: [] };
+    const enrollments = await this.prisma.schoolEnrollment.findMany({
+      where: {
+        tenantId,
+        academicYearId: year.id,
+        deletedAt: null,
+        status: 'ACTIVE',
+        ...searchWhere,
+      },
+      include: {
+        student: { include: { guardians: { include: { guardian: true } } } },
+        section: { include: { grade: true } },
+      },
+      orderBy: { student: { fullName: 'asc' } },
+      take: 20,
+    });
+    const wantParent = recipient.toUpperCase() !== 'STUDENT';
+    return {
+      items: enrollments.map((en) => {
+        const st = en.student;
+        const parent =
+          st.guardians.find((g) => g.guardian.isPrimary)?.guardian ??
+          st.guardians[0]?.guardian;
+        const parentMobile = normalizeInMobile(parent?.phone);
+        const studentMobile = normalizeInMobile(st.phone);
+        const recipientMobile = wantParent
+          ? parentMobile || studentMobile
+          : studentMobile;
+        return {
+          studentId: st.id,
+          fullName: st.fullName,
+          admissionNumber: st.admissionNumber,
+          rollNumber: en.rollNumber,
+          classLabel: formatClassLabel(en.section.grade.name, en.section.name),
+          parentName: parent?.fullName ?? null,
+          studentMobile,
+          parentMobile,
+          studentMobileDisplay: displayInMobile(studentMobile),
+          parentMobileDisplay: displayInMobile(parentMobile),
+          recipientMobile,
+          recipientMobileDisplay: displayInMobile(recipientMobile),
+          recipientType: wantParent ? 'PARENT' : 'STUDENT',
+        };
+      }),
+    };
+  }
+
+  async configStatus(
+    tenantId: string,
+    gatewayId?: string,
+    opts?: { transactional?: boolean },
+  ) {
+    const settings = await this.ensure(tenantId);
+    const gw = gatewayId
+      ? await this.prisma.schoolSmsGateway.findFirst({
+          where: { id: gatewayId, tenantId },
+        })
+      : ((await this.prisma.schoolSmsGateway.findFirst({
+          where: { tenantId, isDefault: true, status: 'ACTIVE' },
+        })) ??
+        (await this.prisma.schoolSmsGateway.findFirst({
+          where: { tenantId, status: 'ACTIVE' },
+          orderBy: { updatedAt: 'desc' },
+        })));
+    const issues: string[] = [];
+    const creds = this.creds(gw?.credentialsEnc);
+    if (!gw) {
+      issues.push('No active SMS gateway is configured.');
+    } else {
+      issues.push(
+        ...collectGatewayConfigIssues({
+          provider: gw.provider,
+          status: gw.status,
+          apiUrl: gw.apiUrl,
+          senderId: gw.senderId,
+          defaultSenderId: settings.defaultSenderId,
+          creds,
+        }),
+      );
+    }
+    const [header, approvedTemplates, templates] = await Promise.all([
+      this.prisma.schoolSmsHeader.findFirst({
+        where: { tenantId, status: 'APPROVED' },
+      }),
+      this.prisma.schoolSmsDltTemplate.count({
+        where: { tenantId, status: 'APPROVED' },
+      }),
+      this.prisma.schoolSmsTemplate.count({
+        where: { tenantId, status: 'ACTIVE' },
+      }),
+    ]);
+    if (settings.enforceDltOnService && !header) {
+      issues.push('DLT header is required but none is approved.');
+    }
+    if (opts?.transactional === false) {
+      const idx = issues.findIndex((i) => i.includes('Apitxt is configured'));
+      if (idx >= 0) issues.splice(idx, 1);
+    }
+    const origin =
+      this.config.get<string>('API_PUBLIC_ORIGIN')?.replace(/\/$/, '') ||
+      'https://erp.stlukestura.in/api';
+    const providerKey = (gw?.provider || 'msg91').toLowerCase();
+    const callbackPath = `/v1/school-sis/public/sms/webhooks/${providerKey}`;
+    const lastError = gw?.lastError ? sanitizeSmsError(gw.lastError) : null;
+    return {
+      ready: issues.length === 0,
+      canSend: issues.length === 0,
+      issues,
+      gateway: gw
+        ? {
+            id: gw.id,
+            name: gw.name,
+            provider: gw.provider,
+            status: gw.status,
+            isDefault: gw.isDefault,
+            health: gw.health,
+            environment: gw.environment,
+            senderId: gw.senderId || settings.defaultSenderId,
+            hasApiUrl: Boolean(gw.apiUrl),
+            apiHost: gw.apiUrl
+              ? (() => {
+                  try {
+                    return new URL(gw.apiUrl).host;
+                  } catch {
+                    return null;
+                  }
+                })()
+              : gw.provider === 'MSG91'
+                ? 'control.msg91.com'
+                : gw.provider === 'TWILIO'
+                  ? 'api.twilio.com'
+                  : null,
+            hasCredentials: Boolean(
+              creds.apiKey ||
+              creds.authkey ||
+              creds.authToken ||
+              creds.token ||
+              creds.accountSid,
+            ),
+            hasSenderId: Boolean(gw.senderId || settings.defaultSenderId),
+            hasDltEntityId: Boolean(gw.dltEntityId || settings.entityId),
+            dltHeader: gw.dltHeader,
+            route:
+              creds.route ||
+              creds.smsType ||
+              (gw.provider === 'MSG91' ? 'transactional' : null),
+            transactionalSms: providerSendsTransactionalSms(gw.provider),
+            lastSuccessAt: gw.lastSuccessAt,
+            lastError,
+            credentialFields: {
+              hasApiKey: Boolean(creds.apiKey || creds.authkey),
+              hasApiSecret: Boolean(creds.apiSecret),
+              hasAccountSid: Boolean(creds.accountSid),
+              hasAuthToken: Boolean(creds.authToken),
+              hasToken: Boolean(creds.token),
+            },
+          }
+        : null,
+      dlt: {
+        enforceDlt: settings.enforceDlt,
+        enforceDltOnService: settings.enforceDltOnService,
+        entityIdSet: Boolean(settings.entityId),
+        entityName: settings.entityName,
+        approvedHeader: header?.header ?? null,
+        approvedTemplateCount: approvedTemplates,
+      },
+      templates: { activeCount: templates },
+      credits: { manualBalance: settings.manualBalance },
+      deliveryCallback: {
+        path: callbackPath,
+        url: `${origin}${callbackPath}`,
+        configured: true,
+      },
+    };
+  }
+
   async resolve(tenantId: string, audience: Audience, category = 'GENERAL') {
     await this.ensure(tenantId);
     const year = await this.sis.currentYear(tenantId);
     const recipient = (audience.recipient || 'PARENT').toUpperCase();
+    const type = (audience.type || '').toUpperCase();
     const rows: Resolved[] = [];
     const seen = new Set<string>();
     const missing: Array<{ name: string; reason: string }> = [];
+    const searchWhere = audience.search
+      ? enrollmentSearchWhere(audience.search)
+      : null;
+    if (type === 'INDIVIDUAL' && !audience.studentIds?.length && !searchWhere) {
+      return {
+        selected: 0,
+        valid: 0,
+        missing: 0,
+        duplicatesSkipped: 0,
+        missingRows: [] as Array<{ name: string; reason: string }>,
+        sample: [] as Array<{ name: string; mobile: string }>,
+        recipients: [] as Resolved[],
+        hint: 'Search and select a student before sending an individual SMS.',
+      };
+    }
     if (audience.type === 'STAFF' || audience.staffIds?.length) {
       const staff = await this.prisma.schoolStaff.findMany({
         where: {
@@ -291,6 +497,25 @@ export class SchoolSisSmsService implements OnModuleInit {
         });
       }
     } else {
+      const targeted =
+        Boolean(audience.sectionIds?.length) ||
+        Boolean(audience.studentIds?.length) ||
+        Boolean(searchWhere);
+      if (
+        (type === 'CLASS' || type === 'SECTION' || type === '') &&
+        !targeted
+      ) {
+        return {
+          selected: 0,
+          valid: 0,
+          missing: 0,
+          duplicatesSkipped: 0,
+          missingRows: [],
+          sample: [],
+          recipients: [],
+          hint: 'Search for a student or choose a class/section. Whole-school SMS is not allowed from this composer.',
+        };
+      }
       const enrollments = await this.prisma.schoolEnrollment.findMany({
         where: {
           tenantId,
@@ -303,33 +528,17 @@ export class SchoolSisSmsService implements OnModuleInit {
           ...(audience.studentIds?.length
             ? { studentId: { in: audience.studentIds } }
             : {}),
-          ...(audience.search
-            ? {
-                student: {
-                  OR: [
-                    {
-                      fullName: {
-                        contains: audience.search,
-                        mode: 'insensitive',
-                      },
-                    },
-                    {
-                      admissionNumber: {
-                        contains: audience.search,
-                        mode: 'insensitive',
-                      },
-                    },
-                    { phone: { contains: audience.search } },
-                  ],
-                },
-              }
-            : {}),
+          ...(searchWhere && !audience.studentIds?.length ? searchWhere : {}),
         },
         include: {
           student: { include: { guardians: { include: { guardian: true } } } },
           section: { include: { grade: true } },
         },
-        take: 5000,
+        take: audience.studentIds?.length
+          ? Math.min(audience.studentIds.length, 200)
+          : searchWhere
+            ? 30
+            : 5000,
       });
       for (const en of enrollments) {
         const st = en.student;
@@ -400,6 +609,12 @@ export class SchoolSisSmsService implements OnModuleInit {
     ip?: string,
   ) {
     const settings = await this.ensure(tenantId);
+    const audienceType = (dto.audience.type || '').toUpperCase();
+    if (audienceType === 'INDIVIDUAL' && !dto.audience.studentIds?.length) {
+      throw new BadRequestException(
+        'Select a student before sending an individual SMS.',
+      );
+    }
     const template = dto.templateKey
       ? await this.prisma.schoolSmsTemplate.findFirst({
           where: { tenantId, key: dto.templateKey, status: 'ACTIVE' },
@@ -408,6 +623,19 @@ export class SchoolSisSmsService implements OnModuleInit {
     const body = dto.body || template?.body;
     if (!body) throw new BadRequestException('Message body required');
     const kind = (dto.smsKind || template?.smsKind || 'SERVICE').toUpperCase();
+    const category = (
+      dto.category ||
+      template?.category ||
+      'GENERAL'
+    ).toUpperCase();
+    const cfg = await this.configStatus(tenantId, dto.gatewayId, {
+      transactional: kind !== 'OTP' && category !== 'OTP',
+    });
+    if (!cfg.canSend) {
+      throw new BadRequestException(
+        cfg.issues.join(' ') || 'SMS configuration is incomplete.',
+      );
+    }
     await this.assertDlt(tenantId, settings, kind, template?.dltTemplateId);
     const resolved = await this.resolve(
       tenantId,
@@ -418,6 +646,17 @@ export class SchoolSisSmsService implements OnModuleInit {
     if (resolved.valid > settings.maxCampaignSize) {
       throw new BadRequestException(
         `Campaign exceeds maximum of ${settings.maxCampaignSize}`,
+      );
+    }
+    const sample = resolved.recipients[0];
+    const missingVars = sample
+      ? missingVariables(body, { ...sample.vars, ...(dto.variables ?? {}) })
+      : [];
+    if (missingVars.length) {
+      throw new BadRequestException(
+        `Message is missing values for: ${missingVars
+          .map((k) => `{${k}}`)
+          .join(', ')}`,
       );
     }
     const gw = await this.pickGateway(tenantId, dto.gatewayId);
@@ -554,7 +793,17 @@ export class SchoolSisSmsService implements OnModuleInit {
       tenantId,
       msg.gatewayId ?? undefined,
     );
-    const result = await this.dispatch(primary, msg);
+    let result;
+    try {
+      result = await this.dispatch(primary, msg);
+    } catch (err) {
+      result = {
+        accepted: false,
+        status: 'FAILED' as const,
+        errorMessage: sanitizeSmsError(err),
+        errorClass: 'TEMPORARY' as const,
+      };
+    }
     if (
       !result.accepted &&
       settings.failoverEnabled &&
@@ -565,7 +814,17 @@ export class SchoolSisSmsService implements OnModuleInit {
         orderBy: { failoverRank: 'asc' },
       });
       if (secondary) {
-        const fb = await this.dispatch(secondary, msg);
+        let fb;
+        try {
+          fb = await this.dispatch(secondary, msg);
+        } catch (err) {
+          fb = {
+            accepted: false,
+            status: 'FAILED' as const,
+            errorMessage: sanitizeSmsError(err),
+            errorClass: 'TEMPORARY' as const,
+          };
+        }
         await this.applyProviderResult(
           msg.id,
           tenantId,
@@ -802,28 +1061,96 @@ export class SchoolSisSmsService implements OnModuleInit {
     return { ok: true };
   }
 
-  async testGateway(tenantId: string, id: string) {
+  async testGateway(tenantId: string, id: string, testMobile?: string) {
+    const settings = await this.ensure(tenantId);
     const gw = await this.prisma.schoolSmsGateway.findFirst({
       where: { id, tenantId },
     });
     if (!gw) throw new NotFoundException('Gateway not found');
     const creds = this.creds(gw.credentialsEnc);
-    const ok = await resolveSmsProvider(gw.provider).validateConfiguration(
+    const issues = collectGatewayConfigIssues({
+      provider: gw.provider,
+      status: gw.status === 'ACTIVE' ? 'ACTIVE' : gw.status,
+      apiUrl: gw.apiUrl,
+      senderId: gw.senderId,
+      defaultSenderId: settings.defaultSenderId,
       creds,
-      gw.apiUrl,
-    );
+    });
+    const provider = resolveSmsProvider(gw.provider);
+    const fieldsOk = await provider.validateConfiguration(creds, gw.apiUrl);
+    if (!fieldsOk && !issues.some((i) => /key|token|sid|url/i.test(i))) {
+      issues.push('Gateway credentials are incomplete.');
+    }
+    let balance: Awaited<ReturnType<typeof provider.getBalance>> = {};
+    try {
+      balance = await provider.getBalance(creds, gw.apiUrl);
+    } catch (err) {
+      balance = { error: sanitizeSmsError(err), reachable: false };
+    }
+    const connected =
+      Boolean(balance.reachable) ||
+      typeof balance.credits === 'number' ||
+      typeof balance.amount === 'number';
+    if (balance.error && !connected) {
+      issues.push(sanitizeSmsError(balance.error));
+    }
+    const ok =
+      issues.filter((i) => !i.includes('Apitxt is configured')).length === 0 &&
+      (connected || gw.provider.toUpperCase() === 'APITXT');
     await this.prisma.schoolSmsGateway.update({
       where: { id },
       data: {
-        health: ok ? 'OK' : 'ERROR',
-        lastError: ok ? null : 'Configuration invalid',
+        health:
+          connected || gw.provider.toUpperCase() === 'APITXT' ? 'OK' : 'ERROR',
+        lastError: ok ? null : issues[0] || 'Configuration invalid',
       },
     });
-    if (!ok)
-      throw new BadRequestException(
-        'SMS Gateway unavailable. Please configure another active default gateway.',
+    if (issues.length && gw.provider.toUpperCase() !== 'APITXT' && !connected) {
+      throw new BadRequestException(issues.join(' '));
+    }
+    let testSend: { queued?: boolean; campaignId?: string } | null = null;
+    if (testMobile && providerSendsTransactionalSms(gw.provider)) {
+      if (issues.length) {
+        throw new BadRequestException(issues.join(' '));
+      }
+      const sent = await this.sendCampaign(
+        tenantId,
+        {
+          name: 'Gateway connection test',
+          category: 'GENERAL',
+          smsKind: 'SERVICE',
+          body: "St. Luke's School SMS gateway test. Please ignore.",
+          audience: { type: 'CUSTOM', mobiles: [testMobile] },
+          gatewayId: gw.id,
+          sendNow: true,
+        },
+        '00000000-0000-0000-0000-000000000000',
       );
-    return { ok: true };
+      testSend = {
+        queued: true,
+        campaignId: String(
+          (sent as { campaign?: { id?: string } }).campaign?.id ?? '',
+        ),
+      };
+    }
+    return {
+      ok:
+        issues.length === 0 ||
+        (gw.provider.toUpperCase() === 'APITXT' && fieldsOk),
+      connected,
+      issues,
+      provider: gw.provider,
+      senderId: gw.senderId || settings.defaultSenderId,
+      credits: balance.credits ?? settings.manualBalance,
+      providerBalance:
+        typeof balance.credits === 'number'
+          ? { credits: balance.credits }
+          : typeof balance.amount === 'number'
+            ? { amount: balance.amount, currency: balance.currency }
+            : null,
+      transactionalSms: providerSendsTransactionalSms(gw.provider),
+      testSend,
+    };
   }
 
   async dlt(tenantId: string) {
@@ -1229,7 +1556,7 @@ export class SchoolSisSmsService implements OnModuleInit {
       status: g.status,
       isDefault: g.isDefault,
       health: g.health,
-      lastError: g.lastError,
+      lastError: g.lastError ? sanitizeSmsError(g.lastError) : null,
       lastSuccessAt: g.lastSuccessAt,
       hasApiKey: Boolean(creds.apiKey || creds.authkey || creds.authToken),
     };
@@ -1290,7 +1617,9 @@ export class SchoolSisSmsService implements OnModuleInit {
         status,
         providerMessageId: result.providerMessageId,
         errorCode: result.errorCode,
-        errorMessage: result.errorMessage,
+        errorMessage: result.errorMessage
+          ? sanitizeSmsError(result.errorMessage)
+          : result.errorMessage,
         errorClass: result.errorClass,
         submittedAt: result.accepted ? new Date() : undefined,
         sentAt: result.accepted ? new Date() : undefined,
@@ -1311,7 +1640,7 @@ export class SchoolSisSmsService implements OnModuleInit {
       where: { id: gatewayId },
       data: result.accepted
         ? { lastSuccessAt: new Date(), health: 'OK', lastError: null }
-        : { health: 'ERROR', lastError: result.errorMessage },
+        : { health: 'ERROR', lastError: sanitizeSmsError(result.errorMessage) },
     });
     if (result.accepted) {
       await this.prisma.schoolSmsSettings.update({

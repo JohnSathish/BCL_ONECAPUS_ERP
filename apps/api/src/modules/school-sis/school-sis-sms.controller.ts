@@ -52,6 +52,22 @@ export class SchoolSisSmsController {
     return this.sms.preview(user.tid, body);
   }
 
+  @Get('configuration')
+  @RequireAnyPermission(...SIS_SMS_VIEW, ...SIS_SMS_GATEWAY)
+  configuration(@CurrentUser() user: JwtUser) {
+    return this.sms.configStatus(user.tid);
+  }
+
+  @Get('students')
+  @RequireAnyPermission(...SIS_SMS_SEND)
+  searchStudents(
+    @CurrentUser() user: JwtUser,
+    @Query('q') q?: string,
+    @Query('recipient') recipient?: string,
+  ) {
+    return this.sms.searchStudents(user.tid, q || '', recipient || 'PARENT');
+  }
+
   @Post('recipients')
   @RequireAnyPermission(...SIS_SMS_SEND)
   recipients(
@@ -163,9 +179,13 @@ export class SchoolSisSmsController {
   }
 
   @Post('gateways/:id/test')
-  @RequireAnyPermission(...SIS_SMS_GATEWAY)
-  testGw(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.sms.testGateway(user.tid, id);
+  @RequireAnyPermission(...SIS_SMS_GATEWAY, ...SIS_SMS_SEND)
+  testGw(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { mobile?: string },
+  ) {
+    return this.sms.testGateway(user.tid, id, body?.mobile);
   }
 
   @Post('gateways/:id/set-default')

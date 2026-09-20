@@ -1,4 +1,5 @@
 import {
+  displayInMobile,
   extractVariables,
   hashOtp,
   missingVariables,
@@ -12,6 +13,10 @@ describe('school SMS helpers', () => {
     expect(normalizeInMobile('98625 12345')).toBe('919862512345');
     expect(normalizeInMobile('+91 9862512345')).toBe('919862512345');
     expect(normalizeInMobile('123')).toBeNull();
+  });
+
+  it('formats mobiles for office display', () => {
+    expect(displayInMobile('919862512345')).toBe('+91 98625 12345');
   });
 
   it('counts GSM vs unicode segments', () => {

@@ -20,6 +20,41 @@ export async function previewSmsRecipients(payload: Record<string, unknown>) {
   return data as Record<string, unknown>;
 }
 
+export type SmsStudentMatch = {
+  studentId: string;
+  fullName: string;
+  admissionNumber: string;
+  rollNumber?: string | null;
+  classLabel: string;
+  parentName?: string | null;
+  studentMobile?: string | null;
+  parentMobile?: string | null;
+  studentMobileDisplay?: string;
+  parentMobileDisplay?: string;
+  recipientMobile?: string | null;
+  recipientMobileDisplay?: string;
+  recipientType?: string;
+};
+
+export async function searchSmsStudents(q: string, recipient = 'PARENT') {
+  const { data } = await api.get(`${base}/students`, { params: { q, recipient } });
+  return data as { items: SmsStudentMatch[] };
+}
+
+export async function fetchSmsConfiguration() {
+  const { data } = await api.get(`${base}/configuration`);
+  return data as {
+    ready?: boolean;
+    canSend?: boolean;
+    issues?: string[];
+    gateway?: Record<string, unknown> | null;
+    dlt?: Record<string, unknown>;
+    templates?: { activeCount?: number };
+    credits?: { manualBalance?: number };
+    deliveryCallback?: { path?: string; url?: string; configured?: boolean };
+  };
+}
+
 export async function sendSmsCampaign(payload: Record<string, unknown>) {
   const { data } = await api.post(`${base}/campaigns`, payload);
   return data;
@@ -69,9 +104,9 @@ export async function saveSmsGateway(payload: Record<string, unknown>, id?: stri
   return data;
 }
 
-export async function testSmsGateway(id: string) {
-  const { data } = await api.post(`${base}/gateways/${id}/test`);
-  return data;
+export async function testSmsGateway(id: string, payload?: { mobile?: string }) {
+  const { data } = await api.post(`${base}/gateways/${id}/test`, payload ?? {});
+  return data as Record<string, unknown>;
 }
 
 export async function defaultSmsGateway(id: string) {

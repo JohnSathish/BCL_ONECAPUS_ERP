@@ -24,6 +24,16 @@ export function maskMobile(mobile: string) {
   return `${'*'.repeat(Math.max(0, mobile.length - 4))}${mobile.slice(-4)}`;
 }
 
+export function displayInMobile(mobile: string | null | undefined): string {
+  if (!mobile) return '';
+  const n = mobile.replace(/\D/g, '');
+  if (n.length === 12 && n.startsWith('91')) {
+    return `+91 ${n.slice(2, 7)} ${n.slice(7)}`;
+  }
+  if (n.length === 10) return `+91 ${n.slice(0, 5)} ${n.slice(5)}`;
+  return mobile;
+}
+
 export function smsSegments(text: string) {
   const unicode = !GSM7.test(text) || text.includes('₹');
   const single = unicode ? 70 : 160;

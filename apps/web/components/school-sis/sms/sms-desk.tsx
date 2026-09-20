@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { apiErrorMessage } from '@/utils/api-error';
 import { GhostButton, PrimaryButton } from '../academic/academic-ui';
 import { WaBadge } from '../whatsapp/whatsapp-ui';
 import { SmsDashboard } from './sms-dashboard';
+import { SmsSendPanel } from './sms-send-panel';
 import { SmsEmpty, SmsPanel, SmsShell } from './sms-ui';
 import {
   adjustSmsCredits,
@@ -21,15 +22,12 @@ import {
   fetchSmsMessages,
   fetchSmsSettings,
   fetchSmsTemplates,
-  previewSms,
-  previewSmsRecipients,
   retrySms,
   saveSmsDltTemplate,
   saveSmsGateway,
   saveSmsHeader,
   saveSmsSettings,
   saveSmsTemplate,
-  sendSmsCampaign,
   testSmsGateway,
 } from '@/services/school-sms';
 
@@ -42,12 +40,6 @@ export function SmsDesk() {
   const ready = useAuthQueryEnabled();
   const qc = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<Record<string, unknown> | null>(null);
-  const [body, setBody] = useState(
-    "Dear {parent_name}, fee of Rs.{amount} for {student_name}, {class_name} is pending. - St. Luke's School",
-  );
-  const [search, setSearch] = useState('');
-  const [audienceType, setAudienceType] = useState('CLASS');
 
   const dash = useQuery({ queryKey: ['sms-dash'], queryFn: fetchSmsDashboard, enabled: ready });
   const templates = useQuery({
@@ -80,49 +72,12 @@ export function SmsDesk() {
     queryFn: fetchSmsSettings,
     enabled: ready && ['settings', 'credits'].includes(section),
   });
-  const preview = useQuery({
-    queryKey: ['sms-prev', body],
-    queryFn: () =>
-      previewSms({
-        template: body,
-        variables: {
-          parent_name: 'Mary',
-          amount: '3600',
-          student_name: 'Adrian D. Sangma',
-          class_name: 'VIII A',
-        },
-      }),
-    enabled: ready && section === 'send',
-  });
 
   const kpis = (dash.data?.kpis ?? {}) as Record<string, number>;
-  const segs = preview.data as
-    | { chars?: number; segments?: number; preview?: string; missing?: string[] }
-    | undefined;
 
   function onErr(err: unknown) {
     setNotice(apiErrorMessage(err));
   }
-
-  const sendMut = useMutation({
-    mutationFn: () =>
-      sendSmsCampaign({
-        name: 'Office SMS',
-        category: 'GENERAL',
-        smsKind: 'SERVICE',
-        body,
-        sendNow: true,
-        audience: { type: audienceType, recipient: 'PARENT', search: search || undefined },
-      }),
-    onSuccess: () => {
-      setConfirm(null);
-      setNotice(
-        'Campaign queued. Delivery will update from the gateway callback — accepted is not delivered.',
-      );
-      void qc.invalidateQueries({ queryKey: ['sms-dash'] });
-    },
-    onError: onErr,
-  });
 
   return (
     <SmsShell notice={notice}>
@@ -161,73 +116,21 @@ export function SmsDesk() {
           loading={dash.isLoading}
           onTestGateway={(id) =>
             testSmsGateway(id)
-              .then(() => setNotice('Gateway configuration valid.'))
+              .then((res) =>
+                setNotice(
+                  res.connected
+                    ? `Gateway connected (${String(res.provider)}).`
+                    : Array.isArray(res.issues) && res.issues.length
+                      ? res.issues.join(' ')
+                      : 'Gateway test finished.',
+                ),
+              )
               .catch(onErr)
           }
         />
       ) : null}
 
-      {section === 'send' ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <SmsPanel title="Composer">
-            <div className="space-y-3">
-              <select
-                value={audienceType}
-                onChange={(e) => setAudienceType(e.target.value)}
-                className="w-full rounded-lg px-3 py-2 text-sm"
-              >
-                {['INDIVIDUAL', 'CLASS', 'SECTION', 'STAFF', 'CUSTOM'].map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search student / admission / mobile"
-                className="w-full rounded-lg px-3 py-2 text-sm"
-              />
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={8}
-                className="w-full rounded-lg px-3 py-2 text-sm"
-              />
-              <p className="text-xs" style={{ color: 'var(--muted-foreground-hex, #64748b)' }}>
-                {segs?.chars ?? 0} characters · {segs?.segments ?? 1} SMS segment
-                {segs?.missing?.length ? ` · missing {${segs.missing.join(', ')}}` : ''}
-              </p>
-              <PrimaryButton
-                type="button"
-                onClick={() =>
-                  previewSmsRecipients({
-                    type: audienceType,
-                    recipient: 'PARENT',
-                    search,
-                    category: 'GENERAL',
-                  })
-                    .then((r) => setConfirm(r))
-                    .catch(onErr)
-                }
-              >
-                Review recipients
-              </PrimaryButton>
-            </div>
-          </SmsPanel>
-          <SmsPanel title="Phone preview">
-            <div
-              className="mx-auto w-64 rounded-[2rem] p-4 text-sm text-white shadow-lg"
-              style={{ background: 'var(--heading, #0f172a)' }}
-            >
-              <p className="text-[10px] uppercase tracking-widest text-slate-400">
-                St. Luke&apos;s School
-              </p>
-              <p className="mt-3 whitespace-pre-wrap leading-relaxed">
-                {String(segs?.preview ?? body)}
-              </p>
-            </div>
-          </SmsPanel>
-        </div>
-      ) : null}
+      {section === 'send' ? <SmsSendPanel onNotice={setNotice} onError={onErr} /> : null}
 
       {section === 'templates' ? (
         <TemplatesPanel
@@ -324,6 +227,7 @@ export function SmsDesk() {
                     <th className="px-3 py-2 text-left">Recipient</th>
                     <th className="px-3 py-2 text-left">Mobile</th>
                     <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">Detail</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -334,6 +238,13 @@ export function SmsDesk() {
                       <td className="px-3 py-2 font-mono text-xs">{String(m.mobile)}</td>
                       <td className="px-3 py-2">
                         <WaBadge value={String(m.status)} />
+                      </td>
+                      <td className="px-3 py-2 text-xs text-slate-500">
+                        {m.providerMessageId
+                          ? `Ref ${String(m.providerMessageId)}`
+                          : m.errorMessage
+                            ? String(m.errorMessage)
+                            : '—'}
                       </td>
                       <td className="px-3 py-2 text-right">
                         {m.status === 'FAILED' ? (
@@ -385,7 +296,15 @@ export function SmsDesk() {
           }
           onTest={(id) =>
             testSmsGateway(id)
-              .then(() => setNotice('Gateway configuration valid.'))
+              .then((res) =>
+                setNotice(
+                  res.connected
+                    ? `Gateway connected (${String(res.provider)}).`
+                    : Array.isArray(res.issues) && res.issues.length
+                      ? res.issues.join(' ')
+                      : 'Gateway test finished.',
+                ),
+              )
               .catch(onErr)
           }
           onDefault={(id) =>
@@ -462,34 +381,6 @@ export function SmsDesk() {
             </label>
           </div>
         </SmsPanel>
-      ) : null}
-
-      {confirm ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md space-y-3 rounded-2xl bg-white p-5 shadow-xl">
-            <h2 className="text-lg font-semibold">Confirm SMS campaign</h2>
-            <p className="text-sm text-slate-600">
-              Recipients: {String(confirm.valid)} · Missing: {String(confirm.missing)} · Segments:{' '}
-              {segs?.segments ?? 1}
-            </p>
-            <p className="text-xs text-slate-500">
-              Messages are queued. Gateway acceptance is not treated as delivered until the callback
-              arrives.
-            </p>
-            <div className="flex justify-end gap-2">
-              <GhostButton type="button" onClick={() => setConfirm(null)}>
-                Cancel
-              </GhostButton>
-              <PrimaryButton
-                type="button"
-                disabled={sendMut.isPending}
-                onClick={() => sendMut.mutate()}
-              >
-                Confirm & send
-              </PrimaryButton>
-            </div>
-          </div>
-        </div>
       ) : null}
     </SmsShell>
   );

@@ -24,6 +24,8 @@ export type SmsBalance = {
   credits?: number;
   amount?: number;
   currency?: string;
+  error?: string;
+  reachable?: boolean;
 };
 
 export interface SmsGatewayProvider {
@@ -80,12 +82,20 @@ export const msg91Provider: SmsGatewayProvider = {
   },
   async getBalance(creds) {
     const key = creds.apiKey || creds.authkey;
-    if (!key) return {};
+    if (!key) return { error: 'MSG91 authkey missing', reachable: false };
     const url = `https://control.msg91.com/api/balance.php?authkey=${encodeURIComponent(key)}&type=4`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    const text = await res.text();
-    const n = Number(text);
-    return Number.isFinite(n) ? { credits: n } : {};
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const text = await res.text();
+      const n = Number(text.trim());
+      if (Number.isFinite(n)) return { credits: n, reachable: true };
+      const hint = /invalid|unauthor|auth/i.test(text)
+        ? 'MSG91 rejected the authkey.'
+        : 'MSG91 did not return a credit balance.';
+      return { error: hint, reachable: res.ok };
+    } catch {
+      return { error: 'Could not reach MSG91.', reachable: false };
+    }
   },
   async sendSms(input, creds, apiUrl) {
     const key = creds.apiKey || creds.authkey;
@@ -148,20 +158,38 @@ export const twilioProvider: SmsGatewayProvider = {
   async getBalance(creds) {
     const sid = creds.accountSid;
     const token = creds.authToken || creds.apiSecret;
-    if (!sid || !token) return {};
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Balance.json`,
-      {
-        headers: {
-          Authorization:
-            'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
+    if (!sid || !token) {
+      return { error: 'Twilio credentials missing', reachable: false };
+    }
+    try {
+      const res = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${sid}/Balance.json`,
+        {
+          headers: {
+            Authorization:
+              'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
+          },
+          signal: AbortSignal.timeout(10000),
         },
-        signal: AbortSignal.timeout(10000),
-      },
-    );
-    if (!res.ok) return {};
-    const json = (await res.json()) as { balance?: string; currency?: string };
-    return { amount: Number(json.balance), currency: json.currency };
+      );
+      if (!res.ok) {
+        return {
+          error: 'Twilio rejected the credentials.',
+          reachable: res.status < 500,
+        };
+      }
+      const json = (await res.json()) as {
+        balance?: string;
+        currency?: string;
+      };
+      return {
+        amount: Number(json.balance),
+        currency: json.currency,
+        reachable: true,
+      };
+    } catch {
+      return { error: 'Could not reach Twilio.', reachable: false };
+    }
   },
   async sendSms(input, creds, apiUrl) {
     const sid = creds.accountSid;
@@ -201,7 +229,7 @@ export const twilioProvider: SmsGatewayProvider = {
         accepted: false,
         status: 'FAILED',
         errorCode: String(res.status),
-        errorMessage: json.message,
+        errorMessage: json.message || `Twilio HTTP ${res.status}`,
         errorClass: res.status >= 500 ? 'TEMPORARY' : 'PERMANENT',
         raw: json,
       };
@@ -225,8 +253,24 @@ export const customHttpProvider: SmsGatewayProvider = {
   async validateConfiguration(creds, apiUrl) {
     return Boolean(apiUrl && (creds.apiKey || creds.token));
   },
-  async getBalance() {
-    return {};
+  async getBalance(_creds, apiUrl) {
+    if (!apiUrl)
+      return { error: 'Custom HTTP API URL missing', reachable: false };
+    try {
+      const res = await fetch(apiUrl, {
+        method: 'GET',
+        signal: AbortSignal.timeout(10000),
+      });
+      return {
+        reachable: true,
+        error: res.status >= 500 ? `Gateway HTTP ${res.status}` : undefined,
+      };
+    } catch {
+      return {
+        error: 'Could not reach the custom HTTP gateway.',
+        reachable: false,
+      };
+    }
   },
   async sendSms(input, creds, apiUrl) {
     if (!apiUrl) {
@@ -285,8 +329,12 @@ export const apitxtProvider: SmsGatewayProvider = {
   async validateConfiguration(creds) {
     return Boolean(creds.apiKey || creds.authkey);
   },
-  async getBalance() {
-    return {};
+  getBalance() {
+    return Promise.resolve({
+      reachable: false,
+      error:
+        'Apitxt does not expose a credit-balance API. It is for login OTP only.',
+    });
   },
   async sendSms(input, creds, apiUrl) {
     const otp = extractOtpCode(input.body);
