@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { SCHOOL_SIS_PERMISSION_MANAGE } from './school-sis.constants';
 import { SUPER_ROLE_SLUGS } from './school-sis-iam.catalog';
+import { resolveSchoolStaffIdForUser } from './school-sis-staff-lookup';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 
 @Injectable()
@@ -72,28 +73,50 @@ export class SchoolSisAccessService {
       select: { sectionId: true },
     });
     const fromScope = scopes.map((s) => s.sectionId!).filter(Boolean);
-    const staff = await this.prisma.schoolPersonAccount.findFirst({
-      where: { tenantId, userId, personType: 'STAFF', staffId: { not: null } },
+    const staffId = await resolveSchoolStaffIdForUser(this.prisma, tenantId, {
+      sub: userId,
     });
-    if (staff?.staffId) {
+    if (staffId) {
       const assigned = await this.prisma.schoolClassTeacherAssignment.findMany({
-        where: { tenantId, staffId: staff.staffId, deletedAt: null },
+        where: { tenantId, staffId, deletedAt: null },
         select: { sectionId: true },
       });
       fromScope.push(...assigned.map((a) => a.sectionId));
       const subjects =
         await this.prisma.schoolSubjectTeacherAssignment.findMany({
-          where: { tenantId, staffId: staff.staffId, deletedAt: null },
+          where: { tenantId, staffId, deletedAt: null },
           select: { sectionId: true },
         });
       fromScope.push(...subjects.map((a) => a.sectionId));
       const since = new Date();
       since.setUTCDate(since.getUTCDate() - 1);
       const subs = await this.prisma.schoolAttendanceSubstitute.findMany({
-        where: { tenantId, staffId: staff.staffId, date: { gte: since } },
+        where: { tenantId, staffId, date: { gte: since } },
         select: { sectionId: true },
       });
       fromScope.push(...subs.map((a) => a.sectionId));
+      const year = await this.prisma.schoolAcademicYear.findFirst({
+        where: { tenantId, deletedAt: null, status: 'CURRENT' },
+        select: { id: true },
+      });
+      if (year) {
+        const plans = await this.prisma.schoolTimetablePlan.findMany({
+          where: { tenantId, academicYearId: year.id },
+          select: { id: true },
+        });
+        if (plans.length) {
+          const slots = await this.prisma.schoolTimetableSlot.findMany({
+            where: {
+              tenantId,
+              staffId,
+              planId: { in: plans.map((plan) => plan.id) },
+            },
+            select: { sectionId: true },
+            distinct: ['sectionId'],
+          });
+          fromScope.push(...slots.map((slot) => slot.sectionId));
+        }
+      }
     }
     return [...new Set(fromScope)];
   }

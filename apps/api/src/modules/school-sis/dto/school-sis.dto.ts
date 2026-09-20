@@ -70,10 +70,10 @@ export class CreateSchoolStudentDto {
 }
 
 export class CreateSchoolStaffDto {
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(40)
-  employeeCode!: string;
+  employeeCode?: string;
 
   @IsString()
   @MinLength(2)

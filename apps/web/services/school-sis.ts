@@ -300,8 +300,16 @@ export async function fetchSchoolSisStaffOne(id: string) {
   return data;
 }
 
+export async function fetchSchoolSisNextStaffCode(staffType?: string) {
+  const { data } = await api.get<{ employeeCode: string; staffType: string }>(
+    '/v1/school-sis/staff/next-employee-code',
+    { params: { staffType } },
+  );
+  return data;
+}
+
 export async function createSchoolSisStaff(payload: {
-  employeeCode: string;
+  employeeCode?: string;
   fullName: string;
   staffType?: string;
   designation?: string;

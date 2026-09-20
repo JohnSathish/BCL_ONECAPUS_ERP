@@ -34,6 +34,7 @@ import { schoolPeopleNav } from '@/lib/school-sis/people-routes';
 import {
   createSchoolSisStaff,
   fetchSchoolSisMasters,
+  fetchSchoolSisNextStaffCode,
   fetchSchoolSisStaffOne,
   patchSchoolSisStaff,
   removeSchoolSisStaffPhoto,
@@ -335,6 +336,13 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
     if (query.data) setForm(hydrate(query.data));
   }, [query.data]);
 
+  const nextCode = useQuery({
+    queryKey: ['school-sis-staff-next-code', form.staffType],
+    queryFn: () => fetchSchoolSisNextStaffCode(form.staffType),
+    enabled: enabled && isNew,
+  });
+  const assignedCode = isNew ? (nextCode.data?.employeeCode ?? '') : form.employeeCode;
+
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
@@ -351,7 +359,6 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
       const extrasJson = compactStaffExtras(form.extras);
       if (isNew) {
         const created = await createSchoolSisStaff({
-          employeeCode: form.employeeCode,
           fullName: form.fullName,
           staffType: form.staffType,
           designation: form.designation,
@@ -518,13 +525,19 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
             <p className="mt-1 text-[11px] text-slate-400">JPG, PNG, SVG (Max 4MB)</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Field label="Teacher ID" required>
+            <Field label={form.staffType === 'NON_TEACHING' ? 'Staff ID' : 'Teacher ID'}>
               <TextInput
-                value={form.employeeCode}
-                onChange={(e) => set('employeeCode', e.target.value)}
-                required
-                disabled={readOnly}
+                value={assignedCode || (isNew ? 'Generating…' : '')}
+                readOnly
+                disabled
+                className="bg-slate-50 font-mono tracking-wide"
               />
+              <span className="mt-1 block text-[11px] text-slate-400">
+                Assigned automatically
+                {form.staffType === 'NON_TEACHING'
+                  ? ' as SLS-NTC-001, 002…'
+                  : ' as SLS-TCH-001, 002…'}
+              </span>
             </Field>
             <Field label="Full Name" required>
               <TextInput
@@ -1075,7 +1088,6 @@ export function SchoolSisStaffProfile({ staffId }: { staffId: string }) {
 
 function payloadFromForm(form: FormState) {
   return {
-    employeeCode: form.employeeCode,
     fullName: form.fullName,
     staffType: form.staffType,
     designation: form.designation,

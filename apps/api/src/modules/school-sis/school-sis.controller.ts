@@ -381,6 +381,18 @@ export class SchoolSisController {
     return this.sis.listStaff(user.tid);
   }
 
+  @Get('staff/next-employee-code')
+  @RequireAnyPermission(
+    SCHOOL_SIS_PERMISSION_READ,
+    SCHOOL_SIS_PERMISSION_MANAGE,
+  )
+  nextStaffEmployeeCode(
+    @CurrentUser() user: JwtUser,
+    @Query('staffType') staffType?: string,
+  ) {
+    return this.sis.previewStaffEmployeeCode(user.tid, staffType);
+  }
+
   @Post('staff')
   @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
   createStaff(@CurrentUser() user: JwtUser, @Body() dto: CreateSchoolStaffDto) {
@@ -715,7 +727,7 @@ export class SchoolSisController {
     SCHOOL_SIS_PERMISSION_MANAGE,
   )
   myTimetable(@CurrentUser() user: JwtUser) {
-    return this.timetable.myTimetable(user.tid, user.email);
+    return this.timetable.myTimetable(user.tid, user);
   }
 
   @Get('timetable/print')

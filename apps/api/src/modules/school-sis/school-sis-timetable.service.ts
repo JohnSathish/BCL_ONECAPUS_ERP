@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from './school-sis.service';
+import { resolveSchoolStaffIdForUser } from './school-sis-staff-lookup';
 import type {
   BulkSchoolTimetableSlotsDto,
   CopySchoolTimetableDto,
@@ -893,19 +894,20 @@ export class SchoolSisTimetableService {
     };
   }
 
-  async myTimetable(tenantId: string, email?: string | null) {
-    if (!email) throw new NotFoundException('No staff email on this account');
-    const staff = await this.prisma.schoolStaff.findFirst({
-      where: {
-        tenantId,
-        deletedAt: null,
-        email: { equals: email, mode: 'insensitive' },
-      },
-    });
-    if (!staff)
+  async myTimetable(
+    tenantId: string,
+    user: { sub: string; email?: string | null },
+  ) {
+    const staffId = await resolveSchoolStaffIdForUser(
+      this.prisma,
+      tenantId,
+      user,
+    );
+    if (!staffId) {
       throw new NotFoundException('No teacher record matches this login');
-    const grid = await this.teacherGrid(tenantId, staff.id, false);
-    const today = await this.todayBoard(tenantId, { staffId: staff.id });
+    }
+    const grid = await this.teacherGrid(tenantId, staffId, false);
+    const today = await this.todayBoard(tenantId, { staffId });
     return { ...grid, today };
   }
 

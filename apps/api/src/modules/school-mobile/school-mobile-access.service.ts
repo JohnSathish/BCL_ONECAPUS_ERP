@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisService } from '../school-sis/school-sis.service';
+import { resolveSchoolStaffIdForUser } from '../school-sis/school-sis-staff-lookup';
 import {
   SCHOOL_MOBILE_PERMISSION_MANAGE,
   SCHOOL_MOBILE_PERMISSION_PARENT,
@@ -195,17 +196,7 @@ export class SchoolMobileAccessService {
     tenantId: string,
     user: JwtUser,
   ): Promise<string | null> {
-    const email = user.email?.trim().toLowerCase();
-    if (!email) return null;
-    const staff = await this.prisma.schoolStaff.findFirst({
-      where: {
-        tenantId,
-        deletedAt: null,
-        email: { equals: email, mode: 'insensitive' },
-      },
-      select: { id: true },
-    });
-    return staff?.id ?? null;
+    return resolveSchoolStaffIdForUser(this.prisma, tenantId, user);
   }
 }
 

@@ -384,16 +384,32 @@ export class SchoolMobileHomeService {
       section?: { id?: string; name?: string; grade?: { name?: string } };
       bell?: { startTime?: string; endTime?: string; sortOrder?: number };
     };
-    const slots = ((grid as { slots?: Slot[] } | null)?.slots ?? []) as Slot[];
+    let slots = ((grid as { slots?: Slot[] } | null)?.slots ?? []) as Slot[];
+    if (!slots.length) {
+      try {
+        const fallback = await this.timetable.teacherGrid(
+          tenantId,
+          staffId,
+          false,
+        );
+        slots = (fallback.slots ?? []) as Slot[];
+      } catch {
+        slots = [];
+      }
+    }
     const { dayOfWeek, minutes } = istNowParts();
-    const assignments = await this.prisma.schoolClassTeacherAssignment.findMany(
-      {
+    const [assignments, subjectAssignments] = await Promise.all([
+      this.prisma.schoolClassTeacherAssignment.findMany({
         where: { tenantId, staffId, deletedAt: null },
         include: { section: { include: { grade: true } } },
-      },
-    );
+      }),
+      this.prisma.schoolSubjectTeacherAssignment.findMany({
+        where: { tenantId, staffId, deletedAt: null },
+        include: { section: { include: { grade: true } } },
+      }),
+    ]);
     const sectionMap = new Map<string, { id: string; label: string }>();
-    for (const row of assignments) {
+    for (const row of [...assignments, ...subjectAssignments]) {
       sectionMap.set(row.sectionId, {
         id: row.sectionId,
         label: `${row.section.grade.name} ${row.section.name}`.trim(),

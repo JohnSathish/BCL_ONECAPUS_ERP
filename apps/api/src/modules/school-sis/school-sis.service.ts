@@ -12,6 +12,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { resolveTenantUploadRoot } from '../../common/uploads/upload-paths';
 import { SchoolSisLicenseService } from './school-sis-license.service';
+import { nextSchoolStaffEmployeeCode } from './school-sis-staff-code';
 import {
   SCHOOL_ADMISSION_NUMBER_PREFIX,
   SCHOOL_SIS_PRODUCT,
@@ -765,9 +766,6 @@ export class SchoolSisService {
       return await this.prisma.schoolStaff.update({
         where: { id: staffId },
         data: {
-          ...(dto.employeeCode !== undefined
-            ? { employeeCode: dto.employeeCode.trim().toUpperCase() }
-            : {}),
           ...(dto.fullName !== undefined
             ? { fullName: dto.fullName.trim() }
             : {}),
@@ -832,26 +830,66 @@ export class SchoolSisService {
     }
   }
 
+  async previewStaffEmployeeCode(tenantId: string, staffType?: string) {
+    await this.assertSecondarySisTenant(tenantId);
+    const type = staffType === 'NON_TEACHING' ? 'NON_TEACHING' : 'TEACHING';
+    const employeeCode = await this.nextStaffEmployeeCode(tenantId, type);
+    return { employeeCode, staffType: type };
+  }
+
   async createStaff(tenantId: string, dto: CreateSchoolStaffDto) {
     await this.assertSecondarySisTenant(tenantId);
     await this.licenses.assertStaffCapacity(tenantId);
-    try {
-      return await this.prisma.schoolStaff.create({
-        data: {
-          tenantId,
-          employeeCode: dto.employeeCode.trim().toUpperCase(),
-          fullName: dto.fullName.trim(),
-          staffType: dto.staffType ?? 'TEACHING',
-          designation: dto.designation?.trim() || null,
-          department: dto.department?.trim() || null,
-          phone: dto.phone?.trim() || null,
-          email: dto.email?.trim() || null,
-          extrasJson: {},
-        },
-      });
-    } catch {
-      throw new ConflictException('Employee code already exists');
+    const staffType =
+      dto.staffType === 'NON_TEACHING' ? 'NON_TEACHING' : 'TEACHING';
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const employeeCode = await this.nextStaffEmployeeCode(
+        tenantId,
+        staffType,
+      );
+      try {
+        return await this.prisma.schoolStaff.create({
+          data: {
+            tenantId,
+            employeeCode,
+            fullName: dto.fullName.trim(),
+            staffType,
+            designation: dto.designation?.trim() || null,
+            department: dto.department?.trim() || null,
+            phone: dto.phone?.trim() || null,
+            email: dto.email?.trim() || null,
+            extrasJson: {},
+          },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002' &&
+          attempt < 11
+        ) {
+          continue;
+        }
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          throw new ConflictException('Employee code already exists');
+        }
+        throw err;
+      }
     }
+    throw new ConflictException('Employee code already exists');
+  }
+
+  private async nextStaffEmployeeCode(tenantId: string, staffType: string) {
+    const rows = await this.prisma.schoolStaff.findMany({
+      where: { tenantId },
+      select: { employeeCode: true },
+    });
+    return nextSchoolStaffEmployeeCode(
+      rows.map((row) => row.employeeCode),
+      staffType,
+    );
   }
 
   async enroll(tenantId: string, dto: EnrollStudentDto) {
