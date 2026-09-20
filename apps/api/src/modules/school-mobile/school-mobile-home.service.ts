@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisAttendanceService } from '../school-sis/school-sis-attendance.service';
@@ -478,6 +478,63 @@ export class SchoolMobileHomeService {
         percent: attBySection.get(row.id) ?? null,
       })),
     };
+  }
+
+  async leaveTypes(user: JwtUser) {
+    this.access.assertAccess(user);
+    const settings = await this.attendanceSvc.getSettings(user.tid);
+    return (settings.leaveTypes ?? []).filter(
+      (row: { active?: boolean }) => row.active !== false,
+    );
+  }
+
+  async leaves(user: JwtUser, childId?: string) {
+    this.access.assertAccess(user);
+    const studentId = await this.access.resolveStudentId(
+      user.tid,
+      user,
+      childId,
+    );
+    if (!studentId) return [];
+    return this.attendanceSvc.listLeaves(user.tid, undefined, studentId);
+  }
+
+  async applyLeave(
+    user: JwtUser,
+    dto: {
+      leaveTypeId: string;
+      fromDate: string;
+      toDate: string;
+      reason?: string;
+      childId?: string;
+    },
+  ) {
+    this.access.assertAccess(user);
+    const studentId = await this.access.resolveStudentId(
+      user.tid,
+      user,
+      dto.childId,
+    );
+    if (!studentId) {
+      throw new ForbiddenException('No linked student for leave.');
+    }
+    return this.attendanceSvc.createLeave(
+      user.tid,
+      {
+        studentId,
+        leaveTypeId: dto.leaveTypeId,
+        fromDate: dto.fromDate,
+        toDate: dto.toDate,
+        reason: dto.reason,
+      },
+      {
+        userId: user.sub,
+        email: user.email,
+        manage: false,
+        canApprove: false,
+        canLock: false,
+      },
+    );
   }
 
   private clockLabel(hhmm?: string | null) {

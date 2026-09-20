@@ -1,0 +1,141 @@
+.school-sis-portal {
+  --portal-pad-bottom: 4.75rem;
+}
+
+@media (min-width: 1024px) {
+  .school-sis-portal {
+    --portal-pad-bottom: 0px;
+  }
+}
+
+.school-sis-portal .portal-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--background, #f5f7fb);
+  color: var(--text, #1e293b);
+}
+
+.school-sis-portal .portal-header {
+  flex-shrink: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.6rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #fff);
+}
+
+.school-sis-portal .portal-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.school-sis-portal .portal-sidebar {
+  display: none;
+  width: var(--school-erp-sidebar-width, 16.5rem);
+  flex-shrink: 0;
+  flex-direction: column;
+  overflow: auto;
+  border-right: 1px solid var(--border-color, #e2e8f0);
+  background: var(--sidebar-background, #fff);
+  color: var(--sidebar-foreground, #1e293b);
+}
+
+@media (min-width: 1024px) {
+  .school-sis-portal .portal-sidebar {
+    display: flex;
+  }
+}
+
+.school-sis-portal .portal-main {
+  min-width: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 1rem 1rem var(--portal-pad-bottom);
+}
+
+@media (min-width: 768px) {
+  .school-sis-portal .portal-main {
+    padding: 1.25rem 1.5rem var(--portal-pad-bottom);
+  }
+}
+
+.school-sis-portal .portal-bottom {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.15rem;
+  padding: 0.35rem 0.4rem calc(0.35rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface, #fff);
+}
+
+@media (min-width: 1024px) {
+  .school-sis-portal .portal-bottom {
+    display: none;
+  }
+}
+
+.school-sis-portal .portal-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  color: var(--sidebar-foreground, #334155);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.school-sis-portal .portal-nav-link:hover {
+  background: var(--sidebar-hover, #f1f5f9);
+}
+
+.school-sis-portal .portal-nav-link.is-active {
+  background: var(--sidebar-active, #eef2ff);
+  color: var(--sidebar-active-foreground, var(--school-erp-primary, #1a365d));
+}
+
+.school-sis-portal .portal-card {
+  border: 1px solid var(--border-subtle, #e8edf5);
+  border-radius: 16px;
+  background: var(--surface, #fff);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--heading, #0f172a) 6%, transparent);
+}
+
+.school-sis-portal .portal-empty {
+  padding: 1.25rem;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.875rem;
+}
+
+.school-sis-portal table.portal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.school-sis-portal table.portal-table th,
+.school-sis-portal table.portal-table td {
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--border-subtle, #e8edf5);
+  text-align: left;
+}
+
+.school-sis-portal table.portal-table th {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

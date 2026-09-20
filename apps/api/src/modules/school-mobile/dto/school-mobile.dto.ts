@@ -1,10 +1,12 @@
 import {
   IsBoolean,
+  IsDateString,
   IsIn,
   IsInt,
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -316,4 +318,24 @@ export class PatchSchoolMobileInboxDto {
   @IsOptional()
   @IsBoolean()
   archived?: boolean;
+}
+
+export class SchoolMobileLeaveDto {
+  @IsUUID()
+  leaveTypeId!: string;
+
+  @IsDateString()
+  fromDate!: string;
+
+  @IsDateString()
+  toDate!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+
+  @IsOptional()
+  @IsUUID()
+  childId?: string;
 }

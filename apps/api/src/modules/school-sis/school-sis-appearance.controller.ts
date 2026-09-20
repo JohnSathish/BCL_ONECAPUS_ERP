@@ -23,6 +23,7 @@ import {
   SCHOOL_SIS_PERMISSION_MANAGE,
   SCHOOL_SIS_PERMISSION_READ,
 } from './school-sis.constants';
+import { SCHOOL_MOBILE_ACCESS_PERMISSIONS } from '../school-mobile/school-mobile.constants';
 import { SchoolSisAppearanceService } from './school-sis-appearance.service';
 import {
   ImportAppearanceDto,
@@ -49,7 +50,7 @@ export class SchoolSisAppearanceController {
   }
 
   @Get('published')
-  @RequireAnyPermission(...VIEW)
+  @RequireAnyPermission(...VIEW, ...SCHOOL_MOBILE_ACCESS_PERMISSIONS)
   published(@CurrentUser() user: JwtUser) {
     return this.appearance.published(user.tid);
   }

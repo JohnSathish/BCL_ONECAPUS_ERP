@@ -220,6 +220,38 @@ export function canAccessPath(
       canAccessAdminPortal(roles, permissions)
     );
   }
+  if (path.startsWith('/school-sis-portal/apply')) return true;
+  if (path.startsWith('/school-sis-portal')) {
+    const student =
+      roles.includes('school-student') ||
+      roles.includes('school-parent') ||
+      (permissions ?? []).includes('school-mobile:student') ||
+      (permissions ?? []).includes('school-mobile:parent');
+    const principal =
+      roles.includes('principal') ||
+      roles.includes('vice-principal') ||
+      (permissions ?? []).includes('school-mobile:manage');
+    const admin =
+      roles.includes('college-admin') ||
+      roles.includes('school-admin') ||
+      roles.includes('super-admin') ||
+      roles.includes('erp-administrator');
+    const staff =
+      roles.includes('teacher') ||
+      roles.includes('office-staff') ||
+      (permissions ?? []).includes('school-mobile:staff') ||
+      (permissions ?? []).includes('school-sis:read');
+    if (path === '/school-sis-portal' || path === '/school-sis-portal/me') {
+      return student || staff || principal || admin;
+    }
+    if (path.startsWith('/school-sis-portal/student'))
+      return student && !principal && !admin;
+    if (path.startsWith('/school-sis-portal/staff'))
+      return staff && !principal && !admin;
+    if (path.startsWith('/school-sis-portal/principal'))
+      return principal && !admin;
+    return false;
+  }
   if (
     path.startsWith('/admissions-portal') ||
     path.startsWith('/school-admissions-portal')

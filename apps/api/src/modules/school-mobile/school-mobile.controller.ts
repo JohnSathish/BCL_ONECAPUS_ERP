@@ -42,7 +42,10 @@ import {
   MobileBoardingDto,
   MobileSosDto,
 } from '../school-sis/dto/school-transport.dto';
-import { SCHOOL_SIS_PERMISSION_MANAGE } from '../school-sis/school-sis.constants';
+import {
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  SCHOOL_SIS_PERMISSION_READ,
+} from '../school-sis/school-sis.constants';
 import {
   SIS_ATTENDANCE_MARK,
   SIS_ATTENDANCE_VIEW,
@@ -67,6 +70,7 @@ import {
   SchoolMobileBroadcastDto,
   SchoolMobileChangePasswordDto,
   SchoolMobileFeedbackDto,
+  SchoolMobileLeaveDto,
   SchoolMobileLoginDto,
   UpsertSchoolMobilePrayerDto,
 } from './dto/school-mobile.dto';
@@ -81,6 +85,11 @@ import { SchoolMobilePrayerService } from './school-mobile-prayer.service';
 import { SchoolMobileSettingsService } from './school-mobile-settings.service';
 
 const ACCESS = [...SCHOOL_MOBILE_ACCESS_PERMISSIONS, 'school-sis:read'];
+const OFFICE = [
+  ...ACCESS,
+  SCHOOL_SIS_PERMISSION_READ,
+  SCHOOL_SIS_PERMISSION_MANAGE,
+] as const;
 
 @ApiTags('school-mobile')
 @Controller({ path: 'school-mobile', version: '1' })
@@ -436,22 +445,14 @@ export class SchoolMobileController {
 
   @Get('principal/desk')
   @ApiBearerAuth()
-  @RequireAnyPermission(
-    SCHOOL_MOBILE_PERMISSION_MANAGE,
-    'school-sis:manage',
-    '*',
-  )
+  @RequireAnyPermission(...OFFICE)
   principalDesk(@CurrentUser() user: JwtUser) {
     return this.principal.desk(user);
   }
 
   @Get('principal/students')
   @ApiBearerAuth()
-  @RequireAnyPermission(
-    SCHOOL_MOBILE_PERMISSION_MANAGE,
-    'school-sis:manage',
-    '*',
-  )
+  @RequireAnyPermission(...OFFICE)
   principalStudents(
     @CurrentUser() user: JwtUser,
     @Query('q') q?: string,
@@ -462,68 +463,69 @@ export class SchoolMobileController {
 
   @Get('principal/teachers')
   @ApiBearerAuth()
-  @RequireAnyPermission(
-    SCHOOL_MOBILE_PERMISSION_MANAGE,
-    'school-sis:manage',
-    '*',
-  )
+  @RequireAnyPermission(...OFFICE)
   principalTeachers(@CurrentUser() user: JwtUser, @Query('q') q?: string) {
     return this.principal.teachers(user, q);
   }
 
   @Get('principal/academics')
   @ApiBearerAuth()
-  @RequireAnyPermission(
-    SCHOOL_MOBILE_PERMISSION_MANAGE,
-    'school-sis:manage',
-    '*',
-  )
+  @RequireAnyPermission(...OFFICE)
   principalAcademics(@CurrentUser() user: JwtUser) {
     return this.principal.academics(user);
   }
 
   @Get('principal/examinations')
   @ApiBearerAuth()
-  @RequireAnyPermission(
-    SCHOOL_MOBILE_PERMISSION_MANAGE,
-    'school-sis:manage',
-    '*',
-  )
+  @RequireAnyPermission(...OFFICE)
   principalExams(@CurrentUser() user: JwtUser) {
     return this.principal.examinations(user);
   }
 
   @Get('principal/attendance')
   @ApiBearerAuth()
-  @RequireAnyPermission(
-    SCHOOL_MOBILE_PERMISSION_MANAGE,
-    'school-sis:manage',
-    '*',
-  )
+  @RequireAnyPermission(...OFFICE)
   principalAttendance(@CurrentUser() user: JwtUser) {
     return this.principal.attendanceOverview(user);
   }
 
   @Get('principal/fees')
   @ApiBearerAuth()
-  @RequireAnyPermission(
-    SCHOOL_MOBILE_PERMISSION_MANAGE,
-    'school-sis:manage',
-    '*',
-  )
+  @RequireAnyPermission(...OFFICE)
   principalFees(@CurrentUser() user: JwtUser) {
     return this.principal.feesOverview(user);
   }
 
   @Get('principal/notices')
   @ApiBearerAuth()
-  @RequireAnyPermission(
-    SCHOOL_MOBILE_PERMISSION_MANAGE,
-    'school-sis:manage',
-    '*',
-  )
+  @RequireAnyPermission(...OFFICE)
   principalNotices(@CurrentUser() user: JwtUser) {
     return this.principal.notices(user);
+  }
+
+  @Get('leave-types')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  leaveTypes(@CurrentUser() user: JwtUser) {
+    return this.home.leaveTypes(user);
+  }
+
+  @Get('leave')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  leaves(
+    @CurrentUser() user: JwtUser,
+    @Query('childId') childId?: string,
+    @Headers('x-school-child-id') childHeader?: string,
+  ) {
+    return this.home.leaves(user, childId || childHeader);
+  }
+
+  @Post('leave')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  applyLeave(@CurrentUser() user: JwtUser, @Body() dto: SchoolMobileLeaveDto) {
+    return this.home.applyLeave(user, dto);
   }
 
   @Get('prayer')

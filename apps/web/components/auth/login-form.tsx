@@ -11,6 +11,7 @@ import {
   canAccessPath,
   resolveHomePath,
 } from '@/lib/permissions/portal-access';
+import { resolveSchoolSisHomePath } from '@/lib/school-sis/portal-access';
 import { getWebDeviceFingerprint } from '@/lib/device-fingerprint';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import type { ApiStartupRetryOptions } from '@/lib/http/wait-for-api';
@@ -221,15 +222,16 @@ export function LoginForm({
           context?.institutionType === 'SCHOOL' ||
           schoolSis ||
           context?.schoolProduct === 'SECONDARY_SIS';
-        const schoolHome = schoolSession
-          ? canAccessAdminPortal(roles, permissions)
-            ? '/admin'
-            : canAccessApplicantPortal(roles, permissions)
-              ? '/school-admissions-portal/dashboard'
-              : roles.includes('school-student') || roles.includes('school-parent')
-                ? '/school-sis-portal/me'
+        const secondarySis = schoolSis || context?.schoolProduct === 'SECONDARY_SIS';
+        const schoolHome = secondarySis
+          ? resolveSchoolSisHomePath(roles, permissions)
+          : schoolSession
+            ? canAccessAdminPortal(roles, permissions)
+              ? '/admin'
+              : canAccessApplicantPortal(roles, permissions)
+                ? '/school-admissions-portal/dashboard'
                 : '/admin'
-          : null;
+            : null;
         const requestedPath = postLoginPath ?? queryNextPath;
         const destination =
           (requestedPath && canAccessPath(roles, requestedPath, permissions)
@@ -238,7 +240,11 @@ export function LoginForm({
           schoolHome ??
           resolveHomePath(roles, permissions);
         // School student home has no portal shell — keep the in-memory session.
-        if (destination === '/school-sis-portal/me' || destination === '/change-password') {
+        if (
+          destination === '/school-sis-portal/me' ||
+          destination.startsWith('/school-sis-portal/') ||
+          destination === '/change-password'
+        ) {
           router.replace(destination);
           return;
         }

@@ -503,7 +503,7 @@
 .sls-tab.is-active {
   border-color: var(--primary-hex, #1a365d);
   background: var(--primary-hex, #1a365d);
-  color: var(--primary-foreground-hex, #fff);
+  color: var(--primary-foreground-hex, #fff) !important;
   box-shadow: 0 6px 14px color-mix(in srgb, var(--primary-hex, #1a365d) 24%, transparent);
 }
 

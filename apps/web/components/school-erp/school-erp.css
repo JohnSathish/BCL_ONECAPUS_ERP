@@ -1214,7 +1214,7 @@ html:has(.school-erp-shell.is-sls) {
   color: inherit;
 }
 
-.school-erp-shell.is-sls .school-erp-main-inner a:not([class*='bg-']):not(.sls-cta):not(.sls-kpi) {
+.school-erp-shell.is-sls .school-erp-main-inner a:not([class*='bg-']):not(.sls-cta):not(.sls-kpi):not(.sls-tab):not(.sls-btn-primary):not(.sls-register-primary) {
   color: var(--school-erp-primary);
 }
 
@@ -1238,6 +1238,8 @@ html:has(.school-erp-shell.is-sls) {
 
 .school-erp-shell.is-sls .sls-cta,
 .school-erp-shell.is-sls a.sls-cta,
+.school-erp-shell.is-sls a.sls-tab.is-active,
+.school-erp-shell.is-sls .sls-tab.is-active,
 .school-erp-shell.is-sls a[class*='text-white'],
 .school-erp-shell.is-sls button[class*='text-white'],
 .school-erp-shell.is-sls summary[class*='text-white'] {

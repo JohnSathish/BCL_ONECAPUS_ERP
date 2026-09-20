@@ -15,6 +15,8 @@ import { evaluatePasswordPolicy } from '@/utils/password-policy';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 import { resolveHomePath } from '@/lib/permissions/portal-access';
+import { isSecondarySchoolSisSession } from '@/lib/school-erp/product';
+import { resolveSchoolSisHomePath } from '@/lib/school-sis/portal-access';
 
 function isLibraryKioskHost() {
   return (
@@ -134,7 +136,7 @@ export default function ForceChangePasswordPage() {
       return;
     }
     if (schoolSelf) {
-      window.location.replace('/school-sis-portal/me');
+      window.location.replace('/school-sis-portal/student');
     }
   }, [
     hasHydrated,
@@ -180,9 +182,13 @@ export default function ForceChangePasswordPage() {
         const nextPerms = next.user.permissions ?? [];
         const dest = isLibraryKioskHost()
           ? '/library-desk'
-          : nextRoles.includes('school-student') || nextRoles.includes('school-parent')
-            ? '/school-sis-portal/me'
-            : resolveHomePath(nextRoles, nextPerms);
+          : isSecondarySchoolSisSession({
+                hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+              })
+            ? resolveSchoolSisHomePath(nextRoles, nextPerms)
+            : nextRoles.includes('school-student') || nextRoles.includes('school-parent')
+              ? '/school-sis-portal/student'
+              : resolveHomePath(nextRoles, nextPerms);
         // Soft navigate so the new in-memory session is not wiped by a full reload.
         router.replace(dest);
         return;

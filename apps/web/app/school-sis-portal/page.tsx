@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { resolveSchoolSisHomePath } from '@/lib/school-sis/portal-access';
 
-export default function SchoolSisMeRedirect() {
+export default function SchoolSisPortalIndex() {
   const router = useRouter();
   const { session, isReady } = useAuth();
 
