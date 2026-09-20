@@ -46,16 +46,7 @@ export function AttendanceShell({
             ? pathname === pathOnly
             : pathname === pathOnly || pathname?.startsWith(`${pathOnly}/`);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'rounded-full px-3.5 py-1.5 text-xs font-semibold ring-1 sm:text-sm',
-                active
-                  ? 'bg-[#1e3a8a] text-white ring-[#1e3a8a] shadow-sm'
-                  : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50',
-              )}
-            >
+            <Link key={item.href} href={item.href} className={cn('sls-tab', active && 'is-active')}>
               {item.label}
             </Link>
           );
@@ -88,13 +79,22 @@ export function AttCard({
   );
 }
 
+export const STATUS_TONE: Record<string, string> = {
+  PRESENT: 'present',
+  ABSENT: 'absent',
+  LATE: 'late',
+  HALF_DAY: 'holiday',
+  LEAVE: 'leave',
+  EXCUSED: 'excused',
+};
+
 export const STATUS_BTN: Record<string, string> = {
-  PRESENT: 'bg-emerald-600 text-white ring-emerald-600',
-  ABSENT: 'bg-rose-600 text-white ring-rose-600',
-  LATE: 'bg-amber-500 text-white ring-amber-500',
-  HALF_DAY: 'bg-sky-600 text-white ring-sky-600',
-  LEAVE: 'bg-violet-600 text-white ring-violet-600',
-  EXCUSED: 'bg-slate-700 text-white ring-slate-700',
+  PRESENT: 'is-present',
+  ABSENT: 'is-absent',
+  LATE: 'is-late',
+  HALF_DAY: 'is-holiday',
+  LEAVE: 'is-leave',
+  EXCUSED: 'is-excused',
 };
 
 export const STATUS_BADGE: Record<string, string> = {

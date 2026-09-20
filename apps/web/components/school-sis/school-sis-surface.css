@@ -1,24 +1,25 @@
-/* St. Luke's SIS — professional surfaces for every module (not TPS / college). */
+/* St. Luke's SIS — global control borders + surfaces (not TPS / college). */
 
 .school-erp-shell.is-sls {
-  --sls-hairline: color-mix(in srgb, var(--heading, #0f172a) 7%, transparent);
-  --sls-soft-shadow: 0 10px 28px color-mix(in srgb, var(--heading, #0f172a) 7%, transparent);
+  --sls-hairline: var(--border-subtle, #e8edf5);
+  --sls-soft-shadow: 0 8px 24px color-mix(in srgb, var(--heading, #0f172a) 6%, transparent);
   --sls-fill: color-mix(in srgb, var(--school-erp-primary, #1a365d) 5.5%, var(--surface, #fff));
+  --sls-control-radius: 10px;
+  --sls-card-radius: 16px;
 }
 
-/* Soft cards / panels instead of outlined boxes. Keep alert colours. */
+/* Keep alert colours. Do not strip slate borders — they map to the token system. */
 .school-erp-shell.is-sls .school-erp-main-inner [class*='border-slate-200'],
 .school-erp-shell.is-sls .school-erp-main-inner [class*='border-slate-100'],
 .school-erp-shell.is-sls .school-erp-main-inner [class*='border-white/70'] {
-  border-color: transparent !important;
+  border-color: var(--border-color) !important;
 }
 
 .school-erp-shell.is-sls .school-erp-main-inner [class*='border-rose-'],
 .school-erp-shell.is-sls .school-erp-main-inner [class*='border-emerald-'],
 .school-erp-shell.is-sls .school-erp-main-inner [class*='border-amber-'],
 .school-erp-shell.is-sls .school-erp-main-inner [class*='border-red-'] {
-  border-color: inherit !important;
-  box-shadow: none !important;
+  border-color: inherit;
 }
 
 .school-erp-shell.is-sls .school-erp-main-inner .rounded-2xl,
@@ -26,38 +27,83 @@
 .school-erp-shell.is-sls .school-erp-main-inner section.rounded-xl,
 .school-erp-shell.is-sls .school-erp-main-inner .p-4.rounded-xl,
 .school-erp-shell.is-sls .school-erp-main-inner .p-5.rounded-xl {
+  border: 1px solid var(--border-subtle, #e8edf5);
   box-shadow: var(--sls-soft-shadow);
 }
 
 .school-erp-shell.is-sls .school-erp-main-inner [class*='ring-slate-'] {
-  --tw-ring-color: transparent !important;
-  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-color: var(--border-color);
 }
 
-/* Filter / search bars: filled, not outlined. */
+/* Controls: visible 1px boundary, theme-aware. */
 .school-erp-shell.is-sls .school-erp-main-inner input:not([type='checkbox']):not([type='radio']):not([type='hidden']):not([type='range']):not([type='file']),
 .school-erp-shell.is-sls .school-erp-main-inner select,
-.school-erp-shell.is-sls .school-erp-main-inner textarea {
-  border: 0 !important;
-  background: var(--sls-fill) !important;
-  box-shadow: none !important;
+.school-erp-shell.is-sls .school-erp-main-inner textarea,
+.school-erp-shell.is-sls .school-erp-main-inner [role='combobox'],
+.school-erp-shell.is-sls .school-erp-main-inner [role='listbox'] {
+  border: 1px solid var(--border-color) !important;
+  background: var(--control-background) !important;
+  border-radius: var(--sls-control-radius);
+  box-shadow: none;
   color: var(--text, #334155);
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner input:hover:not(:disabled):not([type='checkbox']):not([type='radio']),
+.school-erp-shell.is-sls .school-erp-main-inner select:hover:not(:disabled),
+.school-erp-shell.is-sls .school-erp-main-inner textarea:hover:not(:disabled) {
+  border-color: var(--border-color-hover) !important;
 }
 
 .school-erp-shell.is-sls .school-erp-main-inner input:focus-visible,
 .school-erp-shell.is-sls .school-erp-main-inner select:focus-visible,
 .school-erp-shell.is-sls .school-erp-main-inner textarea:focus-visible {
-  background: var(--surface, #fff) !important;
-  box-shadow: 0 0 0 3px var(--focus-ring, rgba(14, 165, 233, 0.16)) !important;
+  background: var(--control-background) !important;
+  border-color: var(--border-color-focus) !important;
+  outline: 2px solid color-mix(in srgb, var(--border-color-focus) 35%, transparent);
+  outline-offset: 2px;
+  box-shadow: none !important;
 }
 
-.school-erp-shell.is-sls .school-erp-main-inner button[class*='border-slate'],
-.school-erp-shell.is-sls .school-erp-main-inner a[class*='border-slate'] {
-  border-color: transparent !important;
-  background: var(--sls-fill);
+.school-erp-shell.is-sls .school-erp-main-inner input:disabled,
+.school-erp-shell.is-sls .school-erp-main-inner select:disabled,
+.school-erp-shell.is-sls .school-erp-main-inner textarea:disabled,
+.school-erp-shell.is-sls .school-erp-main-inner button:disabled {
+  border-color: var(--border-subtle) !important;
+  opacity: 0.62;
 }
 
-/* Data tables: SaaS register, not a spreadsheet. Keep timetable grids. */
+.school-erp-shell.is-sls .school-erp-main-inner input[type='checkbox'],
+.school-erp-shell.is-sls .school-erp-main-inner input[type='radio'] {
+  accent-color: var(--primary-hex, #1a365d);
+  width: 1rem;
+  height: 1rem;
+  outline-offset: 2px;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner input[type='file'] {
+  border: 1px dashed var(--border-color);
+  border-radius: var(--sls-control-radius);
+  background: var(--control-background);
+  padding: 0.35rem 0.5rem;
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner button:not(.sls-status-chip):not(.sls-tab):not(.sls-btn-primary):not(.sls-cta):not(.sls-register-primary):not(.sls-kpi):not(.is-on),
+.school-erp-shell.is-sls .school-erp-main-inner a[class*='border-slate'],
+.school-erp-shell.is-sls .school-erp-main-inner button[class*='border-slate'] {
+  border: 1px solid var(--border-color, #d9e1ee);
+  border-radius: var(--sls-control-radius, 10px);
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner button:not(.sls-status-chip):not(.sls-tab):not(.sls-btn-primary):not(.sls-cta):not(.sls-register-primary):not(.is-on):hover:not(:disabled) {
+  border-color: var(--border-color-hover, #b8c7df);
+}
+
+.school-erp-shell.is-sls .school-erp-main-inner button:focus-visible {
+  outline: 2px solid var(--border-color-focus);
+  outline-offset: 2px;
+}
+
+/* Data tables: outer frame + row hairlines, not a spreadsheet. */
 .school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) {
   width: 100%;
   border: 0 !important;
@@ -68,12 +114,10 @@
 
 .school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) th,
 .school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) td {
-  border: 0 !important;
   border-left: 0 !important;
   border-right: 0 !important;
   border-top: 0 !important;
   box-shadow: none !important;
-  outline: none !important;
 }
 
 .school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) thead th {
@@ -86,10 +130,11 @@
   padding: 0.85rem 0.95rem;
   white-space: nowrap;
   vertical-align: middle;
+  border-bottom: 1px solid var(--border-color) !important;
 }
 
 .school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) tbody td {
-  border-bottom: 1px solid var(--sls-hairline) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
   background: transparent;
   padding: 0.95rem 0.95rem;
   vertical-align: middle;
@@ -108,10 +153,6 @@
   background: color-mix(in srgb, var(--school-erp-primary, #1a365d) 5%, var(--surface, #fff));
 }
 
-.school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) tbody tr:last-child td {
-  border-bottom: 0 !important;
-}
-
 .school-erp-shell.is-sls .school-erp-main-inner table:not(.sls-tt-table):not(.sls-register-table) tbody tr[class*='border'] {
   border: 0 !important;
 }
@@ -121,7 +162,7 @@
 .school-erp-shell.is-sls .school-erp-main-inner .overflow-x-auto[class*='rounded'],
 .school-erp-shell.is-sls .school-erp-main-inner .overflow-auto[class*='rounded'] {
   background: var(--surface, #fff);
-  border: 0 !important;
+  border: 1px solid var(--border-subtle) !important;
   box-shadow: var(--sls-soft-shadow);
 }
 
@@ -148,14 +189,14 @@
   width: 100%;
   padding: 1.15rem 1.2rem 1.4rem;
   text-align: left;
-  border: 0 !important;
-  border-radius: 1.35rem;
+  border: 1px solid var(--border-subtle, #e8edf5);
+  border-radius: var(--sls-card-radius, 16px);
   background: linear-gradient(
     165deg,
     color-mix(in srgb, var(--school-erp-primary, #38bdf8) 12%, var(--surface, #fff)) 0%,
     var(--surface, #fff) 72%
   );
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--heading, #0f172a) 6%, transparent);
+  box-shadow: var(--sls-soft-shadow, 0 8px 24px rgba(15, 23, 42, 0.06));
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
@@ -330,20 +371,20 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0.65rem 0.7rem;
-  border: 0 !important;
-  border-radius: 1.25rem;
+  border: 1px solid var(--border-subtle, #e8edf5);
+  border-radius: var(--sls-card-radius, 16px);
   background: var(--surface, #fff);
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--heading, #0f172a) 6%, transparent);
+  box-shadow: var(--sls-soft-shadow, 0 8px 24px rgba(15, 23, 42, 0.06));
 }
 
 .sls-toolbar input:not([type='checkbox']):not([type='radio']),
 .sls-toolbar select {
   height: 2.5rem;
-  border: 0 !important;
-  border-radius: 0.85rem;
-  background: #f3f6fb !important;
+  border: 1px solid var(--border-color, #d9e1ee) !important;
+  border-radius: var(--sls-control-radius, 10px);
+  background: var(--control-background, #fff) !important;
   box-shadow: none !important;
-  color: #334155;
+  color: var(--text, #334155);
   font-size: 0.875rem;
 }
 
@@ -374,38 +415,160 @@
   gap: 0.45rem;
   height: 2.5rem;
   padding: 0 0.85rem;
-  border-radius: 0.85rem;
-  background: #f3f6fb;
-  color: #475569;
+  border: 1px solid var(--border-color, #d9e1ee);
+  border-radius: var(--sls-control-radius, 10px);
+  background: var(--control-background, #fff);
+  color: var(--text, #475569);
   font-size: 0.8125rem;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .school-erp-shell.is-sls a.sls-cta,
-.sls-cta {
+.sls-cta,
+.sls-btn-primary,
+.sls-register-primary {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
   height: 2.6rem;
   padding: 0 1.15rem;
-  border: 0 !important;
-  border-radius: 0.95rem;
-  background: var(--button-primary, #7c3aed);
+  border: 1px solid color-mix(in srgb, var(--button-primary, #1a365d) 78%, #0f172a);
+  border-radius: var(--sls-control-radius, 10px);
+  background: var(--button-primary, #1a365d);
   color: var(--primary-foreground-hex, #fff) !important;
   font-size: 0.875rem;
   font-weight: 700;
   text-decoration: none;
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--button-primary, #7c3aed) 30%, transparent);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--button-primary, #1a365d) 22%, transparent);
 }
 
-.sls-cta:hover {
-  background: var(--button-primary-hover, #6d28d9);
+.sls-cta:hover,
+.sls-btn-primary:hover:not(:disabled),
+.sls-register-primary:hover {
+  background: var(--button-primary-hover, #163056);
+  border-color: var(--button-primary-hover, #163056);
 }
 
-.sls-cta:disabled {
+.sls-cta:disabled,
+.sls-btn-primary:disabled {
   opacity: 0.55;
   pointer-events: none;
+}
+
+.sls-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2.5rem;
+  padding: 0 0.95rem;
+  border-radius: var(--sls-control-radius, 10px);
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sls-btn-secondary {
+  border: 1px solid var(--border-color, #d9e1ee);
+  background: var(--control-background, #fff);
+  color: var(--heading, #1e3a5f);
+}
+
+.sls-btn-secondary:hover:not(:disabled) {
+  border-color: var(--border-color-hover, #b8c7df);
+  background: color-mix(in srgb, var(--school-erp-primary, #1a365d) 6%, var(--control-background, #fff));
+}
+
+.sls-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border-color, #d9e1ee);
+  border-radius: 999px;
+  background: var(--control-background, #fff);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text, #475569);
+  text-decoration: none;
+}
+
+.sls-tab:hover {
+  border-color: var(--border-color-hover, #b8c7df);
+  background: color-mix(in srgb, var(--school-erp-primary, #1a365d) 6%, #fff);
+}
+
+.sls-tab.is-active {
+  border-color: var(--primary-hex, #1a365d);
+  background: var(--primary-hex, #1a365d);
+  color: var(--primary-foreground-hex, #fff);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--primary-hex, #1a365d) 24%, transparent);
+}
+
+.sls-status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.15rem;
+  height: 2.15rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--border-color, #d9e1ee);
+  border-radius: 999px;
+  background: var(--control-background, #fff);
+  color: var(--muted-foreground-hex, #64748b);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.sls-status-chip.is-wide {
+  min-height: 2.6rem;
+  min-width: 0;
+  height: auto;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.sls-status-chip:hover:not(:disabled):not(.is-present):not(.is-absent):not(.is-late):not(.is-holiday):not(.is-leave):not(.is-excused) {
+  border-color: var(--border-color-hover, #b8c7df);
+}
+
+.sls-status-chip.is-present {
+  background: #059669;
+  border-color: #047857;
+  color: #fff;
+}
+
+.sls-status-chip.is-absent {
+  background: #e11d48;
+  border-color: #be123c;
+  color: #fff;
+}
+
+.sls-status-chip.is-late {
+  background: #d97706;
+  border-color: #b45309;
+  color: #fff;
+}
+
+.sls-status-chip.is-holiday {
+  background: #64748b;
+  border-color: #475569;
+  color: #fff;
+}
+
+.sls-status-chip.is-leave {
+  background: #7c3aed;
+  border-color: #6d28d9;
+  color: #fff;
+}
+
+.sls-status-chip.is-excused {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #fff;
 }
 
 .sls-pill {
@@ -413,6 +576,7 @@
   align-items: center;
   justify-content: center;
   min-width: 3.1rem;
+  border: 1px solid var(--border-color, #d9e1ee);
   border-radius: 999px;
   padding: 0.22rem 0.65rem;
   font-size: 0.6875rem;
@@ -421,31 +585,35 @@
 }
 
 .sls-pill.is-ok {
-  background: #dcfce7;
+  background: #ecfdf5;
+  border-color: #bbf7d0;
   color: #15803d;
 }
 
 .sls-pill.is-amber {
-  background: #fef3c7;
+  background: #fffbeb;
+  border-color: #fde68a;
   color: #b45309;
 }
 
 .sls-pill.is-muted {
-  background: #e2e8f0;
+  background: var(--control-background, #fff);
+  border-color: var(--border-color, #d9e1ee);
   color: #475569;
 }
 
 .sls-pill.is-warn {
-  background: #fee2e2;
+  background: #fff1f2;
+  border-color: #fecdd3;
   color: #be123c;
 }
 
 .sls-saas-panel {
   overflow: hidden;
-  border: 0 !important;
-  border-radius: 1.25rem;
+  border: 1px solid var(--border-subtle, #e8edf5);
+  border-radius: var(--sls-card-radius, 16px);
   background: var(--surface, #fff);
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--heading, #0f172a) 6%, transparent);
+  box-shadow: var(--sls-soft-shadow, 0 8px 24px rgba(15, 23, 42, 0.06));
 }
 
 .sls-saas-foot {
@@ -469,23 +637,175 @@
 .sls-saas-foot select {
   height: 2rem;
   min-width: 2rem;
-  border: 0 !important;
+  border: 1px solid var(--border-color, #d9e1ee);
   border-radius: 999px;
-  background: #eef2f7;
-  color: #334155;
+  background: var(--control-background, #fff);
+  color: var(--text, #334155);
   font-size: 0.75rem;
   font-weight: 700;
 }
 
 .sls-saas-pager button.is-on {
-  background: var(--button-primary, #7c3aed);
+  background: var(--button-primary, #1a365d);
+  border-color: var(--button-primary, #1a365d);
   color: #fff;
 }
 
-.school-erp-shell.is-sls .school-erp-main-inner .sls-saas-panel,
-.school-erp-shell.is-sls .school-erp-main-inner .sls-toolbar,
-.school-erp-shell.is-sls .school-erp-main-inner .sls-kpi {
-  border: 0 !important;
+.school-erp-shell.is-sls .school-erp-main-inner [role='dialog'],
+.school-erp-shell.is-sls .school-erp-main-inner [role='menu'],
+.school-erp-shell.is-sls .school-erp-main-inner [role='listbox'] {
+  border: 1px solid var(--border-subtle, #e8edf5);
+}
+
+.sls-sms-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 2.4rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--border-color, #d9e1ee);
+  border-radius: 999px;
+  background: var(--control-background, #fff);
+  color: var(--text, #334155);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--heading, #0f172a) 5%, transparent);
+}
+
+.sls-sms-health {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--success-hex, #10b981) 28%, var(--border-subtle, #e8edf5));
+  border-radius: var(--sls-card-radius, 16px);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--success-hex, #10b981) 14%, var(--surface, #fff)),
+    var(--surface, #fff)
+  );
+}
+
+.sls-sms-health.is-warn {
+  border-color: color-mix(in srgb, #f59e0b 32%, var(--border-subtle, #e8edf5));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, #f59e0b 14%, var(--surface, #fff)),
+    var(--surface, #fff)
+  );
+}
+
+.sls-sms-qa {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.sls-sms-qa-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-height: 5.4rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  text-decoration: none;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.sls-sms-qa-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--heading, #0f172a) 8%, transparent);
+}
+
+.sls-sms-qa-card b {
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.sls-sms-qa-card span {
+  font-size: 0.75rem;
+  opacity: 0.78;
+}
+
+.sls-sms-qa-card.is-send {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.sls-sms-qa-card.is-tpl {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.sls-sms-qa-card.is-camp {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.sls-sms-qa-card.is-rpt {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.sls-cta.sls-sms-send {
+  border-radius: 999px;
+  height: 2.45rem;
+  padding: 0 1.2rem;
+}
+
+.sls-sms-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.sls-sms-feed-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.55rem 0.15rem;
+  border-bottom: 1px solid var(--border-subtle, #e8edf5);
+}
+
+.sls-sms-feed-row:last-child {
+  border-bottom: 0;
+}
+
+.sls-wa-logo {
+  display: flex;
+  height: 2.75rem;
+  width: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.95rem;
+  background: #25d366;
+  color: #fff;
+  box-shadow: 0 8px 18px color-mix(in srgb, #25d366 32%, transparent);
+}
+
+.sls-wa-conn-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground-hex, #64748b);
+}
+
+.sls-wa-conn-row b {
+  font-weight: 800;
+  color: var(--heading, #0f172a);
+}
+
+.sls-wa-conn-row .is-missing {
+  color: #e11d48;
+  font-weight: 800;
 }
 
 @media (max-width: 639px) {

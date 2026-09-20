@@ -150,27 +150,11 @@ export const fieldClass =
   'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none ring-[var(--school-erp-accent)] focus:ring-2';
 
 export function PrimaryButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      {...props}
-      className={cn(
-        'inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-[var(--school-erp-primary,#1a365d)] px-4 text-sm font-medium text-white shadow-sm disabled:opacity-50',
-        props.className,
-      )}
-    />
-  );
+  return <button {...props} className={cn('sls-btn sls-btn-primary', props.className)} />;
 }
 
 export function GhostButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      {...props}
-      className={cn(
-        'inline-flex h-10 items-center justify-center rounded-lg px-3 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50',
-        props.className,
-      )}
-    />
-  );
+  return <button {...props} className={cn('sls-btn sls-btn-secondary', props.className)} />;
 }
 
 export function EmptyState({ title, hint }: { title: string; hint: string }) {

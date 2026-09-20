@@ -545,16 +545,19 @@ html:has(.school-erp-shell.is-sls) {
   font-size: 0.8125rem;
   padding: 0.45rem 0.65rem;
   border-radius: 0.65rem;
+  border: 1px solid transparent;
 }
 
 .school-erp-shell.is-sls .school-erp-nav-link:hover:not(.is-active) {
   background: color-mix(in srgb, var(--sidebar-foreground) 22%, transparent) !important;
   color: var(--sidebar-foreground) !important;
+  border-color: color-mix(in srgb, var(--sidebar-foreground) 18%, transparent);
 }
 
 .school-erp-shell.is-sls .school-erp-nav-link.is-active {
   background: var(--sidebar-active);
   color: var(--sidebar-active-foreground);
+  border-color: color-mix(in srgb, var(--sidebar-active-foreground) 22%, transparent);
   box-shadow: none;
 }
 
@@ -686,22 +689,26 @@ html:has(.school-erp-shell.is-sls) {
 
 .school-erp-shell.is-sls .school-erp-topbar-search-input {
   height: 2.55rem;
-  border-color: var(--input-border, #e2e8f0);
-  background: var(--muted-hex, #f1f5f9);
+  border: 1px solid var(--border-color, var(--input-border, #d9e1ee));
+  background: var(--control-background, var(--muted-hex, #f1f5f9));
   color: var(--text, #0f172a);
 }
 
 .school-erp-shell.is-sls .school-erp-topbar-search-input:hover,
 .school-erp-shell.is-sls .school-erp-topbar-search-input:focus {
-  background: var(--surface, #fff);
-  border-color: var(--accent-hex, #7dd3fc);
-  box-shadow: 0 0 0 3px var(--focus-ring, rgba(14, 165, 233, 0.12));
+  background: var(--control-background, #fff);
+  border-color: var(--border-color-focus, var(--accent-hex, #7dd3fc));
+  outline: 2px solid color-mix(in srgb, var(--border-color-focus, #1a365d) 28%, transparent);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 .school-erp-shell.is-sls .school-erp-icon-btn {
   height: 2.45rem;
   width: 2.45rem;
   border-radius: 0.8rem;
+  border: 1px solid var(--border-color, #d9e1ee);
+  background: var(--control-background, #fff);
   color: var(--sidebar-foreground, #334155);
 }
 

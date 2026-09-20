@@ -66,6 +66,13 @@ function maskSecret(value: string | null | undefined) {
   return { configured: true, hint: `***************${plain.slice(-4)}` };
 }
 
+function waLocalDayKey(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 @Injectable()
 export class SchoolSisWhatsappService {
   private readonly logger = new Logger(SchoolSisWhatsappService.name);
@@ -229,6 +236,8 @@ export class SchoolSisWhatsappService {
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - 6);
     const [
       sent,
       delivered,
@@ -240,6 +249,7 @@ export class SchoolSisWhatsappService {
       campaigns,
       todayRows,
       recent,
+      weekRows,
     ] = await Promise.all([
       this.prisma.schoolWhatsappMessage.count({
         where: {
@@ -300,11 +310,34 @@ export class SchoolSisWhatsappService {
         take: 8,
         include: { template: { select: { name: true } } },
       }),
+      this.prisma.schoolWhatsappMessage.findMany({
+        where: { tenantId, createdAt: { gte: weekStart } },
+        select: { createdAt: true, status: true, direction: true },
+      }),
     ]);
     const todayMap = Object.fromEntries(
       todayRows.map((r) => [r.status, r._count]),
     );
     const number = await this.defaultNumber(tenantId);
+    const activity = Array.from({ length: 7 }, (_, i) => {
+      const day = new Date(weekStart);
+      day.setDate(weekStart.getDate() + i);
+      const key = waLocalDayKey(day);
+      const rows = weekRows.filter((m) => waLocalDayKey(m.createdAt) === key);
+      const outbound = rows.filter((m) => m.direction === 'OUT');
+      return {
+        date: key,
+        label: day.toLocaleDateString('en-IN', {
+          month: 'short',
+          day: 'numeric',
+        }),
+        sent: outbound.length,
+        delivered: outbound.filter((m) =>
+          ['DELIVERED', 'READ'].includes(m.status),
+        ).length,
+        failed: outbound.filter((m) => m.status === 'FAILED').length,
+      };
+    });
     return {
       kpis: {
         sent,
@@ -328,10 +361,13 @@ export class SchoolSisWhatsappService {
           where: { tenantId, direction: 'IN', createdAt: { gte: today } },
         }),
       },
+      activity,
       connection: number
         ? {
             connected: number.account.status === 'CONNECTED',
             displayPhone: number.displayPhone,
+            phoneNumberId: number.phoneNumberId,
+            wabaId: number.account.wabaId,
             accountName: number.account.name,
             apiStatus: number.account.status,
             lastWebhookAt: number.account.lastWebhookAt,

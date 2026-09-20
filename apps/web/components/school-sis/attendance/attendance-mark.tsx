@@ -234,18 +234,10 @@ export function AttendanceMarkDesk() {
       {sectionId ? (
         <>
           <div className="flex flex-wrap gap-2 text-sm">
-            <span className="rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
-              Present {counts.PRESENT}
-            </span>
-            <span className="rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
-              Absent {counts.ABSENT}
-            </span>
-            <span className="rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
-              Late {counts.LATE}
-            </span>
-            <span className="rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">
-              Leave {counts.LEAVE}
-            </span>
+            <span className="sls-pill is-ok">Present {counts.PRESENT}</span>
+            <span className="sls-pill is-warn">Absent {counts.ABSENT}</span>
+            <span className="sls-pill is-amber">Late {counts.LATE}</span>
+            <span className="sls-pill is-muted">Leave {counts.LEAVE}</span>
             {roster.data?.session ? (
               <StatusChip code={roster.data.session.status} />
             ) : (
@@ -305,8 +297,8 @@ export function AttendanceMarkDesk() {
                               )
                             }
                             className={cn(
-                              'min-h-9 min-w-9 rounded-lg px-2 text-[11px] font-bold ring-1 ring-slate-200',
-                              r.status === code ? STATUS_BTN[code] : 'bg-white text-slate-600',
+                              'sls-status-chip',
+                              r.status === code && (STATUS_BTN[code] ?? ''),
                             )}
                           >
                             {code === 'HALF_DAY'
@@ -364,8 +356,8 @@ export function AttendanceMarkDesk() {
                         )
                       }
                       className={cn(
-                        'min-h-11 rounded-xl text-sm font-semibold ring-1 ring-slate-200',
-                        r.status === code ? STATUS_BTN[code] : 'bg-white',
+                        'sls-status-chip is-wide',
+                        r.status === code && (STATUS_BTN[code] ?? ''),
                       )}
                     >
                       {code}

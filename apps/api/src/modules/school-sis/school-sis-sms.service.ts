@@ -50,6 +50,13 @@ type Resolved = {
   vars: Record<string, string>;
 };
 
+function localDayKey(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 @Injectable()
 export class SchoolSisSmsService implements OnModuleInit {
   private readonly logger = new Logger(SchoolSisSmsService.name);
@@ -108,6 +115,8 @@ export class SchoolSisSmsService implements OnModuleInit {
     start.setHours(0, 0, 0, 0);
     const month = new Date(start);
     month.setDate(1);
+    const weekStart = new Date(start);
+    weekStart.setDate(weekStart.getDate() - 6);
     const [
       today,
       delivered,
@@ -117,6 +126,7 @@ export class SchoolSisSmsService implements OnModuleInit {
       recent,
       gateways,
       cost,
+      weekRows,
     ] = await Promise.all([
       this.prisma.schoolSmsMessage.count({
         where: { tenantId, createdAt: { gte: start } },
@@ -151,11 +161,36 @@ export class SchoolSisSmsService implements OnModuleInit {
         where: { tenantId, createdAt: { gte: start } },
         _sum: { totalCost: true },
       }),
+      this.prisma.schoolSmsMessage.findMany({
+        where: {
+          tenantId,
+          createdAt: { gte: weekStart },
+        },
+        select: { createdAt: true, status: true },
+      }),
     ]);
     const cats = await this.prisma.schoolSmsMessage.groupBy({
       by: ['recipientType'],
       where: { tenantId, createdAt: { gte: month } },
       _count: true,
+    });
+    const activity = Array.from({ length: 7 }, (_, i) => {
+      const day = new Date(weekStart);
+      day.setDate(weekStart.getDate() + i);
+      const key = localDayKey(day);
+      const rows = weekRows.filter((m) => localDayKey(m.createdAt) === key);
+      return {
+        date: key,
+        label: day.toLocaleDateString('en-IN', {
+          month: 'short',
+          day: 'numeric',
+        }),
+        sent: rows.length,
+        delivered: rows.filter((m) => m.status === 'DELIVERED').length,
+        failed: rows.filter((m) =>
+          ['FAILED', 'REJECTED', 'UNDELIVERED'].includes(m.status),
+        ).length,
+      };
     });
     return {
       kpis: {
@@ -174,6 +209,7 @@ export class SchoolSisSmsService implements OnModuleInit {
       categories: SMS_CATEGORIES,
       providers: SMS_PROVIDERS,
       byType: cats,
+      activity,
       recent: recent.map((m) => ({
         ...m,
         mobile: maskMobile(m.mobile),

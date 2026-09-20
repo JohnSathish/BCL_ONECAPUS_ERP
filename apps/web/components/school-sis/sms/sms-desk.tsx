@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { apiErrorMessage } from '@/utils/api-error';
-import { cn } from '@/utils/cn';
 import { GhostButton, PrimaryButton } from '../academic/academic-ui';
-import { WaBadge, WaCard } from '../whatsapp/whatsapp-ui';
+import { WaBadge } from '../whatsapp/whatsapp-ui';
+import { SmsDashboard } from './sms-dashboard';
+import { SmsEmpty, SmsPanel, SmsShell } from './sms-ui';
 import {
   adjustSmsCredits,
   cancelSmsCampaign,
@@ -32,21 +32,6 @@ import {
   sendSmsCampaign,
   testSmsGateway,
 } from '@/services/school-sms';
-
-const LINKS = [
-  ['Dashboard', '/admin/school-sis/sms'],
-  ['Send', '/admin/school-sis/sms/send'],
-  ['Templates', '/admin/school-sis/sms/templates'],
-  ['Campaigns', '/admin/school-sis/sms/campaigns'],
-  ['Scheduled', '/admin/school-sis/sms/scheduled'],
-  ['Delivery', '/admin/school-sis/sms/delivery'],
-  ['History', '/admin/school-sis/sms/history'],
-  ['Failed', '/admin/school-sis/sms/failed'],
-  ['DLT', '/admin/school-sis/sms/dlt'],
-  ['Gateways', '/admin/school-sis/sms/gateways'],
-  ['Credits', '/admin/school-sis/sms/credits'],
-  ['Settings', '/admin/school-sis/sms/settings'],
-] as const;
 
 export function SmsDesk() {
   const path = usePathname() ?? '';
@@ -140,113 +125,99 @@ export function SmsDesk() {
   });
 
   return (
-    <div className="space-y-4 bg-[#f4f7fb] p-4 sm:p-5">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-          Communication
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">SMS</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Multi-gateway school SMS with DLT checks, queued sending, and delivery callbacks.
-        </p>
-      </div>
-      <nav className="flex flex-wrap gap-1">
-        {LINKS.map(([label, href]) => (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              'rounded-full px-3 py-1 text-xs font-medium ring-1',
-              path === href
-                ? 'bg-slate-900 text-white ring-slate-900'
-                : 'bg-white text-slate-600 ring-slate-200',
-            )}
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
-      {notice ? (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{notice}</p>
-      ) : null}
-
+    <SmsShell notice={notice}>
       {section === 'dashboard' ? (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {[
-              ['SMS balance', kpis.balance],
-              ['Sent today', kpis.sentToday],
-              ['Delivered', kpis.delivered],
-              ['Failed', kpis.failed],
-              ['Pending', kpis.pending],
-              ['This month', kpis.monthCount],
-              ['Delivery rate', `${kpis.deliveryRate ?? 0}%`],
-              ['Failed rate', `${kpis.failedRate ?? 0}%`],
-              ['Estimated cost', `₹${kpis.estimatedCost ?? 0}`],
-            ].map(([l, v]) => (
-              <WaCard key={String(l)} label={String(l)} value={String(v ?? 0)} />
-            ))}
-          </div>
-          <WaCard label="Gateway health">
-            {((dash.data?.gateways as Array<Record<string, unknown>>) ?? []).map((g) => (
-              <p key={String(g.id)} className="text-sm">
-                {String(g.name)} · {String(g.provider)} · {String(g.health)}{' '}
-                {g.isDefault ? '(default)' : ''}
-              </p>
-            ))}
-            {!((dash.data?.gateways as unknown[]) ?? []).length ? (
-              <p className="text-sm text-slate-500">No gateway configured yet.</p>
-            ) : null}
-          </WaCard>
-        </>
+        <SmsDashboard
+          kpis={kpis}
+          activity={
+            (Array.isArray(dash.data?.activity) ? dash.data?.activity : []) as Array<{
+              date: string;
+              label: string;
+              sent: number;
+              delivered: number;
+              failed: number;
+            }>
+          }
+          recent={
+            (Array.isArray(dash.data?.recent) ? dash.data?.recent : []) as Array<{
+              id?: string;
+              recipientName?: string | null;
+              mobile?: string;
+              status?: string;
+              createdAt?: string;
+            }>
+          }
+          gateways={
+            (Array.isArray(dash.data?.gateways)
+              ? dash.data?.gateways
+              : (gateways.data ?? [])) as Array<{
+              id?: string;
+              name?: string;
+              provider?: string;
+              health?: string;
+              isDefault?: boolean;
+            }>
+          }
+          loading={dash.isLoading}
+          onTestGateway={(id) =>
+            testSmsGateway(id)
+              .then(() => setNotice('Gateway configuration valid.'))
+              .catch(onErr)
+          }
+        />
       ) : null}
 
       {section === 'send' ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <WaCard className="space-y-3 p-5" label="Composer">
-            <select
-              value={audienceType}
-              onChange={(e) => setAudienceType(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
+          <SmsPanel title="Composer">
+            <div className="space-y-3">
+              <select
+                value={audienceType}
+                onChange={(e) => setAudienceType(e.target.value)}
+                className="w-full rounded-lg px-3 py-2 text-sm"
+              >
+                {['INDIVIDUAL', 'CLASS', 'SECTION', 'STAFF', 'CUSTOM'].map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search student / admission / mobile"
+                className="w-full rounded-lg px-3 py-2 text-sm"
+              />
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={8}
+                className="w-full rounded-lg px-3 py-2 text-sm"
+              />
+              <p className="text-xs" style={{ color: 'var(--muted-foreground-hex, #64748b)' }}>
+                {segs?.chars ?? 0} characters · {segs?.segments ?? 1} SMS segment
+                {segs?.missing?.length ? ` · missing {${segs.missing.join(', ')}}` : ''}
+              </p>
+              <PrimaryButton
+                type="button"
+                onClick={() =>
+                  previewSmsRecipients({
+                    type: audienceType,
+                    recipient: 'PARENT',
+                    search,
+                    category: 'GENERAL',
+                  })
+                    .then((r) => setConfirm(r))
+                    .catch(onErr)
+                }
+              >
+                Review recipients
+              </PrimaryButton>
+            </div>
+          </SmsPanel>
+          <SmsPanel title="Phone preview">
+            <div
+              className="mx-auto w-64 rounded-[2rem] p-4 text-sm text-white shadow-lg"
+              style={{ background: 'var(--heading, #0f172a)' }}
             >
-              {['INDIVIDUAL', 'CLASS', 'SECTION', 'STAFF', 'CUSTOM'].map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search student / admission / mobile"
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-            />
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={8}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-            />
-            <p className="text-xs text-slate-500">
-              {segs?.chars ?? 0} characters · {segs?.segments ?? 1} SMS segment
-              {segs?.missing?.length ? ` · missing {${segs.missing.join(', ')}}` : ''}
-            </p>
-            <PrimaryButton
-              type="button"
-              onClick={() =>
-                previewSmsRecipients({
-                  type: audienceType,
-                  recipient: 'PARENT',
-                  search,
-                  category: 'GENERAL',
-                })
-                  .then((r) => setConfirm(r))
-                  .catch(onErr)
-              }
-            >
-              Review recipients
-            </PrimaryButton>
-          </WaCard>
-          <WaCard className="p-5" label="Phone preview">
-            <div className="mx-auto w-64 rounded-[2rem] border bg-slate-900 p-4 text-sm text-white shadow-lg">
               <p className="text-[10px] uppercase tracking-widest text-slate-400">
                 St. Luke&apos;s School
               </p>
@@ -254,7 +225,7 @@ export function SmsDesk() {
                 {String(segs?.preview ?? body)}
               </p>
             </div>
-          </WaCard>
+          </SmsPanel>
         </div>
       ) : null}
 
@@ -270,87 +241,122 @@ export function SmsDesk() {
       ) : null}
 
       {['campaigns', 'scheduled'].includes(section) ? (
-        <WaCard className="overflow-auto p-0">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-3 py-2 text-left">Campaign</th>
-                <th className="px-3 py-2 text-left">Status</th>
-                <th className="px-3 py-2 text-left">Recipients</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {(campaigns.data ?? [])
-                .filter((c) => section !== 'scheduled' || c.status === 'SCHEDULED')
-                .map((c) => (
-                  <tr key={String(c.id)} className="border-t">
-                    <td className="px-3 py-2">{String(c.name)}</td>
-                    <td className="px-3 py-2">
-                      <WaBadge value={String(c.status)} />
-                    </td>
-                    <td className="px-3 py-2">{String(c.recipientCount)}</td>
-                    <td className="px-3 py-2">
-                      <GhostButton
-                        type="button"
-                        onClick={() =>
-                          cancelSmsCampaign(String(c.id)).then(() =>
-                            qc.invalidateQueries({ queryKey: ['sms-camp'] }),
-                          )
-                        }
-                      >
-                        Cancel
-                      </GhostButton>
-                    </td>
+        <SmsPanel title={section === 'scheduled' ? 'Scheduled campaigns' : 'Campaigns'}>
+          {(campaigns.data ?? []).filter((c) => section !== 'scheduled' || c.status === 'SCHEDULED')
+            .length ? (
+            <div className="overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead
+                  className="text-xs uppercase"
+                  style={{ color: 'var(--muted-foreground-hex, #64748b)' }}
+                >
+                  <tr>
+                    <th className="px-3 py-2 text-left">Campaign</th>
+                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">Recipients</th>
+                    <th className="px-3 py-2"></th>
                   </tr>
-                ))}
-            </tbody>
-          </table>
-        </WaCard>
+                </thead>
+                <tbody>
+                  {(campaigns.data ?? [])
+                    .filter((c) => section !== 'scheduled' || c.status === 'SCHEDULED')
+                    .map((c) => (
+                      <tr key={String(c.id)}>
+                        <td className="px-3 py-2 font-medium">{String(c.name)}</td>
+                        <td className="px-3 py-2">
+                          <WaBadge value={String(c.status)} />
+                        </td>
+                        <td className="px-3 py-2">{String(c.recipientCount)}</td>
+                        <td className="px-3 py-2 text-right">
+                          <GhostButton
+                            type="button"
+                            onClick={() =>
+                              cancelSmsCampaign(String(c.id)).then(() =>
+                                qc.invalidateQueries({ queryKey: ['sms-camp'] }),
+                              )
+                            }
+                          >
+                            Cancel
+                          </GhostButton>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <SmsEmpty
+              title={section === 'scheduled' ? 'No scheduled SMS' : 'No campaigns yet'}
+              hint="Create a campaign from Send SMS. Queued and scheduled runs will appear here."
+            />
+          )}
+        </SmsPanel>
       ) : null}
 
       {['history', 'delivery', 'failed'].includes(section) ? (
-        <WaCard className="overflow-auto p-0">
-          <div className="flex justify-end gap-2 p-3">
-            <GhostButton type="button" onClick={() => void downloadSmsExport('xlsx')}>
-              Excel
-            </GhostButton>
-            <GhostButton type="button" onClick={() => void downloadSmsExport('pdf')}>
-              PDF
-            </GhostButton>
-          </div>
-          <table className="min-w-full text-sm">
-            <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-3 py-2 text-left">Recipient</th>
-                <th className="px-3 py-2 text-left">Mobile</th>
-                <th className="px-3 py-2 text-left">Status</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {(messages.data ?? []).map((m) => (
-                <tr key={String(m.id)} className="border-t">
-                  <td className="px-3 py-2">{String(m.recipientName ?? '—')}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{String(m.mobile)}</td>
-                  <td className="px-3 py-2">
-                    <WaBadge value={String(m.status)} />
-                  </td>
-                  <td className="px-3 py-2">
-                    {m.status === 'FAILED' ? (
-                      <GhostButton
-                        type="button"
-                        onClick={() => retrySms(String(m.id)).catch(onErr)}
-                      >
-                        Retry
-                      </GhostButton>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </WaCard>
+        <SmsPanel
+          title={
+            section === 'failed'
+              ? 'Failed messages'
+              : section === 'delivery'
+                ? 'Delivery reports'
+                : 'SMS history'
+          }
+          action={
+            <div className="flex gap-2">
+              <GhostButton type="button" onClick={() => void downloadSmsExport('xlsx')}>
+                Excel
+              </GhostButton>
+              <GhostButton type="button" onClick={() => void downloadSmsExport('pdf')}>
+                PDF
+              </GhostButton>
+            </div>
+          }
+        >
+          {(messages.data ?? []).length ? (
+            <div className="overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead
+                  className="sticky top-0 text-xs uppercase"
+                  style={{ color: 'var(--muted-foreground-hex, #64748b)' }}
+                >
+                  <tr>
+                    <th className="px-3 py-2 text-left">Recipient</th>
+                    <th className="px-3 py-2 text-left">Mobile</th>
+                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(messages.data ?? []).map((m) => (
+                    <tr key={String(m.id)}>
+                      <td className="px-3 py-2 font-medium">{String(m.recipientName ?? '—')}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{String(m.mobile)}</td>
+                      <td className="px-3 py-2">
+                        <WaBadge value={String(m.status)} />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {m.status === 'FAILED' ? (
+                          <GhostButton
+                            type="button"
+                            onClick={() => retrySms(String(m.id)).catch(onErr)}
+                          >
+                            Retry
+                          </GhostButton>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <SmsEmpty
+              title={section === 'failed' ? 'No failed messages' : 'No messages yet'}
+              hint="Delivery, history, and failures will list here after you send SMS."
+            />
+          )}
+        </SmsPanel>
       ) : null}
 
       {section === 'dlt' ? (
@@ -391,50 +397,71 @@ export function SmsDesk() {
       ) : null}
 
       {section === 'credits' ? (
-        <WaCard className="max-w-lg space-y-3 p-5" label="Credits">
-          <p className="text-3xl font-semibold">
-            {String(
+        <SmsPanel title="SMS credits">
+          <p
+            className="text-4xl font-extrabold tracking-tight"
+            style={{ color: 'var(--heading, #0f172a)' }}
+          >
+            {Number(
               (settings.data as { manualBalance?: number } | undefined)?.manualBalance ??
                 kpis.balance ??
                 0,
-            )}
+            ).toLocaleString('en-IN')}
           </p>
-          <PrimaryButton
-            type="button"
-            onClick={() =>
-              adjustSmsCredits(1000, 'Manual top-up').then(() =>
-                qc.invalidateQueries({ queryKey: ['sms-set'] }),
-              )
-            }
-          >
-            Add 1,000 credits
-          </PrimaryButton>
-        </WaCard>
+          <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground-hex, #64748b)' }}>
+            Credits remaining for this tenant
+          </p>
+          <div className="mt-4">
+            <PrimaryButton
+              type="button"
+              onClick={() =>
+                adjustSmsCredits(1000, 'Manual top-up').then(() =>
+                  qc.invalidateQueries({ queryKey: ['sms-set'] }),
+                )
+              }
+            >
+              Add 1,000 credits
+            </PrimaryButton>
+          </div>
+        </SmsPanel>
+      ) : null}
+
+      {section === 'contacts' ? (
+        <SmsPanel title="Contacts / Recipients">
+          <SmsEmpty
+            title="Reach parents and staff from Send"
+            hint="Use CLASS, SECTION, STAFF, or search a student to build the recipient list."
+          />
+        </SmsPanel>
       ) : null}
 
       {section === 'settings' ? (
-        <WaCard className="max-w-xl space-y-2 p-5" label="SMS settings">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              defaultChecked={
-                (settings.data as { failoverEnabled?: boolean } | undefined)?.failoverEnabled
-              }
-              onChange={(e) => saveSmsSettings({ failoverEnabled: e.target.checked }).catch(onErr)}
-            />
-            Enable automatic failover
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              defaultChecked={
-                (settings.data as { enforceDlt?: boolean } | undefined)?.enforceDlt !== false
-              }
-              onChange={(e) => saveSmsSettings({ enforceDlt: e.target.checked }).catch(onErr)}
-            />
-            Enforce DLT for promotional SMS
-          </label>
-        </WaCard>
+        <SmsPanel title="SMS settings">
+          <div className="max-w-xl space-y-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                defaultChecked={
+                  (settings.data as { failoverEnabled?: boolean } | undefined)?.failoverEnabled
+                }
+                onChange={(e) =>
+                  saveSmsSettings({ failoverEnabled: e.target.checked }).catch(onErr)
+                }
+              />
+              Enable automatic failover
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                defaultChecked={
+                  (settings.data as { enforceDlt?: boolean } | undefined)?.enforceDlt !== false
+                }
+                onChange={(e) => saveSmsSettings({ enforceDlt: e.target.checked }).catch(onErr)}
+              />
+              Enforce DLT for promotional SMS
+            </label>
+          </div>
+        </SmsPanel>
       ) : null}
 
       {confirm ? (
@@ -464,7 +491,7 @@ export function SmsDesk() {
           </div>
         </div>
       ) : null}
-    </div>
+    </SmsShell>
   );
 }
 
@@ -479,34 +506,46 @@ function TemplatesPanel({
   const [text, setText] = useState('');
   return (
     <div className="space-y-3">
-      <WaCard className="flex flex-wrap gap-2 p-4">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Template name"
-          className="rounded-lg border px-3 py-2"
-        />
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Body"
-          className="min-w-[240px] flex-1 rounded-lg border px-3 py-2"
-        />
-        <PrimaryButton
-          type="button"
-          disabled={!name || !text}
-          onClick={() => onSave({ name, body: text, category: 'GENERAL' })}
-        >
-          Save
-        </PrimaryButton>
-      </WaCard>
-      {rows.map((t) => (
-        <WaCard key={String(t.id)} className="p-4">
-          <p className="font-medium">{String(t.name)}</p>
-          <p className="text-xs text-slate-500">{String(t.key)}</p>
-          <p className="mt-2 text-sm">{String(t.body)}</p>
-        </WaCard>
-      ))}
+      <SmsPanel title="Create template">
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Template name"
+            className="rounded-lg px-3 py-2"
+          />
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Body"
+            className="min-w-[240px] flex-1 rounded-lg px-3 py-2"
+          />
+          <PrimaryButton
+            type="button"
+            disabled={!name || !text}
+            onClick={() => onSave({ name, body: text, category: 'GENERAL' })}
+          >
+            Save
+          </PrimaryButton>
+        </div>
+      </SmsPanel>
+      {rows.length ? (
+        rows.map((t) => (
+          <SmsPanel key={String(t.id)} title={String(t.name)}>
+            <p className="text-xs" style={{ color: 'var(--muted-foreground-hex, #64748b)' }}>
+              {String(t.key)}
+            </p>
+            <p className="mt-2 text-sm">{String(t.body)}</p>
+          </SmsPanel>
+        ))
+      ) : (
+        <SmsPanel title="Saved templates">
+          <SmsEmpty
+            title="No templates yet"
+            hint="Save a reusable template to send fee, attendance, and notice SMS faster."
+          />
+        </SmsPanel>
+      )}
     </div>
   );
 }
@@ -525,54 +564,60 @@ function DltPanel({
   const entity = (data?.entity ?? {}) as { id?: string; name?: string };
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <WaCard className="space-y-2 p-5" label="Principal entity">
-        <p className="text-sm">{entity.name || "St. Luke's Secondary School"}</p>
-        <p className="text-xs text-slate-500">Entity ID: {entity.id || 'Not set'}</p>
-        <input
-          value={header}
-          onChange={(e) => setHeader(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <PrimaryButton type="button" onClick={() => onHeader({ header, status: 'DRAFT' })}>
-          Add header
-        </PrimaryButton>
-        <ul className="text-sm">
-          {((data?.headers as Array<Record<string, unknown>>) ?? []).map((h) => (
-            <li key={String(h.id)}>
-              {String(h.header)} · {String(h.status)}
-            </li>
-          ))}
-        </ul>
-      </WaCard>
-      <WaCard className="space-y-2 p-5" label="Content templates">
-        <input
-          value={dltId}
-          onChange={(e) => setDltId(e.target.value)}
-          placeholder="DLT template ID"
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <PrimaryButton
-          type="button"
-          disabled={!dltId}
-          onClick={() =>
-            onTpl({
-              name: dltId,
-              dltTemplateId: dltId,
-              templateText: 'Registered content',
-              status: 'DRAFT',
-            })
-          }
-        >
-          Add DLT template
-        </PrimaryButton>
-        <ul className="text-sm">
-          {((data?.templates as Array<Record<string, unknown>>) ?? []).map((t) => (
-            <li key={String(t.id)}>
-              {String(t.dltTemplateId)} · {String(t.status)}
-            </li>
-          ))}
-        </ul>
-      </WaCard>
+      <SmsPanel title="Principal entity">
+        <div className="space-y-2">
+          <p className="text-sm">{entity.name || "St. Luke's Secondary School"}</p>
+          <p className="text-xs" style={{ color: 'var(--muted-foreground-hex, #64748b)' }}>
+            Entity ID: {entity.id || 'Not set'}
+          </p>
+          <input
+            value={header}
+            onChange={(e) => setHeader(e.target.value)}
+            className="w-full rounded-lg px-3 py-2"
+          />
+          <PrimaryButton type="button" onClick={() => onHeader({ header, status: 'DRAFT' })}>
+            Add header
+          </PrimaryButton>
+          <ul className="text-sm">
+            {((data?.headers as Array<Record<string, unknown>>) ?? []).map((h) => (
+              <li key={String(h.id)}>
+                {String(h.header)} · {String(h.status)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </SmsPanel>
+      <SmsPanel title="Content templates">
+        <div className="space-y-2">
+          <input
+            value={dltId}
+            onChange={(e) => setDltId(e.target.value)}
+            placeholder="DLT template ID"
+            className="w-full rounded-lg px-3 py-2"
+          />
+          <PrimaryButton
+            type="button"
+            disabled={!dltId}
+            onClick={() =>
+              onTpl({
+                name: dltId,
+                dltTemplateId: dltId,
+                templateText: 'Registered content',
+                status: 'DRAFT',
+              })
+            }
+          >
+            Add DLT template
+          </PrimaryButton>
+          <ul className="text-sm">
+            {((data?.templates as Array<Record<string, unknown>>) ?? []).map((t) => (
+              <li key={String(t.id)}>
+                {String(t.dltTemplateId)} · {String(t.status)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </SmsPanel>
     </div>
   );
 }
@@ -595,85 +640,93 @@ function GatewayPanel({
   const [otpChannel, setOtpChannel] = useState('sms');
   return (
     <div className="space-y-3">
-      <WaCard className="grid gap-2 p-5 sm:grid-cols-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="rounded-lg border px-3 py-2"
-        />
-        <select
-          value={provider}
-          onChange={(e) => setProvider(e.target.value)}
-          className="rounded-lg border px-3 py-2"
-        >
-          {['APITXT', 'MSG91', 'TWILIO', 'EXOTEL', 'CUSTOM_HTTP'].map((p) => (
-            <option key={p}>{p}</option>
-          ))}
-        </select>
-        <input
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="API key / authkey (stored encrypted)"
-          className="rounded-lg border px-3 py-2 sm:col-span-2"
-        />
-        {provider === 'APITXT' ? (
-          <>
-            <input
-              value={otpTemplateId}
-              onChange={(e) => setOtpTemplateId(e.target.value)}
-              placeholder="OTP template_id (optional)"
-              className="rounded-lg border px-3 py-2"
-            />
-            <select
-              value={otpChannel}
-              onChange={(e) => setOtpChannel(e.target.value)}
-              className="rounded-lg border px-3 py-2"
-            >
-              <option value="sms">SMS OTP</option>
-              <option value="whatsapp">WhatsApp OTP</option>
-              <option value="voice">Voice OTP</option>
-            </select>
-          </>
-        ) : null}
-        <PrimaryButton
-          type="button"
-          onClick={() =>
-            onSave({
-              name,
-              provider,
-              apiKey,
-              status: 'ACTIVE',
-              ...(provider === 'APITXT' ? { otpTemplateId, otpChannel, otpCountry: '91' } : {}),
-            })
-          }
-        >
-          Save gateway
-        </PrimaryButton>
-      </WaCard>
-      {rows.map((g) => (
-        <WaCard
-          key={String(g.id)}
-          className="flex flex-wrap items-center justify-between gap-2 p-4"
-        >
-          <div>
-            <p className="font-medium">
-              {String(g.name)} {g.isDefault ? '· default' : ''}
-            </p>
-            <p className="text-xs text-slate-500">
-              {String(g.provider)} · {String(g.status)} · {String(g.health)} · key{' '}
-              {g.hasApiKey ? 'set' : 'missing'}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <GhostButton type="button" onClick={() => onTest(String(g.id))}>
-              Test
-            </GhostButton>
-            <PrimaryButton type="button" onClick={() => onDefault(String(g.id))}>
-              Set default
-            </PrimaryButton>
-          </div>
-        </WaCard>
-      ))}
+      <SmsPanel title="Add gateway">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="rounded-lg px-3 py-2"
+          />
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value)}
+            className="rounded-lg px-3 py-2"
+          >
+            {['APITXT', 'MSG91', 'TWILIO', 'EXOTEL', 'CUSTOM_HTTP'].map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+          <input
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="API key / authkey (stored encrypted)"
+            className="rounded-lg px-3 py-2 sm:col-span-2"
+          />
+          {provider === 'APITXT' ? (
+            <>
+              <input
+                value={otpTemplateId}
+                onChange={(e) => setOtpTemplateId(e.target.value)}
+                placeholder="OTP template_id (optional)"
+                className="rounded-lg px-3 py-2"
+              />
+              <select
+                value={otpChannel}
+                onChange={(e) => setOtpChannel(e.target.value)}
+                className="rounded-lg px-3 py-2"
+              >
+                <option value="sms">SMS OTP</option>
+                <option value="whatsapp">WhatsApp OTP</option>
+                <option value="voice">Voice OTP</option>
+              </select>
+            </>
+          ) : null}
+          <PrimaryButton
+            type="button"
+            onClick={() =>
+              onSave({
+                name,
+                provider,
+                apiKey,
+                status: 'ACTIVE',
+                ...(provider === 'APITXT' ? { otpTemplateId, otpChannel, otpCountry: '91' } : {}),
+              })
+            }
+          >
+            Save gateway
+          </PrimaryButton>
+        </div>
+      </SmsPanel>
+      {rows.length ? (
+        rows.map((g) => (
+          <SmsPanel
+            key={String(g.id)}
+            title={`${String(g.name)}${g.isDefault ? ' · default' : ''}`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs" style={{ color: 'var(--muted-foreground-hex, #64748b)' }}>
+                {String(g.provider)} · {String(g.status)} · {String(g.health)} · key{' '}
+                {g.hasApiKey ? 'set' : 'missing'}
+              </p>
+              <div className="flex gap-2">
+                <GhostButton type="button" onClick={() => onTest(String(g.id))}>
+                  Test
+                </GhostButton>
+                <PrimaryButton type="button" onClick={() => onDefault(String(g.id))}>
+                  Set default
+                </PrimaryButton>
+              </div>
+            </div>
+          </SmsPanel>
+        ))
+      ) : (
+        <SmsPanel title="Registered gateways">
+          <SmsEmpty
+            title="No gateway yet"
+            hint="Add Apitxt or another provider to send OTP and school SMS."
+          />
+        </SmsPanel>
+      )}
     </div>
   );
 }
