@@ -1,7 +1,7 @@
 import { apiFetch } from '@/api/client';
 import { getDeviceId } from '@/auth/device';
 import { markPasswordLogin } from '@/auth/password-gate';
-import { getRefreshToken, saveSession, saveUser } from '@/auth/session';
+import { getRefreshToken, getUser, saveSession, saveUser } from '@/auth/session';
 import { registerSchoolPush } from '@/services/push';
 import { isPrincipalUser, isStaffUser } from '@/persona';
 
@@ -53,7 +53,8 @@ export async function login(identifier: string, password: string) {
   await saveUser({
     displayName: session.user.displayName,
     roles: session.user.roles,
-    mustResetPassword: false,
+    permissions: session.user.permissions,
+    mustResetPassword: Boolean(session.user.mustResetPassword),
     firstLogin: Boolean(session.firstLogin),
     persona: isPrincipalUser(session.user)
       ? 'admin'
@@ -74,7 +75,16 @@ export async function changePassword(currentPassword: string, newPassword: strin
     body: JSON.stringify({ currentPassword, newPassword }),
   });
   await saveSession(session.accessToken, session.refreshToken);
-  await saveUser({ ...session.user, mustResetPassword: false, firstLogin: false });
+  const previous = await getUser();
+  await saveUser({
+    ...previous,
+    ...session.user,
+    mustResetPassword: false,
+    firstLogin: false,
+    persona:
+      previous?.persona ??
+      (isPrincipalUser(session.user) ? 'admin' : isStaffUser(session.user) ? 'teacher' : undefined),
+  });
   return session;
 }
 

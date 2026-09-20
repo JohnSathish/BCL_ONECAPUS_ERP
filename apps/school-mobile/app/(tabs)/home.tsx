@@ -74,12 +74,17 @@ export default function HomeScreen() {
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
       ]);
       setData(home);
-      const me = (home.me ?? {}) as { persona?: string; displayName?: string };
+      const me = (home.me ?? {}) as {
+        persona?: string;
+        displayName?: string;
+        mustResetPassword?: boolean;
+      };
       const user = cached ?? (await getUser());
       await saveUser({
         ...user,
         persona: me.persona,
         displayName: me.displayName || user?.displayName,
+        mustResetPassword: Boolean(me.mustResetPassword),
       });
       setError(null);
     } catch (err) {

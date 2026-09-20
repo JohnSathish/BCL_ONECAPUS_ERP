@@ -1,5 +1,5 @@
 import { getApiBase, schoolHeaders } from '@/api/config';
-import { getAccessToken } from '@/auth/session';
+import { getAccessToken, getUser, saveUser } from '@/auth/session';
 import { justDidPasswordLogin } from '@/auth/password-gate';
 import {
   AccountDisabledError,
@@ -10,10 +10,15 @@ import {
 } from '@/auth/token-refresh';
 
 let onAuthFailure: ((kind: 'expired' | 'disabled' | 'revoked' | 'blocked') => void) | null = null;
+let onPasswordResetRequired: (() => void) | null = null;
 export function setAuthFailureHandler(
   handler: (kind: 'expired' | 'disabled' | 'revoked' | 'blocked') => void,
 ) {
   onAuthFailure = handler;
+}
+
+export function setPasswordResetHandler(handler: () => void) {
+  onPasswordResetRequired = handler;
 }
 
 type Options = RequestInit & {
@@ -63,6 +68,12 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   if ((res.status === 401 || res.status === 403) && /ACCOUNT_DISABLED/i.test(combined)) {
     if (!options.ignoreAuthFailure) onAuthFailure?.('disabled');
     throw new AccountDisabledError();
+  }
+  if (res.status === 403 && /PASSWORD_RESET_REQUIRED/i.test(combined)) {
+    const user = await getUser();
+    if (user) await saveUser({ ...user, mustResetPassword: true });
+    if (!options.ignoreAuthFailure) onPasswordResetRequired?.();
+    throw new Error('Change your temporary password before continuing.');
   }
   if (res.status === 401 && !options.skipAuth && !options._retried) {
     try {

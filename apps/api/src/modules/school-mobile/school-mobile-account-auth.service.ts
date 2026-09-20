@@ -182,7 +182,7 @@ export class SchoolMobileAccountAuthService {
       user.id,
       tenantId,
       { ...meta, clientType: 'mobile' },
-      { mustResetPassword: false },
+      { mustResetPassword: Boolean(user.mustResetPassword) },
     );
     await this.prisma.user.update({
       where: { id: userId },
@@ -232,7 +232,12 @@ export class SchoolMobileAccountAuthService {
     if (!user) throw new UnauthorizedException('Please sign in again.');
     const currentOk = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!currentOk) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new BadRequestException('Current password is incorrect');
+    }
+    if (currentPassword === newPassword) {
+      throw new BadRequestException(
+        'Choose a different password from the current one.',
+      );
     }
     await this.assertNewPassword(
       tenantId,

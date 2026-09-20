@@ -89,6 +89,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       impersonatedBy: payload.impersonatedBy,
       impersonationSessionId: payload.impersonationSessionId,
       isImpersonating: !!payload.impersonationSessionId,
+      mustResetPassword: Boolean(user.mustResetPassword),
     };
   }
 }

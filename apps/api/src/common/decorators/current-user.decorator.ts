@@ -20,6 +20,7 @@ export type JwtUser = {
   impersonatedBy?: string;
   impersonationSessionId?: string;
   isImpersonating?: boolean;
+  mustResetPassword?: boolean;
 };
 
 export const CurrentUser = createParamDecorator(

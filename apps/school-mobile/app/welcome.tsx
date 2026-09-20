@@ -13,13 +13,21 @@ export default function WelcomeScreen() {
 
   useEffect(() => {
     void getUser().then((user) => {
+      if (user?.mustResetPassword) {
+        router.replace('/password');
+        return;
+      }
       const display = user?.displayName?.trim().split(/\s+/)[0];
       if (display) setName(display);
     });
-  }, []);
+  }, [router]);
 
   const continueNext = async () => {
     const user = await getUser();
+    if (user?.mustResetPassword) {
+      router.replace('/password');
+      return;
+    }
     if (user) await saveUser({ ...user, firstLogin: false });
     markPasswordLogin();
     router.replace(HOME_PATH);

@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { BackHandler, Platform } from 'react-native';
 import { useNavigation, usePathname, useRouter, useSegments } from 'expo-router';
+import { getUser } from '@/auth/session';
 import { isBiometricPromptBusy } from '@/auth/biometric';
+import { PASSWORD_PATH } from '@/auth/post-login';
 import {
   dismissAppExitConfirm,
   isAppExitConfirmOpen,
@@ -42,8 +44,15 @@ export function useSchoolAndroidBack() {
   const pathRef = useRef(path);
   const segmentsRef = useRef(segments);
   const exitOpen = useRef(false);
+  const mustResetRef = useRef(false);
   pathRef.current = path;
   segmentsRef.current = segments;
+
+  useEffect(() => {
+    void getUser().then((user) => {
+      mustResetRef.current = Boolean(user?.mustResetPassword);
+    });
+  }, [path]);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -59,6 +68,20 @@ export function useSchoolAndroidBack() {
       const onHome = isHomeScreen(current, segs);
       const onAuth = AUTH_ROOT.has(current);
       const canGoBack = navigation.canGoBack();
+
+      if (mustResetRef.current) {
+        if (current !== PASSWORD_PATH) {
+          router.replace(PASSWORD_PATH);
+          return true;
+        }
+        if (exitOpen.current || isAppExitConfirmOpen()) return true;
+        exitOpen.current = true;
+        requestAppExitConfirm();
+        setTimeout(() => {
+          exitOpen.current = false;
+        }, 400);
+        return true;
+      }
 
       if (onHome) {
         if (exitOpen.current || isAppExitConfirmOpen()) return true;

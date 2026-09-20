@@ -5,9 +5,10 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { setAuthFailureHandler } from '@/api/client';
-import { isAppLockEnabled, isBiometricLoginEnabled } from '@/auth/session';
+import { setAuthFailureHandler, setPasswordResetHandler } from '@/api/client';
+import { getUser, isAppLockEnabled, isBiometricLoginEnabled } from '@/auth/session';
 import { justDidPasswordLogin } from '@/auth/password-gate';
+import { PASSWORD_PATH } from '@/auth/post-login';
 import { ExitAppDialog } from '@/components/exit-app-dialog';
 import { useSchoolAndroidBack } from '@/navigation/use-android-back';
 import {
@@ -31,6 +32,7 @@ const AUTH_HOLD = new Set([
   '/session-ended',
   '/device-blocked',
   '/welcome',
+  '/password',
 ]);
 
 export default function RootLayout() {
@@ -60,6 +62,9 @@ export default function RootLayout() {
       else if (kind === 'blocked') router.replace('/device-blocked');
       else if (kind === 'revoked') router.replace('/session-ended');
       else router.replace('/login');
+    });
+    setPasswordResetHandler(() => {
+      router.replace(PASSWORD_PATH);
     });
     let sub: { remove: () => void } | undefined;
     void import('expo-notifications')
@@ -117,6 +122,22 @@ export default function RootLayout() {
   }, [path, router]);
 
   useEffect(() => {
+    void getUser().then((user) => {
+      if (!user?.mustResetPassword) return;
+      if (
+        path === PASSWORD_PATH ||
+        path === '/login' ||
+        path === '/' ||
+        path === '/account-disabled' ||
+        path === '/session-ended'
+      ) {
+        return;
+      }
+      router.replace(PASSWORD_PATH);
+    });
+  }, [path, router]);
+
+  useEffect(() => {
     void SystemUI.setBackgroundColorAsync('#ffffff');
   }, []);
 
@@ -143,6 +164,14 @@ export default function RootLayout() {
           options={{ contentStyle: { backgroundColor: '#ffffff' }, animation: 'fade' }}
         />
         <Stack.Screen name="welcome" options={{ contentStyle: { backgroundColor: '#ffffff' } }} />
+        <Stack.Screen
+          name="password"
+          options={{
+            contentStyle: { backgroundColor: '#ffffff' },
+            gestureEnabled: false,
+            animationTypeForReplace: 'push',
+          }}
+        />
         <Stack.Screen
           name="(tabs)"
           options={{ contentStyle: { backgroundColor: '#f4f6fb' }, animation: 'fade' }}

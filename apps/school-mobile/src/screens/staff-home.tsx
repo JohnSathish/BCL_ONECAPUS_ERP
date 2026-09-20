@@ -23,7 +23,7 @@ type ClassRow = {
 type Props = { data: Record<string, unknown> };
 
 const ACTIONS = [
-  { icon: '👥', label: 'Take Attendance', href: '/attendance', tint: '#dbeafe' },
+  { icon: '👥', label: 'Take Attendance', href: '/take-attendance', tint: '#dbeafe' },
   { icon: '📝', label: 'Lesson Plan', href: '/lesson-plan', tint: '#dcfce7' },
   { icon: '📖', label: 'Homework', href: '/homework', tint: '#ffedd5' },
   { icon: '📊', label: 'Examinations', href: '/examinations', tint: '#fee2e2' },
@@ -292,7 +292,9 @@ export function StaffHome({ data }: Props) {
                 <Pressable
                   key={row.id}
                   style={styles.classCard}
-                  onPress={() => router.push('/attendance')}
+                  onPress={() =>
+                    router.push(`/take-attendance?sectionId=${encodeURIComponent(row.id)}`)
+                  }
                 >
                   <Text style={styles.className}>{row.label}</Text>
                   <Text style={styles.classCount}>{row.students} Students</Text>

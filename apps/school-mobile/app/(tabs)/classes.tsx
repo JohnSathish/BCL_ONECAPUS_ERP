@@ -33,7 +33,10 @@ export default function ClassesScreen() {
       ) : null}
       <Feed>
         {rows.map((row) => (
-          <Pressable key={row.id} onPress={() => router.push('/attendance')}>
+          <Pressable
+            key={row.id}
+            onPress={() => router.push(`/take-attendance?sectionId=${encodeURIComponent(row.id)}`)}
+          >
             <Card>
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>

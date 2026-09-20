@@ -8,6 +8,7 @@ import { mediaUrl } from '@/api/config';
 import { confirmLogout } from '@/auth/logout';
 import { Loader } from '@/ui/kit';
 import { colors } from '@/theme/tokens';
+import { isPrincipalUser, isStaffUser } from '@/persona';
 
 type Guardian = { fullName: string; relation: string; phone?: string | null };
 type Child = {
@@ -17,10 +18,12 @@ type Child = {
   academicYearName?: string | null;
 };
 type Me = {
+  persona?: string;
   displayName?: string;
   email?: string;
   activeStudentId?: string | null;
   children?: Child[];
+  staff?: { fullName?: string; photoUrl?: string | null; designation?: string | null } | null;
   student?: {
     fullName?: string;
     admissionNumber?: string;
@@ -79,6 +82,13 @@ const MENU: Array<{
     href: '/examinations',
   },
   {
+    icon: '🔒',
+    tint: '#e0e7ff',
+    label: 'Change Password',
+    hint: 'Update your account password',
+    href: '/password',
+  },
+  {
     icon: '⚙️',
     tint: '#e0f2fe',
     label: 'Settings',
@@ -117,8 +127,19 @@ export default function ProfileScreen() {
     );
   }
 
-  const name = me.student?.fullName || me.displayName || 'Student';
-  const photo = me.student?.photoUrl;
+  const name = me.staff?.fullName || me.student?.fullName || me.displayName || 'Student';
+  const photo = me.staff?.photoUrl || me.student?.photoUrl;
+  const staff = isStaffUser(me) || isPrincipalUser(me);
+  const menu = MENU.filter((item) => {
+    if (!staff) return true;
+    return !['Parent / Guardian Details', 'Academic Information', 'Examination Results'].includes(
+      item.label,
+    );
+  }).map((item) =>
+    staff && item.label === 'Attendance'
+      ? { ...item, hint: 'Mark class attendance', href: '/take-attendance' }
+      : item,
+  );
   const child =
     me.children?.find((row) => row.studentId === me.activeStudentId) ?? me.children?.[0];
   const classLabel = me.student?.classLabel || child?.classLabel || '—';
@@ -202,7 +223,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {MENU.map((item) => (
+        {menu.map((item) => (
           <Pressable
             key={item.label}
             onPress={() => (item.logout ? logout() : router.push(item.href as never))}

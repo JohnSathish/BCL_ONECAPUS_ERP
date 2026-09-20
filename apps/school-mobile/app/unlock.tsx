@@ -10,7 +10,7 @@ import { getUser } from '@/auth/session';
 import { refreshAccessToken } from '@/auth/token-refresh';
 import { CREST, SCHOOL } from '@/brand';
 import { Screen } from '@/ui/kit';
-import { HOME_PATH } from '@/services/notification-path';
+import { destinationAfterAuth } from '@/auth/post-login';
 import { justDidPasswordLogin } from '@/auth/password-gate';
 import { colors, radii, space } from '@/theme/tokens';
 
@@ -22,11 +22,11 @@ export default function UnlockScreen() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (justDidPasswordLogin()) {
-      router.replace(HOME_PATH);
-      return;
-    }
     void getUser().then((user) => {
+      if (justDidPasswordLogin() || user?.mustResetPassword) {
+        router.replace(destinationAfterAuth(user));
+        return;
+      }
       if (user?.displayName) setName(user.displayName);
     });
     void biometricCapability().then((cap) => setLabel(cap.label));
@@ -48,7 +48,8 @@ export default function UnlockScreen() {
         return;
       }
       await refreshAccessToken({ biometricUnlock: true });
-      router.replace(HOME_PATH);
+      const user = await getUser();
+      router.replace(destinationAfterAuth(user));
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (msg === 'ACCOUNT_DISABLED') {
@@ -56,7 +57,8 @@ export default function UnlockScreen() {
         return;
       }
       if (msg.toLowerCase().includes('offline')) {
-        router.replace(HOME_PATH);
+        const user = await getUser();
+        router.replace(destinationAfterAuth(user));
         return;
       }
       setError('Session could not be renewed. Sign in with your password.');

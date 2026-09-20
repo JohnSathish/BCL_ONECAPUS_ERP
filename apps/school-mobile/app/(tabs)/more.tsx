@@ -48,6 +48,7 @@ export default function MoreScreen() {
         <Card>
           <Row icon="🙏" label="Daily Morning Prayer" onPress={() => router.push('/prayer')} />
           <Row icon="🏫" label="School Information" onPress={() => router.push('/school')} />
+          <Row icon="🔑" label="Change Password" onPress={() => router.push('/password')} />
           <Row icon="🔒" label="Security" onPress={() => router.push('/security')} />
           <Row icon="💬" label="Feedback / Enquiry" onPress={() => router.push('/feedback')} />
           <Row icon="ℹ️" label="App Information" onPress={() => router.push('/app-info')} />

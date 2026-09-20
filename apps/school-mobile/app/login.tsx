@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CREST, SCHOOL } from '@/brand';
 import { login } from '@/auth/account';
 import { markPasswordLogin } from '@/auth/password-gate';
+import { destinationAfterAuth } from '@/auth/post-login';
 import { APP_VERSION } from '@/api/config';
 import { Screen } from '@/ui/kit';
 import { colors, radii, space } from '@/theme/tokens';
@@ -44,11 +45,9 @@ export default function LoginScreen() {
       const session = await login(id, password);
       markPasswordLogin();
       Keyboard.dismiss();
-      if (session.firstLogin) {
-        router.replace('/welcome');
-        return;
-      }
-      router.replace('/home');
+      const next = destinationAfterAuth(session.user, session.firstLogin);
+      router.replace(next);
+      return;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not sign in');
     } finally {

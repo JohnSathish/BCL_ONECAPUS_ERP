@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { apiFetch } from '@/api/client';
 import { APP_VERSION } from '@/api/config';
 import { restoreSchoolSession } from '@/auth/restore';
+import { PASSWORD_PATH } from '@/auth/post-login';
 import { captureLaunchNotification } from '@/services/notification-open';
 import { HOME_PATH } from '@/services/notification-path';
 import { LaunchSplash } from '@/screens/launch-splash';
@@ -56,8 +57,13 @@ export default function GateScreen() {
       }
       if (cancelled) return;
       await captureLaunchNotification();
-      let next: '/login' | '/welcome' | '/account-disabled' | typeof HOME_PATH | '/unlock' =
-        '/login';
+      let next:
+        | '/login'
+        | '/welcome'
+        | '/account-disabled'
+        | typeof HOME_PATH
+        | '/unlock'
+        | typeof PASSWORD_PATH = '/login';
       try {
         const restored = await restoreSchoolSession();
         next = restored.route === HOME_PATH ? HOME_PATH : restored.route;

@@ -11,6 +11,7 @@ import {
   Query,
   Req,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
@@ -90,6 +91,7 @@ import { SchoolMobilePrincipalService } from './school-mobile-principal.service'
 import { SchoolMobileInboxService } from './school-mobile-inbox.service';
 import { SchoolMobilePrayerService } from './school-mobile-prayer.service';
 import { SchoolMobileSettingsService } from './school-mobile-settings.service';
+import { SchoolMobilePasswordResetGuard } from './school-mobile-password-reset.guard';
 
 const ACCESS = [...SCHOOL_MOBILE_ACCESS_PERMISSIONS, 'school-sis:read'];
 const OFFICE = [
@@ -100,6 +102,7 @@ const OFFICE = [
 
 @ApiTags('school-mobile')
 @Controller({ path: 'school-mobile', version: '1' })
+@UseGuards(SchoolMobilePasswordResetGuard)
 export class SchoolMobileController {
   constructor(
     private readonly cls: ClsService,
