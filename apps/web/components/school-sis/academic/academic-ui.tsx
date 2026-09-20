@@ -7,6 +7,7 @@ import { cn } from '@/utils/cn';
 export const ACADEMIC_LINKS = [
   { href: '/admin/school-sis/academic', label: 'Overview', exact: true },
   { href: '/admin/school-sis/academic/years', label: 'Academic Year' },
+  { href: '/admin/school-sis/academic/calendar', label: 'Academic Calendar' },
   { href: '/admin/school-sis/academic/classes', label: 'Classes' },
   { href: '/admin/school-sis/academic/subjects', label: 'Subjects' },
   { href: '/admin/school-sis/academic/class-subjects', label: 'Class-wise Subjects' },
@@ -49,9 +50,10 @@ export function AcademicSubnav() {
   return (
     <nav className="flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
       {ACADEMIC_LINKS.map((item) => {
-        const active = item.exact
-          ? pathname === item.href
-          : pathname === item.href || pathname?.startsWith(`${item.href}/`);
+        const active =
+          'exact' in item && item.exact
+            ? pathname === item.href
+            : pathname === item.href || pathname?.startsWith(`${item.href}/`);
         return (
           <Link
             key={item.href}

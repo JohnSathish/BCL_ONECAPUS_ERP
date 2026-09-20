@@ -21,6 +21,12 @@ const MODULES = [
     icon: CalendarDays,
   },
   {
+    href: '/admin/school-sis/academic/calendar',
+    title: 'Academic Calendar',
+    hint: 'Year schedule, holidays, exams, meetings and events',
+    icon: CalendarDays,
+  },
+  {
     href: '/admin/school-sis/academic/classes',
     title: 'Classes',
     hint: 'Classes, sections, capacity, class teacher',

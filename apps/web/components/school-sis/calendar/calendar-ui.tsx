@@ -6,7 +6,7 @@ import { cn } from '@/utils/cn';
 
 export const CAL_LINKS = [
   { href: '/admin/school-sis/holidays', label: 'Holiday Calendar', exact: true },
-  { href: '/admin/school-sis/holidays/academic', label: 'Academic Calendar' },
+  { href: '/admin/school-sis/academic/calendar', label: 'Academic Calendar' },
 ];
 
 export function CalendarShell({

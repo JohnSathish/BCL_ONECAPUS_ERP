@@ -1,7 +1,5 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { AcademicCalendarDesk } from '@/components/school-sis/calendar/academic-calendar-desk';
-
-export default function Page() {
-  return <AcademicCalendarDesk />;
+export default function LegacyAcademicCalendarPage() {
+  redirect('/admin/school-sis/academic/calendar');
 }

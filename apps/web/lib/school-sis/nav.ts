@@ -71,6 +71,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         status: 'active',
         children: [
           live('ac-years', 'Academic Year', '/admin/school-sis/academic/years'),
+          live('ac-calendar', 'Academic Calendar', '/admin/school-sis/academic/calendar'),
           live('ac-classes', 'Classes', '/admin/school-sis/academic/classes'),
           live('ac-subjects', 'Subjects', '/admin/school-sis/academic/subjects'),
           live(
@@ -256,7 +257,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         status: 'active',
         children: [
           live('holiday-calendar', 'Holiday Calendar', '/admin/school-sis/holidays'),
-          live('academic-calendar', 'Academic Calendar', '/admin/school-sis/holidays/academic'),
+          live('academic-calendar', 'Academic Calendar', '/admin/school-sis/academic/calendar'),
         ],
       },
       {
