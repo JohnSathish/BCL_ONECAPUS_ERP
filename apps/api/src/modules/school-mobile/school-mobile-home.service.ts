@@ -692,6 +692,147 @@ export class SchoolMobileHomeService {
     };
   }
 
+  /** Class-wise monthly attendance summary for the staff portal history page. */
+  async teacherAttendanceHistory(
+    tenantId: string,
+    staffId: string,
+    month?: string,
+  ) {
+    const monthKey =
+      month && /^\d{4}-\d{2}$/.test(month) ? month : istDayKey().slice(0, 7);
+    const [assignments, subjectAssignments, academicYear] = await Promise.all([
+      this.prisma.schoolClassTeacherAssignment.findMany({
+        where: { tenantId, staffId, deletedAt: null },
+        include: { section: { include: { grade: true } } },
+      }),
+      this.prisma.schoolSubjectTeacherAssignment.findMany({
+        where: { tenantId, staffId, deletedAt: null },
+        include: { section: { include: { grade: true } } },
+      }),
+      this.sis.currentYear(tenantId).catch(() => null),
+    ]);
+    type SectionRow = {
+      id: string;
+      label: string;
+      sortOrder: number;
+    };
+    const sectionMap = new Map<string, SectionRow>();
+    const upsert = (
+      id: string,
+      label: string,
+      grade?: { sortOrder?: number } | null,
+    ) => {
+      const prev = sectionMap.get(id);
+      sectionMap.set(id, {
+        id,
+        label: label || prev?.label || 'Class',
+        sortOrder: grade?.sortOrder ?? prev?.sortOrder ?? 99,
+      });
+    };
+    for (const row of assignments) {
+      upsert(
+        row.sectionId,
+        `${row.section.grade.name} ${row.section.name}`.trim(),
+        row.section.grade,
+      );
+    }
+    for (const row of subjectAssignments) {
+      upsert(
+        row.sectionId,
+        `${row.section.grade.name} ${row.section.name}`.trim(),
+        row.section.grade,
+      );
+    }
+    if (academicYear) {
+      try {
+        const grid = await this.timetable.teacherGrid(tenantId, staffId, false);
+        for (const slot of grid.slots ?? []) {
+          const id = slot.section?.id;
+          if (!id) continue;
+          const label =
+            `${slot.section?.grade?.name ?? ''} ${slot.section?.name ?? ''}`.trim();
+          if (label) upsert(id, label, null);
+        }
+      } catch {
+        /* optional */
+      }
+    }
+    const sections = [...sectionMap.values()].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label),
+    );
+    const monthlyRows = await Promise.all(
+      sections.map(async (sec) => {
+        try {
+          const pack = await this.attendanceSvc.monthly(tenantId, {
+            academicYearId: academicYear?.id,
+            sectionId: sec.id,
+            month: monthKey,
+          });
+          const students = pack.students ?? [];
+          const present = students.reduce(
+            (n, row) => n + Number(row.present ?? 0),
+            0,
+          );
+          const absent = students.reduce(
+            (n, row) => n + Number(row.absent ?? 0),
+            0,
+          );
+          const late = students.reduce(
+            (n, row) => n + Number(row.late ?? 0),
+            0,
+          );
+          const pctSum = students.reduce(
+            (n, row) => n + Number(row.percent ?? 0),
+            0,
+          );
+          const percent = students.length
+            ? Math.round(pctSum / students.length)
+            : 0;
+          return {
+            id: sec.id,
+            label: sec.label,
+            students: students.length,
+            present,
+            absent,
+            late,
+            percent,
+            workingDays: Number(pack.workingDays ?? 0),
+          };
+        } catch {
+          return {
+            id: sec.id,
+            label: sec.label,
+            students: 0,
+            present: 0,
+            absent: 0,
+            late: 0,
+            percent: 0,
+            workingDays: 0,
+          };
+        }
+      }),
+    );
+    const workingDays = monthlyRows.reduce(
+      (max, row) => Math.max(max, row.workingDays),
+      0,
+    );
+    const studentCount = monthlyRows.reduce((n, row) => n + row.students, 0);
+    const marked = monthlyRows.filter((row) => row.students > 0);
+    const avgAttendance = marked.length
+      ? Math.round(
+          marked.reduce((n, row) => n + row.percent, 0) / marked.length,
+        )
+      : 0;
+    return {
+      month: monthKey,
+      workingDays,
+      classCount: monthlyRows.length,
+      studentCount,
+      avgAttendance,
+      classes: monthlyRows.map(({ workingDays: _wd, ...row }) => row),
+    };
+  }
+
   async teacherClass(tenantId: string, staffId: string, sectionId: string) {
     const year = await this.sis.currentYear(tenantId);
     const section = await this.prisma.schoolSection.findFirst({

@@ -2440,3 +2440,388 @@
     width: 100%;
   }
 }
+
+/* —— Staff attendance history —— */
+.school-sis-portal .sls-ath {
+  display: grid;
+  gap: 1rem;
+}
+
+.school-sis-portal .sls-ath-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.school-sis-portal .sls-ath-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.school-sis-portal .sls-ath-title-ico {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 14px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  flex-shrink: 0;
+}
+
+.school-sis-portal .sls-ath-title h1 {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.school-sis-portal .sls-ath-title p {
+  margin: 0.2rem 0 0;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.school-sis-portal .sls-ath-month {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.school-sis-portal .sls-ath-month select {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.school-sis-portal .sls-ath-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.school-sis-portal .sls-ath-kpi {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 1rem 1.05rem;
+  border-radius: 18px;
+  border: 1px solid #e8edf5;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.school-sis-portal .sls-ath-kpi > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.school-sis-portal .sls-ath-kpi p {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.school-sis-portal .sls-ath-kpi strong {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 1.55rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #0f172a;
+}
+
+.school-sis-portal .sls-ath-kpi em {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  font-style: normal;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.school-sis-portal .sls-ath-kpi-ico {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.school-sis-portal .sls-ath-kpi.is-sky .sls-ath-kpi-ico {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.school-sis-portal .sls-ath-kpi.is-green {
+  background: linear-gradient(180deg, #f0fdf4 0%, #fff 70%);
+}
+.school-sis-portal .sls-ath-kpi.is-green .sls-ath-kpi-ico {
+  background: #d1fae5;
+  color: #059669;
+}
+.school-sis-portal .sls-ath-kpi.is-green strong {
+  color: #059669;
+}
+.school-sis-portal .sls-ath-kpi.is-blue .sls-ath-kpi-ico {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.school-sis-portal .sls-ath-kpi.is-violet .sls-ath-kpi-ico {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.school-sis-portal .sls-ath-meter {
+  display: block;
+  margin-top: 0.55rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.school-sis-portal .sls-ath-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #10b981;
+}
+
+.school-sis-portal .sls-ath-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.school-sis-portal .sls-ath-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.school-sis-portal .sls-ath-panel-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.school-sis-portal .sls-ath-panel-head p {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.school-sis-portal .sls-ath-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.school-sis-portal .sls-ath-export:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.school-sis-portal .sls-ath-table-wrap {
+  overflow-x: auto;
+}
+
+.school-sis-portal .sls-ath-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.school-sis-portal .sls-ath-table th,
+.school-sis-portal .sls-ath-table td {
+  padding: 0.85rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.school-sis-portal .sls-ath-table th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.school-sis-portal .sls-ath-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.school-sis-portal .sls-ath-table td.is-present {
+  color: #059669;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-ath-table td.is-absent {
+  color: #e11d48;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-ath-class {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.school-sis-portal .sls-ath-class b {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.school-sis-portal .sls-ath-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.school-sis-portal .sls-ath-badge.is-sky {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.school-sis-portal .sls-ath-badge.is-emerald {
+  background: #d1fae5;
+  color: #047857;
+}
+.school-sis-portal .sls-ath-badge.is-violet {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+.school-sis-portal .sls-ath-badge.is-amber {
+  background: #fef3c7;
+  color: #b45309;
+}
+.school-sis-portal .sls-ath-badge.is-rose {
+  background: #ffe4e6;
+  color: #be123c;
+}
+.school-sis-portal .sls-ath-badge.is-navy {
+  background: #e2e8f0;
+  color: #1e3a8a;
+}
+
+.school-sis-portal .sls-ath-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 8.5rem;
+}
+
+.school-sis-portal .sls-ath-progress-track {
+  display: block;
+  flex: 1;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.school-sis-portal .sls-ath-progress-track > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #10b981;
+}
+
+.school-sis-portal .sls-ath-progress em {
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #334155;
+  min-width: 2.2rem;
+}
+
+.school-sis-portal .sls-ath-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.school-sis-portal .sls-ath-view:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.school-sis-portal .sls-ath-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1.15rem;
+  border-top: 1px solid #edf2f7;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.school-sis-portal .sls-ath-foot p {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .school-sis-portal .sls-ath-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .school-sis-portal .sls-ath-kpis {
+    grid-template-columns: 1fr;
+  }
+}

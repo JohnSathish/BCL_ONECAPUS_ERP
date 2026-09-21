@@ -97,6 +97,28 @@ export async function fetchSchoolTeacherToday(date?: string) {
   return data as Record<string, unknown>;
 }
 
+export async function fetchSchoolAttendanceHistory(month?: string) {
+  const { data } = await api.get('/v1/school-mobile/attendance/history', {
+    params: month ? { month } : undefined,
+  });
+  return data as {
+    month: string;
+    workingDays: number;
+    classCount: number;
+    studentCount: number;
+    avgAttendance: number;
+    classes: Array<{
+      id: string;
+      label: string;
+      students: number;
+      present: number;
+      absent: number;
+      late: number;
+      percent: number;
+    }>;
+  };
+}
+
 export async function fetchSchoolPortalRoster(input: {
   date: string;
   sectionId: string;

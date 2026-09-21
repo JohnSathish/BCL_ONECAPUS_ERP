@@ -778,6 +778,25 @@ export class SchoolMobileController {
     return this.attendance.teacherToday(user.tid, user.sub, date);
   }
 
+  @Get('attendance/history')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    SCHOOL_MOBILE_PERMISSION_MANAGE,
+    'school-sis:read',
+    'school-sis:manage',
+    'attendance.view',
+    'attendance.create',
+  )
+  async attendanceHistory(
+    @CurrentUser() user: JwtUser,
+    @Query('month') month?: string,
+  ) {
+    const staffId = await this.access.staffIdForUser(user.tid, user);
+    if (!staffId) throw new ForbiddenException('Staff profile not found');
+    return this.home.teacherAttendanceHistory(user.tid, staffId, month);
+  }
+
   @Get('teacher/class')
   @ApiBearerAuth()
   @RequireAnyPermission(

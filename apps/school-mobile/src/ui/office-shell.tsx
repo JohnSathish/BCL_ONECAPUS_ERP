@@ -22,7 +22,7 @@ export function OfficeShell({
 }) {
   const router = useRouter();
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.bar}>
         <Pressable
           onPress={() => {

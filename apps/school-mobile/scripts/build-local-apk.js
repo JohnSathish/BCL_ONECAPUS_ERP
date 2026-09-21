@@ -18,7 +18,7 @@ process.chdir(root);
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const appVersion = pkg.version || '1.0.6';
-const versionCode = '25';
+const versionCode = '27';
 
 const jdkCandidates = [
   process.env.JAVA_HOME,
@@ -155,6 +155,31 @@ function run(cmd, args, opts = {}) {
   }
 }
 
+function ensureProguardRules() {
+  const rulesPath = path.join(root, 'android', 'app', 'proguard-rules.pro');
+  const rules = `# St. Luke's School — R8 keep rules (Play memory/performance score)
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+-keepattributes *Annotation*,Signature,Exceptions,InnerClasses,EnclosingMethod
+-keep class com.facebook.react.** { *; }
+-keep class com.facebook.hermes.** { *; }
+-keep class com.facebook.jni.** { *; }
+-keep class com.facebook.react.turbomodule.** { *; }
+-keep class com.facebook.react.bridge.** { *; }
+-dontwarn com.facebook.react.**
+-dontwarn com.facebook.hermes.**
+-keep class com.swmansion.reanimated.** { *; }
+-keep class com.swmansion.gesturehandler.** { *; }
+-keep class expo.modules.** { *; }
+-dontwarn expo.modules.**
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+-keep class com.zoontek.rnedgetoedge.** { *; }
+`;
+  fs.writeFileSync(rulesPath, rules);
+  console.log('Wrote android/app/proguard-rules.pro for R8 release builds');
+}
+
 function shrinkSplashLogos() {
   const pyPath = path.join(root, 'scripts', '_shrink_splash.py');
   fs.writeFileSync(
@@ -179,8 +204,26 @@ for folder, px in sizes.items():
     x = (px - im.width) // 2
     y = (px - im.height) // 2
     canvas.paste(im, (x, y), im)
-    canvas.save(p, 'PNG')
-    print('splash', folder, canvas.size)
+    canvas.save(p, 'PNG', optimize=True, compress_level=9)
+    print('splash', folder, canvas.size, os.path.getsize(p))
+
+# Re-encode oversized mipmap/drawable bitmaps (Play bitmap optimization).
+for dirpath, _, files in os.walk(root):
+    for name in files:
+        if not name.lower().endswith('.png'):
+            continue
+        p = os.path.join(dirpath, name)
+        try:
+            before = os.path.getsize(p)
+            if before < 40_000:
+                continue
+            im = Image.open(p).convert('RGBA')
+            im.save(p, 'PNG', optimize=True, compress_level=9)
+            after = os.path.getsize(p)
+            if after < before:
+                print('crunch', os.path.relpath(p, root), before, '->', after)
+        except Exception as e:
+            print('skip', p, e)
 `,
   );
   const r = spawnSync('python', [pyPath], { stdio: 'inherit', cwd: root });
@@ -357,6 +400,9 @@ function patchGradleProperties() {
     'android.targetSdkVersion': '36',
     'android.buildToolsVersion': '36.0.0',
     'android.enableProguardInReleaseBuilds': 'true',
+    'android.enableShrinkResourcesInReleaseBuilds': 'true',
+    'android.enablePngCrunchInReleaseBuilds': 'true',
+    'expo.edgeToEdgeEnabled': 'true',
   };
   for (const [key, value] of Object.entries(sdkProps)) {
     const line = `${key}=${value}`;
@@ -441,6 +487,7 @@ run('npx', prebuildArgs);
 patchGradleProperties();
 patchAndroidSdkGradleFiles();
 assertTargetSdk36();
+ensureProguardRules();
 shrinkSplashLogos();
 stripFirebaseMessagingIfNeeded();
 ensureUploadSigningInGradle();

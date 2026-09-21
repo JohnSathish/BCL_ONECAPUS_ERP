@@ -19,6 +19,7 @@ import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { apiErrorMessage } from '@/utils/api-error';
 import { DashboardCard, NotificationPanel, PortalAvatar } from './portal-widgets';
 import { StaffAttendanceMarkPage } from './staff-attendance-mark-page';
+import { StaffAttendanceHistoryPage } from './staff-attendance-history-page';
 import { StaffHomeworkPage } from './staff-homework-page';
 import { StaffMarksPage } from './staff-marks-page';
 import { StaffTimetablePage } from './staff-timetable-page';
@@ -158,26 +159,7 @@ export function StaffSection({ section }: { section: string }) {
   if (section === 'timetable') return <StaffTimetablePage />;
   if (section === 'reports') return <AttendanceReportsDesk />;
   if (section === 'attendance') {
-    return (
-      <div>
-        <Title title="Attendance history" hint="Class-wise summary from your assigned sections." />
-        <DashboardCard title="Classes">
-          <ul className="space-y-2 text-sm">
-            {asList(asRecord(home?.desk).classes).map((row) => {
-              const item = asRecord(row);
-              return (
-                <li key={asText(item.id)} className="flex justify-between">
-                  <span>{asText(item.label)}</span>
-                  <span>
-                    {item.percent == null ? '—' : `${Math.round(asNumber(item.percent))}%`}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </DashboardCard>
-      </div>
-    );
+    return <StaffAttendanceHistoryPage />;
   }
   if (section === 'messages') {
     return <StaffInbox onRead={() => qc.invalidateQueries({ queryKey: ['portal-inbox'] })} />;

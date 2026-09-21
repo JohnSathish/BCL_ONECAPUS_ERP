@@ -17,9 +17,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? "St. Luke's School",
   slug: 'st-lukes-school',
-  version: '1.0.22',
+  version: '1.0.24',
   scheme: 'stlukesschool',
-  orientation: 'portrait',
+  // Play large-screen guidance: do not lock to portrait in the manifest.
+  orientation: 'default',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   icon: './assets/icon.png',
@@ -28,18 +29,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     resizeMode: 'contain',
     backgroundColor: '#0b2db8',
   },
+  // Edge-to-edge: avoid solid status/nav bar colors (deprecated on Android 15+).
   androidStatusBar: {
-    backgroundColor: '#ffffff',
     barStyle: 'dark-content',
+    translucent: true,
+    backgroundColor: '#00000000',
   },
   androidNavigationBar: {
-    backgroundColor: '#ffffff',
     barStyle: 'dark-content',
+    backgroundColor: '#00000000',
   },
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'in.stlukestura.school',
-    buildNumber: '25',
+    buildNumber: '27',
     ...(hasGoogleServiceInfo ? { googleServicesFile: googleServiceInfoLocal } : {}),
     infoPlist: {
       NSFaceIDUsageDescription:
@@ -51,7 +54,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'in.stlukestura.school',
-    versionCode: 25,
+    versionCode: 27,
+    edgeToEdgeEnabled: true,
     allowBackup: false,
     ...(hasGoogleServices ? { googleServicesFile: googleServicesLocal } : {}),
     adaptiveIcon: {
@@ -107,6 +111,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     'expo-font',
     'expo-document-picker',
+    [
+      'react-native-edge-to-edge',
+      {
+        android: {
+          parentTheme: 'Default',
+          enforceNavigationBarContrast: false,
+        },
+      },
+    ],
     './plugins/with-android-target-sdk-36',
   ],
   experiments: { typedRoutes: true },

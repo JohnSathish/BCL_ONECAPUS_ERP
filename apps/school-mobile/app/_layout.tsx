@@ -190,10 +190,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar
-        style={splash ? 'light' : 'dark'}
-        backgroundColor={splash ? '#0b2db8' : '#ffffff'}
-      />
+      <StatusBar style={splash ? 'light' : 'dark'} translucent />
       <Stack
         screenOptions={{
           headerShown: false,
