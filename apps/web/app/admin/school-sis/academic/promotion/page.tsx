@@ -1,6 +1,6 @@
 'use client';
 
-import { AcademicPromotionPanel } from '@/components/school-sis/academic/academic-life-panels';
+import { AcademicPromotionPanel } from '@/components/school-sis/academic/academic-promotion-panel';
 
 export default function Page() {
   return <AcademicPromotionPanel />;

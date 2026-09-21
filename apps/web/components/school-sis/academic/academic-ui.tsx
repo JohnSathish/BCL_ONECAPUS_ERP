@@ -2,6 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import {
+  ArrowUpRight,
+  BookMarked,
+  BookOpen,
+  CalendarDays,
+  CalendarRange,
+  ClipboardCheck,
+  Clock3,
+  GitBranch,
+  Home,
+  IdCard,
+  LayoutDashboard,
+  School,
+  Trophy,
+  Users,
+} from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 export const ACADEMIC_LINKS = [
@@ -20,6 +36,23 @@ export const ACADEMIC_LINKS = [
   { href: '/admin/school-sis/academic/id-cards', label: 'ID Cards' },
   { href: '/admin/school-sis/academic/attendance-settings', label: 'Attendance Settings' },
 ] as const;
+
+const ACADEMIC_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  Overview: LayoutDashboard,
+  'Academic Year': CalendarRange,
+  'Academic Calendar': CalendarDays,
+  Classes: School,
+  Subjects: BookOpen,
+  'Class-wise Subjects': BookMarked,
+  'Class-wise Staff': Users,
+  Timetable: Clock3,
+  'Optional Mapping': GitBranch,
+  Houses: Home,
+  Clubs: Trophy,
+  Promotion: ArrowUpRight,
+  'ID Cards': IdCard,
+  'Attendance Settings': ClipboardCheck,
+};
 
 export function AcademicPageHeader({
   title,
@@ -49,25 +82,35 @@ export function AcademicPageHeader({
 export function AcademicSubnav() {
   const pathname = usePathname();
   return (
-    <nav className="flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
-      {ACADEMIC_LINKS.map((item) => {
-        const active =
-          'exact' in item && item.exact
-            ? pathname === item.href
-            : pathname === item.href || pathname?.startsWith(`${item.href}/`);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              'rounded-xl px-3 py-2 text-xs font-medium transition sm:text-sm',
-              active ? 'bg-[#1e3a8a] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
-            )}
-          >
-            {item.label}
-          </Link>
-        );
-      })}
+    <nav
+      aria-label="Academic configuration"
+      className="-mx-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <div className="flex w-max min-w-full gap-1.5 px-1 py-0.5">
+        {ACADEMIC_LINKS.map((item) => {
+          const active =
+            'exact' in item && item.exact
+              ? pathname === item.href
+              : pathname === item.href || pathname?.startsWith(`${item.href}/`);
+          const Icon = ACADEMIC_ICONS[item.label];
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm',
+                active
+                  ? 'bg-[var(--school-erp-primary,#1e3a8a)] text-white'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+              )}
+            >
+              {Icon ? <Icon className="h-3.5 w-3.5" aria-hidden /> : null}
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

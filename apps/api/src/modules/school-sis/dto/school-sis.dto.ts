@@ -1048,6 +1048,12 @@ export class SaveSchoolClassSubjectsDto {
   subjectIds!: string[];
 }
 
+export class SaveSchoolSubjectGradesDto {
+  @IsArray()
+  @IsUUID('4', { each: true })
+  gradeIds!: string[];
+}
+
 export class BulkSchoolClassSubjectsDto {
   @IsArray()
   @IsUUID('4', { each: true })
@@ -1219,6 +1225,20 @@ export class SaveSchoolOptionalMappingDto {
   subjectIds!: string[];
 }
 
+export class SchoolPromotionTargetDto {
+  @IsUUID()
+  studentId!: string;
+
+  @IsOptional()
+  @IsUUID()
+  toSectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  note?: string;
+}
+
 export class BulkSchoolPromotionDto {
   @IsArray()
   @IsUUID('4', { each: true })
@@ -1235,6 +1255,12 @@ export class BulkSchoolPromotionDto {
   @IsString()
   @MaxLength(240)
   note?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SchoolPromotionTargetDto)
+  items?: SchoolPromotionTargetDto[];
 }
 
 export class SaveSchoolIdCardTemplateDto {

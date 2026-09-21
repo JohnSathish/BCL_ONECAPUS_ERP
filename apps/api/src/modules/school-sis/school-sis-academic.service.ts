@@ -52,6 +52,36 @@ const DEFAULT_ID_LAYOUT = {
   accentColor: '#1a365d',
 };
 
+type PromotionSection = {
+  id: string;
+  name: string;
+  academicYearId: string;
+  grade: { sortOrder: number };
+};
+
+function suggestNextSection(
+  from: PromotionSection,
+  sections: PromotionSection[],
+) {
+  const ranked = sections
+    .filter(
+      (row) => row.id !== from.id && row.grade.sortOrder > from.grade.sortOrder,
+    )
+    .sort((a, b) => {
+      const aSameYear = a.academicYearId === from.academicYearId ? 0 : 1;
+      const bSameYear = b.academicYearId === from.academicYearId ? 0 : 1;
+      if (aSameYear !== bSameYear) return aSameYear - bSameYear;
+      if (a.grade.sortOrder !== b.grade.sortOrder) {
+        return a.grade.sortOrder - b.grade.sortOrder;
+      }
+      const aSameName = a.name === from.name ? 0 : 1;
+      const bSameName = b.name === from.name ? 0 : 1;
+      if (aSameName !== bSameName) return aSameName - bSameName;
+      return a.name.localeCompare(b.name);
+    });
+  return ranked[0]?.id ?? null;
+}
+
 @Injectable()
 export class SchoolSisAcademicService {
   constructor(
@@ -802,7 +832,7 @@ export class SchoolSisAcademicService {
           tenantId,
           academicYearId: year.id,
           deletedAt: null,
-          status: 'ACTIVE',
+          status: { in: ['ACTIVE', 'WITHDRAWN'] },
           ...(sectionId ? { sectionId } : {}),
         },
         include: {
@@ -834,21 +864,57 @@ export class SchoolSisAcademicService {
         },
       }),
     ]);
+    const studentIds = enrollments.map((row) => row.student.id);
+    const latestEvents = studentIds.length
+      ? await this.prisma.schoolEnrollmentEvent.findMany({
+          where: {
+            tenantId,
+            studentId: { in: studentIds },
+            type: {
+              in: ['PROMOTED', 'HELD_BACK', 'WITHDRAWN', 'SECTION_CHANGE'],
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+    const lastByStudent = new Map<string, (typeof latestEvents)[number]>();
+    for (const event of latestEvents) {
+      if (!lastByStudent.has(event.studentId))
+        lastByStudent.set(event.studentId, event);
+    }
     return {
       academicYear: year,
       years,
-      sections,
-      students: enrollments.map((row) => ({
-        enrollmentId: row.id,
-        studentId: row.student.id,
-        fullName: row.student.fullName,
-        admissionNumber: row.student.admissionNumber,
-        status: row.status,
-        studentStatus: row.student.status,
-        className: `${row.section.grade.name} ${row.section.name}`,
-        sectionId: row.sectionId,
-        rollNumber: row.rollNumber,
+      sections: sections.map((row) => ({
+        id: row.id,
+        name: row.name,
+        academicYearId: row.academicYearId,
+        grade: {
+          id: row.grade.id,
+          name: row.grade.name,
+          sortOrder: row.grade.sortOrder,
+        },
+        academicYear: { id: row.academicYear.id, name: row.academicYear.name },
       })),
+      students: enrollments.map((row) => {
+        const last = lastByStudent.get(row.student.id);
+        return {
+          enrollmentId: row.id,
+          studentId: row.student.id,
+          fullName: row.student.fullName,
+          admissionNumber: row.student.admissionNumber,
+          status: row.status,
+          studentStatus: row.student.status,
+          className: `${row.section.grade.name} ${row.section.name}`,
+          sectionId: row.sectionId,
+          gradeId: row.section.grade.id,
+          rollNumber: row.rollNumber,
+          lastEventType: last?.type ?? null,
+          lastEventNote: last?.note ?? null,
+          lastEventAt: last?.createdAt ?? null,
+          suggestedToSectionId: suggestNextSection(row.section, sections),
+        };
+      }),
       history: history.map((row) => ({
         id: row.id,
         type: row.type,
@@ -867,27 +933,39 @@ export class SchoolSisAcademicService {
     actorUserId?: string,
   ) {
     await this.sis.assertSecondarySisTenant(tenantId);
-    if (!dto.studentIds.length) {
+    if (!dto.studentIds.length && !dto.items?.length) {
       throw new BadRequestException('Select at least one student');
     }
-    if (dto.action === 'PROMOTE' && !dto.toSectionId) {
+    const jobs = dto.items?.length
+      ? dto.items
+      : dto.studentIds.map((studentId) => ({
+          studentId,
+          toSectionId: dto.toSectionId,
+          note: dto.note,
+        }));
+    if (
+      dto.action === 'PROMOTE' &&
+      jobs.some((job) => !job.toSectionId && !dto.toSectionId)
+    ) {
       throw new BadRequestException('Choose the promotion class and section');
     }
     const results: Array<{ studentId: string; action: string }> = [];
-    for (const studentId of dto.studentIds) {
-      if (dto.action === 'PROMOTE' && dto.toSectionId) {
+    for (const job of jobs) {
+      const toSectionId = job.toSectionId || dto.toSectionId;
+      const note = job.note ?? dto.note;
+      if (dto.action === 'PROMOTE' && toSectionId) {
         await this.sis.promote(
           tenantId,
-          { studentId, toSectionId: dto.toSectionId, note: dto.note },
+          { studentId: job.studentId, toSectionId, note },
           actorUserId,
         );
-        results.push({ studentId, action: 'PROMOTED' });
+        results.push({ studentId: job.studentId, action: 'PROMOTED' });
         continue;
       }
       const current = await this.prisma.schoolEnrollment.findFirst({
         where: {
           tenantId,
-          studentId,
+          studentId: job.studentId,
           status: 'ACTIVE',
           deletedAt: null,
         },
@@ -898,16 +976,16 @@ export class SchoolSisAcademicService {
         await this.prisma.schoolEnrollmentEvent.create({
           data: {
             tenantId,
-            studentId,
+            studentId: job.studentId,
             enrollmentId: current.id,
             type: 'HELD_BACK',
             fromSectionId: current.sectionId,
             toSectionId: current.sectionId,
-            note: dto.note?.trim() || 'Held back in the same class',
+            note: note?.trim() || 'Held back in the same class',
             actorUserId: actorUserId ?? null,
           },
         });
-        results.push({ studentId, action: 'HELD_BACK' });
+        results.push({ studentId: job.studentId, action: 'HELD_BACK' });
       }
       if (dto.action === 'WITHDRAW') {
         await this.prisma.$transaction([
@@ -916,22 +994,22 @@ export class SchoolSisAcademicService {
             data: { status: 'WITHDRAWN' },
           }),
           this.prisma.schoolStudent.update({
-            where: { id: studentId },
+            where: { id: job.studentId },
             data: { status: 'WITHDRAWN' },
           }),
           this.prisma.schoolEnrollmentEvent.create({
             data: {
               tenantId,
-              studentId,
+              studentId: job.studentId,
               enrollmentId: current.id,
               type: 'WITHDRAWN',
               fromSectionId: current.sectionId,
-              note: dto.note?.trim() || null,
+              note: note?.trim() || null,
               actorUserId: actorUserId ?? null,
             },
           }),
         ]);
-        results.push({ studentId, action: 'WITHDRAWN' });
+        results.push({ studentId: job.studentId, action: 'WITHDRAWN' });
       }
     }
     return { ok: true, count: results.length, results };

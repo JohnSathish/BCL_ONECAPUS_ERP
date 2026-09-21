@@ -46,6 +46,7 @@ import {
   PatchApplicationStatusDto,
   PromoteStudentDto,
   SaveSchoolClassSubjectsDto,
+  SaveSchoolSubjectGradesDto,
   SaveSchoolStaffDto,
   SaveSchoolStudentMasterDto,
   SaveSchoolSubjectDto,
@@ -168,6 +169,16 @@ export class SchoolSisController {
   @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
   deleteSubject(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.curriculum.deleteSubject(user.tid, id);
+  }
+
+  @Put('subjects/:id/grades')
+  @RequireAnyPermission(SCHOOL_SIS_PERMISSION_MANAGE)
+  assignSubjectGrades(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: SaveSchoolSubjectGradesDto,
+  ) {
+    return this.curriculum.assignSubjectGrades(user.tid, id, dto.gradeIds);
   }
 
   @Put('class-subjects')

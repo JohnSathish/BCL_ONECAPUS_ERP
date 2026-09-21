@@ -16,7 +16,13 @@ import type {
 const DEFAULT_TYPES: Array<{ code: string; name: string; sortOrder: number }> =
   [
     { code: 'MAIN', name: 'Main Subject', sortOrder: 1 },
-    { code: 'OPTIONAL', name: 'Optional Subject', sortOrder: 2 },
+    { code: 'LANGUAGE', name: 'Language', sortOrder: 2 },
+    { code: 'ELECTIVE', name: 'Elective', sortOrder: 3 },
+    { code: 'PRACTICAL', name: 'Practical', sortOrder: 4 },
+    { code: 'CO_CURRICULAR', name: 'Co-curricular', sortOrder: 5 },
+    { code: 'SKILL', name: 'Skill-based', sortOrder: 6 },
+    { code: 'OPTIONAL', name: 'Optional Subject', sortOrder: 7 },
+    { code: 'OTHER', name: 'Other', sortOrder: 8 },
   ];
 
 function slugCode(name: string, fallback: string) {
@@ -40,7 +46,7 @@ export class SchoolSisCurriculumService {
     await this.sis.assertSecondarySisTenant(tenantId);
     const year = await this.sis.currentYear(tenantId);
     await this.ensureDefaultTypes(tenantId);
-    const [types, subjects, mappings, grades] = await Promise.all([
+    const [types, subjects, mappings, grades, teachers] = await Promise.all([
       this.prisma.schoolSubjectType.findMany({
         where: { tenantId, deletedAt: null },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
@@ -58,11 +64,35 @@ export class SchoolSisCurriculumService {
         where: { tenantId, deletedAt: null, active: true },
         orderBy: { sortOrder: 'asc' },
       }),
+      this.prisma.schoolSubjectTeacherAssignment.findMany({
+        where: { tenantId, academicYearId: year.id, deletedAt: null },
+        select: {
+          subjectId: true,
+          staff: { select: { fullName: true } },
+        },
+      }),
     ]);
+    const teachersBySubject = new Map<string, string[]>();
+    for (const row of teachers) {
+      const list = teachersBySubject.get(row.subjectId) ?? [];
+      if (row.staff.fullName && !list.includes(row.staff.fullName)) {
+        list.push(row.staff.fullName);
+      }
+      teachersBySubject.set(row.subjectId, list);
+    }
     return {
       academicYear: year,
       types,
-      subjects,
+      subjects: subjects.map((row) => {
+        const classRows = mappings.filter((m) => m.subjectId === row.id);
+        return {
+          ...row,
+          classCount: classRows.length,
+          classIds: classRows.map((m) => m.gradeId),
+          classNames: classRows.map((m) => m.grade.name),
+          teacherNames: teachersBySubject.get(row.id) ?? [],
+        };
+      }),
       grades,
       mappings: mappings.map((row) => ({
         id: row.id,
@@ -230,16 +260,95 @@ export class SchoolSisCurriculumService {
       where: { id, tenantId, deletedAt: null },
     });
     if (!row) throw new NotFoundException('Subject not found');
-    await this.prisma.$transaction([
-      this.prisma.schoolGradeSubject.deleteMany({
-        where: { tenantId, subjectId: id },
-      }),
-      this.prisma.schoolSubject.update({
-        where: { id },
-        data: { deletedAt: new Date(), active: false },
-      }),
-    ]);
+    const usage = await this.subjectUsage(tenantId, id);
+    const blockers = Object.entries(usage)
+      .filter(([, count]) => count > 0)
+      .map(([key, count]) => `${count} ${key}`);
+    if (blockers.length) {
+      throw new ConflictException(
+        `Cannot delete ${row.name} because it is used in ${blockers.join(', ')}. Deactivate it instead so timetable, exams and marks stay intact.`,
+      );
+    }
+    await this.prisma.schoolSubject.update({
+      where: { id },
+      data: { deletedAt: new Date(), active: false },
+    });
     return { ok: true };
+  }
+
+  async assignSubjectGrades(
+    tenantId: string,
+    subjectId: string,
+    gradeIds: string[],
+  ) {
+    await this.sis.assertSecondarySisTenant(tenantId);
+    const year = await this.sis.currentYear(tenantId);
+    const subject = await this.prisma.schoolSubject.findFirst({
+      where: { id: subjectId, tenantId, deletedAt: null },
+    });
+    if (!subject) throw new NotFoundException('Subject not found');
+    const unique = [...new Set(gradeIds)];
+    if (unique.length) {
+      const found = await this.prisma.schoolGrade.count({
+        where: { tenantId, deletedAt: null, id: { in: unique } },
+      });
+      if (found !== unique.length) {
+        throw new BadRequestException('One or more classes were not found');
+      }
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.schoolGradeSubject.deleteMany({
+        where: {
+          tenantId,
+          academicYearId: year.id,
+          subjectId,
+          ...(unique.length ? { gradeId: { notIn: unique } } : {}),
+        },
+      });
+      if (unique.length) {
+        await tx.schoolGradeSubject.createMany({
+          data: unique.map((gradeId) => ({
+            tenantId,
+            academicYearId: year.id,
+            gradeId,
+            subjectId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    });
+    return this.listBundle(tenantId);
+  }
+
+  private async subjectUsage(tenantId: string, subjectId: string) {
+    const [classes, timetable, exams, schedules, marks, homework] =
+      await Promise.all([
+        this.prisma.schoolGradeSubject.count({
+          where: { tenantId, subjectId },
+        }),
+        this.prisma.schoolTimetableSlot.count({
+          where: { tenantId, subjectId },
+        }),
+        this.prisma.schoolExamSubject.count({
+          where: { tenantId, subjectId },
+        }),
+        this.prisma.schoolExamSchedule.count({
+          where: { tenantId, subjectId },
+        }),
+        this.prisma.schoolExamResultSubject.count({
+          where: { tenantId, subjectId },
+        }),
+        this.prisma.schoolHomework.count({
+          where: { tenantId, subjectId, deletedAt: null },
+        }),
+      ]);
+    return {
+      classes,
+      timetable,
+      examinations: exams + schedules,
+      marks,
+      homework,
+    };
   }
 
   async saveClassSubjects(tenantId: string, dto: SaveSchoolClassSubjectsDto) {

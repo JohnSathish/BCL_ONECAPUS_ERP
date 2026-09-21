@@ -7,7 +7,6 @@ import { useAuthStore } from '@/store/auth-store';
 import { canManageSchoolSis } from '@/lib/school-sis/permissions';
 import {
   addSchoolClubActivity,
-  applySchoolPromotion,
   assignSchoolClubMembers,
   assignSchoolHouseMembers,
   fetchSchoolAcademicClasses,
@@ -15,7 +14,6 @@ import {
   fetchSchoolHouses,
   fetchSchoolIdCards,
   fetchSchoolOptionals,
-  fetchSchoolPromotion,
   fetchSchoolSisStudents,
   previewSchoolIdCard,
   saveSchoolClub,
@@ -27,16 +25,11 @@ import { apiErrorMessage } from '@/utils/api-error';
 import {
   AcademicCard,
   AcademicPageHeader,
-  AcademicTable,
   EmptyState,
   Field,
-  GhostButton,
   PrimaryButton,
   SkeletonRows,
   StatusBadge,
-  Td,
-  Th,
-  confirmAction,
   fieldClass,
 } from './academic-ui';
 
@@ -375,172 +368,6 @@ export function AcademicClubsPanel() {
           ) : null}
         </AcademicCard>
       ))}
-    </div>
-  );
-}
-
-export function AcademicPromotionPanel() {
-  const enabled = useAuthQueryEnabled();
-  const canManage = canManageSchoolSis(useAuthStore((s) => s.session?.user)?.permissions);
-  const [sectionId, setSectionId] = useState('');
-  const [toSectionId, setToSectionId] = useState('');
-  const [selected, setSelected] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const qc = useQueryClient();
-  const query = useQuery({
-    queryKey: ['school-promotion', sectionId],
-    queryFn: () => fetchSchoolPromotion(sectionId || undefined),
-    enabled,
-  });
-  const currentSections = (query.data?.sections ?? []).filter(
-    (s) => s.academicYearId === query.data?.academicYear.id,
-  );
-  const otherSections = (query.data?.sections ?? []).filter(
-    (s) => s.academicYearId !== query.data?.academicYear.id,
-  );
-
-  const run = (action: 'PROMOTE' | 'HOLD' | 'WITHDRAW') => {
-    if (!selected.length) return;
-    if (action === 'PROMOTE' && !toSectionId) {
-      setError('Choose the promotion class/section');
-      return;
-    }
-    if (!confirmAction(`${action} ${selected.length} student(s)? Previous year records are kept.`))
-      return;
-    void applySchoolPromotion({
-      studentIds: selected,
-      action,
-      toSectionId: toSectionId || undefined,
-    })
-      .then(() => {
-        setError(null);
-        setSelected([]);
-        void qc.invalidateQueries({ queryKey: ['school-promotion'] });
-      })
-      .catch((err) => setError(apiErrorMessage(err)));
-  };
-
-  return (
-    <div className="space-y-5">
-      <AcademicPageHeader
-        title="Student promotion"
-        description="Promote, hold back or withdraw without overwriting previous enrolments. History is stored as events."
-      />
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <div className="flex flex-wrap gap-2">
-        <select
-          className={`${fieldClass} max-w-xs`}
-          value={sectionId}
-          onChange={(e) => setSectionId(e.target.value)}
-        >
-          <option value="">Current class (all)</option>
-          {currentSections.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.grade.name} {s.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className={`${fieldClass} max-w-xs`}
-          value={toSectionId}
-          onChange={(e) => setToSectionId(e.target.value)}
-        >
-          <option value="">Promotion class/section</option>
-          {otherSections.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.academicYear.name} · {s.grade.name} {s.name}
-            </option>
-          ))}
-          {currentSections.map((s) => (
-            <option key={`c-${s.id}`} value={s.id}>
-              Same year · {s.grade.name} {s.name}
-            </option>
-          ))}
-        </select>
-        {canManage ? (
-          <>
-            <PrimaryButton type="button" onClick={() => run('PROMOTE')}>
-              Promote selected
-            </PrimaryButton>
-            <GhostButton type="button" onClick={() => run('HOLD')}>
-              Hold back
-            </GhostButton>
-            <GhostButton type="button" onClick={() => run('WITHDRAW')}>
-              Withdraw
-            </GhostButton>
-          </>
-        ) : null}
-      </div>
-      {query.isLoading ? (
-        <SkeletonRows />
-      ) : (
-        <AcademicTable>
-          <thead>
-            <tr>
-              <Th>
-                {canManage ? (
-                  <input
-                    type="checkbox"
-                    onChange={(e) =>
-                      setSelected(
-                        e.target.checked
-                          ? (query.data?.students ?? []).map((s) => s.studentId)
-                          : [],
-                      )
-                    }
-                  />
-                ) : (
-                  '#'
-                )}
-              </Th>
-              <Th>Student</Th>
-              <Th>Admission</Th>
-              <Th>Class</Th>
-              <Th>Roll</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {(query.data?.students ?? []).map((row) => (
-              <tr key={row.studentId} className="border-t">
-                <Td>
-                  {canManage ? (
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(row.studentId)}
-                      onChange={() =>
-                        setSelected((s) =>
-                          s.includes(row.studentId)
-                            ? s.filter((id) => id !== row.studentId)
-                            : [...s, row.studentId],
-                        )
-                      }
-                    />
-                  ) : null}
-                </Td>
-                <Td className="font-medium">{row.fullName}</Td>
-                <Td>{row.admissionNumber}</Td>
-                <Td>{row.className}</Td>
-                <Td>{row.rollNumber ?? '—'}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </AcademicTable>
-      )}
-      <AcademicCard>
-        <h2 className="mb-2 text-sm font-semibold">Promotion history</h2>
-        <ul className="max-h-64 space-y-1 overflow-auto text-sm">
-          {(query.data?.history ?? []).map((row) => (
-            <li key={row.id} className="flex flex-wrap gap-2">
-              <StatusBadge value={row.type} />
-              <span>{row.student.fullName}</span>
-              <span className="text-slate-400">
-                {new Date(row.createdAt).toLocaleString('en-IN')}
-              </span>
-              {row.note ? <span className="text-slate-500">{row.note}</span> : null}
-            </li>
-          ))}
-        </ul>
-      </AcademicCard>
     </div>
   );
 }

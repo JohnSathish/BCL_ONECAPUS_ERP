@@ -83,6 +83,12 @@ export type SchoolSisSubject = {
   hasTheory?: boolean;
   hasPractical?: boolean;
   isOptional?: boolean;
+  classCount?: number;
+  classIds?: string[];
+  classNames?: string[];
+  teacherNames?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type SchoolSisCurriculum = {
@@ -161,6 +167,11 @@ export async function updateSchoolSisSubject(
 
 export async function deleteSchoolSisSubject(id: string) {
   await api.delete(`/v1/school-sis/subjects/${id}`);
+}
+
+export async function assignSchoolSisSubjectGrades(subjectId: string, gradeIds: string[]) {
+  const { data } = await api.put(`/v1/school-sis/subjects/${subjectId}/grades`, { gradeIds });
+  return data as SchoolSisCurriculum;
 }
 
 export async function saveSchoolSisClassSubjects(payload: {
@@ -1197,41 +1208,56 @@ export async function fetchSchoolPromotion(sectionId?: string) {
   const { data } = await api.get('/v1/school-sis/academic/promotion', {
     params: sectionId ? { sectionId } : undefined,
   });
-  return data as {
-    academicYear: { id: string; name: string };
-    years: Array<{ id: string; name: string; status: string }>;
-    sections: Array<{
-      id: string;
-      name: string;
-      academicYearId: string;
-      grade: { name: string };
-      academicYear: { name: string };
-    }>;
-    students: Array<{
-      enrollmentId: string;
-      studentId: string;
-      fullName: string;
-      admissionNumber: string;
-      status: string;
-      className: string;
-      sectionId: string;
-      rollNumber: string | null;
-    }>;
-    history: Array<{
-      id: string;
-      type: string;
-      createdAt: string;
-      note: string | null;
-      student: { fullName: string; admissionNumber: string };
-    }>;
-  };
+  return data as SchoolSisPromotionBoard;
 }
+
+export type SchoolSisPromotionSection = {
+  id: string;
+  name: string;
+  academicYearId: string;
+  grade: { id?: string; name: string; sortOrder?: number };
+  academicYear: { id?: string; name: string };
+};
+
+export type SchoolSisPromotionStudent = {
+  enrollmentId: string;
+  studentId: string;
+  fullName: string;
+  admissionNumber: string;
+  status: string;
+  studentStatus?: string;
+  className: string;
+  sectionId: string;
+  gradeId?: string;
+  rollNumber: string | null;
+  lastEventType?: string | null;
+  lastEventNote?: string | null;
+  lastEventAt?: string | null;
+  suggestedToSectionId?: string | null;
+};
+
+export type SchoolSisPromotionBoard = {
+  academicYear: { id: string; name: string; status?: string };
+  years: Array<{ id: string; name: string; status: string }>;
+  sections: SchoolSisPromotionSection[];
+  students: SchoolSisPromotionStudent[];
+  history: Array<{
+    id: string;
+    type: string;
+    createdAt: string;
+    note: string | null;
+    student: { fullName: string; admissionNumber: string };
+    fromSectionId?: string | null;
+    toSectionId?: string | null;
+  }>;
+};
 
 export async function applySchoolPromotion(payload: {
   studentIds: string[];
   action: 'PROMOTE' | 'HOLD' | 'WITHDRAW';
   toSectionId?: string;
   note?: string;
+  items?: Array<{ studentId: string; toSectionId?: string; note?: string }>;
 }) {
   const { data } = await api.post('/v1/school-sis/academic/promotion', payload);
   return data as { ok: boolean; count: number };
