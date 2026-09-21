@@ -22,14 +22,17 @@ import {
 } from './school-sis-sms.catalog';
 import {
   displayInMobile,
+  extractVariables,
   hashOtp,
   maskMobile,
   missingVariables,
   normalizeInMobile,
+  pickSmsVariables,
   renderSms,
   smsSegments,
 } from './school-sis-sms.phone';
-import { sendApitxtOtp } from './school-sis-apitxt-otp';
+import { APITXT_SEND_OTP_URL, sendApitxtOtp } from './school-sis-apitxt-otp';
+import { APITXT_SEND_MSG_URL } from './school-sis-apitxt-sms';
 import { resolveSmsProvider } from './school-sis-sms.providers';
 import {
   collectGatewayConfigIssues,
@@ -112,9 +115,38 @@ export class SchoolSisSmsService implements OnModuleInit {
         })),
       });
     }
+    const settings = await this.prisma.schoolSmsSettings.findUniqueOrThrow({
+      where: { tenantId },
+    });
+    await this.ensureApitxtGateway(tenantId, settings);
     return this.prisma.schoolSmsSettings.findUniqueOrThrow({
       where: { tenantId },
     });
+  }
+
+  async settingsView(tenantId: string) {
+    const settings = await this.ensure(tenantId);
+    const extras = asJson(settings.extrasJson);
+    const gw = await this.prisma.schoolSmsGateway.findFirst({
+      where: { tenantId, provider: 'APITXT' },
+      orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+    });
+    const creds = this.creds(gw?.credentialsEnc);
+    return {
+      ...settings,
+      apitxtRoute:
+        String(extras.apitxtRoute || creds.route || '4') === '1' ? '1' : '4',
+      apitxtTemplateId: String(
+        extras.apitxtTemplateId || creds.templateId || '',
+      ),
+      apitxtFlash: String(extras.apitxtFlash || creds.flash || '0'),
+      apitxtUnicode: String(extras.apitxtUnicode || creds.unicode || 'auto'),
+      otpTemplateId: creds.otpTemplateId || '',
+      otpChannel: creds.otpChannel || 'sms',
+      gatewayId: gw?.id ?? null,
+      gatewayStatus: gw?.status ?? 'INACTIVE',
+      hasAuthkey: Boolean(creds.apiKey || creds.authkey),
+    };
   }
 
   async dashboard(tenantId: string) {
@@ -325,6 +357,12 @@ export class SchoolSisSmsService implements OnModuleInit {
           apiUrl: gw.apiUrl,
           senderId: gw.senderId,
           defaultSenderId: settings.defaultSenderId,
+          dltEntityId: gw.dltEntityId,
+          entityId: settings.entityId,
+          defaultTemplateId:
+            String(asJson(settings.extrasJson).apitxtTemplateId || '') ||
+            creds.templateId ||
+            null,
           creds,
         }),
       );
@@ -342,10 +380,6 @@ export class SchoolSisSmsService implements OnModuleInit {
     ]);
     if (settings.enforceDltOnService && !header) {
       issues.push('DLT header is required but none is approved.');
-    }
-    if (opts?.transactional === false) {
-      const idx = issues.findIndex((i) => i.includes('Apitxt is configured'));
-      if (idx >= 0) issues.splice(idx, 1);
     }
     const origin =
       this.config.get<string>('API_PUBLIC_ORIGIN')?.replace(/\/$/, '') ||
@@ -380,7 +414,9 @@ export class SchoolSisSmsService implements OnModuleInit {
                 ? 'control.msg91.com'
                 : gw.provider === 'TWILIO'
                   ? 'api.twilio.com'
-                  : null,
+                  : gw.provider === 'APITXT'
+                    ? 'apitxt.com'
+                    : null,
             hasCredentials: Boolean(
               creds.apiKey ||
               creds.authkey ||
@@ -394,7 +430,11 @@ export class SchoolSisSmsService implements OnModuleInit {
             route:
               creds.route ||
               creds.smsType ||
-              (gw.provider === 'MSG91' ? 'transactional' : null),
+              (gw.provider === 'APITXT'
+                ? '4'
+                : gw.provider === 'MSG91'
+                  ? 'transactional'
+                  : null),
             transactionalSms: providerSendsTransactionalSms(gw.provider),
             lastSuccessAt: gw.lastSuccessAt,
             lastError,
@@ -666,7 +706,10 @@ export class SchoolSisSmsService implements OnModuleInit {
         name: dto.name || template?.name || 'SMS campaign',
         category: dto.category || template?.category || 'GENERAL',
         smsKind: kind,
-        audienceJson: dto.audience as object,
+        audienceJson: {
+          ...dto.audience,
+          flowVariables: dto.variables ?? {},
+        } as object,
         templateId: template?.id,
         gatewayId: gw.id,
         body,
@@ -978,7 +1021,9 @@ export class SchoolSisSmsService implements OnModuleInit {
       smsKind: String(body.smsKind || 'SERVICE'),
       dltTemplateId: body.dltTemplateId ? String(body.dltTemplateId) : null,
       body: String(body.body || ''),
-      variablesJson: body.variables ?? [],
+      variablesJson: Array.isArray(body.variables)
+        ? body.variables
+        : extractVariables(String(body.body || '')),
       status: String(body.status || 'ACTIVE'),
     };
     if (id)
@@ -1002,41 +1047,80 @@ export class SchoolSisSmsService implements OnModuleInit {
     id?: string,
   ) {
     await this.ensure(tenantId);
-    const creds = {
-      apiKey: String(body.apiKey || ''),
-      apiSecret: String(body.apiSecret || ''),
-      authkey: String(body.authkey || ''),
-      accountSid: String(body.accountSid || ''),
-      authToken: String(body.authToken || ''),
-      token: String(body.token || ''),
-      from: String(body.from || ''),
-      otpTemplateId: String(body.otpTemplateId || ''),
-      otpTemplateName: String(body.otpTemplateName || ''),
-      otpChannel: String(body.otpChannel || ''),
-      otpCountry: String(body.otpCountry || ''),
-      projectRefId: String(body.projectRefId || ''),
-    };
+    const providerHint = String(body.provider || 'APITXT').toUpperCase();
+    let existing = id
+      ? await this.prisma.schoolSmsGateway.findFirst({
+          where: { id, tenantId },
+        })
+      : null;
+    if (!existing && providerHint === 'APITXT') {
+      existing = await this.prisma.schoolSmsGateway.findFirst({
+        where: { tenantId, provider: 'APITXT' },
+        orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+      });
+    }
+    if (id && !existing) throw new NotFoundException('Gateway not found');
+    id = existing?.id ?? id;
+    const provider = String(
+      body.provider || existing?.provider || 'APITXT',
+    ).toUpperCase();
+    const creds = mergeSmsCreds(this.creds(existing?.credentialsEnc), body);
+    if (provider === 'APITXT') {
+      creds.otpApiUrl = creds.otpApiUrl || APITXT_SEND_OTP_URL;
+      if (!creds.route) creds.route = '4';
+    }
     const credentialsEnc = this.crypto.encrypt(JSON.stringify(creds));
+    let apiUrl =
+      body.apiUrl != null && String(body.apiUrl)
+        ? String(body.apiUrl)
+        : (existing?.apiUrl ?? null);
+    if (provider === 'APITXT' && (!apiUrl || /sendotp/i.test(apiUrl))) {
+      apiUrl =
+        this.config.get<string>('SCHOOL_APITXT_SEND_URL')?.trim() ||
+        APITXT_SEND_MSG_URL;
+    }
+    const senderRaw = keepStr(
+      body.senderId,
+      existing?.senderId || creds.sender,
+    );
+    const senderId = senderRaw ? senderRaw.toUpperCase() : null;
     const data = {
-      name: String(body.name || body.provider || 'Gateway'),
-      provider: String(body.provider || 'MSG91').toUpperCase(),
-      apiUrl: body.apiUrl ? String(body.apiUrl) : null,
-      senderId: body.senderId ? String(body.senderId) : null,
-      dltEntityId: body.dltEntityId ? String(body.dltEntityId) : null,
-      dltHeader: body.dltHeader ? String(body.dltHeader) : null,
-      environment: String(body.environment || 'LIVE'),
-      status: String(body.status || 'INACTIVE'),
-      failoverRank: Number(body.failoverRank || 0),
+      name: String(body.name || existing?.name || body.provider || 'API txt'),
+      provider,
+      apiUrl,
+      senderId,
+      dltEntityId: keepStr(
+        body.dltEntityId ?? body.peId ?? body.pe_id,
+        existing?.dltEntityId || creds.peId,
+      ),
+      dltHeader: keepStr(body.dltHeader, existing?.dltHeader || senderId),
+      environment: String(body.environment || existing?.environment || 'LIVE'),
+      status: String(body.status || existing?.status || 'INACTIVE'),
+      failoverRank: Number(body.failoverRank ?? existing?.failoverRank ?? 0),
       credentialsEnc,
     };
-    if (id) {
-      return this.publicGateway(
-        await this.prisma.schoolSmsGateway.update({ where: { id }, data }),
-      );
+    const saved = id
+      ? await this.prisma.schoolSmsGateway.update({ where: { id }, data })
+      : await this.prisma.schoolSmsGateway.create({
+          data: { tenantId, ...data },
+        });
+    if (body.isDefault === true && saved.status === 'ACTIVE') {
+      await this.setDefaultGateway(tenantId, saved.id);
+    }
+    if (provider === 'APITXT') {
+      await this.prisma.schoolSmsGateway.deleteMany({
+        where: {
+          tenantId,
+          provider: 'APITXT',
+          id: { not: saved.id },
+          senderId: null,
+          messages: { none: {} },
+        },
+      });
     }
     return this.publicGateway(
-      await this.prisma.schoolSmsGateway.create({
-        data: { tenantId, ...data },
+      await this.prisma.schoolSmsGateway.findUniqueOrThrow({
+        where: { id: saved.id },
       }),
     );
   }
@@ -1074,6 +1158,12 @@ export class SchoolSisSmsService implements OnModuleInit {
       apiUrl: gw.apiUrl,
       senderId: gw.senderId,
       defaultSenderId: settings.defaultSenderId,
+      dltEntityId: gw.dltEntityId,
+      entityId: settings.entityId,
+      defaultTemplateId:
+        String(asJson(settings.extrasJson).apitxtTemplateId || '') ||
+        creds.templateId ||
+        null,
       creds,
     });
     const provider = resolveSmsProvider(gw.provider);
@@ -1091,11 +1181,11 @@ export class SchoolSisSmsService implements OnModuleInit {
       Boolean(balance.reachable) ||
       typeof balance.credits === 'number' ||
       typeof balance.amount === 'number';
-    if (balance.error && !connected) {
+    if (balance.error && !connected && gw.provider.toUpperCase() !== 'APITXT') {
       issues.push(sanitizeSmsError(balance.error));
     }
     const ok =
-      issues.filter((i) => !i.includes('Apitxt is configured')).length === 0 &&
+      issues.length === 0 &&
       (connected || gw.provider.toUpperCase() === 'APITXT');
     await this.prisma.schoolSmsGateway.update({
       where: { id },
@@ -1134,9 +1224,7 @@ export class SchoolSisSmsService implements OnModuleInit {
       };
     }
     return {
-      ok:
-        issues.length === 0 ||
-        (gw.provider.toUpperCase() === 'APITXT' && fieldsOk),
+      ok: issues.length === 0,
       connected,
       issues,
       provider: gw.provider,
@@ -1195,26 +1283,60 @@ export class SchoolSisSmsService implements OnModuleInit {
   }
 
   async saveSettings(tenantId: string, body: Record<string, unknown>) {
-    await this.ensure(tenantId);
+    const current = await this.ensure(tenantId);
+    const extras = asJson(current.extrasJson);
+    if ('apitxtRoute' in body) {
+      extras.apitxtRoute = String(body.apitxtRoute || '4') === '1' ? '1' : '4';
+    }
+    if ('apitxtTemplateId' in body) {
+      extras.apitxtTemplateId = String(body.apitxtTemplateId || '').trim();
+    }
+    if ('apitxtFlash' in body) {
+      extras.apitxtFlash = String(body.apitxtFlash ?? '0');
+    }
+    if ('apitxtUnicode' in body) {
+      extras.apitxtUnicode = String(body.apitxtUnicode || 'auto');
+    }
+    const data: Prisma.SchoolSmsSettingsUpdateInput = {
+      extrasJson: extras as Prisma.InputJsonValue,
+    };
+    if ('defaultSenderId' in body) {
+      const sender = String(body.defaultSenderId || '')
+        .trim()
+        .toUpperCase();
+      data.defaultSenderId = sender || null;
+    }
+    if ('enforceDlt' in body) data.enforceDlt = body.enforceDlt !== false;
+    if ('enforceDltOnService' in body) {
+      data.enforceDltOnService = !!body.enforceDltOnService;
+    }
+    if ('failoverEnabled' in body)
+      data.failoverEnabled = !!body.failoverEnabled;
+    if ('maxPerMinute' in body) data.maxPerMinute = Number(body.maxPerMinute);
+    if ('maxCampaignSize' in body) {
+      data.maxCampaignSize = Number(body.maxCampaignSize);
+    }
+    if ('retryAttempts' in body)
+      data.retryAttempts = Number(body.retryAttempts);
+    if ('otpExpiryMinutes' in body) {
+      data.otpExpiryMinutes = Number(body.otpExpiryMinutes);
+    }
+    if ('otpMaxAttempts' in body) {
+      data.otpMaxAttempts = Number(body.otpMaxAttempts);
+    }
+    if ('unitCost' in body) data.unitCost = Number(body.unitCost);
+    if ('manualBalance' in body) {
+      data.manualBalance = Number(body.manualBalance);
+    }
+    if ('entityId' in body) {
+      data.entityId = String(body.entityId || '').trim() || null;
+    }
+    if ('entityName' in body) {
+      data.entityName = String(body.entityName || '').trim() || null;
+    }
     return this.prisma.schoolSmsSettings.update({
       where: { tenantId },
-      data: {
-        defaultSenderId: body.defaultSenderId
-          ? String(body.defaultSenderId)
-          : null,
-        enforceDlt: body.enforceDlt !== false,
-        enforceDltOnService: !!body.enforceDltOnService,
-        failoverEnabled: !!body.failoverEnabled,
-        maxPerMinute: Number(body.maxPerMinute ?? 60),
-        maxCampaignSize: Number(body.maxCampaignSize ?? 5000),
-        retryAttempts: Number(body.retryAttempts ?? 3),
-        otpExpiryMinutes: Number(body.otpExpiryMinutes ?? 5),
-        otpMaxAttempts: Number(body.otpMaxAttempts ?? 5),
-        unitCost: Number(body.unitCost ?? 1),
-        manualBalance: Number(body.manualBalance ?? 0),
-        entityId: body.entityId ? String(body.entityId) : null,
-        entityName: body.entityName ? String(body.entityName) : null,
-      },
+      data,
     });
   }
 
@@ -1296,7 +1418,6 @@ export class SchoolSisSmsService implements OnModuleInit {
         'sms',
       templateId:
         creds.otpTemplateId ||
-        creds.templateId ||
         this.config.get<string>('SCHOOL_APITXT_OTP_TEMPLATE_ID') ||
         undefined,
       templateName:
@@ -1314,9 +1435,9 @@ export class SchoolSisSmsService implements OnModuleInit {
         this.config.get<string>('SCHOOL_APITXT_PROJECT_REF_ID') ||
         undefined,
       apiUrl:
-        gw?.apiUrl ||
+        creds.otpApiUrl ||
         this.config.get<string>('SCHOOL_APITXT_OTP_URL') ||
-        undefined,
+        APITXT_SEND_OTP_URL,
     };
   }
 
@@ -1539,6 +1660,8 @@ export class SchoolSisSmsService implements OnModuleInit {
     provider: string;
     apiUrl: string | null;
     senderId: string | null;
+    dltEntityId?: string | null;
+    dltHeader?: string | null;
     status: string;
     isDefault: boolean;
     health: string;
@@ -1553,18 +1676,29 @@ export class SchoolSisSmsService implements OnModuleInit {
       provider: g.provider,
       apiUrl: g.apiUrl,
       senderId: g.senderId,
+      dltEntityId: g.dltEntityId ?? null,
+      dltHeader: g.dltHeader ?? null,
       status: g.status,
       isDefault: g.isDefault,
       health: g.health,
       lastError: g.lastError ? sanitizeSmsError(g.lastError) : null,
       lastSuccessAt: g.lastSuccessAt,
       hasApiKey: Boolean(creds.apiKey || creds.authkey || creds.authToken),
+      hasTemplateId: Boolean(creds.templateId || creds.dltTemplateId),
+      hasPeId: Boolean(g.dltEntityId || creds.peId || creds.pe_id),
+      route: creds.route || (g.provider === 'APITXT' ? '4' : null),
+      otpTemplateId: creds.otpTemplateId || '',
+      otpChannel: creds.otpChannel || 'sms',
+      templateId: creds.templateId || '',
+      flash: creds.flash || '0',
+      unicode: creds.unicode || 'auto',
     };
   }
 
   private async dispatch(
     gw: {
       id: string;
+      tenantId?: string;
       provider: string;
       apiUrl: string | null;
       senderId: string | null;
@@ -1574,25 +1708,279 @@ export class SchoolSisSmsService implements OnModuleInit {
     },
     msg: {
       id: string;
+      tenantId?: string;
       mobile: string;
       body: string;
       senderId: string | null;
       idempotencyKey: string | null;
+      templateId?: string | null;
+      campaignId?: string | null;
+      studentId?: string | null;
+      staffId?: string | null;
+      recipientName?: string | null;
     },
   ) {
     const provider = resolveSmsProvider(gw.provider);
+    const creds = this.creds(gw.credentialsEnc);
+    const tenantId = msg.tenantId || gw.tenantId;
+    let dltTemplateId = creds.templateId || creds.dltTemplateId || '';
+    let smsKind: string | null = null;
+    if (msg.templateId) {
+      const tpl = await this.prisma.schoolSmsTemplate.findFirst({
+        where: { id: msg.templateId },
+        select: { dltTemplateId: true, smsKind: true },
+      });
+      if (tpl?.dltTemplateId) dltTemplateId = tpl.dltTemplateId;
+      smsKind = tpl?.smsKind ?? null;
+    }
+    if (msg.campaignId) {
+      const camp = await this.prisma.schoolSmsCampaign.findFirst({
+        where: { id: msg.campaignId },
+        select: { smsKind: true },
+      });
+      smsKind = camp?.smsKind || smsKind;
+    }
+    if (!dltTemplateId && tenantId) {
+      const approved = await this.prisma.schoolSmsDltTemplate.findFirst({
+        where: { tenantId, status: 'APPROVED' },
+        orderBy: { createdAt: 'desc' },
+      });
+      dltTemplateId = approved?.dltTemplateId || dltTemplateId;
+    }
+    if (!dltTemplateId && tenantId) {
+      const settings = await this.prisma.schoolSmsSettings.findUnique({
+        where: { tenantId },
+      });
+      dltTemplateId = String(
+        asJson(settings?.extrasJson).apitxtTemplateId || '',
+      );
+    }
+    const segs = smsSegments(msg.body);
+    const variables = await this.flowVariablesFor(msg);
     return provider.sendSms(
       {
         to: msg.mobile,
         body: msg.body,
-        senderId: msg.senderId || gw.senderId,
+        senderId: msg.senderId || gw.senderId || creds.sender,
         header: gw.dltHeader,
-        entityId: gw.dltEntityId,
+        entityId: gw.dltEntityId || creds.peId || creds.pe_id,
+        dltTemplateId: dltTemplateId || null,
+        smsKind,
+        unicode: segs.unicode,
+        variables,
         idempotencyKey: msg.idempotencyKey || msg.id,
       },
-      this.creds(gw.credentialsEnc),
+      creds,
       gw.apiUrl,
     );
+  }
+
+  private async flowVariablesFor(msg: {
+    tenantId?: string;
+    studentId?: string | null;
+    staffId?: string | null;
+    recipientName?: string | null;
+    campaignId?: string | null;
+    templateId?: string | null;
+    body: string;
+  }): Promise<Record<string, string>> {
+    const vars: Record<string, string> = {
+      school_name: "St. Luke's Secondary School",
+    };
+    if (msg.recipientName) {
+      vars.parent_name = msg.recipientName;
+      vars.name = msg.recipientName;
+    }
+    let templateBody = '';
+    if (msg.campaignId) {
+      const camp = await this.prisma.schoolSmsCampaign.findFirst({
+        where: { id: msg.campaignId },
+        select: { body: true, audienceJson: true, templateId: true },
+      });
+      templateBody = camp?.body || '';
+      const extra = asJson(asJson(camp?.audienceJson).flowVariables);
+      for (const [k, v] of Object.entries(extra)) {
+        if (v != null && v !== '') vars[k] = String(v);
+      }
+    }
+    if (!templateBody && msg.templateId) {
+      const tpl = await this.prisma.schoolSmsTemplate.findFirst({
+        where: { id: msg.templateId },
+        select: { body: true },
+      });
+      templateBody = tpl?.body || '';
+    }
+    if (!templateBody) templateBody = msg.body;
+    if (msg.studentId) {
+      const en = await this.prisma.schoolEnrollment.findFirst({
+        where: { studentId: msg.studentId, deletedAt: null },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          student: {
+            include: { guardians: { include: { guardian: true } } },
+          },
+          section: { include: { grade: true } },
+        },
+      });
+      if (en) {
+        const parent =
+          en.student.guardians.find((g) => g.guardian.isPrimary)?.guardian ??
+          en.student.guardians[0]?.guardian;
+        vars.student_name = en.student.fullName;
+        vars.parent_name = parent?.fullName || vars.parent_name || 'Parent';
+        vars.class_name = `${en.section.grade.name} ${en.section.name}`;
+        vars.class = en.section.grade.code;
+        vars.section = en.section.name;
+        vars.admission_no = en.student.admissionNumber;
+        vars.name = vars.parent_name;
+      }
+    }
+    if (msg.staffId && !vars.student_name) {
+      const staff = await this.prisma.schoolStaff.findFirst({
+        where: { id: msg.staffId },
+        select: { fullName: true },
+      });
+      if (staff) {
+        vars.student_name = staff.fullName;
+        vars.parent_name = staff.fullName;
+        vars.name = staff.fullName;
+      }
+    }
+    return pickSmsVariables(templateBody, vars);
+  }
+
+  private async ensureApitxtGateway(
+    tenantId: string,
+    settings: {
+      defaultSenderId: string | null;
+      entityId: string | null;
+    },
+  ) {
+    const envKey =
+      this.config.get<string>('SCHOOL_APITXT_AUTHKEY')?.trim() || '';
+    const sender = (
+      this.config.get<string>('SCHOOL_APITXT_SENDER')?.trim() ||
+      settings.defaultSenderId ||
+      ''
+    ).toUpperCase();
+    const peId =
+      this.config.get<string>('SCHOOL_APITXT_PE_ID')?.trim() ||
+      settings.entityId ||
+      '';
+    const templateId =
+      this.config.get<string>('SCHOOL_APITXT_TEMPLATE_ID')?.trim() || '';
+    const route = this.config.get<string>('SCHOOL_APITXT_ROUTE')?.trim() || '4';
+    const sendUrl =
+      this.config.get<string>('SCHOOL_APITXT_SEND_URL')?.trim() ||
+      APITXT_SEND_MSG_URL;
+    const existing = await this.prisma.schoolSmsGateway.findFirst({
+      where: { tenantId, provider: 'APITXT' },
+      orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+    });
+    if (existing) {
+      await this.prisma.schoolSmsGateway.deleteMany({
+        where: {
+          tenantId,
+          provider: 'APITXT',
+          id: { not: existing.id },
+          senderId: null,
+          messages: { none: {} },
+        },
+      });
+    }
+    const prev = this.creds(existing?.credentialsEnc);
+    const creds: Record<string, string> = { ...prev };
+    if (envKey && !creds.apiKey && !creds.authkey) {
+      creds.apiKey = envKey;
+      creds.authkey = envKey;
+    }
+    if (!creds.route) creds.route = route;
+    if (!creds.peId && peId) creds.peId = peId;
+    if (!creds.templateId && templateId) creds.templateId = templateId;
+    if (!creds.otpApiUrl) creds.otpApiUrl = APITXT_SEND_OTP_URL;
+    const otpTemplateId =
+      this.config.get<string>('SCHOOL_APITXT_OTP_TEMPLATE_ID')?.trim() || '';
+    if (!creds.otpTemplateId && otpTemplateId) {
+      creds.otpTemplateId = otpTemplateId;
+    }
+    if (!creds.otpChannel) {
+      creds.otpChannel =
+        this.config.get<string>('SCHOOL_APITXT_CHANNEL')?.trim() || 'sms';
+    }
+    if (!creds.otpCountry) {
+      creds.otpCountry =
+        this.config.get<string>('SCHOOL_APITXT_COUNTRY')?.trim() || '91';
+    }
+    if (!existing) {
+      const others = await this.prisma.schoolSmsGateway.count({
+        where: { tenantId },
+      });
+      const hasKey = Boolean(creds.apiKey || creds.authkey);
+      await this.prisma.schoolSmsGateway.create({
+        data: {
+          tenantId,
+          name: 'API txt',
+          provider: 'APITXT',
+          apiUrl: sendUrl,
+          senderId: sender || null,
+          dltEntityId: peId || null,
+          dltHeader: sender || null,
+          environment: 'LIVE',
+          status: hasKey ? 'ACTIVE' : 'INACTIVE',
+          isDefault: others === 0 && hasKey,
+          credentialsEnc: this.crypto.encrypt(JSON.stringify(creds)),
+        },
+      });
+      if (sender || peId) {
+        await this.prisma.schoolSmsSettings.update({
+          where: { tenantId },
+          data: {
+            ...(sender && !settings.defaultSenderId
+              ? { defaultSenderId: sender }
+              : {}),
+            ...(peId && !settings.entityId ? { entityId: peId } : {}),
+          },
+        });
+      }
+      return;
+    }
+    const nextApiUrl =
+      !existing.apiUrl || /sendotp/i.test(existing.apiUrl)
+        ? sendUrl
+        : existing.apiUrl;
+    const hadKey = Boolean(prev.apiKey || prev.authkey);
+    const hasKey = Boolean(creds.apiKey || creds.authkey);
+    const shouldActivate = !hadKey && hasKey && existing.status !== 'ACTIVE';
+    const decryptFailed = Boolean(
+      existing.credentialsEnc && Object.keys(prev).length === 0,
+    );
+    const needsUpdate =
+      nextApiUrl !== existing.apiUrl ||
+      existing.name === 'Apitxt OTP' ||
+      shouldActivate ||
+      (!existing.senderId && Boolean(sender)) ||
+      (!existing.dltEntityId && Boolean(peId)) ||
+      (!decryptFailed &&
+        (creds.route !== prev.route ||
+          creds.otpApiUrl !== prev.otpApiUrl ||
+          creds.peId !== prev.peId ||
+          creds.templateId !== prev.templateId ||
+          creds.apiKey !== prev.apiKey));
+    if (!needsUpdate) return;
+    await this.prisma.schoolSmsGateway.update({
+      where: { id: existing.id },
+      data: {
+        apiUrl: nextApiUrl,
+        senderId: existing.senderId || sender || null,
+        dltEntityId: existing.dltEntityId || peId || null,
+        dltHeader: existing.dltHeader || sender || null,
+        status: shouldActivate ? 'ACTIVE' : existing.status,
+        ...(decryptFailed
+          ? {}
+          : { credentialsEnc: this.crypto.encrypt(JSON.stringify(creds)) }),
+        name: existing.name === 'Apitxt OTP' ? 'API txt' : existing.name,
+      },
+    });
   }
 
   private async applyProviderResult(
@@ -1675,4 +2063,55 @@ function safeJson(raw: string): Record<string, unknown> {
   } catch {
     return { raw };
   }
+}
+
+function asJson(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  if (typeof raw === 'string') return safeJson(raw);
+  return {};
+}
+
+function keepStr(incoming: unknown, fallback?: string | null): string | null {
+  if (incoming == null) return fallback?.trim() ? fallback : null;
+  const v = String(incoming).trim();
+  return v || fallback || null;
+}
+
+function mergeSmsCreds(
+  previous: Record<string, string>,
+  body: Record<string, unknown>,
+): Record<string, string> {
+  const next = { ...previous };
+  const assign = (key: string, ...aliases: string[]) => {
+    for (const alias of [key, ...aliases]) {
+      if (alias in body && body[alias] != null && String(body[alias]) !== '') {
+        next[key] = String(body[alias]);
+        return;
+      }
+    }
+  };
+  assign('apiKey', 'authkey');
+  assign('authkey', 'apiKey');
+  assign('apiSecret');
+  assign('accountSid');
+  assign('authToken');
+  assign('token');
+  assign('from');
+  assign('sender', 'senderId');
+  assign('peId', 'pe_id', 'dltEntityId');
+  assign('templateId', 'dltTemplateId', 'apitxtTemplateId');
+  assign('route', 'apitxtRoute');
+  assign('flash', 'apitxtFlash');
+  assign('unicode', 'apitxtUnicode');
+  assign('otpTemplateId');
+  assign('otpTemplateName');
+  assign('otpChannel');
+  assign('otpCountry');
+  assign('otpApiUrl');
+  assign('projectRefId');
+  if (next.apiKey && !next.authkey) next.authkey = next.apiKey;
+  if (next.authkey && !next.apiKey) next.apiKey = next.authkey;
+  return next;
 }

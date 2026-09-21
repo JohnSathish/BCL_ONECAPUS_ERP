@@ -25,6 +25,7 @@ export const PUSH_CHANNELS: Record<string, string> = {
   ATTENDANCE: 'stlukes_attendance',
   EXAMINATION: 'stlukes_examination',
   RESULT: 'stlukes_examination',
+  HOMEWORK: 'stlukes_homework',
   TRANSPORT: 'stlukes_transport',
   EMERGENCY: 'stlukes_emergency',
 };
@@ -108,6 +109,13 @@ export const DEFAULT_PUSH_TEMPLATES = [
     body: '{{school_name}} will remain closed on {{date}} ({{holiday_name}}).',
     deepLinkType: 'HOLIDAY',
   },
+  {
+    name: 'Homework Assigned',
+    category: 'HOMEWORK',
+    title: 'New homework',
+    body: '{{subject}}: {{title}} for {{class_label}}. Due {{due_date}}.',
+    deepLinkType: 'HOMEWORK',
+  },
 ];
 
 export const DEFAULT_PUSH_RULES = [
@@ -127,6 +135,11 @@ export const DEFAULT_PUSH_RULES = [
   {
     eventType: 'HOLIDAY_PUBLISHED',
     name: 'Holiday published',
+    pushEnabled: true,
+  },
+  {
+    eventType: 'HOMEWORK_ASSIGNED',
+    name: 'Homework assigned',
     pushEnabled: true,
   },
   { eventType: 'TRANSPORT_ALERT', name: 'Transport alert', pushEnabled: true },

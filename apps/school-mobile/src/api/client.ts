@@ -4,6 +4,7 @@ import { justDidPasswordLogin } from '@/auth/password-gate';
 import {
   AccountDisabledError,
   DeviceBlockedError,
+  authFailureKind,
   refreshAccessToken,
   SessionExpiredError,
   SessionRevokedError,
@@ -92,15 +93,12 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
   }
   const json = await res.json().catch(() => ({}));
   const combined = `${messageOf(json, '')}`;
-  if ((res.status === 401 || res.status === 403) && /DEVICE_BLOCKED/i.test(combined)) {
+  const failure = authFailureKind(combined);
+  if ((res.status === 401 || res.status === 403) && failure === 'blocked') {
     if (!options.ignoreAuthFailure) onAuthFailure?.('blocked');
     throw new DeviceBlockedError();
   }
-  if ((res.status === 401 || res.status === 403) && /SESSION_REVOKED/i.test(combined)) {
-    if (!options.ignoreAuthFailure) onAuthFailure?.('revoked');
-    throw new SessionRevokedError();
-  }
-  if ((res.status === 401 || res.status === 403) && /ACCOUNT_DISABLED/i.test(combined)) {
+  if ((res.status === 401 || res.status === 403) && failure === 'disabled') {
     if (!options.ignoreAuthFailure) onAuthFailure?.('disabled');
     throw new AccountDisabledError();
   }
@@ -137,6 +135,10 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
       }
       throw err instanceof Error ? err : new Error(msg);
     }
+  }
+  if ((res.status === 401 || res.status === 403) && failure === 'revoked') {
+    if (!options.ignoreAuthFailure) onAuthFailure?.('revoked');
+    throw new SessionRevokedError();
   }
   if (!res.ok) {
     throw new Error(messageOf(json, 'Something went wrong. Please try again.'));

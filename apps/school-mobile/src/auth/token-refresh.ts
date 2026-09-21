@@ -1,6 +1,5 @@
 import { getApiBase, schoolHeaders } from '@/api/config';
-import { justDidPasswordLogin } from '@/auth/password-gate';
-import { clearAuthTokens, getAccessToken, getRefreshToken, saveSession } from '@/auth/session';
+import { getAccessToken, getRefreshToken, saveSession } from '@/auth/session';
 
 export class AccountDisabledError extends Error {
   constructor() {
@@ -50,6 +49,13 @@ function combinedMessage(json: unknown, fallback = '') {
   const row = asRefreshed(json);
   const root = json && typeof json === 'object' ? (json as { message?: string }) : {};
   return `${row.detail || ''} ${row.message || ''} ${root.message || ''} ${fallback}`;
+}
+
+export function authFailureKind(message: string): 'blocked' | 'revoked' | 'disabled' | null {
+  if (/\bDEVICE_BLOCKED\b/.test(message)) return 'blocked';
+  if (/\bACCOUNT_DISABLED\b/.test(message)) return 'disabled';
+  if (/\bSESSION_REVOKED\b/.test(message)) return 'revoked';
+  return null;
 }
 
 async function currentTokensIfRotated(sentRefresh: string): Promise<Refreshed | null> {
@@ -107,16 +113,10 @@ async function doRefresh(opts?: { biometricUnlock?: boolean }): Promise<Refreshe
 
   const message = combinedMessage(json);
   if (res.status === 401 || res.status === 403) {
-    if (/DEVICE_BLOCKED/i.test(message)) {
-      throw new DeviceBlockedError();
-    }
-    if (/SESSION_REVOKED/i.test(message)) {
-      throw new SessionRevokedError();
-    }
-    if (/ACCOUNT_DISABLED/i.test(message)) {
-      throw new AccountDisabledError();
-    }
-    if (!justDidPasswordLogin()) await clearAuthTokens();
+    const kind = authFailureKind(message);
+    if (kind === 'blocked') throw new DeviceBlockedError();
+    if (kind === 'revoked') throw new SessionRevokedError();
+    if (kind === 'disabled') throw new AccountDisabledError();
     throw new SessionExpiredError('Please sign in again.');
   }
 

@@ -84,6 +84,22 @@ export class SchoolSisPushService {
           },
         });
       }
+    } else {
+      for (const r of DEFAULT_PUSH_RULES) {
+        await this.prisma.schoolPushRule.upsert({
+          where: {
+            tenantId_eventType: { tenantId, eventType: r.eventType },
+          },
+          create: {
+            id: randomUUID(),
+            tenantId,
+            eventType: r.eventType,
+            name: r.name,
+            pushEnabled: r.pushEnabled,
+          },
+          update: {},
+        });
+      }
     }
   }
 
@@ -234,7 +250,7 @@ export class SchoolSisPushService {
       where: {
         tenantId,
         userId: { in: userIds },
-        deviceStatus: { notIn: ['BLOCKED', 'REVOKED'] },
+        deviceStatus: { notIn: ['BLOCKED', 'REVOKED', 'SIGNED_OUT'] },
         revokedAt: null,
       },
     });
@@ -1135,16 +1151,26 @@ export class SchoolSisPushService {
             this.fcmImageUrl(campaign.imageUrl) ?? this.schoolLogoPublicUrl(),
           data: {
             notificationId: campaign.id,
-            type: campaign.category,
+            type:
+              campaign.deepLinkType?.toLowerCase() ||
+              campaign.category.toLowerCase(),
+            category: campaign.category,
             deepLink,
             entityId: campaign.deepLinkValue ?? '',
+            relatedId: campaign.deepLinkValue ?? '',
             attachmentUrl: campaign.imageUrl ?? '',
             attachmentType: this.attachmentKind(campaign.imageUrl),
             path:
               this.attachmentKind(campaign.imageUrl) === 'pdf'
                 ? (campaign.imageUrl ?? '')
-                : '',
-            screen: '/(tabs)/messages',
+                : deepLink.startsWith('/')
+                  ? deepLink
+                  : '',
+            screen: deepLink.startsWith('/')
+              ? deepLink
+              : campaign.deepLinkType === 'HOMEWORK' && campaign.deepLinkValue
+                ? `/homework?id=${campaign.deepLinkValue}`
+                : '/(tabs)/messages',
           },
         })
       : {
@@ -1606,5 +1632,85 @@ export class SchoolSisPushService {
       },
       true,
     );
+  }
+
+  /**
+   * Push + inbox when homework is newly assigned (not drafts, not re-saves).
+   * Deduped by homework id on deepLinkValue so retries do not spam devices.
+   */
+  async notifyHomeworkAssigned(
+    tenantId: string,
+    input: {
+      homeworkId: string;
+      sectionId: string;
+      subjectName: string;
+      title: string;
+      classLabel: string;
+      dueDate: string;
+      visibleTo?: string;
+    },
+  ) {
+    await this.sis.assertSecondarySisTenant(tenantId);
+    const existing = await this.prisma.schoolPushCampaign.findFirst({
+      where: {
+        tenantId,
+        category: 'HOMEWORK',
+        deepLinkType: 'HOMEWORK',
+        deepLinkValue: input.homeworkId,
+        status: { notIn: ['CANCELLED'] },
+      },
+      select: { id: true },
+    });
+    if (existing) return { skipped: true, reason: 'already_notified' };
+
+    const due = input.dueDate.slice(0, 10);
+    const dueLabel = (() => {
+      const d = new Date(`${due}T12:00:00Z`);
+      if (Number.isNaN(d.getTime())) return due;
+      return d.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+    })();
+    const subject = (input.subjectName || 'Homework').trim();
+    const hwTitle = input.title.trim().slice(0, 80);
+    const classLabel = input.classLabel.trim() || 'your class';
+    const title = `New homework · ${subject}`.slice(0, 100);
+    const body =
+      `${hwTitle} · ${classLabel} · Due ${dueLabel}`.slice(0, 500) ||
+      'New homework has been assigned. Open the app to view it.';
+
+    try {
+      return await this.compose(
+        tenantId,
+        {
+          title,
+          body,
+          category: 'HOMEWORK',
+          priority: 'HIGH',
+          deepLinkType: 'HOMEWORK',
+          deepLinkValue: input.homeworkId,
+          audience: {
+            kind: 'SECTION',
+            sectionIds: [input.sectionId],
+            includeParents: input.visibleTo === 'STUDENTS_PARENTS',
+          },
+          confirm: true,
+        },
+        {
+          userId: '00000000-0000-0000-0000-000000000000',
+          manage: true,
+          send: true,
+        },
+        true,
+      );
+    } catch (err) {
+      // Homework save must not fail if nobody has the app / push yet.
+      return {
+        skipped: true,
+        reason: err instanceof Error ? err.message : 'push_failed',
+      };
+    }
   }
 }

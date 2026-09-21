@@ -215,7 +215,7 @@ export class SchoolSisSmsController {
   @Get('settings')
   @RequireAnyPermission(...SIS_SMS_SETTINGS, ...SIS_SMS_VIEW)
   settings(@CurrentUser() user: JwtUser) {
-    return this.sms.ensure(user.tid);
+    return this.sms.settingsView(user.tid);
   }
 
   @Patch('settings')

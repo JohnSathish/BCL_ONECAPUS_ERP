@@ -37,7 +37,7 @@ export function formatClassLabel(
 
 export function providerSendsTransactionalSms(provider: string): boolean {
   const key = (provider || '').toUpperCase();
-  return key !== 'APITXT';
+  return Boolean(key);
 }
 
 export function enrollmentSearchWhere(
@@ -103,6 +103,9 @@ export function collectGatewayConfigIssues(input: {
   apiUrl?: string | null;
   senderId?: string | null;
   defaultSenderId?: string | null;
+  dltEntityId?: string | null;
+  entityId?: string | null;
+  defaultTemplateId?: string | null;
   creds: Record<string, string>;
 }): string[] {
   const issues: string[] = [];
@@ -127,13 +130,38 @@ export function collectGatewayConfigIssues(input: {
   } else if (!hasKey) {
     issues.push('Gateway API key / authkey is missing.');
   }
-  if (!input.senderId && !input.defaultSenderId && provider !== 'APITXT') {
+  const sender = (
+    input.senderId ||
+    input.defaultSenderId ||
+    input.creds.sender ||
+    input.creds.senderId ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
+  if (!sender) {
     issues.push('Sender ID is not set on the gateway or SMS settings.');
+  } else if (provider === 'APITXT' && !/^[A-Z]{6}$/.test(sender)) {
+    issues.push('Sender ID must be 6 uppercase letters (DLT header).');
   }
-  if (!providerSendsTransactionalSms(provider)) {
-    issues.push(
-      'Apitxt is configured for login OTP only. Add MSG91, Twilio, or a custom HTTP gateway for individual SMS.',
-    );
+  if (provider === 'APITXT') {
+    const peId =
+      input.dltEntityId ||
+      input.entityId ||
+      input.creds.peId ||
+      input.creds.pe_id ||
+      '';
+    const templateId =
+      input.defaultTemplateId ||
+      input.creds.templateId ||
+      input.creds.dltTemplateId ||
+      '';
+    if (!String(peId).trim()) {
+      issues.push('Principal Entity ID (pe_id) is missing.');
+    }
+    if (!String(templateId).trim()) {
+      issues.push('Approved DLT template_id is missing.');
+    }
   }
   return issues;
 }

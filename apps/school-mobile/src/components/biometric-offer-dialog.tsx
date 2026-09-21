@@ -110,7 +110,7 @@ export function BiometricOfferDialog() {
                 Fingerprint Login Enabled ✓
               </Text>
               <Text style={[styles.body, { color: bodyColor }]}>
-                You can use it next time you open the app.
+                You stay signed in. Fingerprint is only used if the app needs to confirm it is you.
               </Text>
             </>
           ) : (

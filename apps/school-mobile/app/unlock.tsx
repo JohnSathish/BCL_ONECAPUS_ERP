@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -17,7 +17,7 @@ import {
 import { CREST, SCHOOL } from '@/brand';
 import { Screen } from '@/ui/kit';
 import { destinationAfterAuth } from '@/auth/post-login';
-import { justDidPasswordLogin } from '@/auth/password-gate';
+import { justDidPasswordLogin, preferPasswordLogin } from '@/auth/password-gate';
 import { colors, radii, space } from '@/theme/tokens';
 
 export default function UnlockScreen() {
@@ -26,6 +26,8 @@ export default function UnlockScreen() {
   const [label, setLabel] = useState('Unlock with fingerprint');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const started = useRef(false);
 
   useEffect(() => {
     void getUser().then((user) => {
@@ -85,6 +87,18 @@ export default function UnlockScreen() {
     }
   }, [busy, label, router]);
 
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    const t = setTimeout(() => {
+      if (justDidPasswordLogin()) return;
+      void unlock();
+    }, 350);
+    return () => clearTimeout(t);
+    // Prompt once on arrival. `unlock` identity changes after the first run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Screen light insetBottom>
       <View style={styles.box}>
@@ -97,7 +111,12 @@ export default function UnlockScreen() {
           <Text style={styles.label}>{busy ? 'Unlocking…' : label}</Text>
         </Pressable>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Pressable onPress={() => router.replace('/login')}>
+        <Pressable
+          onPress={() => {
+            preferPasswordLogin();
+            router.replace('/login');
+          }}
+        >
           <Text style={styles.password}>Use Password</Text>
         </Pressable>
       </View>

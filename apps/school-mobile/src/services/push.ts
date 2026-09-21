@@ -42,6 +42,11 @@ const ANDROID_CHANNELS: Array<{
     importance: Notifications.AndroidImportance.HIGH,
   },
   {
+    id: 'stlukes_homework',
+    name: 'Homework',
+    importance: Notifications.AndroidImportance.HIGH,
+  },
+  {
     id: 'stlukes_examination',
     name: 'Examination',
     importance: Notifications.AndroidImportance.HIGH,

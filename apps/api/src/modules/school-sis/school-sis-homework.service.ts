@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  StreamableFile,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../shared/storage/storage.service';
@@ -10,6 +12,7 @@ import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { resolveSchoolStaffIdForUser } from './school-sis-staff-lookup';
 import { SchoolSisAccessService } from './school-sis-access.service';
 import { SchoolSisService } from './school-sis.service';
+import { SchoolSisPushService } from './school-sis-push.service';
 import { homeworkListStatus } from './school-sis-homework.status';
 import type { SaveSchoolHomeworkDto } from './dto/school-homework.dto';
 
@@ -47,11 +50,14 @@ function asJwt(actor: HomeworkActor): JwtUser {
 
 @Injectable()
 export class SchoolSisHomeworkService {
+  private readonly logger = new Logger(SchoolSisHomeworkService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sis: SchoolSisService,
     private readonly access: SchoolSisAccessService,
     private readonly storage: StorageService,
+    private readonly push: SchoolSisPushService,
   ) {}
 
   private async staffId(tenantId: string, actor: HomeworkActor) {
@@ -217,6 +223,7 @@ export class SchoolSisHomeworkService {
         files: row.files.map((f) => ({
           id: f.id,
           fileName: f.fileName,
+          mimeType: f.mimeType,
           sizeBytes: f.sizeBytes,
         })),
       };
@@ -324,11 +331,13 @@ export class SchoolSisHomeworkService {
       deletedAt: null,
     };
     let homeworkId = id;
+    let previousStatus: string | null = null;
     if (id) {
       const existing = await this.prisma.schoolHomework.findFirst({
         where: { id, tenantId, deletedAt: null },
       });
       if (!existing) throw new NotFoundException('Homework not found');
+      previousStatus = existing.status;
       await this.prisma.schoolHomework.update({
         where: { id },
         data: payload,
@@ -340,7 +349,27 @@ export class SchoolSisHomeworkService {
       homeworkId = created.id;
     }
     await this.storeFiles(tenantId, homeworkId!, files);
-    return this.get(tenantId, actor, homeworkId!);
+    const saved = await this.get(tenantId, actor, homeworkId!);
+    const newlyAssigned =
+      status === 'ASSIGNED' && (!id || previousStatus !== 'ASSIGNED');
+    if (newlyAssigned) {
+      void this.push
+        .notifyHomeworkAssigned(tenantId, {
+          homeworkId: homeworkId!,
+          sectionId: saved.sectionId,
+          subjectName: saved.subjectName,
+          title: saved.title,
+          classLabel: saved.classLabel,
+          dueDate: saved.dueDate,
+          visibleTo: saved.visibleTo,
+        })
+        .catch((err) => {
+          this.logger.warn(
+            `Homework push failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+    }
+    return saved;
   }
 
   async duplicate(tenantId: string, actor: HomeworkActor, id: string) {
@@ -399,8 +428,10 @@ export class SchoolSisHomeworkService {
         status: 'ACTIVE',
         deletedAt: null,
       },
+      include: { section: { include: { grade: true } } },
     });
     if (!enroll) return { items: [] };
+    const today = todayKey();
     const rows = await this.prisma.schoolHomework.findMany({
       where: {
         tenantId,
@@ -408,20 +439,90 @@ export class SchoolSisHomeworkService {
         sectionId: enroll.sectionId,
         status: 'ASSIGNED',
         deletedAt: null,
+        assignDate: { lte: new Date(`${today}T23:59:59.999Z`) },
       },
       include: { subject: true, files: true },
       orderBy: { dueDate: 'asc' },
     });
+    const classLabel =
+      `${enroll.section.grade.name} ${enroll.section.name}`.trim();
     return {
       items: rows.map((row) => ({
         id: row.id,
         title: row.title,
         body: row.body,
+        assignDate: row.assignDate.toISOString().slice(0, 10),
         dueDate: row.dueDate.toISOString().slice(0, 10),
+        listStatus: homeworkListStatus({
+          status: row.status,
+          dueDate: row.dueDate,
+          today,
+        }),
         subjectName: row.subject?.name ?? '—',
-        files: row.files.map((f) => ({ id: f.id, fileName: f.fileName })),
+        classLabel,
+        files: row.files.map((f) => ({
+          id: f.id,
+          fileName: f.fileName,
+          mimeType: f.mimeType,
+          sizeBytes: f.sizeBytes,
+        })),
       })),
     };
+  }
+
+  async studentGet(tenantId: string, studentId: string, homeworkId: string) {
+    const list = await this.studentList(tenantId, studentId);
+    const item = list.items.find((row) => row.id === homeworkId);
+    if (!item) throw new NotFoundException('Homework not found');
+    return item;
+  }
+
+  async openFile(
+    tenantId: string,
+    fileId: string,
+    access:
+      | { kind: 'staff'; actor: HomeworkActor }
+      | { kind: 'student'; studentId: string },
+  ) {
+    await this.sis.assertSecondarySisTenant(tenantId);
+    const file = await this.prisma.schoolHomeworkFile.findFirst({
+      where: { id: fileId, tenantId },
+      include: { homework: true },
+    });
+    if (!file || file.homework.deletedAt) {
+      throw new NotFoundException('Attachment not found');
+    }
+    if (access.kind === 'staff') {
+      await this.access.assertSectionAccess(
+        tenantId,
+        asJwt(access.actor),
+        file.homework.sectionId,
+      );
+    } else {
+      if (file.homework.status !== 'ASSIGNED') {
+        throw new NotFoundException('Homework not found');
+      }
+      const year = await this.sis.currentYear(tenantId);
+      const enroll = await this.prisma.schoolEnrollment.findFirst({
+        where: {
+          tenantId,
+          studentId: access.studentId,
+          academicYearId: year.id,
+          sectionId: file.homework.sectionId,
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!enroll) throw new ForbiddenException('Not enrolled in this class');
+    }
+    const buf = await this.storage.get(file.storageKey);
+    if (!buf?.length) throw new NotFoundException('Attachment file is missing');
+    const safeName = file.fileName.replace(/"/g, '');
+    return new StreamableFile(buf, {
+      type: file.mimeType || 'application/octet-stream',
+      disposition: `attachment; filename="${safeName}"`,
+    });
   }
 
   private async storeFiles(

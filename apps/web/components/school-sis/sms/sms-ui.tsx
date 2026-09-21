@@ -76,7 +76,7 @@ export function SmsShell({
             className="mt-1 max-w-2xl text-sm"
             style={{ color: 'var(--muted-foreground-hex, #64748b)' }}
           >
-            Multi-gateway school SMS with DLT checks, queued sending, and delivery callbacks.
+            Multi-gateway school SMS via API.txt sendMsg and sendFlow (personalised DLT variables).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

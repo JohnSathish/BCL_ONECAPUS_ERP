@@ -5,7 +5,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { fetchHome, switchChild } from '@/auth/login';
 import { getActiveChild, getRefreshToken, getUser, saveUser } from '@/auth/session';
-import { justDidPasswordLogin } from '@/auth/password-gate';
 import { mediaUrl } from '@/api/config';
 import { CAMPUS, CREST, SCHOOL } from '@/brand';
 import { isPrincipalUser, isStaffUser } from '@/persona';
@@ -57,7 +56,6 @@ export default function HomeScreen() {
       const refresh = await getRefreshToken();
       if (!refresh) {
         setError('Could not load home. Please try again.');
-        if (!justDidPasswordLogin()) router.replace('/login');
         return;
       }
       const [childId, cached] = await Promise.all([getActiveChild(), getUser()]);

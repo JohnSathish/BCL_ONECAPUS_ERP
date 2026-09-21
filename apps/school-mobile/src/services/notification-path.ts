@@ -35,9 +35,14 @@ export function notificationPath(data?: Record<string, unknown> | null) {
     return rawLink;
   }
   if (rawLink.startsWith('notification://')) {
-    const rest = rawLink.replace('notification://', '').split('/')[0]?.toLowerCase();
+    const parts = rawLink.replace('notification://', '').split('/').filter(Boolean);
+    const rest = parts[0]?.toLowerCase();
+    const related = parts[1] || '';
     if (rest === 'document' && /^https?:\/\//i.test(attach)) {
       return `/media-view?url=${encodeURIComponent(attach)}&title=${encodeURIComponent('Document')}`;
+    }
+    if (rest === 'homework' && related) {
+      return `/homework?id=${encodeURIComponent(related)}`;
     }
     return mapType(rest);
   }
@@ -46,6 +51,9 @@ export function notificationPath(data?: Record<string, unknown> | null) {
   if (type === 'notice' && related) return `/notice/${related}`;
   if (type === 'event' && related) return `/event/${related}`;
   if (type === 'gallery' && related) return `/gallery/${related}`;
+  if ((type === 'homework' || type === 'HOMEWORK'.toLowerCase()) && related) {
+    return `/homework?id=${encodeURIComponent(related)}`;
+  }
   if (type === 'document' && /^https?:\/\//i.test(attach)) {
     return `/media-view?url=${encodeURIComponent(attach)}&title=${encodeURIComponent('Document')}`;
   }

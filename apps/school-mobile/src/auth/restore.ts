@@ -8,6 +8,7 @@ import {
   setBiometricLoginEnabled,
 } from '@/auth/session';
 import { biometricCapability, biometricEnrollmentChanged } from '@/auth/biometric';
+import { destinationIfReauthNeeded } from '@/auth/reauth';
 import {
   AccountDisabledError,
   DeviceBlockedError,
@@ -48,7 +49,8 @@ export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
         const user = await getUser();
         return { route: destinationAfterAuth(user) };
       }
-      return { route: '/login' };
+      const reauth = await destinationIfReauthNeeded();
+      return { route: reauth ?? '/login' };
     }
 
     if (await biometricEnrollmentChanged()) {
@@ -80,7 +82,12 @@ export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
       if (err instanceof AccountDisabledError) return { route: '/account-disabled' };
       if (err instanceof DeviceBlockedError) return { route: '/device-blocked' };
       if (err instanceof SessionRevokedError) return { route: '/session-ended' };
-      if (err instanceof SessionExpiredError) return { route: '/login' };
+      if (err instanceof SessionExpiredError) {
+        const reauth = await destinationIfReauthNeeded();
+        if (reauth === '/unlock') return { route: '/unlock' };
+        const user = await getUser();
+        return { route: homeFor(user) };
+      }
       const user = await getUser();
       return { route: homeFor(user) };
     }
@@ -90,6 +97,7 @@ export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
       const user = await getUser().catch(() => null);
       return { route: homeFor(user) };
     }
-    return { route: '/login' };
+    const reauth = await destinationIfReauthNeeded().catch(() => '/login' as const);
+    return { route: reauth ?? '/login' };
   }
 }

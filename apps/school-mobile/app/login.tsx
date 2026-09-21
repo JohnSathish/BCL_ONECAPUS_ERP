@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Keyboard,
   Image,
@@ -16,8 +16,9 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CREST, SCHOOL } from '@/brand';
 import { login } from '@/auth/account';
-import { markPasswordLogin } from '@/auth/password-gate';
+import { markPasswordLogin, wantsPasswordLogin } from '@/auth/password-gate';
 import { destinationAfterAuth } from '@/auth/post-login';
+import { restoreSchoolSession } from '@/auth/restore';
 import { APP_VERSION } from '@/api/config';
 import { Screen } from '@/ui/kit';
 import { colors, radii, space } from '@/theme/tokens';
@@ -33,6 +34,20 @@ export default function LoginScreen() {
   const [idError, setIdError] = useState<string | null>(null);
   const [pwError, setPwError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (wantsPasswordLogin()) return;
+    let alive = true;
+    void restoreSchoolSession()
+      .then((restored) => {
+        if (!alive) return;
+        if (restored.route !== '/login') router.replace(restored.route);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [router]);
 
   const submit = async () => {
     const id = identifier.trim();

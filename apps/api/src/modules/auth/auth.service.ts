@@ -458,10 +458,12 @@ export class AuthService {
     const jti = randomUUID();
     const refreshPlain = randomBytes(48).toString('base64url');
     const policy = await this.resolveSecuritySessionPolicy(user.tenantId);
+    const isSchoolMobile =
+      String(options.meta?.clientType || '').toLowerCase() === 'mobile';
     let refreshMaxAgeSeconds = this.resolveRefreshTtlSeconds(
-      options.rememberMe,
+      options.rememberMe || isSchoolMobile,
     );
-    if (!options.rememberMe) {
+    if (!options.rememberMe && !isSchoolMobile) {
       refreshMaxAgeSeconds = Math.min(
         refreshMaxAgeSeconds,
         policy.sessionTimeoutSeconds,
@@ -469,9 +471,13 @@ export class AuthService {
     }
     const accessTtl = options.skipRefreshSession
       ? '1800s'
-      : this.config.get<string>('JWT_ACCESS_TTL', '1200s');
+      : isSchoolMobile
+        ? this.config.get<string>('JWT_MOBILE_ACCESS_TTL', '12h')
+        : this.config.get<string>('JWT_ACCESS_TTL', '1200s');
     let accessExpiresIn = this.parseTtlSeconds(accessTtl);
-    accessExpiresIn = Math.min(accessExpiresIn, policy.sessionTimeoutSeconds);
+    if (!isSchoolMobile) {
+      accessExpiresIn = Math.min(accessExpiresIn, policy.sessionTimeoutSeconds);
+    }
 
     const refreshExpiresAt = new Date(Date.now() + refreshMaxAgeSeconds * 1000);
 
@@ -565,7 +571,9 @@ export class AuthService {
               appVersion: options.meta?.appVersion,
               deviceId: options.meta?.deviceId,
               deviceLabel: options.meta?.deviceLabel,
-              rememberMe: Boolean(options.rememberMe),
+              rememberMe:
+                Boolean(options.rememberMe) ||
+                String(clientType || '').toLowerCase() === 'mobile',
               accessDeviceId: accessDeviceId ?? null,
               lastActivityAt,
             },
@@ -1249,7 +1257,11 @@ export class AuthService {
         roles,
       );
 
-      const rememberMe = Boolean(sessionMeta.rememberMe);
+      const rememberMe =
+        Boolean(sessionMeta.rememberMe) ||
+        String(
+          sessionMeta.clientType || meta?.clientType || '',
+        ).toLowerCase() === 'mobile';
 
       const session = await this.issueTokens(
         activeSession.user,
@@ -1335,7 +1347,7 @@ export class AuthService {
     });
 
     if (revokedSession) {
-      const graceMs = Number(this.config.get('REFRESH_REUSE_GRACE_MS', 10_000));
+      const graceMs = Number(this.config.get('REFRESH_REUSE_GRACE_MS', 60_000));
       const revokedRecently =
         revokedSession.replacedById &&
         revokedSession.revokedAt &&

@@ -14,6 +14,7 @@ import {
 } from '@/auth/session';
 import { justDidPasswordLogin } from '@/auth/password-gate';
 import { PASSWORD_PATH } from '@/auth/post-login';
+import { destinationIfReauthNeeded } from '@/auth/reauth';
 import { ExitAppDialog } from '@/components/exit-app-dialog';
 import { useSchoolAndroidBack } from '@/navigation/use-android-back';
 import {
@@ -66,7 +67,12 @@ export default function RootLayout() {
       if (kind === 'disabled') router.replace('/account-disabled');
       else if (kind === 'blocked') router.replace('/device-blocked');
       else if (kind === 'revoked') router.replace('/session-ended');
-      else router.replace('/login');
+      else {
+        void destinationIfReauthNeeded().then((dest) => {
+          if (dest === '/unlock') router.replace('/unlock');
+          else if (dest === '/login') router.replace('/login');
+        });
+      }
     });
     setPasswordResetHandler(() => {
       router.replace(PASSWORD_PATH);
@@ -137,7 +143,10 @@ export default function RootLayout() {
                 return;
               }
               if (err instanceof SessionExpiredError) {
-                router.replace('/login');
+                void destinationIfReauthNeeded().then((dest) => {
+                  if (dest === '/unlock') router.replace('/unlock');
+                  else if (dest === '/login') router.replace('/login');
+                });
               }
             });
           });

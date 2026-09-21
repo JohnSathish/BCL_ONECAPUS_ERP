@@ -18,7 +18,7 @@ process.chdir(root);
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const appVersion = pkg.version || '1.0.6';
-const versionCode = '20';
+const versionCode = '25';
 
 const jdkCandidates = [
   process.env.JAVA_HOME,
@@ -340,17 +340,17 @@ function patchGradleProperties() {
   }
   if (!/^org\.gradle\.jvmargs=/m.test(text)) {
     text +=
-      '\norg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError\n';
+      '\norg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError\n';
   } else {
     text = text.replace(
       /^org\.gradle\.jvmargs=.*$/m,
-      'org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError',
+      'org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError',
     );
   }
   if (!/^org\.gradle\.workers\.max=/m.test(text)) {
-    text += '\norg.gradle.workers.max=2\n';
+    text += '\norg.gradle.workers.max=1\n';
   } else {
-    text = text.replace(/^org\.gradle\.workers\.max=.*$/m, 'org.gradle.workers.max=2');
+    text = text.replace(/^org\.gradle\.workers\.max=.*$/m, 'org.gradle.workers.max=1');
   }
   const sdkProps = {
     'android.compileSdkVersion': '36',
@@ -368,7 +368,7 @@ function patchGradleProperties() {
   }
   fs.writeFileSync(gp, text);
   console.log(
-    `Patched android/gradle.properties → architectures=${arches}, workers=2, targetSdk=36`,
+    `Patched android/gradle.properties → architectures=${arches}, workers=1, heap=4g, targetSdk=36`,
   );
 }
 
@@ -470,7 +470,7 @@ run(
     'assembleRelease',
     'bundleRelease',
     '--no-daemon',
-    '--max-workers=2',
+    '--max-workers=1',
     `-PreactNativeArchitectures=${arches}`,
   ],
   { cwd: path.join(root, 'android') },

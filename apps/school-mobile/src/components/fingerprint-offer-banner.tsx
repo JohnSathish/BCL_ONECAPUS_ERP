@@ -108,7 +108,8 @@ export function FingerprintOfferBanner() {
           <>
             <Text style={styles.title}>Enable Fingerprint Login?</Text>
             <Text style={styles.body}>
-              Optional. Use your fingerprint next time, or skip and keep using your password.
+              Stay signed in. Next time the app needs to confirm it is you, it will ask for your
+              fingerprint instead of your password.
             </Text>
             {notice ? <Text style={styles.error}>{notice}</Text> : null}
             <View style={styles.actions}>

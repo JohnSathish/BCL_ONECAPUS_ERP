@@ -1,4 +1,10 @@
 import { extractOtpCode, sendApitxtOtp } from './school-sis-apitxt-otp';
+import {
+  APITXT_SEND_FLOW_URL,
+  APITXT_SEND_MSG_URL,
+  sendApitxtFlow,
+  sendApitxtMsg,
+} from './school-sis-apitxt-sms';
 
 export type SmsSendInput = {
   to: string;
@@ -7,6 +13,10 @@ export type SmsSendInput = {
   dltTemplateId?: string | null;
   entityId?: string | null;
   header?: string | null;
+  smsKind?: string | null;
+  unicode?: boolean;
+  schtime?: string | null;
+  variables?: Record<string, string> | null;
   idempotencyKey: string;
 };
 
@@ -329,39 +339,77 @@ export const apitxtProvider: SmsGatewayProvider = {
   async validateConfiguration(creds) {
     return Boolean(creds.apiKey || creds.authkey);
   },
-  getBalance() {
+  getBalance(creds) {
+    const hasKey = Boolean(creds.apiKey || creds.authkey);
     return Promise.resolve({
-      reachable: false,
-      error:
-        'Apitxt does not expose a credit-balance API. It is for login OTP only.',
+      reachable: hasKey,
+      error: hasKey
+        ? 'API.txt does not expose a credit-balance API. Check remaining credits in the API.txt dashboard after purchase.'
+        : 'Apitxt authkey missing',
     });
   },
   async sendSms(input, creds, apiUrl) {
     const otp = extractOtpCode(input.body);
-    if (!otp) {
-      return {
-        accepted: false,
-        status: 'FAILED',
-        errorCode: 'OTP_ONLY',
-        errorMessage:
-          'Apitxt sendOTP is for login OTP. Use a 4–8 digit code in the message, or another gateway for bulk SMS.',
-        errorClass: 'PERMANENT',
-      };
+    const sender = input.senderId || creds.sender || creds.senderId;
+    const peId =
+      input.entityId || creds.peId || creds.pe_id || creds.dltEntityId;
+    const templateId =
+      input.dltTemplateId || creds.templateId || creds.dltTemplateId;
+    const canSendMsg = Boolean(sender && peId && templateId);
+    const otpUrlLooksLikeOtp = Boolean(apiUrl && /sendotp/i.test(apiUrl));
+    if (otp && (!canSendMsg || otpUrlLooksLikeOtp)) {
+      return sendApitxtOtp({
+        authkey: creds.apiKey || creds.authkey,
+        mobile: input.to,
+        otp,
+        channel: creds.otpChannel || creds.channel || 'sms',
+        templateId: creds.otpTemplateId || undefined,
+        templateName: creds.otpTemplateName || creds.templateName,
+        country: creds.otpCountry || creds.country || '91',
+        projectRefId: creds.projectRefId,
+        apiUrl: creds.otpApiUrl || undefined,
+      });
     }
-    return sendApitxtOtp({
+    const promotional =
+      String(input.smsKind || '').toUpperCase() === 'PROMOTIONAL' ||
+      String(creds.route || '') === '1';
+    const route = promotional ? '1' : creds.route || '4';
+    const flowVars = input.variables || {};
+    const useFlow = Boolean(templateId) && Object.keys(flowVars).length > 0;
+    if (useFlow) {
+      return sendApitxtFlow({
+        authkey: creds.apiKey || creds.authkey,
+        templateId: templateId || '',
+        route,
+        recipients: [
+          {
+            mobiles: input.to,
+            variables: flowVars,
+          },
+        ],
+        schtime: input.schtime || undefined,
+        flash: creds.flash || '0',
+        apiUrl:
+          apiUrl && /sendflow/i.test(apiUrl) ? apiUrl : APITXT_SEND_FLOW_URL,
+      });
+    }
+    return sendApitxtMsg({
       authkey: creds.apiKey || creds.authkey,
-      mobile: input.to,
-      otp,
-      channel: creds.otpChannel || creds.channel || 'sms',
-      templateId:
-        creds.otpTemplateId ||
-        creds.templateId ||
-        input.dltTemplateId ||
-        undefined,
-      templateName: creds.otpTemplateName || creds.templateName,
-      country: creds.otpCountry || creds.country || '91',
-      projectRefId: creds.projectRefId,
-      apiUrl: apiUrl || undefined,
+      mobiles: input.to,
+      message: input.body,
+      sender: sender || '',
+      route,
+      templateId: templateId || '',
+      peId: peId || '',
+      schtime: input.schtime || undefined,
+      flash: creds.flash || '0',
+      unicode:
+        creds.unicode && creds.unicode !== 'auto'
+          ? creds.unicode
+          : input.unicode
+            ? '1'
+            : '0',
+      apiUrl: apiUrl && !/sendotp/i.test(apiUrl) ? apiUrl : APITXT_SEND_MSG_URL,
     });
   },
   async sendBulkSms(messages, creds, apiUrl) {

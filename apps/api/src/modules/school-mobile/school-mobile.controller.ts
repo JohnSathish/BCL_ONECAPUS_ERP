@@ -926,6 +926,58 @@ export class SchoolMobileController {
     return this.homework.studentList(user.tid, studentId);
   }
 
+  @Get('homework/mine/:id')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  async homeworkMineOne(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query('childId') childId?: string,
+  ) {
+    const studentId = await this.access.resolveStudentId(
+      user.tid,
+      user,
+      childId,
+    );
+    if (!studentId) throw new ForbiddenException('No student linked');
+    return this.homework.studentGet(user.tid, studentId, id);
+  }
+
+  @Get('homework/:id/files/:fileId')
+  @ApiBearerAuth()
+  @RequireAnyPermission(...ACCESS)
+  async homeworkFile(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('fileId') fileId: string,
+    @Query('childId') childId?: string,
+  ) {
+    const perms = user.permissions ?? [];
+    const staffLike =
+      perms.includes('*') ||
+      perms.includes(SCHOOL_MOBILE_PERMISSION_STAFF) ||
+      perms.includes(SCHOOL_MOBILE_PERMISSION_MANAGE) ||
+      perms.includes(SCHOOL_SIS_PERMISSION_READ) ||
+      perms.includes(SCHOOL_SIS_PERMISSION_MANAGE);
+    if (staffLike) {
+      return this.homework.openFile(user.tid, fileId, {
+        kind: 'staff',
+        actor: this.homeworkActor(user),
+      });
+    }
+    const studentId = await this.access.resolveStudentId(
+      user.tid,
+      user,
+      childId,
+    );
+    if (!studentId) throw new ForbiddenException('No student linked');
+    void id;
+    return this.homework.openFile(user.tid, fileId, {
+      kind: 'student',
+      studentId,
+    });
+  }
+
   @Post('homework')
   @ApiBearerAuth()
   @RequireAnyPermission(

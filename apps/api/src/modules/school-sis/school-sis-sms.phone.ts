@@ -64,6 +64,19 @@ export function renderSms(
   });
 }
 
+export function pickSmsVariables(
+  template: string,
+  vars: Record<string, string | number | null | undefined>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of extractVariables(template)) {
+    const v = vars[key] ?? vars[key.toLowerCase()];
+    if (v == null || v === '' || String(v).startsWith('{')) continue;
+    out[key] = String(v);
+  }
+  return out;
+}
+
 export function missingVariables(
   body: string,
   vars: Record<string, string | number | null | undefined>,

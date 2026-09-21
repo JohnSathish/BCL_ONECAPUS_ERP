@@ -7,7 +7,8 @@ import * as SecureStore from 'expo-secure-store';
  * (especially New Architecture) makes Kotlin reject getValueWithKeyAsync.
  *
  * Android SecureStore also rejects values larger than 2048 bytes (JWTs with
- * permission lists). Those are chunked, with a file fallback if keystore fails.
+ * permission lists). Those are chunked. Tokens are always mirrored to the app
+ * private documents folder so a Keystore hiccup cannot log the user out.
  */
 const IOS_OPTIONS: SecureStore.SecureStoreOptions | undefined =
   Platform.OS === 'ios' ? { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK } : undefined;
@@ -66,30 +67,36 @@ async function fileDel(key: string): Promise<void> {
   }
 }
 
-async function persistChunk(key: string, value: string) {
-  await nativeSet(key, value);
+async function persistNativeChunks(key: string, value: string) {
+  const n = Math.max(1, Math.ceil(value.length / ANDROID_CHUNK) || 1);
+  await nativeSet(`${key}__n`, String(n));
+  for (let i = 0; i < n; i++) {
+    await nativeSet(
+      i === 0 ? key : `${key}__${i}`,
+      value.slice(i * ANDROID_CHUNK, (i + 1) * ANDROID_CHUNK),
+    );
+  }
+  let extra = n;
+  while (extra < 12) {
+    const leftover = await nativeGet(`${key}__${extra}`);
+    if (!leftover) break;
+    await nativeDel(`${key}__${extra}`);
+    extra += 1;
+  }
 }
 
 async function persistValue(key: string, value: string) {
-  const n = Math.max(1, Math.ceil(value.length / ANDROID_CHUNK) || 1);
+  let nativeOk = false;
   try {
-    await persistChunk(`${key}__n`, String(n));
-    for (let i = 0; i < n; i++) {
-      await persistChunk(
-        i === 0 ? key : `${key}__${i}`,
-        value.slice(i * ANDROID_CHUNK, (i + 1) * ANDROID_CHUNK),
-      );
-    }
-    let extra = n;
-    while (extra < 12) {
-      const leftover = await nativeGet(`${key}__${extra}`);
-      if (!leftover) break;
-      await nativeDel(`${key}__${extra}`);
-      extra += 1;
-    }
+    await persistNativeChunks(key, value);
+    nativeOk = true;
   } catch {
-    if (!/token/i.test(key)) await fileSet(key, value);
-    else throw new Error('secure store unavailable');
+    nativeOk = false;
+  }
+  try {
+    await fileSet(key, value);
+  } catch (err) {
+    if (!nativeOk) throw err;
   }
 }
 
@@ -97,15 +104,19 @@ async function readPersisted(key: string): Promise<string | null> {
   const countRaw = await nativeGet(`${key}__n`);
   const first = await nativeGet(key);
   const n = Number(countRaw);
+  let nativeValue: string | null = null;
   if (Number.isFinite(n) && n > 1) {
     let out = first ?? '';
     for (let i = 1; i < n; i++) {
       out += (await nativeGet(`${key}__${i}`)) ?? '';
     }
-    if (out) return out;
+    if (out) nativeValue = out;
+  } else if (first) {
+    nativeValue = first;
   }
-  if (first) return first;
-  return fileGet(key);
+  const fileValue = await fileGet(key);
+  if (nativeValue && fileValue && fileValue.length > nativeValue.length) return fileValue;
+  return nativeValue || fileValue;
 }
 
 export async function secureGet(key: string): Promise<string | null> {
@@ -120,7 +131,6 @@ export async function secureSet(key: string, value: string): Promise<void> {
   try {
     await persistValue(key, value);
   } catch {
-    if (/token/i.test(key)) return;
     try {
       await fileSet(key, value);
     } catch {

@@ -61,9 +61,22 @@ describe('school SMS student search', () => {
 });
 
 describe('school SMS config helpers', () => {
-  it('treats Apitxt as OTP-only', () => {
-    expect(providerSendsTransactionalSms('APITXT')).toBe(false);
+  it('treats Apitxt sendMsg as transactional SMS', () => {
+    expect(providerSendsTransactionalSms('APITXT')).toBe(true);
     expect(providerSendsTransactionalSms('MSG91')).toBe(true);
+  });
+
+  it('requires Apitxt DLT sender, pe_id, and template_id', () => {
+    const issues = collectGatewayConfigIssues({
+      provider: 'APITXT',
+      status: 'ACTIVE',
+      creds: { authkey: 'KEY' },
+      senderId: null,
+      defaultSenderId: null,
+    });
+    expect(issues.join(' ')).toContain('Sender ID');
+    expect(issues.join(' ')).toContain('Principal Entity');
+    expect(issues.join(' ')).toContain('template_id');
   });
 
   it('lists missing gateway fields without echoing secrets', () => {

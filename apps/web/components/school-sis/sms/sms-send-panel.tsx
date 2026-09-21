@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -417,11 +418,18 @@ function ConfigBanner({
           </p>
           {callback ? <p className="mt-1 opacity-80">Delivery callback: {callback}</p> : null}
           {!canSend ? (
-            <ul className="mt-1 list-disc pl-4">
-              {issues.map((issue) => (
-                <li key={issue}>{issue}</li>
-              ))}
-            </ul>
+            <>
+              <ul className="mt-1 list-disc pl-4">
+                {issues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+              <p className="mt-2">
+                <Link href="/admin/school-sis/sms/settings" className="font-semibold underline">
+                  Open Send SMS settings
+                </Link>
+              </p>
+            </>
           ) : null}
         </div>
         <GhostButton type="button" disabled={testing || !gateway} onClick={onTest}>

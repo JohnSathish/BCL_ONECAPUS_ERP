@@ -4,6 +4,7 @@ import {
   hashOtp,
   missingVariables,
   normalizeInMobile,
+  pickSmsVariables,
   renderSms,
   smsSegments,
 } from './school-sis-sms.phone';
@@ -43,6 +44,16 @@ describe('school SMS helpers', () => {
       'amount',
       'student_name',
     ]);
+  });
+
+  it('picks only template placeholders that have values', () => {
+    expect(
+      pickSmsVariables('Dear {parent_name}, Rs.{amount}', {
+        parent_name: 'Mary',
+        amount: 3600,
+        extra: 'skip',
+      }),
+    ).toEqual({ parent_name: 'Mary', amount: '3600' });
   });
 
   it('hashes OTPs without storing the code', () => {
