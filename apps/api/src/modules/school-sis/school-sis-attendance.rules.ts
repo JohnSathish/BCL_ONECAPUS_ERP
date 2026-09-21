@@ -141,6 +141,17 @@ export function bandForPercent(
   return 'CRITICAL';
 }
 
+export function attendanceStatusLabel(
+  pct: number,
+  warnPercent: number,
+  minPercent: number,
+): 'Excellent' | 'Good' | 'Normal' | 'Warning' {
+  if (pct >= 95) return 'Excellent';
+  if (pct >= warnPercent) return 'Good';
+  if (pct > minPercent) return 'Normal';
+  return 'Warning';
+}
+
 export function sessionNaturalKey(input: {
   academicYearId: string;
   date: string;

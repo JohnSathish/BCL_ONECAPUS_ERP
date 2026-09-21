@@ -1,5 +1,6 @@
 import {
   attendancePercent,
+  attendanceStatusLabel,
   bandForPercent,
   sessionNaturalKey,
   unitForStatus,
@@ -35,6 +36,13 @@ describe('school attendance percentage rules', () => {
     expect(bandForPercent(90, 85, 75)).toBe('GREEN');
     expect(bandForPercent(80, 85, 75)).toBe('WARNING');
     expect(bandForPercent(70, 85, 75)).toBe('CRITICAL');
+  });
+
+  it('labels student attendance for the reports desk', () => {
+    expect(attendanceStatusLabel(95, 85, 75)).toBe('Excellent');
+    expect(attendanceStatusLabel(90, 85, 75)).toBe('Good');
+    expect(attendanceStatusLabel(80, 85, 75)).toBe('Normal');
+    expect(attendanceStatusLabel(75, 85, 75)).toBe('Warning');
   });
 
   it('builds a unique daily session key including period', () => {

@@ -17,6 +17,7 @@ import { GhostButton } from '../academic/academic-ui';
 import { WaCard } from '../whatsapp/whatsapp-ui';
 import { ReportExportButtons } from './export-buttons';
 import { formatInr } from './report-format';
+import { AttendanceReportsDesk } from './attendance-reports-desk';
 
 export function SchoolReportsDesk() {
   const ready = useAuthQueryEnabled();
@@ -88,6 +89,34 @@ export function SchoolReportsDesk() {
   });
 
   const sections = (masters.data?.sections ?? []).filter((s) => !gradeId || s.grade.id === gradeId);
+
+  if (moduleId === 'attendance') {
+    return (
+      <div className="space-y-4 bg-[#f4f7fb] p-4 md:p-6">
+        <div className="flex flex-wrap gap-2 print:hidden">
+          {(catalog.data?.modules ?? []).map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => {
+                setModuleId(m.id);
+                const first = (catalog.data?.reports ?? []).find((r) => r.module === m.id);
+                if (first) setKey(first.key);
+              }}
+              className={`rounded-full border px-3 py-1 text-sm ${
+                moduleId === m.id
+                  ? 'border-blue-700 bg-blue-50 text-blue-800'
+                  : 'border-slate-200 bg-white'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <AttendanceReportsDesk />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 bg-[#f4f7fb] p-4 md:p-6">

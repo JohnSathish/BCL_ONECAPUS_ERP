@@ -58,12 +58,23 @@ type Chart = {
   data: { name: string; value: number }[];
 };
 
+type SeriesPoint = {
+  name: string;
+  present?: number;
+  absent?: number;
+  late?: number;
+  leave?: number;
+  value?: number;
+};
+
 export type ReportResult = {
   report: ReportDef;
   columns: Col[];
   rows: Row[];
   kpis: Kpi[];
   charts: Chart[];
+  series?: SeriesPoint[];
+  summary?: Record<string, string | number>;
   empty: boolean;
   emptyHint?: string;
   total: number;
@@ -802,6 +813,8 @@ export class SchoolSisReportsQueryService {
         rows,
         kpis: built.kpis ?? [],
         charts: built.charts ?? [],
+        series: 'series' in built ? built.series : undefined,
+        summary: 'summary' in built ? built.summary : undefined,
         empty: rows.length === 0,
         emptyHint:
           rows.length === 0 ? this.emptyMessage(report, filters) : undefined,

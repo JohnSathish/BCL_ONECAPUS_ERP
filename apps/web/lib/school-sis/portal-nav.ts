@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   CreditCard,
+  FileBarChart2,
   FileText,
   GraduationCap,
   Home,
@@ -107,6 +108,18 @@ export const STAFF_PORTAL_NAV: PortalNavGroup[] = [
       { id: 'exams', label: 'Examinations', href: `${T}/exams`, icon: FileText },
       { id: 'marks', label: 'Mark entry', href: `${T}/marks`, icon: GraduationCap },
       { id: 'performance', label: 'Class performance', href: `${T}/performance`, icon: Users },
+    ],
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    items: [
+      {
+        id: 'reports',
+        label: 'Reports & Analytics',
+        href: `${T}/reports`,
+        icon: FileBarChart2,
+      },
     ],
   },
   {

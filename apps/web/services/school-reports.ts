@@ -37,10 +37,19 @@ export async function fetchSchoolReportCatalog() {
 export async function fetchSchoolReportPreview(key: string, filters: Record<string, string>) {
   const { data } = await api.get('/v1/school-sis/reports/preview', { params: { key, ...filters } });
   return data as {
-    report: { title: string; key: string };
+    report: { title: string; key: string; description?: string };
     columns: Array<{ key: string; label: string }>;
     rows: Array<Record<string, unknown>>;
-    kpis: Array<{ label: string; value: string | number }>;
+    kpis: Array<{ key?: string; label: string; value: string | number }>;
+    series?: Array<{
+      name: string;
+      present?: number;
+      absent?: number;
+      late?: number;
+      leave?: number;
+      value?: number;
+    }>;
+    summary?: Record<string, string | number>;
     empty: boolean;
     total: number;
   };

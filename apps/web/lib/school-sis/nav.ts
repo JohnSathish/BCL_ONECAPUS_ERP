@@ -719,7 +719,11 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         children: [
           live('all-reports', 'All reports', '/admin/school-sis/reports'),
           live('student-reports', 'Student Reports', '/admin/school-sis/reports'),
-          live('attendance-reports-hub', 'Attendance Reports', '/admin/school-sis/reports'),
+          live(
+            'attendance-reports-hub',
+            'Attendance Reports',
+            '/admin/school-sis/reports?module=attendance',
+          ),
           live('fee-reports-hub', 'Fee Reports', '/admin/school-sis/fees/reports'),
           live('exam-reports', 'Exam Reports', '/admin/school-sis/reports'),
           live('report-design', 'Report design', '/admin/school-sis/reports/design'),

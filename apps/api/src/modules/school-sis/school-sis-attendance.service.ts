@@ -15,6 +15,7 @@ import { resolveSchoolStaffIdForUser } from './school-sis-staff-lookup';
 import { istDayKey } from './school-sis-timetable-bells';
 import {
   attendancePercent,
+  attendanceStatusLabel,
   bandForPercent,
   DEFAULT_ATTENDANCE_STATUSES,
   DEFAULT_LEAVE_TYPES,
@@ -2087,6 +2088,268 @@ export class SchoolSisAttendanceService {
     return out;
   }
 
+  private reportDateRange(filters: {
+    dateFrom?: string;
+    dateTo?: string;
+    month?: string;
+  }) {
+    if (filters.month && /^\d{4}-\d{2}$/.test(filters.month)) {
+      const [y, m] = filters.month.split('-').map(Number);
+      return {
+        from: `${filters.month}-01`,
+        to: dayKey(new Date(Date.UTC(y, m, 0))),
+      };
+    }
+    const to = (filters.dateTo || istDayKey()).slice(0, 10);
+    const from = (filters.dateFrom || `${to.slice(0, 7)}-01`).slice(0, 10);
+    return from <= to ? { from, to } : { from: to, to: from };
+  }
+
+  async rangeAnalytics(
+    tenantId: string,
+    filters: {
+      academicYearId?: string;
+      sectionId?: string;
+      gradeId?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      month?: string;
+      studentId?: string;
+      subjectId?: string;
+    },
+  ) {
+    const year = await this.year(tenantId, filters.academicYearId);
+    const settings = await this.ensureSetup(tenantId, year.id);
+    const { from, to } = this.reportDateRange(filters);
+    const sections = await this.prisma.schoolSection.findMany({
+      where: {
+        tenantId,
+        academicYearId: year.id,
+        deletedAt: null,
+        active: true,
+        ...(filters.gradeId ? { gradeId: filters.gradeId } : {}),
+        ...(filters.sectionId ? { id: filters.sectionId } : {}),
+      },
+      include: { grade: { select: { id: true, name: true, sortOrder: true } } },
+      orderBy: [{ grade: { sortOrder: 'asc' } }, { name: 'asc' }],
+    });
+    const sectionIds = sections.map((s) => s.id);
+    const sectionMap = new Map(sections.map((s) => [s.id, s]));
+    const enrolls = sectionIds.length
+      ? await this.prisma.schoolEnrollment.findMany({
+          where: {
+            tenantId,
+            academicYearId: year.id,
+            status: 'ACTIVE',
+            deletedAt: null,
+            sectionId: { in: sectionIds },
+            ...(filters.studentId ? { studentId: filters.studentId } : {}),
+            student: { deletedAt: null, status: 'ACTIVE' },
+          },
+          include: {
+            student: {
+              select: { id: true, fullName: true, admissionNumber: true },
+            },
+          },
+          orderBy: [{ rollNumber: 'asc' }, { student: { fullName: 'asc' } }],
+          take: 8000,
+        })
+      : [];
+    const working = await this.calendar.workingDaysInRange(
+      tenantId,
+      from,
+      to,
+      year.id,
+    );
+    const sessions = sectionIds.length
+      ? await this.prisma.schoolAttendanceSession.findMany({
+          where: {
+            tenantId,
+            academicYearId: year.id,
+            date: { gte: parseDay(from), lte: parseDay(to) },
+            sectionId: { in: sectionIds },
+            status: { in: ['SUBMITTED', 'LOCKED'] },
+            ...(filters.subjectId
+              ? { mode: 'PERIOD', subjectId: filters.subjectId }
+              : { mode: 'DAILY', periodKey: 'DAILY' }),
+          },
+          include: { records: { where: { voided: false } } },
+        })
+      : [];
+    type Counts = {
+      present: number;
+      absent: number;
+      late: number;
+      leave: number;
+      half: number;
+      earned: number;
+      marked: number;
+    };
+    const emptyCounts = (): Counts => ({
+      present: 0,
+      absent: 0,
+      late: 0,
+      leave: 0,
+      half: 0,
+      earned: 0,
+      marked: 0,
+    });
+    const bump = (st: Counts, code: string) => {
+      if (code === 'PRESENT') st.present += 1;
+      else if (code === 'ABSENT') st.absent += 1;
+      else if (code === 'LATE') st.late += 1;
+      else if (code === 'LEAVE') st.leave += 1;
+      else if (code === 'HALF_DAY') st.half += 1;
+      st.earned += unitForStatus(code, settingsUnits(settings));
+      st.marked += 1;
+    };
+    const byStudent = new Map<string, Counts>();
+    const byClass = new Map<string, Counts>();
+    const byDay = new Map<string, Counts>();
+    const lastStatus = new Map<string, { date: string; status: string }>();
+    for (const session of sessions) {
+      const dk = dayKey(session.date);
+      const classCounts = byClass.get(session.sectionId) ?? emptyCounts();
+      const dayCounts = byDay.get(dk) ?? emptyCounts();
+      for (const rec of session.records) {
+        if (filters.studentId && rec.studentId !== filters.studentId) continue;
+        const st = byStudent.get(rec.studentId) ?? emptyCounts();
+        bump(st, rec.statusCode);
+        bump(classCounts, rec.statusCode);
+        bump(dayCounts, rec.statusCode);
+        byStudent.set(rec.studentId, st);
+        const prev = lastStatus.get(rec.studentId);
+        if (!prev || dk >= prev.date) {
+          lastStatus.set(rec.studentId, { date: dk, status: rec.statusCode });
+        }
+      }
+      byClass.set(session.sectionId, classCounts);
+      byDay.set(dk, dayCounts);
+    }
+    const workingDays = Math.max(1, working.working);
+    const students = enrolls.map((e) => {
+      const st = byStudent.get(e.studentId) ?? emptyCounts();
+      const sec = sectionMap.get(e.sectionId);
+      const percent = attendancePercent(st.earned, workingDays);
+      return {
+        studentId: e.studentId,
+        admissionNumber: e.student.admissionNumber,
+        fullName: e.student.fullName,
+        className: sec?.grade.name ?? '',
+        sectionName: sec?.name ?? '',
+        classLabel: sec ? `${sec.grade.name} ${sec.name}` : '',
+        totalDays: working.working,
+        present: st.present,
+        absent: st.absent,
+        late: st.late,
+        leave: st.leave,
+        percent,
+        status: attendanceStatusLabel(
+          percent,
+          settings.warnPercent,
+          settings.minPercent,
+        ),
+        band: bandForPercent(
+          percent,
+          settings.warnPercent,
+          settings.minPercent,
+        ),
+      };
+    });
+    const classRows = sections.map((sec) => {
+      const st = byClass.get(sec.id) ?? emptyCounts();
+      const headcount = enrolls.filter((e) => e.sectionId === sec.id).length;
+      const percent = attendancePercent(st.earned, Math.max(1, st.marked));
+      return {
+        sectionId: sec.id,
+        label: `${sec.grade.name} ${sec.name}`,
+        className: sec.grade.name,
+        sectionName: sec.name,
+        students: headcount,
+        present: st.present,
+        absent: st.absent,
+        late: st.late,
+        leave: st.leave,
+        percent: st.marked ? percent : 0,
+      };
+    });
+    const series: Array<{
+      name: string;
+      present: number;
+      absent: number;
+      late: number;
+      leave: number;
+    }> = [];
+    for (
+      let d = parseDay(from);
+      d <= parseDay(to);
+      d = new Date(d.getTime() + 86_400_000)
+    ) {
+      const dk = dayKey(d);
+      const st = byDay.get(dk) ?? emptyCounts();
+      series.push({
+        name: dk.slice(8),
+        present: st.present,
+        absent: st.absent,
+        late: st.late,
+        leave: st.leave,
+      });
+      if (series.length >= 45) break;
+    }
+    const unique = { present: 0, absent: 0, late: 0, leave: 0 };
+    for (const enroll of enrolls) {
+      const last = lastStatus.get(enroll.studentId)?.status;
+      if (last === 'ABSENT') unique.absent += 1;
+      else if (last === 'LATE') unique.late += 1;
+      else if (last === 'LEAVE' || last === 'EXCUSED') unique.leave += 1;
+      else if (last === 'HALF_DAY') unique.present += 1;
+      else if (last) unique.present += 1;
+    }
+    const uniquePct = (n: number) =>
+      Math.round((n / Math.max(1, enrolls.length)) * 1000) / 10;
+    const summary = {
+      students: enrolls.length,
+      present: unique.present,
+      absent: unique.absent,
+      late: unique.late,
+      leave: unique.leave,
+      presentPct: uniquePct(unique.present),
+      absentPct: uniquePct(unique.absent),
+      latePct: uniquePct(unique.late),
+      leavePct: uniquePct(unique.leave),
+      workingDays: working.working,
+    };
+    const kpis = [
+      { key: 'students', label: 'Total Students', value: summary.students },
+      { key: 'present', label: 'Present', value: summary.present },
+      { key: 'absent', label: 'Absent', value: summary.absent },
+      { key: 'late', label: 'Late', value: summary.late },
+      { key: 'leave', label: 'Leave', value: summary.leave },
+      { key: 'presentPct', label: 'Present %', value: summary.presentPct },
+      { key: 'absentPct', label: 'Absent %', value: summary.absentPct },
+      { key: 'latePct', label: 'Late %', value: summary.latePct },
+      { key: 'leavePct', label: 'Leave %', value: summary.leavePct },
+    ];
+    return {
+      from,
+      to,
+      year,
+      settings,
+      summary,
+      kpis,
+      series,
+      students,
+      classRows,
+      charts: [
+        {
+          type: 'bar' as const,
+          title: 'Attendance Overview',
+          data: series.map((d) => ({ name: d.name, value: d.present })),
+        },
+      ],
+    };
+  }
+
   async reportBundle(
     tenantId: string,
     key: string,
@@ -2099,99 +2362,124 @@ export class SchoolSisAttendanceService {
       month?: string;
       studentId?: string;
       status?: string;
+      subjectId?: string;
     },
   ) {
     const year = await this.year(tenantId, filters.academicYearId);
     const settings = await this.ensureSetup(tenantId, year.id);
     const date = filters.dateFrom || istDayKey();
-    if (key === 'attendance_daily' || key === 'attendance_absentees_daily') {
-      const rows = await this.absentees(tenantId, {
-        date,
-        academicYearId: year.id,
-        status: key === 'attendance_daily' ? undefined : 'ABSENT',
-      });
-      const dash = await this.dashboard(tenantId, {
-        academicYearId: year.id,
-        date,
-      });
-      if (key === 'attendance_daily') {
-        const sessions = await this.prisma.schoolAttendanceRecord.findMany({
-          where: {
-            tenantId,
-            session: {
-              academicYearId: year.id,
-              date: parseDay(date),
-              mode: 'DAILY',
-            },
-          },
-          include: {
-            student: true,
-            session: { include: { section: { include: { grade: true } } } },
-          },
-          take: 5000,
-        });
+    const studentListKeys = new Set([
+      'attendance_daily',
+      'attendance_range',
+      'attendance_student',
+      'attendance_subject',
+      'attendance_percent',
+      'attendance_monthly',
+      'attendance_absentees',
+      'attendance_absentees_daily',
+      'attendance_absentees_monthly',
+      'attendance_low',
+      'attendance_chronic',
+      'attendance_defaulters',
+      'attendance_late',
+    ]);
+    const classListKeys = new Set([
+      'attendance_class',
+      'attendance_section',
+      'attendance_class_compare',
+      'attendance_section_compare',
+      'attendance_trend',
+    ]);
+    if (studentListKeys.has(key) || classListKeys.has(key)) {
+      const analytics = await this.rangeAnalytics(tenantId, filters);
+      const studentColumns = [
+        { key: 'admissionNumber', label: 'Admission No' },
+        { key: 'fullName', label: 'Student Name' },
+        { key: 'className', label: 'Class' },
+        { key: 'sectionName', label: 'Section' },
+        { key: 'totalDays', label: 'Total Days' },
+        { key: 'present', label: 'Present' },
+        { key: 'absent', label: 'Absent' },
+        { key: 'late', label: 'Late' },
+        { key: 'leave', label: 'Leave' },
+        { key: 'percent', label: 'Attendance %' },
+        { key: 'status', label: 'Status' },
+      ];
+      let students = analytics.students;
+      if (
+        key === 'attendance_absentees' ||
+        key === 'attendance_absentees_monthly'
+      ) {
+        students = students.filter((s) => s.absent > 0);
+      }
+      if (key === 'attendance_absentees_daily') {
+        students = students.filter((s) => s.absent > 0);
+      }
+      if (key === 'attendance_late') {
+        students = students.filter((s) => s.late > 0);
+      }
+      if (
+        key === 'attendance_low' ||
+        key === 'attendance_chronic' ||
+        key === 'attendance_defaulters'
+      ) {
+        students = students.filter((s) => s.percent < settings.minPercent);
+      }
+      if (classListKeys.has(key)) {
+        const trendSeries =
+          key === 'attendance_trend'
+            ? analytics.series
+            : analytics.classRows.map((c) => ({
+                name: c.label,
+                present: c.present,
+                absent: c.absent,
+                late: c.late,
+                leave: c.leave,
+              }));
         return {
           columns: [
-            { key: 'className', label: 'Class' },
-            { key: 'admissionNumber', label: 'Admission No' },
-            { key: 'fullName', label: 'Student' },
-            { key: 'status', label: 'Status' },
-            { key: 'remark', label: 'Remark' },
+            { key: 'label', label: 'Class' },
+            { key: 'students', label: 'Students' },
+            { key: 'present', label: 'Present' },
+            { key: 'absent', label: 'Absent' },
+            { key: 'late', label: 'Late' },
+            { key: 'leave', label: 'Leave' },
+            { key: 'percent', label: '%' },
           ],
-          rows: sessions.map((r) => ({
-            className: `${r.session.section.grade.name} ${r.session.section.name}`,
-            admissionNumber: r.student.admissionNumber,
-            fullName: r.student.fullName,
-            status: r.statusCode,
-            remark: r.remark,
-          })),
-          kpis: [
-            { key: 'present', label: 'Present', value: dash.totals.present },
-            { key: 'absent', label: 'Absent', value: dash.totals.absent },
-            { key: 'pct', label: 'Attendance %', value: dash.totals.percent },
-          ],
+          rows: analytics.classRows,
+          kpis: analytics.kpis,
+          charts: analytics.charts,
+          series: trendSeries,
+          summary: analytics.summary,
         };
       }
       return {
-        columns: [
-          { key: 'fullName', label: 'Student' },
-          { key: 'className', label: 'Class' },
-          { key: 'status', label: 'Status' },
-          { key: 'parentPhone', label: 'Parent mobile' },
-        ],
-        rows: rows.map((r) => ({
-          fullName: r.fullName,
-          className: r.className,
-          status: r.status,
-          parentPhone: r.parentPhone,
-        })),
-        kpis: [{ key: 'n', label: 'Absentees', value: rows.length }],
+        columns: studentColumns,
+        rows: students,
+        kpis: analytics.kpis,
+        charts: analytics.charts,
+        series: analytics.series,
+        summary: analytics.summary,
       };
     }
     if (
-      key === 'attendance_monthly' ||
       key === 'attendance_register' ||
-      key === 'attendance_percent'
+      key === 'attendance_monthly_register'
     ) {
       if (!filters.sectionId) {
-        const dash = await this.dashboard(tenantId, {
-          academicYearId: year.id,
-          date,
-        });
+        const analytics = await this.rangeAnalytics(tenantId, filters);
         return {
           columns: [
             { key: 'label', label: 'Class' },
             { key: 'percent', label: '%' },
-            { key: 'status', label: 'Status' },
+            { key: 'present', label: 'Present' },
+            { key: 'absent', label: 'Absent' },
           ],
-          rows: dash.byClass.map((c) => ({
-            label: c.label,
-            percent: c.percent,
-            status: c.status,
-          })),
-          kpis: [
-            { key: 'pct', label: 'Overall %', value: dash.totals.percent },
-          ],
+          rows: analytics.classRows,
+          kpis: analytics.kpis,
+          charts: analytics.charts,
+          series: analytics.series,
+          summary: analytics.summary,
         };
       }
       const month = filters.month || date.slice(0, 7);
@@ -2245,26 +2533,6 @@ export class SchoolSisAttendanceService {
         ],
       };
     }
-    if (
-      key === 'attendance_low' ||
-      key === 'attendance_chronic' ||
-      key === 'attendance_defaulters'
-    ) {
-      const low = await this.lowAttendance(tenantId, {
-        academicYearId: year.id,
-        below: settings.minPercent,
-      });
-      return {
-        columns: [
-          { key: 'fullName', label: 'Student' },
-          { key: 'className', label: 'Class' },
-          { key: 'percent', label: '%' },
-          { key: 'band', label: 'Band' },
-        ],
-        rows: low.rows,
-        kpis: [{ key: 'n', label: 'Below threshold', value: low.rows.length }],
-      };
-    }
     if (key === 'attendance_leave') {
       const leaves = await this.listLeaves(tenantId);
       return {
@@ -2307,41 +2575,26 @@ export class SchoolSisAttendanceService {
         ],
       };
     }
-    if (key === 'attendance_late') {
-      const rows = await this.absentees(tenantId, {
-        date,
-        academicYearId: year.id,
-        status: 'LATE',
-      });
-      return {
-        columns: [
-          { key: 'fullName', label: 'Student' },
-          { key: 'className', label: 'Class' },
-          { key: 'status', label: 'Status' },
-        ],
-        rows,
-        kpis: [{ key: 'n', label: 'Late', value: rows.length }],
-      };
-    }
-    const dash = await this.dashboard(tenantId, {
-      academicYearId: year.id,
-      date,
-    });
+    const analytics = await this.rangeAnalytics(tenantId, filters);
     return {
       columns: [
-        { key: 'label', label: 'Class' },
-        { key: 'percent', label: '%' },
+        { key: 'admissionNumber', label: 'Admission No' },
+        { key: 'fullName', label: 'Student Name' },
+        { key: 'className', label: 'Class' },
+        { key: 'sectionName', label: 'Section' },
+        { key: 'totalDays', label: 'Total Days' },
+        { key: 'present', label: 'Present' },
         { key: 'absent', label: 'Absent' },
+        { key: 'late', label: 'Late' },
+        { key: 'leave', label: 'Leave' },
+        { key: 'percent', label: 'Attendance %' },
+        { key: 'status', label: 'Status' },
       ],
-      rows: dash.byClass,
-      kpis: [{ key: 'pct', label: 'Overall %', value: dash.totals.percent }],
-      charts: [
-        {
-          type: 'bar' as const,
-          title: 'Attendance by class',
-          data: dash.byClass.map((c) => ({ name: c.label, value: c.percent })),
-        },
-      ],
+      rows: analytics.students,
+      kpis: analytics.kpis,
+      charts: analytics.charts,
+      series: analytics.series,
+      summary: analytics.summary,
     };
   }
 

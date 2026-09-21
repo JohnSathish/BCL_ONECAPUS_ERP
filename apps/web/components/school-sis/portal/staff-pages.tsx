@@ -22,6 +22,7 @@ import { StaffAttendanceMarkPage } from './staff-attendance-mark-page';
 import { StaffHomeworkPage } from './staff-homework-page';
 import { StaffMarksPage } from './staff-marks-page';
 import { StaffTimetablePage } from './staff-timetable-page';
+import { AttendanceReportsDesk } from '../reports/attendance-reports-desk';
 import { usePortalData, portalDisplayName, portalMe } from './portal-data';
 import { asList, asNumber, asRecord, asText, formatDay } from './portal-utils';
 
@@ -155,6 +156,7 @@ export function StaffSection({ section }: { section: string }) {
   if (section === 'marks') return <StaffMarksPage />;
 
   if (section === 'timetable') return <StaffTimetablePage />;
+  if (section === 'reports') return <AttendanceReportsDesk />;
   if (section === 'attendance') {
     return (
       <div>
