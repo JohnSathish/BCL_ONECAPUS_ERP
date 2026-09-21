@@ -6,7 +6,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setAuthFailureHandler, setPasswordResetHandler } from '@/api/client';
-import { getUser, isAppLockEnabled, isBiometricLoginEnabled } from '@/auth/session';
+import {
+  getRefreshToken,
+  getUser,
+  isAppLockEnabled,
+  isBiometricLoginEnabled,
+} from '@/auth/session';
 import { justDidPasswordLogin } from '@/auth/password-gate';
 import { PASSWORD_PATH } from '@/auth/post-login';
 import { ExitAppDialog } from '@/components/exit-app-dialog';
@@ -105,9 +110,40 @@ export default function RootLayout() {
       }
       if (state !== 'active') return;
       const away = Date.now() - backgroundedAt.current;
-      if (!backgroundedAt.current || away < 8_000) return;
       if (wasOpenedFromNotificationRecently()) return;
       if (AUTH_HOLD.has(path) || path === '/') return;
+      void import('@/auth/token-refresh').then(
+        ({
+          AccountDisabledError,
+          DeviceBlockedError,
+          refreshAccessToken,
+          SessionExpiredError,
+          SessionRevokedError,
+        }) => {
+          void getRefreshToken().then((refresh) => {
+            if (!refresh) return;
+            void refreshAccessToken().catch((err) => {
+              if (justDidPasswordLogin()) return;
+              if (err instanceof AccountDisabledError) {
+                router.replace('/account-disabled');
+                return;
+              }
+              if (err instanceof DeviceBlockedError) {
+                router.replace('/device-blocked');
+                return;
+              }
+              if (err instanceof SessionRevokedError) {
+                router.replace('/session-ended');
+                return;
+              }
+              if (err instanceof SessionExpiredError) {
+                router.replace('/login');
+              }
+            });
+          });
+        },
+      );
+      if (!backgroundedAt.current || away < 8_000) return;
       void import('@/services/push').then(({ pingDeviceHeartbeat, registerSchoolPush }) => {
         void registerSchoolPush();
         void pingDeviceHeartbeat();

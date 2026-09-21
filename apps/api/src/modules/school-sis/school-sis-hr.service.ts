@@ -1061,6 +1061,128 @@ export class SchoolSisHrService {
     });
   }
 
+  async staffLeaveDesk(tenantId: string, staffId: string) {
+    await this.ensureSetup(tenantId);
+    const year = Number(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+      }).format(new Date()),
+    );
+    const [types, balances, requests] = await Promise.all([
+      this.prisma.schoolHrLeaveType.findMany({
+        where: { tenantId, active: true },
+        include: { policies: true },
+        orderBy: { sortOrder: 'asc' },
+      }),
+      this.prisma.schoolHrLeaveBalance.findMany({
+        where: { tenantId, staffId, year },
+      }),
+      this.leaveRequests(tenantId, undefined, staffId),
+    ]);
+    const balMap = new Map(balances.map((row) => [row.leaveTypeId, row]));
+    const cards = types.map((type) => {
+      const bal = balMap.get(type.id);
+      const entitled = Number(
+        bal
+          ? Number(bal.opening) + Number(bal.accrued)
+          : (type.policies[0]?.annualEntitlement ?? 0),
+      );
+      const taken = Number(bal?.taken ?? 0);
+      return {
+        id: type.id,
+        code: type.code,
+        name: type.name,
+        remaining: Math.max(0, Math.round((entitled - taken) * 100) / 100),
+        entitled: Math.max(0, Math.round(entitled * 100) / 100),
+        taken,
+        requiresDocument: type.requiresDocument,
+      };
+    });
+    return {
+      year,
+      balances: cards,
+      types: types.map((type) => ({
+        id: type.id,
+        code: type.code,
+        name: type.name,
+        requiresDocument: type.requiresDocument,
+        isLop: type.isLop,
+      })),
+      requests: requests.map((row) => ({
+        id: row.id,
+        leaveTypeId: row.leaveTypeId,
+        typeName: row.leaveType.name,
+        typeCode: row.leaveType.code,
+        fromDate: row.fromDate.toISOString().slice(0, 10),
+        toDate: row.toDate.toISOString().slice(0, 10),
+        days: Number(row.days),
+        reason: row.reason,
+        status: row.status,
+        reviewNote: row.reviewNote,
+        createdAt: row.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async applyOwnLeave(
+    tenantId: string,
+    staffId: string,
+    dto: {
+      leaveTypeId: string;
+      fromDate: string;
+      toDate: string;
+      days?: number;
+      reason?: string;
+      attachment?: string;
+    },
+    actor: { userId: string },
+  ) {
+    await this.ensureSetup(tenantId);
+    const type = await this.prisma.schoolHrLeaveType.findFirst({
+      where: { id: dto.leaveTypeId, tenantId, active: true },
+    });
+    if (!type) throw new BadRequestException('Select a valid leave type');
+    if (dto.toDate < dto.fromDate) {
+      throw new BadRequestException('To date cannot be before from date');
+    }
+    const from = new Date(`${dto.fromDate}T00:00:00.000Z`);
+    const to = new Date(`${dto.toDate}T00:00:00.000Z`);
+    const days =
+      dto.days ?? Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+    if (days < 1) throw new BadRequestException('Leave must be at least 1 day');
+    const reason = dto.reason?.trim() ?? '';
+    if (!reason) throw new BadRequestException('Reason for leave is required');
+    const row = await this.prisma.schoolHrLeaveRequest.create({
+      data: {
+        tenantId,
+        staffId,
+        leaveTypeId: dto.leaveTypeId,
+        fromDate: from,
+        toDate: to,
+        days,
+        reason,
+        attachment: dto.attachment?.trim() || null,
+        submittedBy: actor.userId,
+      },
+      include: { leaveType: true },
+    });
+    await this.events.publish({
+      event: 'hr.leave.requested',
+      tenantId,
+      entityId: row.id,
+      data: { staff_id: staffId },
+    });
+    return {
+      id: row.id,
+      typeName: row.leaveType.name,
+      fromDate: row.fromDate.toISOString().slice(0, 10),
+      toDate: row.toDate.toISOString().slice(0, 10),
+      days: Number(row.days),
+      status: row.status,
+    };
+  }
+
   async requestLeave(tenantId: string, dto: LeaveRequestDto, actor: HrActor) {
     if (!actor.manageHr) {
       const own = await this.ownStaffId(tenantId, actor.userId);

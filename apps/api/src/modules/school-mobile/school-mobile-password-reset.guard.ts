@@ -9,6 +9,7 @@ import type { JwtUser } from '../../common/decorators/current-user.decorator';
 
 const ALLOWED = [
   /\/school-mobile\/change-password\/?$/i,
+  /\/school-mobile\/auth\/refresh\/?$/i,
   /\/school-mobile\/auth\/logout\/?$/i,
   /\/school-mobile\/auth\/logout-all\/?$/i,
   /\/school-mobile\/auth\/sessions\/revoke-all\/?$/i,

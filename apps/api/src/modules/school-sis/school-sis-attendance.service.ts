@@ -2154,6 +2154,7 @@ export class SchoolSisAttendanceService {
     tenantId: string,
     studentId: string,
     academicYearId?: string,
+    month?: string,
   ) {
     const year = await this.year(tenantId, academicYearId);
     const settings = await this.ensureSetup(tenantId, year.id);
@@ -2165,10 +2166,12 @@ export class SchoolSisAttendanceService {
       throw new NotFoundException(
         'Enrollment not found for this academic year',
       );
+    const monthKey =
+      month && /^\d{4}-\d{2}$/.test(month) ? month : istDayKey().slice(0, 7);
     const monthly = await this.monthly(tenantId, {
       academicYearId: year.id,
       sectionId: enroll.sectionId,
-      month: istDayKey().slice(0, 7),
+      month: monthKey,
     });
     const me = monthly.students.find((s) => s.studentId === studentId);
     const yearWorking = await this.workingDays(
@@ -2189,7 +2192,11 @@ export class SchoolSisAttendanceService {
           status: { in: ['SUBMITTED', 'LOCKED'] },
         },
       },
-      include: { session: true },
+      include: {
+        session: {
+          include: { staff: { select: { fullName: true } } },
+        },
+      },
       orderBy: { session: { date: 'desc' } },
       take: 366,
     });
@@ -2201,6 +2208,8 @@ export class SchoolSisAttendanceService {
         status: r.statusCode,
         remark: r.remark,
         letter: REGISTER_LETTER[r.statusCode] ?? r.statusCode,
+        markedAt: (r.markedAt ?? r.session.submittedAt)?.toISOString() ?? null,
+        markedBy: r.session.staff?.fullName ?? 'School office',
       };
     });
     const pct = attendancePercent(earned, yearWorking.working);
@@ -2211,7 +2220,15 @@ export class SchoolSisAttendanceService {
         admissionNumber: enroll.student.admissionNumber,
         className: `${enroll.section.grade.name} ${enroll.section.name}`,
       },
-      academicYear: { id: year.id, name: year.name },
+      academicYear: {
+        id: year.id,
+        name: year.name,
+        startDate: dayKey(year.startDate),
+        endDate: dayKey(year.endDate),
+      },
+      className: `${enroll.section.grade.name} ${enroll.section.name}`,
+      monthKey,
+      monthWorkingDays: monthly.workingDays,
       workingDays: yearWorking.working,
       percent: pct,
       band: bandForPercent(pct, settings.warnPercent, settings.minPercent),

@@ -378,6 +378,12 @@
   border: 1px solid #f1f5f9;
   background: #fff;
   text-align: left;
+  cursor: pointer;
+}
+
+.sls-cal-day:hover {
+  background: #f8fbff;
+  border-color: #dbeafe;
 }
 
 .sls-cal-day.is-out {
@@ -387,6 +393,51 @@
 
 .sls-cal-day.is-today {
   background: #eff6ff;
+}
+
+.sls-cal-day.is-today:hover {
+  background: #dbeafe;
+}
+
+.sls-cal-add-hint {
+  display: none;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: auto;
+  padding-top: 0.15rem;
+  color: #2563eb;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.sls-cal-day.can-add:hover .sls-cal-add-hint {
+  display: inline-flex;
+}
+
+.sls-cal-week-date {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sls-cal-week-date:hover strong {
+  color: #2563eb;
+}
+
+.sls-cal-week-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  border: 1px dashed #bfdbfe;
+  border-radius: 0.55rem;
+  background: #eff6ff;
+  padding: 0.3rem 0.55rem;
+  color: #2563eb;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .sls-cal-num {

@@ -308,6 +308,8 @@ export class SchoolSisTimetableService {
     const grid = await this.classGrid(tenantId, enrollment.sectionId, false);
     return {
       ...grid,
+      classLabel:
+        `${enrollment.section.grade.name} ${enrollment.section.name}`.trim(),
       student: {
         id: enrollment.student.id,
         fullName: enrollment.student.fullName,

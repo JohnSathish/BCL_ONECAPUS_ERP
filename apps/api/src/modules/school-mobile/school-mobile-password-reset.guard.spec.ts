@@ -19,6 +19,15 @@ describe('schoolMobilePasswordResetAllowed', () => {
     ).toBe(true);
   });
 
+  it('allows token refresh while a reset is required', () => {
+    expect(
+      schoolMobilePasswordResetAllowed(
+        '/api/v1/school-mobile/auth/refresh',
+        true,
+      ),
+    ).toBe(true);
+  });
+
   it('allows change-password and logout while a reset is required', () => {
     expect(
       schoolMobilePasswordResetAllowed(

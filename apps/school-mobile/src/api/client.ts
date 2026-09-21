@@ -1,5 +1,5 @@
 import { getApiBase, schoolHeaders } from '@/api/config';
-import { getAccessToken, getUser, saveUser } from '@/auth/session';
+import { accessTokenLooksExpired, getAccessToken, getUser, saveUser } from '@/auth/session';
 import { justDidPasswordLogin } from '@/auth/password-gate';
 import {
   AccountDisabledError,
@@ -42,10 +42,45 @@ function messageOf(json: unknown, fallback: string) {
   return fallback;
 }
 
+function isOfflineMessage(msg: string) {
+  return /offline|network request failed|failed to fetch|timeout/i.test(msg);
+}
+
 export async function apiFetch<T>(path: string, options: Options = {}): Promise<T> {
   const headers = await schoolHeaders(options.headers as Record<string, string>);
   if (!options.skipAuth) {
-    const token = await getAccessToken();
+    let token = await getAccessToken();
+    if (token && accessTokenLooksExpired(token) && !options._retried) {
+      try {
+        const refreshed = await refreshAccessToken();
+        token = refreshed.accessToken;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '';
+        if (isOfflineMessage(msg)) {
+          throw err instanceof Error ? err : new Error(msg);
+        }
+        if (
+          err instanceof AccountDisabledError ||
+          err instanceof DeviceBlockedError ||
+          err instanceof SessionRevokedError
+        ) {
+          if (!options.ignoreAuthFailure) {
+            onAuthFailure?.(
+              err instanceof AccountDisabledError
+                ? 'disabled'
+                : err instanceof DeviceBlockedError
+                  ? 'blocked'
+                  : 'revoked',
+            );
+          }
+          throw err;
+        }
+        if (err instanceof SessionExpiredError) {
+          if (!options.ignoreAuthFailure && !justDidPasswordLogin()) onAuthFailure?.('expired');
+          throw new Error('Please sign in again.');
+        }
+      }
+    }
     if (token) headers.Authorization = `Bearer ${token}`;
   }
   const url = `${getApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
@@ -93,7 +128,7 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
         throw err;
       }
       const msg = err instanceof Error ? err.message : '';
-      if (msg.toLowerCase().includes('offline')) {
+      if (isOfflineMessage(msg)) {
         throw err instanceof Error ? err : new Error(msg);
       }
       if (err instanceof SessionExpiredError) {

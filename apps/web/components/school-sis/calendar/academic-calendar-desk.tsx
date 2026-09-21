@@ -385,18 +385,20 @@ export function AcademicCalendarDesk() {
     return grid.slice(start, start + 7);
   }, [grid, today, weekAnchor]);
 
-  function openEdit(row?: any, categoryCode?: string) {
+  function openEdit(row?: any, categoryCode?: string, dateIso?: string) {
+    const date = dateIso || row?.startDate?.slice(0, 10) || today;
     const categoryId =
       row?.categoryId ??
       setup.data?.categories?.find((c: any) => c.code === categoryCode)?.id ??
       setup.data?.categories?.[0]?.id ??
       '';
+    setDetail(null);
     setEditing(row ?? null);
     setForm({
       title: row?.title ?? '',
       categoryId,
-      startDate: row?.startDate?.slice(0, 10) ?? today,
-      endDate: row?.endDate?.slice(0, 10) ?? row?.startDate?.slice(0, 10) ?? today,
+      startDate: row?.startDate?.slice(0, 10) ?? date,
+      endDate: row?.endDate?.slice(0, 10) ?? row?.startDate?.slice(0, 10) ?? date,
       startTime: row?.startTime ?? '',
       endTime: row?.endTime ?? '',
       allDay: row?.allDay ?? true,
@@ -417,6 +419,15 @@ export function AcademicCalendarDesk() {
       ptmInstructions: row?.ptm?.instructions ?? '',
     });
     setOpen(true);
+  }
+
+  function openDay(iso: string, items: any[]) {
+    setWeekAnchor(iso);
+    if (canManage && items.length === 0) {
+      openEdit(undefined, undefined, iso);
+      return;
+    }
+    setDetail({ isDay: true, date: iso, items, title: fmtCalDate(iso) });
   }
 
   function shiftMonth(delta: number) {
@@ -658,24 +669,48 @@ export function AcademicCalendarDesk() {
                   <button
                     type="button"
                     key={cell.iso}
-                    className={`sls-cal-day ${cell.outside ? 'is-out' : ''} ${cell.iso === today ? 'is-today' : ''}`}
-                    onClick={() => {
-                      setWeekAnchor(cell.iso);
-                      setDetail({ date: cell.iso, items: cell.items, title: fmtCalDate(cell.iso) });
-                    }}
+                    className={`sls-cal-day ${cell.outside ? 'is-out' : ''} ${cell.iso === today ? 'is-today' : ''} ${canManage ? 'can-add' : ''}`}
+                    aria-label={
+                      canManage && !cell.items.length
+                        ? `Add event on ${fmtCalDate(cell.iso)}`
+                        : `Events on ${fmtCalDate(cell.iso)}`
+                    }
+                    onClick={() => openDay(cell.iso, cell.items)}
                   >
                     <span className="sls-cal-num">{cell.day}</span>
                     {cell.items.slice(0, 3).map((item: any) => {
                       const tone = groupFor(item.category?.code);
                       return (
-                        <div key={item.id} className="sls-cal-chip" style={{ color: tone.color }}>
+                        <span
+                          key={item.id}
+                          role="button"
+                          tabIndex={0}
+                          className="sls-cal-chip"
+                          style={{ color: tone.color }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDetail(item);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDetail(item);
+                            }
+                          }}
+                        >
                           <i style={{ background: tone.color }} />
                           <span>{item.title}</span>
-                        </div>
+                        </span>
                       );
                     })}
                     {cell.items.length > 3 ? (
                       <span className="sls-cal-more">+{cell.items.length - 3} more</span>
+                    ) : null}
+                    {canManage && !cell.items.length ? (
+                      <span className="sls-cal-add-hint">
+                        <Plus className="h-3.5 w-3.5" /> Add event
+                      </span>
                     ) : null}
                   </button>
                 ))}
@@ -687,7 +722,11 @@ export function AcademicCalendarDesk() {
             <div className="sls-cal-week">
               {weekCells.map((cell) => (
                 <div key={cell.iso} className="sls-cal-week-day">
-                  <div>
+                  <button
+                    type="button"
+                    className="sls-cal-week-date"
+                    onClick={() => openDay(cell.iso, cell.items)}
+                  >
                     <strong>{fmtCalDate(cell.iso)}</strong>
                     <em>
                       {new Date(`${cell.iso}T00:00:00Z`).toLocaleDateString('en-IN', {
@@ -695,7 +734,7 @@ export function AcademicCalendarDesk() {
                         timeZone: 'UTC',
                       })}
                     </em>
-                  </div>
+                  </button>
                   <div className="space-y-1">
                     {cell.items.length ? (
                       cell.items.map((item: any) => {
@@ -715,9 +754,26 @@ export function AcademicCalendarDesk() {
                           </button>
                         );
                       })
+                    ) : canManage ? (
+                      <button
+                        type="button"
+                        className="sls-cal-week-add"
+                        onClick={() => openEdit(undefined, undefined, cell.iso)}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add event
+                      </button>
                     ) : (
                       <p className="sls-cal-empty">No events</p>
                     )}
+                    {canManage && cell.items.length ? (
+                      <button
+                        type="button"
+                        className="sls-cal-week-add"
+                        onClick={() => openEdit(undefined, undefined, cell.iso)}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add event
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -1087,35 +1143,73 @@ export function AcademicCalendarDesk() {
       <Dialog open={!!detail} onOpenChange={() => setDetail(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{detail?.title || detail?.date}</DialogTitle>
+            <DialogTitle>
+              {detail?.isDay ? `Events · ${detail.title}` : detail?.title || detail?.date}
+            </DialogTitle>
           </DialogHeader>
-          {detail?.category ? (
-            <p className="text-sm">
-              {detail.category.name} · {detail.status}
-            </p>
-          ) : null}
-          {detail?.startDate ? (
-            <p className="text-sm">
-              {fmtCalDate(detail.startDate)} {detail.startTime || ''}
-            </p>
-          ) : null}
-          {detail?.location ? <p className="text-sm">Location: {detail.location}</p> : null}
-          {detail?.organizer?.fullName ? (
-            <p className="text-sm">Organizer: {detail.organizer.fullName}</p>
-          ) : null}
-          {detail?.description ? (
-            <p className="text-sm text-slate-600">{detail.description}</p>
-          ) : null}
-          {detail?.items?.map((i: any) => (
-            <p key={i.id} className="text-sm">
-              {i.title} · {i.category?.name}
-            </p>
-          ))}
-          {canManage && detail?.id && detail?.source === 'MANUAL' ? (
-            <DialogFooter>
-              <GhostButton onClick={() => openEdit(detail)}>Edit</GhostButton>
-            </DialogFooter>
-          ) : null}
+          {detail?.isDay ? (
+            <div className="space-y-2">
+              {detail.items?.length ? (
+                detail.items.map((item: any) => {
+                  const tone = groupFor(item.category?.code);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="flex w-full items-start gap-2 rounded-lg border border-slate-100 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      onClick={() => setDetail(item)}
+                    >
+                      <i
+                        className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ background: tone.color }}
+                      />
+                      <span>
+                        <b>{item.title}</b>
+                        <span className="mt-0.5 block text-xs text-slate-500">
+                          {item.category?.name} · {prettyTime(item)}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-slate-500">No events on this date yet.</p>
+              )}
+              {canManage ? (
+                <DialogFooter>
+                  <GhostButton onClick={() => setDetail(null)}>Close</GhostButton>
+                  <PrimaryButton onClick={() => openEdit(undefined, undefined, detail.date)}>
+                    Add event
+                  </PrimaryButton>
+                </DialogFooter>
+              ) : null}
+            </div>
+          ) : (
+            <>
+              {detail?.category ? (
+                <p className="text-sm">
+                  {detail.category.name} · {detail.status}
+                </p>
+              ) : null}
+              {detail?.startDate ? (
+                <p className="text-sm">
+                  {fmtCalDate(detail.startDate)} {detail.startTime || ''}
+                </p>
+              ) : null}
+              {detail?.location ? <p className="text-sm">Location: {detail.location}</p> : null}
+              {detail?.organizer?.fullName ? (
+                <p className="text-sm">Organizer: {detail.organizer.fullName}</p>
+              ) : null}
+              {detail?.description ? (
+                <p className="text-sm text-slate-600">{detail.description}</p>
+              ) : null}
+              {canManage && detail?.id && detail?.source === 'MANUAL' ? (
+                <DialogFooter>
+                  <GhostButton onClick={() => openEdit(detail)}>Edit</GhostButton>
+                </DialogFooter>
+              ) : null}
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

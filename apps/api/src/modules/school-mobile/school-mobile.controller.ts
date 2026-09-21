@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Headers,
   Param,
@@ -74,12 +75,14 @@ import {
   SchoolAuthIdentifierDto,
   SchoolAuthLogoutDto,
   SchoolAuthOtpDto,
+  SchoolAuthRefreshDto,
   SchoolAuthSetPasswordDto,
   SchoolMobileBroadcastDto,
   SchoolMobileChangePasswordDto,
   SchoolMobileFeedbackDto,
   SchoolMobileLeaveDto,
   SchoolMobileLoginDto,
+  SchoolMobileStaffLeaveDto,
   UpsertSchoolMobilePrayerDto,
 } from './dto/school-mobile.dto';
 import { SchoolMobileAccessService } from './school-mobile-access.service';
@@ -217,6 +220,29 @@ export class SchoolMobileController {
           ?.split(',')[0]
           ?.trim() || req.ip,
     });
+  }
+
+  @Public()
+  @Post('auth/refresh')
+  refresh(
+    @Req() req: Request,
+    @Body() dto: SchoolAuthRefreshDto,
+    @Headers('x-device-id') deviceHeader?: string,
+    @Headers('x-app-version') appVersion?: string,
+    @Headers('x-app-platform') platform?: string,
+  ) {
+    return this.accountAuth.refreshSession(
+      dto.refreshToken,
+      {
+        deviceId: deviceHeader,
+        clientType: 'mobile',
+        appVersion,
+        platform,
+        userAgent: req.headers['user-agent'],
+        ipAddress: extractClientIp(req),
+      },
+      dto.unlockMethod,
+    );
   }
 
   @Post('change-password')
@@ -565,6 +591,36 @@ export class SchoolMobileController {
     return this.home.applyLeave(user, dto);
   }
 
+  @Get('staff/leave')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    ...ACCESS,
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    'hr.self.view',
+  )
+  async staffLeaveDesk(@CurrentUser() user: JwtUser) {
+    const staffId = await this.access.staffIdForUser(user.tid, user);
+    if (!staffId) throw new ForbiddenException('Staff profile not found');
+    return this.hr.staffLeaveDesk(user.tid, staffId);
+  }
+
+  @Post('staff/leave')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    ...ACCESS,
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+    'hr.self.view',
+    'hr.leave.create',
+  )
+  async staffApplyLeave(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SchoolMobileStaffLeaveDto,
+  ) {
+    const staffId = await this.access.staffIdForUser(user.tid, user);
+    if (!staffId) throw new ForbiddenException('Staff profile not found');
+    return this.hr.applyOwnLeave(user.tid, staffId, dto, { userId: user.sub });
+  }
+
   @Get('prayer')
   @ApiBearerAuth()
   @RequireAnyPermission(...ACCESS)
@@ -683,6 +739,7 @@ export class SchoolMobileController {
   async attendanceNow(
     @CurrentUser() user: JwtUser,
     @Query('childId') childId?: string,
+    @Query('month') month?: string,
   ) {
     const studentId = await this.access.resolveStudentId(
       user.tid,
@@ -690,7 +747,12 @@ export class SchoolMobileController {
       childId,
     );
     if (!studentId) return { percent: null, calendar: [] };
-    return this.attendance.studentProfile(user.tid, studentId);
+    return this.attendance.studentProfile(
+      user.tid,
+      studentId,
+      undefined,
+      month,
+    );
   }
 
   @Get('exams')
@@ -714,6 +776,25 @@ export class SchoolMobileController {
   @RequireAnyPermission(...ACCESS, 'attendance.view', 'attendance.create')
   teacherToday(@CurrentUser() user: JwtUser, @Query('date') date?: string) {
     return this.attendance.teacherToday(user.tid, user.sub, date);
+  }
+
+  @Get('teacher/class')
+  @ApiBearerAuth()
+  @RequireAnyPermission(
+    ...ACCESS,
+    'attendance.view',
+    'attendance.create',
+    SCHOOL_MOBILE_PERMISSION_STAFF,
+  )
+  async teacherClass(
+    @CurrentUser() user: JwtUser,
+    @Query('sectionId') sectionId?: string,
+  ) {
+    if (!sectionId) throw new BadRequestException('sectionId is required');
+    await this.sisAccess.assertSectionAccess(user.tid, user, sectionId);
+    const staffId = await this.access.staffIdForUser(user.tid, user);
+    if (!staffId) throw new ForbiddenException('Staff profile not found');
+    return this.home.teacherClass(user.tid, staffId, sectionId);
   }
 
   @Get('exams/marks/options')

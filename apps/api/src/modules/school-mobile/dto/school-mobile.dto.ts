@@ -3,6 +3,7 @@ import {
   IsDateString,
   IsIn,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -293,6 +294,20 @@ export class SchoolAuthLogoutDto {
   refreshToken?: string;
 }
 
+export class SchoolAuthRefreshDto {
+  @IsString()
+  @MinLength(10)
+  refreshToken!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  rememberMe?: boolean;
+
+  @IsOptional()
+  @IsIn(['biometric_unlock'])
+  unlockMethod?: 'biometric_unlock';
+}
+
 export class SchoolMobileFeedbackDto {
   @IsString()
   @MinLength(8)
@@ -338,4 +353,29 @@ export class SchoolMobileLeaveDto {
   @IsOptional()
   @IsUUID()
   childId?: string;
+}
+
+export class SchoolMobileStaffLeaveDto {
+  @IsUUID()
+  leaveTypeId!: string;
+
+  @IsDateString()
+  fromDate!: string;
+
+  @IsDateString()
+  toDate!: string;
+
+  @IsOptional()
+  @IsNumber()
+  days?: number;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(200)
+  reason!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  attachment?: string;
 }

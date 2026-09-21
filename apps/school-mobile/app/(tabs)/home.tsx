@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
@@ -56,11 +56,8 @@ export default function HomeScreen() {
     try {
       const refresh = await getRefreshToken();
       if (!refresh) {
-        if (justDidPasswordLogin()) {
-          setError('Could not load home. Please try again.');
-          return;
-        }
-        router.replace('/login');
+        setError('Could not load home. Please try again.');
+        if (!justDidPasswordLogin()) router.replace('/login');
         return;
       }
       const [childId, cached] = await Promise.all([getActiveChild(), getUser()]);
@@ -90,11 +87,8 @@ export default function HomeScreen() {
       setError(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
-      if (
-        !justDidPasswordLogin() &&
-        /SecureStore|getValueWithKeyAsync|NullPointerException|unauthor|401/i.test(msg)
-      ) {
-        router.replace('/login');
+      if (/offline|timeout/i.test(msg)) {
+        setError("You're offline. Some information may be unavailable.");
         return;
       }
       setError('Could not load home. Please try again.');
@@ -106,6 +100,12 @@ export default function HomeScreen() {
       void load();
     }, [load]),
   );
+
+  useEffect(() => {
+    if (data || !error) return;
+    const id = setInterval(() => void load(), 8000);
+    return () => clearInterval(id);
+  }, [data, error, load]);
 
   if (!data && !error) {
     return (
@@ -120,9 +120,13 @@ export default function HomeScreen() {
   }
 
   if (!data) {
+    const offline = /offline|internet/i.test(error || '');
     return (
       <Screen>
-        <EmptyState title="Couldn't load home" body={error || 'Please try again.'} />
+        <EmptyState
+          title={offline ? 'No Internet Connection' : "Couldn't load home"}
+          body={error || 'Please try again.'}
+        />
         <Pressable onPress={() => void load()} style={styles.retry}>
           <Text style={styles.retryText}>Try again</Text>
         </Pressable>

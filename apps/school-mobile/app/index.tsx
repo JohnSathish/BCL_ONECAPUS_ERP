@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { apiFetch } from '@/api/client';
 import { APP_VERSION } from '@/api/config';
 import { restoreSchoolSession } from '@/auth/restore';
+import { getRefreshToken } from '@/auth/session';
 import { PASSWORD_PATH } from '@/auth/post-login';
 import { captureLaunchNotification } from '@/services/notification-open';
 import { HOME_PATH } from '@/services/notification-path';
@@ -61,6 +62,8 @@ export default function GateScreen() {
         | '/login'
         | '/welcome'
         | '/account-disabled'
+        | '/session-ended'
+        | '/device-blocked'
         | typeof HOME_PATH
         | '/unlock'
         | typeof PASSWORD_PATH = '/login';
@@ -68,7 +71,7 @@ export default function GateScreen() {
         const restored = await restoreSchoolSession();
         next = restored.route === HOME_PATH ? HOME_PATH : restored.route;
       } catch {
-        next = '/login';
+        next = (await getRefreshToken().catch(() => null)) ? HOME_PATH : '/login';
       }
       const remaining = MIN_SPLASH_MS - (Date.now() - started);
       if (remaining > 0) await wait(remaining);

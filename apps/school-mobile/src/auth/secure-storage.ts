@@ -88,7 +88,8 @@ async function persistValue(key: string, value: string) {
       extra += 1;
     }
   } catch {
-    await fileSet(key, value);
+    if (!/token/i.test(key)) await fileSet(key, value);
+    else throw new Error('secure store unavailable');
   }
 }
 
@@ -119,6 +120,7 @@ export async function secureSet(key: string, value: string): Promise<void> {
   try {
     await persistValue(key, value);
   } catch {
+    if (/token/i.test(key)) return;
     try {
       await fileSet(key, value);
     } catch {

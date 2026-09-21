@@ -120,7 +120,12 @@ export async function hasPersistedSession() {
   return Boolean(refresh);
 }
 
-/** Explicit logout: revoke local credentials. Closing the app must never call this. */
+/** Drop access/refresh tokens only. Keep biometric preference and the user snapshot. */
+export async function clearAuthTokens() {
+  await Promise.all([delSecure(ACCESS), delSecure(REFRESH)]);
+}
+
+/** Explicit logout, revoked session, or disabled account. Closing the app must never call this. */
 export async function clearSession() {
   await Promise.all([
     delSecure(ACCESS),

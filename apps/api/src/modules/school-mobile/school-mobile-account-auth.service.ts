@@ -603,6 +603,21 @@ export class SchoolMobileAccountAuthService {
     return { ok: true };
   }
 
+  async refreshSession(
+    refreshToken: string,
+    meta?: LoginDeviceMeta,
+    unlockMethod?: 'biometric_unlock',
+  ) {
+    const token = refreshToken?.trim();
+    if (!token) throw new UnauthorizedException('Invalid refresh token');
+    const session = await this.auth.refresh(
+      token,
+      { ...meta, clientType: 'mobile' },
+      unlockMethod,
+    );
+    return this.auth.toPublicSession(session, { includeRefreshToken: true });
+  }
+
   async logout(tenantId: string, userId: string, refreshToken?: string) {
     if (refreshToken) {
       await this.prisma.refreshSession.updateMany({

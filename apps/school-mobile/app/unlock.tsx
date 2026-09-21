@@ -7,7 +7,13 @@ import {
   biometricFailMessage,
 } from '@/auth/biometric';
 import { getUser } from '@/auth/session';
-import { refreshAccessToken } from '@/auth/token-refresh';
+import {
+  refreshAccessToken,
+  AccountDisabledError,
+  DeviceBlockedError,
+  SessionExpiredError,
+  SessionRevokedError,
+} from '@/auth/token-refresh';
 import { CREST, SCHOOL } from '@/brand';
 import { Screen } from '@/ui/kit';
 import { destinationAfterAuth } from '@/auth/post-login';
@@ -51,14 +57,26 @@ export default function UnlockScreen() {
       const user = await getUser();
       router.replace(destinationAfterAuth(user));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      if (msg === 'ACCOUNT_DISABLED') {
+      if (err instanceof AccountDisabledError) {
         router.replace('/account-disabled');
         return;
       }
+      if (err instanceof DeviceBlockedError) {
+        router.replace('/device-blocked');
+        return;
+      }
+      if (err instanceof SessionRevokedError) {
+        router.replace('/session-ended');
+        return;
+      }
+      const msg = err instanceof Error ? err.message : '';
       if (msg.toLowerCase().includes('offline')) {
         const user = await getUser();
         router.replace(destinationAfterAuth(user));
+        return;
+      }
+      if (err instanceof SessionExpiredError) {
+        setError('Session could not be renewed. Sign in with your password.');
         return;
       }
       setError('Session could not be renewed. Sign in with your password.');

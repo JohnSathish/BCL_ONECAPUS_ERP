@@ -1,6 +1,6 @@
 import { getApiBase, schoolHeaders } from '@/api/config';
 import { justDidPasswordLogin } from '@/auth/password-gate';
-import { clearSession, getRefreshToken, saveSession } from '@/auth/session';
+import { clearAuthTokens, getAccessToken, getRefreshToken, saveSession } from '@/auth/session';
 
 export class AccountDisabledError extends Error {
   constructor() {
@@ -30,47 +30,103 @@ export class SessionExpiredError extends Error {
   }
 }
 
-export async function refreshAccessToken(opts?: { biometricUnlock?: boolean }) {
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) throw new SessionExpiredError('No refresh token');
+type Refreshed = { accessToken: string; refreshToken: string };
+
+let inFlight: Promise<Refreshed> | null = null;
+
+function asRefreshed(json: unknown): Partial<Refreshed> & { message?: string; detail?: string } {
+  const root = json && typeof json === 'object' ? (json as Record<string, unknown>) : {};
+  const nested =
+    root.data && typeof root.data === 'object' ? (root.data as Record<string, unknown>) : root;
+  return {
+    accessToken: typeof nested.accessToken === 'string' ? nested.accessToken : undefined,
+    refreshToken: typeof nested.refreshToken === 'string' ? nested.refreshToken : undefined,
+    message: typeof nested.message === 'string' ? nested.message : undefined,
+    detail: typeof root.detail === 'string' ? root.detail : undefined,
+  };
+}
+
+function combinedMessage(json: unknown, fallback = '') {
+  const row = asRefreshed(json);
+  const root = json && typeof json === 'object' ? (json as { message?: string }) : {};
+  return `${row.detail || ''} ${row.message || ''} ${root.message || ''} ${fallback}`;
+}
+
+async function currentTokensIfRotated(sentRefresh: string): Promise<Refreshed | null> {
+  const current = await getRefreshToken();
+  const access = await getAccessToken();
+  if (current && current !== sentRefresh && access) {
+    return { accessToken: access, refreshToken: current };
+  }
+  return null;
+}
+
+async function postRefresh(refreshToken: string, unlock?: boolean) {
   const headers = await schoolHeaders();
+  const body = JSON.stringify({
+    refreshToken,
+    rememberMe: true,
+    ...(unlock ? { unlockMethod: 'biometric_unlock' } : {}),
+  });
+  const urls = ['/v1/school-mobile/auth/refresh', '/v1/auth/refresh'];
+  let last: { res: Response; json: unknown } | null = null;
+  for (const path of urls) {
+    const res = await fetch(`${getApiBase()}${path}`, { method: 'POST', headers, body });
+    const json = await res.json().catch(() => ({}));
+    last = { res, json };
+    const data = asRefreshed(json);
+    if (res.ok && data.accessToken) return { res, json, data };
+    if (res.status !== 404) return { res, json, data };
+  }
+  return { res: last!.res, json: last!.json, data: asRefreshed(last!.json) };
+}
+
+async function doRefresh(opts?: { biometricUnlock?: boolean }): Promise<Refreshed> {
+  const sent = await getRefreshToken();
+  if (!sent) throw new SessionExpiredError('No refresh token');
   let res: Response;
+  let json: unknown;
+  let data: ReturnType<typeof asRefreshed>;
   try {
-    res = await fetch(`${getApiBase()}/v1/auth/refresh`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        refreshToken,
-        rememberMe: true,
-        ...(opts?.biometricUnlock ? { unlockMethod: 'biometric_unlock' } : {}),
-      }),
-    });
+    const out = await postRefresh(sent, opts?.biometricUnlock);
+    res = out.res;
+    json = out.json;
+    data = out.data;
   } catch {
     throw new Error("You're offline. Some information may be unavailable.");
   }
-  const json = await res.json().catch(() => ({}));
-  const data = ((json as { data?: { accessToken?: string; refreshToken?: string } }).data ??
-    json) as { accessToken?: string; refreshToken?: string; message?: string };
-  const message = `${data.message || ''} ${(json as { message?: string }).message || ''}`;
+
+  if (res.ok && data.accessToken) {
+    const nextRefresh = data.refreshToken || sent;
+    await saveSession(data.accessToken, nextRefresh);
+    return { accessToken: data.accessToken, refreshToken: nextRefresh };
+  }
+
+  const rotated = await currentTokensIfRotated(sent);
+  if (rotated) return rotated;
+
+  const message = combinedMessage(json);
   if (res.status === 401 || res.status === 403) {
     if (/DEVICE_BLOCKED/i.test(message)) {
-      if (!justDidPasswordLogin()) await clearSession();
       throw new DeviceBlockedError();
     }
     if (/SESSION_REVOKED/i.test(message)) {
-      if (!justDidPasswordLogin()) await clearSession();
       throw new SessionRevokedError();
     }
-    if (/ACCOUNT_DISABLED|disabled/i.test(message)) {
-      if (!justDidPasswordLogin()) await clearSession();
+    if (/ACCOUNT_DISABLED/i.test(message)) {
       throw new AccountDisabledError();
     }
-    if (!justDidPasswordLogin()) await clearSession();
-    throw new SessionExpiredError(data.message || 'Session expired');
+    if (!justDidPasswordLogin()) await clearAuthTokens();
+    throw new SessionExpiredError('Please sign in again.');
   }
-  if (!res.ok || !data.accessToken || !data.refreshToken) {
-    throw new Error(data.message || 'Could not refresh session');
-  }
-  await saveSession(data.accessToken, data.refreshToken);
-  return data;
+
+  throw new Error("Couldn't renew your session. Please try again.");
+}
+
+export async function refreshAccessToken(opts?: { biometricUnlock?: boolean }) {
+  if (inFlight) return inFlight;
+  inFlight = doRefresh(opts).finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
 }

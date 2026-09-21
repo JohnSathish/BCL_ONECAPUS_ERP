@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { SchoolSisAttendanceService } from '../school-sis/school-sis-attendance.service';
@@ -383,8 +387,12 @@ export class SchoolMobileHomeService {
       id: string;
       dayOfWeek?: number;
       roomLabel?: string | null;
-      subject?: { name?: string } | null;
-      section?: { id?: string; name?: string; grade?: { name?: string } };
+      subject?: { id?: string; name?: string } | null;
+      section?: {
+        id?: string;
+        name?: string;
+        grade?: { id?: string; name?: string; sortOrder?: number };
+      };
       bell?: { startTime?: string; endTime?: string; sortOrder?: number };
     };
     let slots = ((grid as { slots?: Slot[] } | null)?.slots ?? []) as Slot[];
@@ -402,7 +410,7 @@ export class SchoolMobileHomeService {
     }
     const { dayOfWeek } = istNowParts();
     const todayKey = istDayKey();
-    const [assignments, subjectAssignments] = await Promise.all([
+    const [assignments, subjectAssignments, academicYear] = await Promise.all([
       this.prisma.schoolClassTeacherAssignment.findMany({
         where: { tenantId, staffId, deletedAt: null },
         include: { section: { include: { grade: true } } },
@@ -411,20 +419,59 @@ export class SchoolMobileHomeService {
         where: { tenantId, staffId, deletedAt: null },
         include: { section: { include: { grade: true } } },
       }),
+      this.sis.currentYear(tenantId).catch(() => null),
     ]);
-    const sectionMap = new Map<string, { id: string; label: string }>();
-    for (const row of [...assignments, ...subjectAssignments]) {
-      sectionMap.set(row.sectionId, {
-        id: row.sectionId,
-        label: `${row.section.grade.name} ${row.section.name}`.trim(),
+    type SectionRow = {
+      id: string;
+      label: string;
+      gradeId: string | null;
+      sortOrder: number;
+      classTeacher: boolean;
+    };
+    const sectionMap = new Map<string, SectionRow>();
+    const upsertSection = (
+      id: string,
+      label: string,
+      grade?: { id?: string; sortOrder?: number } | null,
+      classTeacher = false,
+    ) => {
+      const prev = sectionMap.get(id);
+      sectionMap.set(id, {
+        id,
+        label: label || prev?.label || 'Class',
+        gradeId: grade?.id ?? prev?.gradeId ?? null,
+        sortOrder: grade?.sortOrder ?? prev?.sortOrder ?? 99,
+        classTeacher: Boolean(prev?.classTeacher || classTeacher),
       });
+    };
+    for (const row of assignments) {
+      upsertSection(
+        row.sectionId,
+        `${row.section.grade.name} ${row.section.name}`.trim(),
+        row.section.grade,
+        true,
+      );
+    }
+    for (const row of subjectAssignments) {
+      upsertSection(
+        row.sectionId,
+        `${row.section.grade.name} ${row.section.name}`.trim(),
+        row.section.grade,
+      );
     }
     for (const slot of slots) {
       const id = slot.section?.id;
       if (!id) continue;
       const label =
         `${slot.section?.grade?.name ?? ''} ${slot.section?.name ?? ''}`.trim();
-      if (label) sectionMap.set(id, { id, label });
+      if (label)
+        upsertSection(
+          id,
+          label,
+          slot.section?.grade as
+            | { id?: string; sortOrder?: number }
+            | undefined,
+        );
     }
     const sectionIds = [...sectionMap.keys()];
     const enrollCounts = sectionIds.length
@@ -486,9 +533,9 @@ export class SchoolMobileHomeService {
         ).length
       : [...sectionMap.keys()].filter((id) => attBySection.get(id)?.submitted)
           .length;
-    const year = Number(todayKey.slice(0, 4));
+    const leaveYear = Number(todayKey.slice(0, 4));
     const balances = await this.prisma.schoolHrLeaveBalance.findMany({
-      where: { tenantId, staffId, year },
+      where: { tenantId, staffId, year: leaveYear },
     });
     const leaveRemaining = balances.reduce(
       (sum, row) =>
@@ -522,6 +569,64 @@ export class SchoolMobileHomeService {
           })
         : Promise.resolve([]),
     ]);
+    const gradeIds = [
+      ...new Set(
+        [...sectionMap.values()]
+          .map((row) => row.gradeId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const gradeSubjects =
+      academicYear && gradeIds.length
+        ? await this.prisma.schoolGradeSubject.findMany({
+            where: {
+              tenantId,
+              academicYearId: academicYear.id,
+              gradeId: { in: gradeIds },
+            },
+            select: { gradeId: true, subjectId: true },
+          })
+        : [];
+    const subjectsByGrade = new Map<string, Set<string>>();
+    const uniqueSubjects = new Set<string>();
+    for (const row of gradeSubjects) {
+      const set = subjectsByGrade.get(row.gradeId) ?? new Set<string>();
+      set.add(row.subjectId);
+      subjectsByGrade.set(row.gradeId, set);
+      uniqueSubjects.add(row.subjectId);
+    }
+    const subjectsBySection = new Map<string, Set<string>>();
+    for (const row of subjectAssignments) {
+      const set = subjectsBySection.get(row.sectionId) ?? new Set<string>();
+      set.add(row.subjectId);
+      subjectsBySection.set(row.sectionId, set);
+      uniqueSubjects.add(row.subjectId);
+    }
+    for (const slot of slots) {
+      const sid = slot.section?.id;
+      const subjectId = (slot.subject as { id?: string } | null | undefined)
+        ?.id;
+      if (!sid || !subjectId) continue;
+      const set = subjectsBySection.get(sid) ?? new Set<string>();
+      set.add(subjectId);
+      subjectsBySection.set(sid, set);
+      uniqueSubjects.add(subjectId);
+    }
+    const subjectCountFor = (row: SectionRow) => {
+      const fromGrade = row.gradeId
+        ? (subjectsByGrade.get(row.gradeId)?.size ?? 0)
+        : 0;
+      return fromGrade || subjectsBySection.get(row.id)?.size || 0;
+    };
+    const markedPercents = [...attBySection.values()]
+      .map((row) => row.percent)
+      .filter((n): n is number => n != null);
+    const avgAttendance = markedPercents.length
+      ? Math.round(
+          markedPercents.reduce((sum, n) => sum + n, 0) / markedPercents.length,
+        )
+      : null;
+
     const homework = homeworkRows.map((row) => {
       const listStatus = homeworkListStatus({
         status: row.status,
@@ -558,23 +663,111 @@ export class SchoolMobileHomeService {
         subject: slot.subject?.name ?? 'Period',
         room: slot.roomLabel?.trim() || '',
       })),
-      classes: [...sectionMap.values()].map((row) => {
-        const att = attBySection.get(row.id);
-        return {
-          id: row.id,
-          label: row.label,
-          students: countMap.get(row.id) ?? 0,
-          percent: att?.percent ?? null,
-          present: att?.present ?? 0,
-          absent: att?.absent ?? 0,
-          late: att?.late ?? 0,
-        };
-      }),
+      subjectCount: uniqueSubjects.size,
+      avgAttendance,
+      classes: [...sectionMap.values()]
+        .sort(
+          (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label),
+        )
+        .map((row) => {
+          const att = attBySection.get(row.id);
+          return {
+            id: row.id,
+            label: row.label,
+            students: countMap.get(row.id) ?? 0,
+            subjects: subjectCountFor(row),
+            classTeacher: row.classTeacher,
+            submitted: att?.submitted ?? false,
+            percent: att?.percent ?? null,
+            present: att?.present ?? 0,
+            absent: att?.absent ?? 0,
+            late: att?.late ?? 0,
+          };
+        }),
       recentHomework: homework
         .filter(
           (row) => row.listStatus !== 'draft' && row.listStatus !== 'completed',
         )
         .slice(0, 6),
+    };
+  }
+
+  async teacherClass(tenantId: string, staffId: string, sectionId: string) {
+    const year = await this.sis.currentYear(tenantId);
+    const section = await this.prisma.schoolSection.findFirst({
+      where: { id: sectionId, tenantId, deletedAt: null },
+      include: { grade: true },
+    });
+    if (!section) throw new NotFoundException('Class not found');
+    const [classTeacher, enrolls, gradeSubjects, att] = await Promise.all([
+      this.prisma.schoolClassTeacherAssignment.findFirst({
+        where: {
+          tenantId,
+          staffId,
+          sectionId,
+          academicYearId: year.id,
+          deletedAt: null,
+        },
+      }),
+      this.prisma.schoolEnrollment.findMany({
+        where: {
+          tenantId,
+          sectionId,
+          academicYearId: year.id,
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              fullName: true,
+              admissionNumber: true,
+              photoUrl: true,
+            },
+          },
+        },
+        orderBy: [{ rollNumber: 'asc' }, { student: { fullName: 'asc' } }],
+      }),
+      this.prisma.schoolGradeSubject.findMany({
+        where: {
+          tenantId,
+          academicYearId: year.id,
+          gradeId: section.gradeId,
+        },
+        include: { subject: { select: { id: true, name: true } } },
+        orderBy: { subject: { name: 'asc' } },
+      }),
+      this.attendanceSvc
+        .dashboard(tenantId, { sectionIds: [sectionId], date: istDayKey() })
+        .catch(() => null),
+    ]);
+    const today = att?.byClass?.find((row) => row.sectionId === sectionId);
+    const submitted = Boolean(
+      today && today.status !== 'NOT_SUBMITTED' && today.status !== 'DRAFT',
+    );
+    return {
+      id: section.id,
+      label: `${section.grade.name} ${section.name}`.trim(),
+      grade: section.grade.name,
+      classTeacher: Boolean(classTeacher),
+      students: enrolls.length,
+      subjects: gradeSubjects.map((row) => ({
+        id: row.subject.id,
+        name: row.subject.name,
+      })),
+      submitted,
+      percent: submitted ? (today?.percent ?? null) : null,
+      present: today?.present ?? 0,
+      absent: today?.absent ?? 0,
+      late: today?.late ?? 0,
+      roster: enrolls.map((row) => ({
+        studentId: row.student.id,
+        fullName: row.student.fullName,
+        admissionNumber: row.student.admissionNumber,
+        rollNumber: row.rollNumber,
+        photoUrl: row.student.photoUrl,
+      })),
     };
   }
 

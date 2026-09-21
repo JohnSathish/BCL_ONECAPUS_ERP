@@ -1182,6 +1182,8 @@ export class AuthService {
       clientType?: string;
       appType?: string;
       appVersion?: string;
+      deviceId?: string;
+      platform?: string;
     },
     unlockMethod?: 'biometric_unlock',
   ): Promise<AuthSessionResponse> {
@@ -1260,7 +1262,29 @@ export class AuthService {
           familyId: activeSession.familyId,
           previousSessionId: activeSession.id,
           rememberMe,
-          meta,
+          meta: {
+            ...meta,
+            deviceId:
+              meta?.deviceId ||
+              (typeof sessionMeta.deviceId === 'string'
+                ? sessionMeta.deviceId
+                : undefined),
+            clientType:
+              meta?.clientType ||
+              (typeof sessionMeta.clientType === 'string'
+                ? sessionMeta.clientType
+                : undefined),
+            appVersion:
+              meta?.appVersion ||
+              (typeof sessionMeta.appVersion === 'string'
+                ? sessionMeta.appVersion
+                : undefined),
+            platform:
+              meta?.platform ||
+              (typeof sessionMeta.platform === 'string'
+                ? sessionMeta.platform
+                : undefined),
+          },
         },
       );
 
