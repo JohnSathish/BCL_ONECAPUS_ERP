@@ -86,6 +86,11 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
           live('ac-clubs', 'Student Club Mapping', '/admin/school-sis/academic/clubs'),
           live('ac-promotion', 'Student Promotion', '/admin/school-sis/academic/promotion'),
           live('ac-id-cards', 'ID Card Template', '/admin/school-sis/academic/id-cards'),
+          live(
+            'ac-attendance-settings',
+            'Attendance Settings',
+            '/admin/school-sis/academic/attendance-settings',
+          ),
         ],
       },
       {
@@ -261,6 +266,13 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
         ],
       },
       {
+        id: 'attendance-settings',
+        label: 'Attendance Settings',
+        icon: ClipboardList as LucideIcon,
+        href: '/admin/school-sis/academic/attendance-settings',
+        status: 'active',
+      },
+      {
         id: 'attendance',
         label: 'Attendance',
         icon: ClipboardList as LucideIcon,
@@ -284,7 +296,7 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
           live(
             'attendance-settings',
             'Attendance Settings',
-            '/admin/school-sis/attendance/settings',
+            '/admin/school-sis/academic/attendance-settings',
           ),
           live('staff-attendance', 'Staff Attendance', '/admin/school-sis/hr/attendance'),
         ],
@@ -841,8 +853,12 @@ export const SCHOOL_SIS_NAV_GROUPS: SchoolSisNavGroup[] = [
           soon('settings-year', 'Academic Year'),
           soon('settings-classes', 'Classes'),
           soon('settings-sections', 'Sections'),
-          soon('grading', 'Grading'),
-          soon('attendance-settings', 'Attendance settings'),
+          live('grading', 'Grading', '/admin/school-sis/exams/grades'),
+          live(
+            'attendance-settings',
+            'Attendance settings',
+            '/admin/school-sis/academic/attendance-settings',
+          ),
         ],
       },
       {

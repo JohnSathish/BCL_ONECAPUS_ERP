@@ -12,11 +12,15 @@ export type AttendanceSettingsLike = {
   halfDayValue: number;
   leaveCountsPresent: boolean;
   excusedCountsPresent: boolean;
+  presentWeight?: number;
+  lateWeight?: number;
+  absentWeight?: number;
 };
 
 export const DEFAULT_ATTENDANCE_STATUSES: Array<{
   code: string;
   name: string;
+  shortCode: string;
   countsPresent: boolean;
   countsAbsent: boolean;
   attendanceValue: number;
@@ -26,6 +30,7 @@ export const DEFAULT_ATTENDANCE_STATUSES: Array<{
   {
     code: 'PRESENT',
     name: 'Present',
+    shortCode: 'P',
     countsPresent: true,
     countsAbsent: false,
     attendanceValue: 1,
@@ -35,6 +40,7 @@ export const DEFAULT_ATTENDANCE_STATUSES: Array<{
   {
     code: 'ABSENT',
     name: 'Absent',
+    shortCode: 'A',
     countsPresent: false,
     countsAbsent: true,
     attendanceValue: 0,
@@ -44,6 +50,7 @@ export const DEFAULT_ATTENDANCE_STATUSES: Array<{
   {
     code: 'LATE',
     name: 'Late',
+    shortCode: 'L',
     countsPresent: true,
     countsAbsent: false,
     attendanceValue: 1,
@@ -53,6 +60,7 @@ export const DEFAULT_ATTENDANCE_STATUSES: Array<{
   {
     code: 'HALF_DAY',
     name: 'Half Day',
+    shortCode: 'H',
     countsPresent: true,
     countsAbsent: false,
     attendanceValue: 0.5,
@@ -62,6 +70,7 @@ export const DEFAULT_ATTENDANCE_STATUSES: Array<{
   {
     code: 'LEAVE',
     name: 'Leave',
+    shortCode: 'LV',
     countsPresent: false,
     countsAbsent: false,
     attendanceValue: 0,
@@ -71,6 +80,7 @@ export const DEFAULT_ATTENDANCE_STATUSES: Array<{
   {
     code: 'EXCUSED',
     name: 'Excused',
+    shortCode: 'E',
     countsPresent: true,
     countsAbsent: false,
     attendanceValue: 1,
@@ -117,12 +127,15 @@ export function unitForStatus(
   settings: AttendanceSettingsLike,
 ): number {
   const c = code.toUpperCase();
-  if (c === 'PRESENT') return 1;
-  if (c === 'LATE') return settings.lateCountsPresent ? 1 : 0;
+  if (c === 'PRESENT') return settings.presentWeight ?? 1;
+  if (c === 'LATE') {
+    if (settings.lateWeight != null) return Number(settings.lateWeight);
+    return settings.lateCountsPresent ? 1 : 0;
+  }
   if (c === 'HALF_DAY') return Number(settings.halfDayValue) || 0.5;
   if (c === 'LEAVE') return settings.leaveCountsPresent ? 1 : 0;
   if (c === 'EXCUSED') return settings.excusedCountsPresent ? 1 : 0;
-  if (c === 'ABSENT') return 0;
+  if (c === 'ABSENT') return settings.absentWeight ?? 0;
   return 0;
 }
 
@@ -145,11 +158,13 @@ export function attendanceStatusLabel(
   pct: number,
   warnPercent: number,
   minPercent: number,
-): 'Excellent' | 'Good' | 'Normal' | 'Warning' {
-  if (pct >= 95) return 'Excellent';
-  if (pct >= warnPercent) return 'Good';
-  if (pct > minPercent) return 'Normal';
-  return 'Warning';
+  goodPercent = 90,
+): 'Excellent' | 'Good' | 'Normal' | 'Warning' | 'Critical' {
+  if (pct >= Math.max(95, goodPercent + 5)) return 'Excellent';
+  if (pct >= goodPercent) return 'Good';
+  if (pct >= warnPercent) return 'Normal';
+  if (pct >= minPercent) return 'Warning';
+  return 'Critical';
 }
 
 export function sessionNaturalKey(input: {

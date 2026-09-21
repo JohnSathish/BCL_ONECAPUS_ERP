@@ -104,6 +104,10 @@ export function canManageSchoolSis(permissions?: string[]) {
   return has(permissions, MANAGE);
 }
 
+export function canManageAttendanceSettings(permissions?: string[]) {
+  return has(permissions, MANAGE) || has(permissions, 'attendance.settings.manage');
+}
+
 export function canManageSchoolUsers(permissions?: string[]) {
   return (
     has(permissions, MANAGE) ||
@@ -175,6 +179,10 @@ function filterChildren(
   }
   const payroll = has(permissions, 'payroll.view') || has(permissions, 'payroll.calculate');
   const hrManage = has(permissions, MANAGE) || has(permissions, 'hr.employees.manage');
+  const attendanceSettings = canManage || has(permissions, 'attendance.settings.manage');
+  if (!attendanceSettings) {
+    next = next.filter((c) => c.id !== 'attendance-settings' && c.id !== 'ac-attendance-settings');
+  }
   if (persona === 'teacher' && !hrManage) {
     next = next.filter((c) =>
       ['hr-self', 'hr-leave-requests', 'hr-leave-balance', 'hr-attendance', 'hr-payslips'].includes(
@@ -243,6 +251,13 @@ export function filterSchoolSisNavGroups(
           if (item.id === 'users' || item.id === 'account-security') return usersOk;
           if (item.id === 'system' && !canManage && !has(input.permissions, 'system.view'))
             return false;
+          if (
+            item.id === 'attendance-settings' &&
+            !canManage &&
+            !has(input.permissions, 'attendance.settings.manage')
+          ) {
+            return false;
+          }
           return !allowed || allowed.has(item.id);
         })
         .map((item) => {

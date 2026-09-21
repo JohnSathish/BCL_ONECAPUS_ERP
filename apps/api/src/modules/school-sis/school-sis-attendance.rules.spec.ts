@@ -32,6 +32,18 @@ describe('school attendance percentage rules', () => {
     ).toBe(1);
   });
 
+  it('uses administrator-configured present/late/absent weights', () => {
+    const weighted = {
+      ...settings,
+      presentWeight: 1,
+      lateWeight: 0.5,
+      absentWeight: 0,
+    };
+    expect(unitForStatus('PRESENT', weighted)).toBe(1);
+    expect(unitForStatus('LATE', weighted)).toBe(0.5);
+    expect(unitForStatus('ABSENT', weighted)).toBe(0);
+  });
+
   it('uses configurable warning bands', () => {
     expect(bandForPercent(90, 85, 75)).toBe('GREEN');
     expect(bandForPercent(80, 85, 75)).toBe('WARNING');
@@ -39,10 +51,11 @@ describe('school attendance percentage rules', () => {
   });
 
   it('labels student attendance for the reports desk', () => {
-    expect(attendanceStatusLabel(95, 85, 75)).toBe('Excellent');
-    expect(attendanceStatusLabel(90, 85, 75)).toBe('Good');
-    expect(attendanceStatusLabel(80, 85, 75)).toBe('Normal');
-    expect(attendanceStatusLabel(75, 85, 75)).toBe('Warning');
+    expect(attendanceStatusLabel(95, 80, 75, 90)).toBe('Excellent');
+    expect(attendanceStatusLabel(90, 80, 75, 90)).toBe('Good');
+    expect(attendanceStatusLabel(82, 80, 75, 90)).toBe('Normal');
+    expect(attendanceStatusLabel(76, 80, 75, 90)).toBe('Warning');
+    expect(attendanceStatusLabel(70, 80, 75, 90)).toBe('Critical');
   });
 
   it('builds a unique daily session key including period', () => {

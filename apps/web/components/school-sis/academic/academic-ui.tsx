@@ -18,6 +18,7 @@ export const ACADEMIC_LINKS = [
   { href: '/admin/school-sis/academic/clubs', label: 'Clubs' },
   { href: '/admin/school-sis/academic/promotion', label: 'Promotion' },
   { href: '/admin/school-sis/academic/id-cards', label: 'ID Cards' },
+  { href: '/admin/school-sis/academic/attendance-settings', label: 'Attendance Settings' },
 ] as const;
 
 export function AcademicPageHeader({

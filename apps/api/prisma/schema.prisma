@@ -16618,6 +16618,7 @@ model SchoolAcademicYear {
   transportCalendar    SchoolTransportCalendarEvent[]
   attendanceSessions   SchoolAttendanceSession[]
   attendanceSettings   SchoolAttendanceSettings[]
+  attendanceClassRules SchoolAttendanceClassRule[]
   homework             SchoolHomework[]
 
   @@unique([tenantId, name])
@@ -16659,6 +16660,7 @@ model SchoolGrade {
   stationeryProducts SchoolStationeryProduct[]
   stationeryClassMaps SchoolStationeryProductClassMapping[]
   examSubjects        SchoolExamSubject[]
+  attendanceClassRules SchoolAttendanceClassRule[]
 
   @@unique([tenantId, code])
   @@index([tenantId, active])
@@ -16688,6 +16690,7 @@ model SchoolSection {
   examSchedules      SchoolExamSchedule[]
   attendanceSessions SchoolAttendanceSession[]
   attendanceSubs     SchoolAttendanceSubstitute[]
+  attendanceClassRules SchoolAttendanceClassRule[]
   homework           SchoolHomework[]
 
   @@unique([tenantId, academicYearId, gradeId, name])
@@ -21115,6 +21118,7 @@ model SchoolAttendanceSettings {
   geoRadiusM             Int      @default(100) @map("geo_radius_m")
   geoLat                 Decimal? @map("geo_lat") @db.Decimal(10, 7)
   geoLng                 Decimal? @map("geo_lng") @db.Decimal(10, 7)
+  policy                 Json     @default("{}")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 
@@ -21129,6 +21133,7 @@ model SchoolAttendanceStatus {
   id                 String   @id @default(uuid()) @db.Uuid
   tenantId           String   @map("tenant_id") @db.Uuid
   code               String
+  shortCode          String   @default("") @map("short_code")
   name               String
   description        String?
   countsPresent      Boolean  @default(false) @map("counts_present")
@@ -21146,6 +21151,26 @@ model SchoolAttendanceStatus {
   @@unique([tenantId, code])
   @@index([tenantId, active])
   @@map("school_attendance_statuses")
+  @@schema("school")
+}
+
+model SchoolAttendanceClassRule {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  academicYearId String   @map("academic_year_id") @db.Uuid
+  gradeId        String   @map("grade_id") @db.Uuid
+  sectionId      String?  @map("section_id") @db.Uuid
+  mode           String   @default("DAILY")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  academicYear SchoolAcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  grade        SchoolGrade        @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  section      SchoolSection?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, academicYearId, gradeId])
+  @@map("school_attendance_class_rules")
   @@schema("school")
 }
 

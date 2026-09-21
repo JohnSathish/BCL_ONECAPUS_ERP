@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -18,6 +19,7 @@ import { RequireAnyPermission } from '../../common/decorators/require-permission
 import { SCHOOL_SIS_PERMISSION_MANAGE } from './school-sis.constants';
 import {
   SIS_ATTENDANCE_APPROVE,
+  SIS_ATTENDANCE_CORRECTION,
   SIS_ATTENDANCE_MARK,
   SIS_ATTENDANCE_PARENT,
   SIS_ATTENDANCE_SETTINGS,
@@ -36,6 +38,7 @@ import {
   QrScanDto,
   ReviewCorrectionDto,
   ReviewLeaveDto,
+  SaveAttendanceClassRuleDto,
   SaveAttendanceSettingsDto,
   SaveAttendanceStatusDto,
   SaveLeaveTypeDto,
@@ -100,7 +103,12 @@ export class SchoolSisAttendanceController {
     @Body() dto: SaveAttendanceSettingsDto,
     @Query('academicYearId') academicYearId?: string,
   ) {
-    return this.attendance.saveSettings(user.tid, dto, academicYearId);
+    return this.attendance.saveSettings(
+      user.tid,
+      dto,
+      academicYearId ?? dto.academicYearId,
+      user.sub,
+    );
   }
 
   @Post('statuses')
@@ -109,7 +117,42 @@ export class SchoolSisAttendanceController {
     @CurrentUser() user: JwtUser,
     @Body() dto: SaveAttendanceStatusDto,
   ) {
-    return this.attendance.saveStatus(user.tid, dto);
+    return this.attendance.saveStatus(user.tid, dto, dto.id, user.sub);
+  }
+
+  @Patch('statuses/:id')
+  @RequireAnyPermission(...SIS_ATTENDANCE_SETTINGS)
+  patchStatus(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: SaveAttendanceStatusDto,
+  ) {
+    return this.attendance.saveStatus(user.tid, dto, id, user.sub);
+  }
+
+  @Post('class-rules')
+  @RequireAnyPermission(...SIS_ATTENDANCE_SETTINGS)
+  saveClassRule(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: SaveAttendanceClassRuleDto,
+  ) {
+    return this.attendance.saveClassRule(user.tid, dto, user.sub);
+  }
+
+  @Patch('class-rules/:id')
+  @RequireAnyPermission(...SIS_ATTENDANCE_SETTINGS)
+  patchClassRule(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: SaveAttendanceClassRuleDto,
+  ) {
+    return this.attendance.saveClassRule(user.tid, { ...dto, id }, user.sub);
+  }
+
+  @Delete('class-rules/:id')
+  @RequireAnyPermission(...SIS_ATTENDANCE_SETTINGS)
+  deleteClassRule(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.attendance.deleteClassRule(user.tid, id, user.sub);
   }
 
   @Post('leave-types')
@@ -221,7 +264,7 @@ export class SchoolSisAttendanceController {
   }
 
   @Post('corrections')
-  @RequireAnyPermission(...SIS_ATTENDANCE_MARK)
+  @RequireAnyPermission(...SIS_ATTENDANCE_CORRECTION)
   correction(
     @CurrentUser() user: JwtUser,
     @Body() dto: AttendanceCorrectionDto,

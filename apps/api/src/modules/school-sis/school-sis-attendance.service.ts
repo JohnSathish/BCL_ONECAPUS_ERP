@@ -14,6 +14,12 @@ import { SchoolSisEventBus } from './school-sis-event-bus.service';
 import { resolveSchoolStaffIdForUser } from './school-sis-staff-lookup';
 import { istDayKey } from './school-sis-timetable-bells';
 import {
+  mergeAttendancePolicy,
+  policyFromSettingsRow,
+  anyNotifyChannel,
+  notifyChannels,
+} from './school-sis-attendance.policy';
+import {
   attendancePercent,
   attendanceStatusLabel,
   bandForPercent,
@@ -28,6 +34,7 @@ import type {
   BulkNotifyDto,
   CreateLeaveDto,
   QrScanDto,
+  SaveAttendanceClassRuleDto,
   SaveAttendanceRosterDto,
   SaveAttendanceSettingsDto,
   SaveAttendanceStatusDto,
@@ -64,12 +71,69 @@ function settingsUnits(row: {
   halfDayValue: Prisma.Decimal | number;
   leaveCountsPresent: boolean;
   excusedCountsPresent: boolean;
+  policy?: unknown;
 }) {
+  const policy = policyFromSettingsRow(row);
   return {
     lateCountsPresent: row.lateCountsPresent,
     halfDayValue: Number(row.halfDayValue),
     leaveCountsPresent: row.leaveCountsPresent,
     excusedCountsPresent: row.excusedCountsPresent,
+    presentWeight: policy.presentWeight,
+    lateWeight: policy.lateWeight,
+    absentWeight: policy.absentWeight,
+  };
+}
+
+function presentSettings<
+  T extends { halfDayValue: Prisma.Decimal | number; policy?: unknown },
+>(row: T) {
+  const policy = policyFromSettingsRow(row);
+  return {
+    ...row,
+    halfDayValue: Number(row.halfDayValue),
+    ...policy,
+    policy,
+  };
+}
+
+function settingsSnapshot(row: {
+  mode: string;
+  defaultStatus: string;
+  defaultMarking: string;
+  lockEnabled: boolean;
+  lockAfterHours: number;
+  correctionRequired: boolean;
+  minPercent: number;
+  warnPercent: number;
+  lateCountsPresent: boolean;
+  halfDayValue: Prisma.Decimal | number;
+  leaveCountsPresent: boolean;
+  excusedCountsPresent: boolean;
+  absentNotify: boolean;
+  lateNotify: boolean;
+  lowAttendanceNotify: boolean;
+  consecutiveAbsentAlert: number;
+  policy?: unknown;
+}) {
+  return {
+    mode: row.mode,
+    defaultStatus: row.defaultStatus,
+    defaultMarking: row.defaultMarking,
+    lockEnabled: row.lockEnabled,
+    lockAfterHours: row.lockAfterHours,
+    correctionRequired: row.correctionRequired,
+    minPercent: row.minPercent,
+    warnPercent: row.warnPercent,
+    lateCountsPresent: row.lateCountsPresent,
+    halfDayValue: Number(row.halfDayValue),
+    leaveCountsPresent: row.leaveCountsPresent,
+    excusedCountsPresent: row.excusedCountsPresent,
+    absentNotify: row.absentNotify,
+    lateNotify: row.lateNotify,
+    lowAttendanceNotify: row.lowAttendanceNotify,
+    consecutiveAbsentAlert: row.consecutiveAbsentAlert,
+    policy: policyFromSettingsRow(row),
   };
 }
 
@@ -112,6 +176,7 @@ export class SchoolSisAttendanceService {
         data: DEFAULT_ATTENDANCE_STATUSES.map((s) => ({
           tenantId,
           code: s.code,
+          shortCode: s.shortCode,
           name: s.name,
           countsPresent: s.countsPresent,
           countsAbsent: s.countsAbsent,
@@ -143,7 +208,7 @@ export class SchoolSisAttendanceService {
 
   async getSettings(tenantId: string, academicYearId?: string) {
     const settings = await this.ensureSetup(tenantId, academicYearId);
-    const [statuses, leaveTypes] = await Promise.all([
+    const [statuses, leaveTypes, classRules, audit] = await Promise.all([
       this.prisma.schoolAttendanceStatus.findMany({
         where: { tenantId },
         orderBy: { sortOrder: 'asc' },
@@ -152,29 +217,66 @@ export class SchoolSisAttendanceService {
         where: { tenantId },
         orderBy: { sortOrder: 'asc' },
       }),
+      this.prisma.schoolAttendanceClassRule.findMany({
+        where: { tenantId, academicYearId: settings.academicYearId },
+        include: {
+          grade: { select: { id: true, name: true } },
+          section: { select: { id: true, name: true } },
+          academicYear: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.schoolAttendanceAudit.findMany({
+        where: { tenantId, action: 'SETTINGS_CHANGE' },
+        orderBy: { createdAt: 'desc' },
+        take: 40,
+      }),
     ]);
-    return { settings, statuses, leaveTypes };
+    return {
+      settings: presentSettings(settings),
+      statuses,
+      leaveTypes,
+      classRules,
+      audit,
+    };
   }
 
   async saveSettings(
     tenantId: string,
     dto: SaveAttendanceSettingsDto,
     academicYearId?: string,
+    actorId?: string,
   ) {
-    const year = await this.year(tenantId, academicYearId);
-    await this.ensureSetup(tenantId, year.id);
-    return this.prisma.schoolAttendanceSettings.update({
+    const year = await this.year(
+      tenantId,
+      dto.academicYearId || academicYearId,
+    );
+    const current = await this.ensureSetup(tenantId, year.id);
+    const nextPolicy = mergeAttendancePolicy({
+      ...policyFromSettingsRow(current),
+      ...(dto.policy ?? {}),
+    });
+    const lateCountsPresent =
+      dto.lateCountsPresent ?? nextPolicy.lateWeight > 0;
+    const correctionRequired =
+      dto.correctionRequired ?? !nextPolicy.teacherCanEditSubmitted;
+    const lockAfterHours =
+      dto.lockAfterHours ??
+      (nextPolicy.lockMode === 'AFTER_DAYS'
+        ? Math.max(1, nextPolicy.lockAfterDays) * 24
+        : current.lockAfterHours);
+    const updated = await this.prisma.schoolAttendanceSettings.update({
       where: { tenantId_academicYearId: { tenantId, academicYearId: year.id } },
       data: {
         mode: dto.mode,
         defaultStatus: dto.defaultStatus,
         defaultMarking: dto.defaultMarking,
         lockEnabled: dto.lockEnabled,
-        lockAfterHours: dto.lockAfterHours,
-        correctionRequired: dto.correctionRequired,
+        lockAfterHours,
+        correctionRequired,
         minPercent: dto.minPercent,
         warnPercent: dto.warnPercent,
-        lateCountsPresent: dto.lateCountsPresent,
+        lateCountsPresent,
         halfDayValue: dto.halfDayValue,
         leaveCountsPresent: dto.leaveCountsPresent,
         excusedCountsPresent: dto.excusedCountsPresent,
@@ -189,18 +291,46 @@ export class SchoolSisAttendanceService {
         qrEnabled: dto.qrEnabled,
         geoEnabled: dto.geoEnabled,
         geoRadiusM: dto.geoRadiusM,
+        policy: nextPolicy as unknown as Prisma.InputJsonValue,
       },
     });
+    await this.prisma.schoolAttendanceAudit.create({
+      data: {
+        tenantId,
+        actorId,
+        action: 'SETTINGS_CHANGE',
+        oldStatus: JSON.stringify(settingsSnapshot(current)),
+        newStatus: JSON.stringify(settingsSnapshot(updated)),
+        metadata: {
+          before: settingsSnapshot(current),
+          after: settingsSnapshot(updated),
+        },
+      },
+    });
+    return presentSettings(updated);
   }
 
   async saveStatus(
     tenantId: string,
     dto: SaveAttendanceStatusDto,
     id?: string,
+    actorId?: string,
   ) {
     await this.ensureSetup(tenantId);
+    const code = dto.code.toUpperCase().trim();
+    const shortCode = (dto.shortCode || code.slice(0, 2)).toUpperCase().trim();
+    const dupCode = await this.prisma.schoolAttendanceStatus.findFirst({
+      where: { tenantId, code, ...(id ? { NOT: { id } } : {}) },
+    });
+    if (dupCode) throw new ConflictException('Status code already exists.');
+    const dupShort = await this.prisma.schoolAttendanceStatus.findFirst({
+      where: { tenantId, shortCode, ...(id ? { NOT: { id } } : {}) },
+    });
+    if (dupShort)
+      throw new ConflictException('Status short code already exists.');
     const data = {
-      code: dto.code.toUpperCase(),
+      code,
+      shortCode,
       name: dto.name,
       description: dto.description,
       countsPresent: dto.countsPresent ?? false,
@@ -212,17 +342,30 @@ export class SchoolSisAttendanceService {
       active: dto.active ?? true,
       sortOrder: dto.sortOrder ?? 99,
     };
-    if (id) {
-      const row = await this.prisma.schoolAttendanceStatus.findFirst({
-        where: { id, tenantId },
-      });
-      if (!row) throw new NotFoundException('Status not found');
-      if (row.isSystem) data.code = row.code;
-      return this.prisma.schoolAttendanceStatus.update({ where: { id }, data });
-    }
-    return this.prisma.schoolAttendanceStatus.create({
-      data: { tenantId, ...data, isSystem: false },
+    const row = id
+      ? await this.prisma.schoolAttendanceStatus.findFirst({
+          where: { id, tenantId },
+        })
+      : null;
+    if (id && !row) throw new NotFoundException('Status not found');
+    if (row?.isSystem) data.code = row.code;
+    const saved = id
+      ? await this.prisma.schoolAttendanceStatus.update({ where: { id }, data })
+      : await this.prisma.schoolAttendanceStatus.create({
+          data: { tenantId, ...data, isSystem: false },
+        });
+    await this.prisma.schoolAttendanceAudit.create({
+      data: {
+        tenantId,
+        actorId,
+        action: 'SETTINGS_CHANGE',
+        reason: id ? 'status.update' : 'status.create',
+        oldStatus: row ? row.code : null,
+        newStatus: saved.code,
+        metadata: { status: saved },
+      },
     });
+    return saved;
   }
 
   async saveLeaveType(tenantId: string, dto: SaveLeaveTypeDto, id?: string) {
@@ -245,17 +388,148 @@ export class SchoolSisAttendanceService {
     });
   }
 
+  async saveClassRule(
+    tenantId: string,
+    dto: SaveAttendanceClassRuleDto,
+    actorId?: string,
+  ) {
+    const year = await this.year(tenantId, dto.academicYearId);
+    await this.ensureSetup(tenantId, year.id);
+    const grade = await this.prisma.schoolGrade.findFirst({
+      where: { id: dto.gradeId, tenantId, deletedAt: null },
+    });
+    if (!grade) throw new NotFoundException('Class not found');
+    if (dto.sectionId) {
+      const section = await this.prisma.schoolSection.findFirst({
+        where: {
+          id: dto.sectionId,
+          tenantId,
+          gradeId: dto.gradeId,
+          deletedAt: null,
+        },
+      });
+      if (!section) throw new NotFoundException('Section not found');
+    }
+    const dup = await this.prisma.schoolAttendanceClassRule.findFirst({
+      where: {
+        tenantId,
+        academicYearId: year.id,
+        gradeId: dto.gradeId,
+        sectionId: dto.sectionId ?? null,
+        ...(dto.id ? { NOT: { id: dto.id } } : {}),
+      },
+    });
+    if (dup)
+      throw new ConflictException(
+        'A rule already exists for this class, section and year.',
+      );
+    const data = {
+      academicYearId: year.id,
+      gradeId: dto.gradeId,
+      sectionId: dto.sectionId ?? null,
+      mode: (dto.mode || 'DAILY').toUpperCase(),
+      active: dto.active ?? true,
+    };
+    if (dto.id) {
+      const existing = await this.prisma.schoolAttendanceClassRule.findFirst({
+        where: { id: dto.id, tenantId },
+      });
+      if (!existing) throw new NotFoundException('Class rule not found');
+    }
+    const saved = dto.id
+      ? await this.prisma.schoolAttendanceClassRule.update({
+          where: { id: dto.id },
+          data,
+        })
+      : await this.prisma.schoolAttendanceClassRule.create({
+          data: { tenantId, ...data },
+        });
+    await this.prisma.schoolAttendanceAudit.create({
+      data: {
+        tenantId,
+        actorId,
+        action: 'SETTINGS_CHANGE',
+        reason: dto.id ? 'class_rule.update' : 'class_rule.create',
+        metadata: { classRule: saved },
+      },
+    });
+    return saved;
+  }
+
+  async deleteClassRule(tenantId: string, id: string, actorId?: string) {
+    const row = await this.prisma.schoolAttendanceClassRule.findFirst({
+      where: { id, tenantId },
+    });
+    if (!row) throw new NotFoundException('Class rule not found');
+    await this.prisma.schoolAttendanceClassRule.delete({ where: { id } });
+    await this.prisma.schoolAttendanceAudit.create({
+      data: {
+        tenantId,
+        actorId,
+        action: 'SETTINGS_CHANGE',
+        reason: 'class_rule.delete',
+        metadata: { classRule: row },
+      },
+    });
+    return { ok: true };
+  }
+
+  private async resolveClassRule(
+    tenantId: string,
+    yearId: string,
+    sectionId: string,
+  ) {
+    const section = await this.prisma.schoolSection.findFirst({
+      where: { id: sectionId, tenantId, deletedAt: null },
+      select: { id: true, gradeId: true },
+    });
+    if (!section) return null;
+    const specific = await this.prisma.schoolAttendanceClassRule.findFirst({
+      where: {
+        tenantId,
+        academicYearId: yearId,
+        gradeId: section.gradeId,
+        sectionId: section.id,
+        active: true,
+      },
+    });
+    if (specific) return specific;
+    return this.prisma.schoolAttendanceClassRule.findFirst({
+      where: {
+        tenantId,
+        academicYearId: yearId,
+        gradeId: section.gradeId,
+        sectionId: null,
+        active: true,
+      },
+    });
+  }
+
+  private workingDays(
+    tenantId: string,
+    from: string,
+    to: string,
+    yearId: string,
+    settings: { policy?: unknown; lateCountsPresent?: boolean },
+  ) {
+    return this.calendar.workingDaysInRange(
+      tenantId,
+      from,
+      to,
+      yearId,
+      policyFromSettingsRow(settings),
+    );
+  }
+
   private async assertWorkingDay(
     tenantId: string,
     date: string,
     yearId: string,
+    settings?: { policy?: unknown; lateCountsPresent?: boolean },
   ) {
     const day = await this.calendar.resolveDay(tenantId, date, yearId);
-    if (
-      day.kind === 'HOLIDAY' ||
-      day.kind === 'VACATION' ||
-      day.kind === 'WEEKLY_OFF'
-    ) {
+    const policy = settings ? policyFromSettingsRow(settings) : undefined;
+    if (!this.calendar.isWorkingKind(day.kind, policy)) {
       throw new BadRequestException(
         `Attendance is not required on this date (${day.kind.replace('_', ' ')}).`,
       );
@@ -311,22 +585,53 @@ export class SchoolSisAttendanceService {
       status: string;
       submittedAt: Date | null;
       lockedAt: Date | null;
+      date?: Date;
     },
-    settings: { lockEnabled: boolean; lockAfterHours: number },
+    settings: {
+      lockEnabled: boolean;
+      lockAfterHours: number;
+      policy?: unknown;
+      lateCountsPresent?: boolean;
+    },
   ) {
     if (session.lockedAt) return 'LOCKED';
     if (session.status === 'LOCKED') return 'LOCKED';
+    const policy = policyFromSettingsRow(settings);
+    if (!settings.lockEnabled) return session.status;
     if (
-      session.status === 'SUBMITTED' &&
-      settings.lockEnabled &&
-      session.submittedAt
+      session.status !== 'SUBMITTED' &&
+      session.status !== 'CORRECTION_REQUESTED'
     ) {
-      const lockAt = new Date(
-        session.submittedAt.getTime() + settings.lockAfterHours * 3600_000,
-      );
-      if (Date.now() >= lockAt.getTime()) return 'LOCKED';
+      if (policy.lockMode === 'END_OF_DAY' && session.date) {
+        const endIst = this.endOfIstDay(session.date);
+        if (Date.now() >= endIst && session.status === 'DRAFT') {
+          return session.status;
+        }
+      }
+      return session.status;
+    }
+    if (policy.lockMode === 'AFTER_SUBMIT') return 'LOCKED';
+    if (session.submittedAt && policy.lockMode === 'AFTER_HOURS') {
+      const lockAt =
+        session.submittedAt.getTime() + settings.lockAfterHours * 3600_000;
+      if (Date.now() >= lockAt) return 'LOCKED';
+    }
+    if (session.submittedAt && policy.lockMode === 'AFTER_DAYS') {
+      const lockAt =
+        session.submittedAt.getTime() +
+        Math.max(0, policy.lockAfterDays) * 86_400_000;
+      if (Date.now() >= lockAt) return 'LOCKED';
+    }
+    if (policy.lockMode === 'END_OF_DAY' && session.date) {
+      if (Date.now() >= this.endOfIstDay(session.date)) return 'LOCKED';
     }
     return session.status;
+  }
+
+  private endOfIstDay(date: Date) {
+    const key = dayKey(date);
+    const [y, m, d] = key.split('-').map(Number);
+    return Date.UTC(y, m - 1, d, 18, 29, 59, 999);
   }
 
   async dashboard(
@@ -529,7 +834,7 @@ export class SchoolSisAttendanceService {
       academicYear: { id: year.id, name: year.name },
       date,
       dayKind: holiday.kind,
-      settings,
+      settings: presentSettings(settings),
       totals: { ...totals, percent: overallPct },
       completion: {
         submitted: submittedCount,
@@ -560,15 +865,17 @@ export class SchoolSisAttendanceService {
     const year = await this.year(tenantId, q.academicYearId);
     const settings = await this.ensureSetup(tenantId, year.id);
     const date = dayKey(q.date);
-    const mode = q.mode || 'DAILY';
+    const rule = await this.resolveClassRule(tenantId, year.id, q.sectionId);
+    const allowedMode = rule?.mode || settings.mode || 'DAILY';
+    const mode = q.mode || (allowedMode === 'PERIOD' ? 'PERIOD' : 'DAILY');
     const periodKey = q.periodKey || 'DAILY';
-    if (mode === 'PERIOD' && settings.mode === 'DAILY') {
+    if (mode === 'PERIOD' && allowedMode === 'DAILY') {
       throw new BadRequestException(
-        'Period attendance is not enabled for this school.',
+        'Period attendance is not enabled for this class.',
       );
     }
-    if (mode === 'DAILY' && settings.mode === 'PERIOD') {
-      throw new BadRequestException('This school uses period attendance only.');
+    if (mode === 'DAILY' && allowedMode === 'PERIOD') {
+      throw new BadRequestException('This class uses period attendance only.');
     }
     const day = await this.calendar.resolveDay(tenantId, date, year.id);
     const section = await this.prisma.schoolSection.findFirst({
@@ -651,17 +958,18 @@ export class SchoolSisAttendanceService {
       academicYear: { id: year.id, name: year.name },
       date,
       dayKind: day.kind,
-      holidayBlocked:
-        day.kind === 'HOLIDAY' ||
-        day.kind === 'VACATION' ||
-        day.kind === 'WEEKLY_OFF',
+      holidayBlocked: !this.calendar.isWorkingKind(
+        day.kind,
+        policyFromSettingsRow(settings),
+      ),
+      attendanceEnabled: policyFromSettingsRow(settings).enabled,
       section: {
         id: section.id,
         name: `${section.grade.name} ${section.name}`,
         gradeId: section.gradeId,
         classTeacher: section.classTeachers[0]?.staff.fullName ?? null,
       },
-      settings,
+      settings: presentSettings(settings),
       session: session
         ? {
             id: session.id,
@@ -686,11 +994,20 @@ export class SchoolSisAttendanceService {
   private canEdit(
     actor: AttendanceActor,
     status: string,
-    settings: { correctionRequired: boolean },
+    settings: {
+      correctionRequired: boolean;
+      policy?: unknown;
+      lateCountsPresent?: boolean;
+    },
   ) {
+    const policy = policyFromSettingsRow(settings);
+    if (!policy.enabled) return false;
     if (actor.manage || actor.canLock) return true;
+    if (!policy.allowEditing) return status === 'DRAFT';
     if (status === 'LOCKED') return false;
-    if (status === 'SUBMITTED' && settings.correctionRequired) return false;
+    if (status === 'SUBMITTED' || status === 'CORRECTION_REQUESTED') {
+      return policy.teacherCanEditSubmitted;
+    }
     return true;
   }
 
@@ -702,8 +1019,13 @@ export class SchoolSisAttendanceService {
   ) {
     const year = await this.year(tenantId, dto.academicYearId);
     const settings = await this.ensureSetup(tenantId, year.id);
+    const policy = policyFromSettingsRow(settings);
+    if (!policy.enabled) {
+      throw new BadRequestException('Student attendance is disabled.');
+    }
     const date = dayKey(dto.date);
-    if (!asDraft) await this.assertWorkingDay(tenantId, date, year.id);
+    if (!asDraft)
+      await this.assertWorkingDay(tenantId, date, year.id, settings);
     else {
       const yearRow = await this.year(tenantId, year.id);
       const d = parseDay(date);
@@ -713,8 +1035,18 @@ export class SchoolSisAttendanceService {
         );
       }
     }
-    const mode = dto.mode || 'DAILY';
+    const rule = await this.resolveClassRule(tenantId, year.id, dto.sectionId);
+    const allowedMode = rule?.mode || settings.mode || 'DAILY';
+    const mode = dto.mode || (allowedMode === 'PERIOD' ? 'PERIOD' : 'DAILY');
     const periodKey = dto.periodKey || 'DAILY';
+    if (mode === 'PERIOD' && allowedMode === 'DAILY') {
+      throw new BadRequestException(
+        'Period attendance is not enabled for this class.',
+      );
+    }
+    if (mode === 'DAILY' && allowedMode === 'PERIOD') {
+      throw new BadRequestException('This class uses period attendance only.');
+    }
     const enrolls = await this.enrollments(tenantId, year.id, dto.sectionId);
     const allowed = new Set(enrolls.map((e) => e.studentId));
     for (const row of dto.records) {
@@ -1007,6 +1339,8 @@ export class SchoolSisAttendanceService {
     });
     if (!session) return;
     const settings = await this.ensureSetup(tenantId, session.academicYearId);
+    const policy = policyFromSettingsRow(settings);
+    const channels = notifyChannels(policy);
     const date = dayKey(session.date);
     const className = `${session.section.grade.name} ${session.section.name}`;
     await this.events.publish({
@@ -1014,10 +1348,19 @@ export class SchoolSisAttendanceService {
       tenantId,
       entityType: 'attendance_session',
       entityId: session.id,
-      data: { date, class_name: className, section: session.section.name },
+      data: {
+        date,
+        class_name: className,
+        section: session.section.name,
+        channels,
+      },
     });
     for (const rec of session.records) {
-      if (rec.statusCode === 'ABSENT' && settings.absentNotify) {
+      if (
+        rec.statusCode === 'ABSENT' &&
+        settings.absentNotify &&
+        anyNotifyChannel(policy)
+      ) {
         await this.recordNotify(
           tenantId,
           `absent:${rec.studentId}:${date}:${session.id}`,
@@ -1036,10 +1379,15 @@ export class SchoolSisAttendanceService {
             attendance_date: date,
             class_name: className,
             section: session.section.name,
+            channels,
           },
         });
       }
-      if (rec.statusCode === 'LATE' && settings.lateNotify) {
+      if (
+        rec.statusCode === 'LATE' &&
+        settings.lateNotify &&
+        anyNotifyChannel(policy)
+      ) {
         await this.recordNotify(
           tenantId,
           `late:${rec.studentId}:${date}:${session.id}`,
@@ -1057,6 +1405,7 @@ export class SchoolSisAttendanceService {
             student_name: rec.student.fullName,
             attendance_date: date,
             class_name: className,
+            channels,
           },
         });
       }
@@ -1080,7 +1429,11 @@ export class SchoolSisAttendanceService {
           session.sectionId,
           parseDay(date),
         );
-        if (streak >= settings.consecutiveAbsentAlert) {
+        if (
+          streak >= settings.consecutiveAbsentAlert &&
+          policy.notifyRepeatedAbsence &&
+          anyNotifyChannel(policy)
+        ) {
           await this.events.publish({
             event: 'attendance.consecutive_absent',
             tenantId,
@@ -1090,6 +1443,7 @@ export class SchoolSisAttendanceService {
               student_name: rec.student.fullName,
               class_name: className,
               consecutive_days: streak,
+              channels,
             },
           });
         }
@@ -1107,6 +1461,8 @@ export class SchoolSisAttendanceService {
   ) {
     const from = new Date(end);
     from.setUTCDate(from.getUTCDate() - 21);
+    const settings = await this.ensureSetup(tenantId, academicYearId);
+    const policy = policyFromSettingsRow(settings);
     const recs = await this.prisma.schoolAttendanceRecord.findMany({
       where: {
         tenantId,
@@ -1136,12 +1492,7 @@ export class SchoolSisAttendanceService {
         dayKey(d),
         academicYearId,
       );
-      if (
-        kind.kind === 'HOLIDAY' ||
-        kind.kind === 'VACATION' ||
-        kind.kind === 'WEEKLY_OFF'
-      )
-        continue;
+      if (!this.calendar.isWorkingKind(kind.kind, policy)) continue;
       const st = byDate.get(dayKey(d));
       if (st === 'ABSENT') streak += 1;
       else break;
@@ -1185,6 +1536,7 @@ export class SchoolSisAttendanceService {
       tenantId,
       dayKey(session.date),
       session.academicYearId,
+      settings,
     );
     await this.prisma.schoolAttendanceSession.update({
       where: { id: sessionId },
@@ -1218,9 +1570,15 @@ export class SchoolSisAttendanceService {
       where: { id: sessionId, tenantId },
     });
     if (!session) throw new NotFoundException('Attendance session not found');
+    const settings = await this.ensureSetup(tenantId, session.academicYearId);
+    const policy = policyFromSettingsRow(settings);
     if (unlock) {
       if (!actor.canLock && !actor.manage)
         throw new ForbiddenException('Not allowed to unlock attendance');
+      if (!policy.adminCanUnlock && !actor.manage)
+        throw new ForbiddenException(
+          'Unlock is disabled in attendance settings.',
+        );
       await this.prisma.schoolAttendanceSession.update({
         where: { id: sessionId },
         data: {
@@ -1269,6 +1627,27 @@ export class SchoolSisAttendanceService {
       include: { session: true },
     });
     if (!rec) throw new NotFoundException('Attendance record not found');
+    const settings = await this.ensureSetup(
+      tenantId,
+      rec.session.academicYearId,
+    );
+    const policy = policyFromSettingsRow(settings);
+    if (!policy.allowCorrections) {
+      throw new BadRequestException('Attendance corrections are disabled.');
+    }
+    if (policy.correctionReasonRequired && !dto.reason?.trim()) {
+      throw new BadRequestException('A reason is required for corrections.');
+    }
+    if (policy.correctionWindowDays > 0) {
+      const age =
+        (Date.now() - parseDay(dayKey(rec.session.date)).getTime()) /
+        86_400_000;
+      if (age > policy.correctionWindowDays) {
+        throw new BadRequestException(
+          `Corrections are only allowed within ${policy.correctionWindowDays} day(s).`,
+        );
+      }
+    }
     const row = await this.prisma.schoolAttendanceCorrection.create({
       data: {
         tenantId,
@@ -1303,13 +1682,19 @@ export class SchoolSisAttendanceService {
         reason: dto.reason,
       },
     });
-    await this.events.publish({
-      event: 'attendance.correction.requested',
-      tenantId,
-      studentId: rec.studentId,
-      entityId: row.id,
-      data: { from: rec.statusCode, to: dto.toStatus },
-    });
+    if (policy.notifyCorrection && anyNotifyChannel(policy)) {
+      await this.events.publish({
+        event: 'attendance.correction.requested',
+        tenantId,
+        studentId: rec.studentId,
+        entityId: row.id,
+        data: {
+          from: rec.statusCode,
+          to: dto.toStatus,
+          channels: notifyChannels(policy),
+        },
+      });
+    }
     return row;
   }
 
@@ -1595,11 +1980,12 @@ export class SchoolSisAttendanceService {
     const year = await this.year(tenantId, q.academicYearId);
     const settings = await this.ensureSetup(tenantId, year.id);
     const threshold = q.below ?? settings.minPercent;
-    const working = await this.calendar.workingDaysInRange(
+    const working = await this.workingDays(
       tenantId,
       dayKey(year.startDate),
       istDayKey(),
       year.id,
+      settings,
     );
     const enrolls = await this.prisma.schoolEnrollment.findMany({
       where: {
@@ -1675,11 +2061,12 @@ export class SchoolSisAttendanceService {
     const [y, m] = q.month.split('-').map(Number);
     const from = new Date(Date.UTC(y, m - 1, 1));
     const to = new Date(Date.UTC(y, m, 0));
-    const working = await this.calendar.workingDaysInRange(
+    const working = await this.workingDays(
       tenantId,
       dayKey(from),
       dayKey(to),
       year.id,
+      settings,
     );
     const enrolls = await this.enrollments(tenantId, year.id, q.sectionId);
     const sessions = await this.prisma.schoolAttendanceSession.findMany({
@@ -1784,11 +2171,12 @@ export class SchoolSisAttendanceService {
       month: istDayKey().slice(0, 7),
     });
     const me = monthly.students.find((s) => s.studentId === studentId);
-    const yearWorking = await this.calendar.workingDaysInRange(
+    const yearWorking = await this.workingDays(
       tenantId,
       dayKey(year.startDate),
       istDayKey() > dayKey(year.endDate) ? dayKey(year.endDate) : istDayKey(),
       year.id,
+      settings,
     );
     const recs = await this.prisma.schoolAttendanceRecord.findMany({
       where: {
@@ -1827,6 +2215,12 @@ export class SchoolSisAttendanceService {
       workingDays: yearWorking.working,
       percent: pct,
       band: bandForPercent(pct, settings.warnPercent, settings.minPercent),
+      status: attendanceStatusLabel(
+        pct,
+        settings.warnPercent,
+        settings.minPercent,
+        policyFromSettingsRow(settings).goodPercent,
+      ),
       month: me,
       calendar: history,
     };
@@ -1937,7 +2331,7 @@ export class SchoolSisAttendanceService {
     }
     return {
       date: day,
-      settings,
+      settings: presentSettings(settings),
       periods: slots.map((s) => ({
         sectionId: s.sectionId,
         label: `${s.section.grade.name} ${s.section.name}`,
@@ -2155,11 +2549,12 @@ export class SchoolSisAttendanceService {
           take: 8000,
         })
       : [];
-    const working = await this.calendar.workingDaysInRange(
+    const working = await this.workingDays(
       tenantId,
       from,
       to,
       year.id,
+      settings,
     );
     const sessions = sectionIds.length
       ? await this.prisma.schoolAttendanceSession.findMany({
@@ -2248,6 +2643,7 @@ export class SchoolSisAttendanceService {
           percent,
           settings.warnPercent,
           settings.minPercent,
+          policyFromSettingsRow(settings).goodPercent,
         ),
         band: bandForPercent(
           percent,
@@ -2334,7 +2730,7 @@ export class SchoolSisAttendanceService {
       from,
       to,
       year,
-      settings,
+      settings: presentSettings(settings),
       summary,
       kpis,
       series,

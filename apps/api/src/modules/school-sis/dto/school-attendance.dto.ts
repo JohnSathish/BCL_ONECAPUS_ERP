@@ -5,6 +5,7 @@ import {
   IsDateString,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -14,6 +15,7 @@ import {
 } from 'class-validator';
 
 export class SaveAttendanceSettingsDto {
+  @IsOptional() @IsString() academicYearId?: string;
   @IsOptional() @IsString() mode?: string;
   @IsOptional() @IsString() defaultStatus?: string;
   @IsOptional() @IsString() defaultMarking?: string;
@@ -37,10 +39,13 @@ export class SaveAttendanceSettingsDto {
   @IsOptional() @IsBoolean() qrEnabled?: boolean;
   @IsOptional() @IsBoolean() geoEnabled?: boolean;
   @IsOptional() @IsInt() geoRadiusM?: number;
+  @IsOptional() @IsObject() policy?: Record<string, unknown>;
 }
 
 export class SaveAttendanceStatusDto {
+  @IsOptional() @IsUUID() id?: string;
   @IsString() @MaxLength(20) code!: string;
+  @IsOptional() @IsString() @MaxLength(8) shortCode?: string;
   @IsString() @MaxLength(80) name!: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsBoolean() countsPresent?: boolean;
@@ -144,4 +149,13 @@ export class SaveLeaveTypeDto {
 export class QrScanDto {
   @IsString() token!: string;
   @IsUUID() studentId!: string;
+}
+
+export class SaveAttendanceClassRuleDto {
+  @IsOptional() @IsUUID() id?: string;
+  @IsUUID() academicYearId!: string;
+  @IsUUID() gradeId!: string;
+  @IsOptional() @IsUUID() sectionId?: string;
+  @IsOptional() @IsString() mode?: string;
+  @IsOptional() @IsBoolean() active?: boolean;
 }

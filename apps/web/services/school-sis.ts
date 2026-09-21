@@ -2272,6 +2272,25 @@ export async function saveSchoolAttendanceSettings(
   return data;
 }
 
+export async function saveSchoolAttendanceStatus(payload: Record<string, unknown>, id?: string) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/attendance/statuses/${id}`, payload)
+    : await api.post('/v1/school-sis/attendance/statuses', payload);
+  return data;
+}
+
+export async function saveSchoolAttendanceClassRule(payload: Record<string, unknown>, id?: string) {
+  const { data } = id
+    ? await api.patch(`/v1/school-sis/attendance/class-rules/${id}`, payload)
+    : await api.post('/v1/school-sis/attendance/class-rules', payload);
+  return data;
+}
+
+export async function deleteSchoolAttendanceClassRule(id: string) {
+  const { data } = await api.delete(`/v1/school-sis/attendance/class-rules/${id}`);
+  return data;
+}
+
 export async function fetchSchoolAttendanceRoster(params: Record<string, string | undefined>) {
   const { data } = await api.get('/v1/school-sis/attendance/roster', { params });
   return data;

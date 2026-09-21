@@ -33,6 +33,13 @@ export type DayKind =
   | 'SPECIAL_WORKING_DAY'
   | 'EXAMINATION';
 
+export type WorkingDayPolicy = {
+  countHolidaysAsWorking?: boolean;
+  countWeeklyOffAsWorking?: boolean;
+  countExamAsWorking?: boolean;
+  countEventsAsWorking?: boolean;
+};
+
 function dayKey(d: Date) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
     .toISOString()
@@ -378,23 +385,29 @@ export class SchoolSisCalendarService {
     return { date: key, kind: 'WORKING_DAY' };
   }
 
+  isWorkingKind(kind: DayKind, policy?: WorkingDayPolicy) {
+    if (kind === 'WORKING_DAY') return true;
+    if (kind === 'SPECIAL_WORKING_DAY')
+      return policy?.countEventsAsWorking !== false;
+    if (kind === 'EXAMINATION') return policy?.countExamAsWorking !== false;
+    if (kind === 'HOLIDAY' || kind === 'VACATION')
+      return policy?.countHolidaysAsWorking === true;
+    if (kind === 'WEEKLY_OFF') return policy?.countWeeklyOffAsWorking === true;
+    return false;
+  }
+
   async workingDaysInRange(
     tenantId: string,
     from: string,
     to: string,
     academicYearId?: string,
+    policy?: WorkingDayPolicy,
   ) {
     const days = eachDay(parseDay(from), parseDay(to));
     let working = 0;
     for (const d of days) {
       const r = await this.resolveDay(tenantId, d, academicYearId);
-      if (
-        r.kind === 'WORKING_DAY' ||
-        r.kind === 'SPECIAL_WORKING_DAY' ||
-        r.kind === 'EXAMINATION'
-      ) {
-        working += 1;
-      }
+      if (this.isWorkingKind(r.kind, policy)) working += 1;
     }
     return { from, to, working, total: days.length };
   }

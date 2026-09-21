@@ -12,7 +12,7 @@ export const ATT_LINKS = [
   { href: '/admin/school-sis/attendance/leave', label: 'Leave' },
   { href: '/admin/school-sis/attendance/corrections', label: 'Corrections' },
   { href: '/admin/school-sis/reports?module=attendance', label: 'Reports' },
-  { href: '/admin/school-sis/attendance/settings', label: 'Settings' },
+  { href: '/admin/school-sis/academic/attendance-settings', label: 'Settings' },
 ];
 
 export function AttendanceShell({

@@ -1,7 +1,5 @@
-'use client';
-
-import { AttendanceSettingsDesk } from '@/components/school-sis/attendance/attendance-settings';
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <AttendanceSettingsDesk />;
+  redirect('/admin/school-sis/academic/attendance-settings');
 }

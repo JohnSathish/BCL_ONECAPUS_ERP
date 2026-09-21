@@ -105,6 +105,7 @@ export const SIS_ATTENDANCE_MARK = [
   SCHOOL_SIS_PERMISSION_MANAGE,
   'attendance.create',
   'attendance.update',
+  'attendance.submit',
 ] as const;
 
 export const SIS_ATTENDANCE_APPROVE = [
@@ -116,6 +117,20 @@ export const SIS_ATTENDANCE_APPROVE = [
 export const SIS_ATTENDANCE_SETTINGS = [
   SCHOOL_SIS_PERMISSION_MANAGE,
   'attendance.settings.manage',
+] as const;
+
+export const SIS_ATTENDANCE_CORRECTION = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'attendance.correction.request',
+  'attendance.create',
+  'attendance.update',
+] as const;
+
+export const SIS_ATTENDANCE_REPORTS = [
+  SCHOOL_SIS_PERMISSION_MANAGE,
+  'attendance.view',
+  'attendance.reports.view',
+  'attendance.reports.export',
 ] as const;
 
 export const SIS_ATTENDANCE_PARENT = [

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {
   BookOpen,
   CalendarDays,
+  ClipboardList,
   CreditCard,
   GraduationCap,
   Home,
@@ -85,6 +86,12 @@ const MODULES = [
     title: 'ID Card Template',
     hint: 'Live preview with logo, photo and QR',
     icon: CreditCard,
+  },
+  {
+    href: '/admin/school-sis/academic/attendance-settings',
+    title: 'Attendance Settings',
+    hint: 'Mode, statuses, percentage, locking and notifications',
+    icon: ClipboardList,
   },
   {
     href: '/admin/school-sis/students',
