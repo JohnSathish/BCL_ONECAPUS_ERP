@@ -68,9 +68,12 @@ export default function RootLayout() {
       else if (kind === 'blocked') router.replace('/device-blocked');
       else if (kind === 'revoked') router.replace('/session-ended');
       else {
-        void destinationIfReauthNeeded().then((dest) => {
-          if (dest === '/unlock') router.replace('/unlock');
-          else if (dest === '/login') router.replace('/login');
+        // Soft expiry: only go to login when no refresh token remains.
+        void getRefreshToken().then((refresh) => {
+          if (refresh) return;
+          void destinationIfReauthNeeded().then((dest) => {
+            if (dest === '/login') router.replace('/login');
+          });
         });
       }
     });
@@ -110,53 +113,55 @@ export default function RootLayout() {
 
   useEffect(() => {
     const onChange = (state: AppStateStatus) => {
-      if (state === 'background') {
-        backgroundedAt.current = Date.now();
+      if (state === 'background' || state === 'inactive') {
+        if (!backgroundedAt.current) backgroundedAt.current = Date.now();
         return;
       }
       if (state !== 'active') return;
-      const away = Date.now() - backgroundedAt.current;
+      const away = backgroundedAt.current ? Date.now() - backgroundedAt.current : 0;
+      backgroundedAt.current = 0;
       if (wasOpenedFromNotificationRecently()) return;
       if (AUTH_HOLD.has(path) || path === '/') return;
-      void import('@/auth/token-refresh').then(
-        ({
-          AccountDisabledError,
-          DeviceBlockedError,
-          refreshAccessToken,
-          SessionExpiredError,
-          SessionRevokedError,
-        }) => {
-          void getRefreshToken().then((refresh) => {
-            if (!refresh) return;
-            void refreshAccessToken().catch((err) => {
-              if (justDidPasswordLogin()) return;
-              if (err instanceof AccountDisabledError) {
-                router.replace('/account-disabled');
-                return;
-              }
-              if (err instanceof DeviceBlockedError) {
-                router.replace('/device-blocked');
-                return;
-              }
-              if (err instanceof SessionRevokedError) {
-                router.replace('/session-ended');
-                return;
-              }
-              if (err instanceof SessionExpiredError) {
-                void destinationIfReauthNeeded().then((dest) => {
-                  if (dest === '/unlock') router.replace('/unlock');
-                  else if (dest === '/login') router.replace('/login');
-                });
-              }
+
+      // Renew access only when it is actually expired — avoid rotate-on-every-resume races.
+      void import('@/auth/session').then(({ accessTokenLooksExpired, getAccessToken }) => {
+        void import('@/auth/token-refresh').then(
+          ({
+            AccountDisabledError,
+            DeviceBlockedError,
+            refreshAccessToken,
+            SessionRevokedError,
+          }) => {
+            void getRefreshToken().then(async (refresh) => {
+              if (!refresh) return;
+              const access = await getAccessToken();
+              if (access && !accessTokenLooksExpired(access)) return;
+              void refreshAccessToken().catch((err) => {
+                if (justDidPasswordLogin()) return;
+                if (err instanceof AccountDisabledError) {
+                  router.replace('/account-disabled');
+                  return;
+                }
+                if (err instanceof DeviceBlockedError) {
+                  router.replace('/device-blocked');
+                  return;
+                }
+                if (err instanceof SessionRevokedError) {
+                  router.replace('/session-ended');
+                }
+                // Soft/offline failures: stay on the current screen.
+              });
             });
-          });
-        },
-      );
-      if (!backgroundedAt.current || away < 8_000) return;
+          },
+        );
+      });
+
+      if (away < 120_000) return;
       void import('@/services/push').then(({ pingDeviceHeartbeat, registerSchoolPush }) => {
         void registerSchoolPush();
         void pingDeviceHeartbeat();
       });
+      // App lock is optional and explicit — never treat it as signing out.
       void Promise.all([isAppLockEnabled(), isBiometricLoginEnabled()]).then(([lock, bio]) => {
         if (justDidPasswordLogin()) return;
         if (lock && bio) router.replace('/unlock');

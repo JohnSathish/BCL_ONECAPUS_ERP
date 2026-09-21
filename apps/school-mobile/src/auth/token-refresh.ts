@@ -117,6 +117,15 @@ async function doRefresh(opts?: { biometricUnlock?: boolean }): Promise<Refreshe
     if (kind === 'blocked') throw new DeviceBlockedError();
     if (kind === 'revoked') throw new SessionRevokedError();
     if (kind === 'disabled') throw new AccountDisabledError();
+    // Another refresh may have rotated tokens while this request was in flight.
+    const still = await getRefreshToken().catch(() => null);
+    if (still && still !== sent) {
+      const access = await getAccessToken();
+      if (access) return { accessToken: access, refreshToken: still };
+    }
+    // Refresh is genuinely dead — drop tokens only (keep biometric prefs / user snapshot).
+    const { clearAuthTokens } = await import('@/auth/session');
+    await clearAuthTokens().catch(() => undefined);
     throw new SessionExpiredError('Please sign in again.');
   }
 

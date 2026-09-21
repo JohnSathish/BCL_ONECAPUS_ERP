@@ -463,6 +463,15 @@ export class AuthService {
     let refreshMaxAgeSeconds = this.resolveRefreshTtlSeconds(
       options.rememberMe || isSchoolMobile,
     );
+    if (isSchoolMobile) {
+      // WhatsApp-style persistence: keep school-mobile refresh sessions for months.
+      refreshMaxAgeSeconds = Math.max(
+        refreshMaxAgeSeconds,
+        this.parseTtlSeconds(
+          this.config.get<string>('JWT_MOBILE_REFRESH_TTL', '180d'),
+        ),
+      );
+    }
     if (!options.rememberMe && !isSchoolMobile) {
       refreshMaxAgeSeconds = Math.min(
         refreshMaxAgeSeconds,

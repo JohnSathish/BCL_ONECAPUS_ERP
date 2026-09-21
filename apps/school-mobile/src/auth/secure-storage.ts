@@ -101,6 +101,9 @@ async function persistValue(key: string, value: string) {
 }
 
 async function readPersisted(key: string): Promise<string | null> {
+  // Android Keystore can briefly fail after reboot / process death. Prefer the
+  // app-private file mirror so a Keystore hiccup cannot wipe the session.
+  const fileValue = await fileGet(key);
   const countRaw = await nativeGet(`${key}__n`);
   const first = await nativeGet(key);
   const n = Number(countRaw);
@@ -114,7 +117,15 @@ async function readPersisted(key: string): Promise<string | null> {
   } else if (first) {
     nativeValue = first;
   }
-  const fileValue = await fileGet(key);
+  if (Platform.OS === 'android') {
+    if (fileValue) {
+      if (!nativeValue || nativeValue !== fileValue) {
+        void persistNativeChunks(key, fileValue).catch(() => undefined);
+      }
+      return fileValue;
+    }
+    return nativeValue;
+  }
   if (nativeValue && fileValue && fileValue.length > nativeValue.length) return fileValue;
   return nativeValue || fileValue;
 }

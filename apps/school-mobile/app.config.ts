@@ -17,7 +17,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? "St. Luke's School",
   slug: 'st-lukes-school',
-  version: '1.0.24',
+  version: '1.0.25',
   scheme: 'stlukesschool',
   // Play large-screen guidance: do not lock to portrait in the manifest.
   orientation: 'default',
@@ -42,7 +42,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'in.stlukestura.school',
-    buildNumber: '27',
+    buildNumber: '28',
     ...(hasGoogleServiceInfo ? { googleServicesFile: googleServiceInfoLocal } : {}),
     infoPlist: {
       NSFaceIDUsageDescription:
@@ -54,7 +54,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'in.stlukestura.school',
-    versionCode: 27,
+    versionCode: 28,
     edgeToEdgeEnabled: true,
     allowBackup: false,
     ...(hasGoogleServices ? { googleServicesFile: googleServicesLocal } : {}),

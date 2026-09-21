@@ -8,7 +8,6 @@ import {
   setBiometricLoginEnabled,
 } from '@/auth/session';
 import { biometricCapability, biometricEnrollmentChanged } from '@/auth/biometric';
-import { destinationIfReauthNeeded } from '@/auth/reauth';
 import {
   AccountDisabledError,
   DeviceBlockedError,
@@ -41,6 +40,11 @@ function homeFor(user: Awaited<ReturnType<typeof getUser>>) {
   return destinationAfterAuth(user, user?.firstLogin);
 }
 
+/**
+ * Cold-start / resume session restore.
+ * Keep the user signed in whenever a refresh token is still on device.
+ * Only the login screen is shown when there is no persisted refresh token.
+ */
 export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
   try {
     const refresh = await getRefreshToken();
@@ -49,19 +53,15 @@ export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
         const user = await getUser();
         return { route: destinationAfterAuth(user) };
       }
-      const reauth = await destinationIfReauthNeeded();
-      return { route: reauth ?? '/login' };
+      return { route: '/login' };
     }
 
     if (await biometricEnrollmentChanged()) {
       await setBiometricLoginEnabled(false);
     }
 
-    if (await isAppLockEnabled()) {
-      if (justDidPasswordLogin()) {
-        const user = await getUser();
-        return { route: destinationAfterAuth(user, user?.firstLogin) };
-      }
+    // Optional app lock only — not the same as "logged out".
+    if ((await isAppLockEnabled()) && !justDidPasswordLogin()) {
       const cap = await biometricCapability();
       if (cap.available && (await isBiometricLoginEnabled())) {
         return { route: '/unlock' };
@@ -82,11 +82,10 @@ export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
       if (err instanceof AccountDisabledError) return { route: '/account-disabled' };
       if (err instanceof DeviceBlockedError) return { route: '/device-blocked' };
       if (err instanceof SessionRevokedError) return { route: '/session-ended' };
+      // Soft failure (offline / transient): stay signed in with stored session.
       if (err instanceof SessionExpiredError) {
-        const reauth = await destinationIfReauthNeeded();
-        if (reauth === '/unlock') return { route: '/unlock' };
-        const user = await getUser();
-        return { route: homeFor(user) };
+        const still = await getRefreshToken().catch(() => null);
+        if (!still) return { route: '/login' };
       }
       const user = await getUser();
       return { route: homeFor(user) };
@@ -97,7 +96,6 @@ export async function restoreSchoolSession(): Promise<{ route: AuthRoute }> {
       const user = await getUser().catch(() => null);
       return { route: homeFor(user) };
     }
-    const reauth = await destinationIfReauthNeeded().catch(() => '/login' as const);
-    return { route: reauth ?? '/login' };
+    return { route: '/login' };
   }
 }

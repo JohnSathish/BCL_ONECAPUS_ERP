@@ -59,7 +59,32 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
       });
       if (!liveSession) {
-        throw new UnauthorizedException('Session expired or revoked');
+        // Refresh rotation revokes the prior row but the access JWT can still be
+        // within its TTL. Treat rotation (replacedById set) as still authenticated
+        // until the access token expires or the family is fully revoked.
+        const prior = await this.prisma.refreshSession.findFirst({
+          where: {
+            jti: payload.sid,
+            userId: payload.sub,
+          },
+          select: { familyId: true, replacedById: true, revokedAt: true },
+        });
+        const rotated =
+          Boolean(prior?.replacedById) ||
+          (prior?.familyId
+            ? await this.prisma.refreshSession.findFirst({
+                where: {
+                  familyId: prior.familyId,
+                  userId: payload.sub,
+                  revokedAt: null,
+                  expiresAt: { gt: new Date() },
+                },
+                select: { id: true },
+              })
+            : null);
+        if (!rotated) {
+          throw new UnauthorizedException('Session expired or revoked');
+        }
       }
     }
 

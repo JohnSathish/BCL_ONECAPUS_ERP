@@ -16,8 +16,8 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CREST, SCHOOL } from '@/brand';
 import { login } from '@/auth/account';
-import { markPasswordLogin, wantsPasswordLogin } from '@/auth/password-gate';
 import { destinationAfterAuth } from '@/auth/post-login';
+import { markPasswordLogin } from '@/auth/password-gate';
 import { restoreSchoolSession } from '@/auth/restore';
 import { APP_VERSION } from '@/api/config';
 import { Screen } from '@/ui/kit';
@@ -36,11 +36,11 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (wantsPasswordLogin()) return;
     let alive = true;
     void restoreSchoolSession()
       .then((restored) => {
         if (!alive) return;
+        // Even after "Use password", bounce home when a persisted session exists.
         if (restored.route !== '/login') router.replace(restored.route);
       })
       .catch(() => undefined);

@@ -1,23 +1,21 @@
-import { biometricCapability } from '@/auth/biometric';
 import { getRefreshToken, getUser, isBiometricLoginEnabled } from '@/auth/session';
+import { biometricCapability } from '@/auth/biometric';
 
 export type ReauthRoute = '/unlock' | '/login';
 
 /**
- * Password login is only for a truly empty session.
- * Fingerprint (when enrolled) is the re-auth path. If the refresh token is
- * still on the device, stay signed in and let the next API call retry.
+ * Only used after the server genuinely ended the session (revoked / no refresh).
+ * While a refresh token remains on device, return null — stay signed in.
  */
 export async function destinationIfReauthNeeded(): Promise<ReauthRoute | null> {
-  const [refresh, bioEnabled, user] = await Promise.all([
-    getRefreshToken(),
-    isBiometricLoginEnabled(),
-    getUser(),
-  ]);
-  if (bioEnabled) {
-    const cap = await biometricCapability();
-    if (cap.available && (refresh || user)) return '/unlock';
-  }
+  const refresh = await getRefreshToken();
   if (refresh) return null;
+
+  const [bioEnabled, user] = await Promise.all([isBiometricLoginEnabled(), getUser()]);
+  if (bioEnabled && user) {
+    const cap = await biometricCapability();
+    // No refresh left — unlock cannot renew; fall through to password login.
+    if (cap.available) return '/login';
+  }
   return '/login';
 }

@@ -6,7 +6,7 @@ import {
   biometricCapability,
   biometricFailMessage,
 } from '@/auth/biometric';
-import { getUser } from '@/auth/session';
+import { getUser, getRefreshToken } from '@/auth/session';
 import {
   refreshAccessToken,
   AccountDisabledError,
@@ -78,6 +78,12 @@ export default function UnlockScreen() {
         return;
       }
       if (err instanceof SessionExpiredError) {
+        const user = await getUser();
+        const still = await getRefreshToken().catch(() => null);
+        if (still) {
+          router.replace(destinationAfterAuth(user));
+          return;
+        }
         setError('Session could not be renewed. Sign in with your password.');
         return;
       }

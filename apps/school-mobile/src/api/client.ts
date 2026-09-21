@@ -1,5 +1,11 @@
 import { getApiBase, schoolHeaders } from '@/api/config';
-import { accessTokenLooksExpired, getAccessToken, getUser, saveUser } from '@/auth/session';
+import {
+  accessTokenLooksExpired,
+  getAccessToken,
+  getRefreshToken,
+  getUser,
+  saveUser,
+} from '@/auth/session';
 import { justDidPasswordLogin } from '@/auth/password-gate';
 import {
   AccountDisabledError,
@@ -47,6 +53,13 @@ function isOfflineMessage(msg: string) {
   return /offline|network request failed|failed to fetch|timeout/i.test(msg);
 }
 
+async function notifyExpiredOnlyIfNoSession() {
+  if (justDidPasswordLogin()) return;
+  const refresh = await getRefreshToken().catch(() => null);
+  if (refresh) return; // Soft failure — keep the user signed in.
+  onAuthFailure?.('expired');
+}
+
 export async function apiFetch<T>(path: string, options: Options = {}): Promise<T> {
   const headers = await schoolHeaders(options.headers as Record<string, string>);
   if (!options.skipAuth) {
@@ -77,7 +90,7 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
           throw err;
         }
         if (err instanceof SessionExpiredError) {
-          if (!options.ignoreAuthFailure && !justDidPasswordLogin()) onAuthFailure?.('expired');
+          if (!options.ignoreAuthFailure) await notifyExpiredOnlyIfNoSession();
           throw new Error('Please sign in again.');
         }
       }
@@ -130,7 +143,7 @@ export async function apiFetch<T>(path: string, options: Options = {}): Promise<
         throw err instanceof Error ? err : new Error(msg);
       }
       if (err instanceof SessionExpiredError) {
-        if (!options.ignoreAuthFailure && !justDidPasswordLogin()) onAuthFailure?.('expired');
+        if (!options.ignoreAuthFailure) await notifyExpiredOnlyIfNoSession();
         throw new Error('Please sign in again.');
       }
       throw err instanceof Error ? err : new Error(msg);
