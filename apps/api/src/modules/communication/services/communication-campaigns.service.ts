@@ -25,8 +25,8 @@ export class CommunicationCampaignsService {
     private readonly queue: QueueService,
   ) {}
 
-  list(tenantId: string, status?: string) {
-    return this.prisma.communicationCampaign.findMany({
+  async list(tenantId: string, status?: string) {
+    const rows = await this.prisma.communicationCampaign.findMany({
       where: {
         tenantId,
         ...(status ? { status } : {}),
@@ -38,6 +38,49 @@ export class CommunicationCampaignsService {
       },
       take: 100,
     });
+
+    // Recipient rows are created only when a campaign is sent. Drafts otherwise
+    // display as 0 even when the audience preview already found thousands.
+    const missingEstimate = rows
+      .filter((row) => {
+        if ((row._count?.recipients ?? 0) > 0) return false;
+        if (!['DRAFT', 'SCHEDULED', 'SENDING', 'FAILED'].includes(row.status)) {
+          return false;
+        }
+        const meta = (row.metadata ?? {}) as Record<string, unknown>;
+        return typeof meta.estimatedRecipients !== 'number';
+      })
+      .slice(0, 8);
+
+    for (const row of missingEstimate) {
+      try {
+        const count = await this.audience.count(
+          tenantId,
+          row.audienceType,
+          (row.audienceFilter ?? {}) as {
+            departmentIds?: string[];
+            programVersionIds?: string[];
+            userIds?: string[];
+            studentIds?: string[];
+            staffProfileIds?: string[];
+          },
+        );
+        const metadata = {
+          ...((row.metadata ?? {}) as Record<string, unknown>),
+          estimatedRecipients: count.total,
+          estimatedPush: count.withPush,
+        };
+        await this.prisma.communicationCampaign.update({
+          where: { id: row.id },
+          data: { metadata: metadata as Prisma.InputJsonValue },
+        });
+        row.metadata = metadata as Prisma.JsonValue;
+      } catch {
+        // Keep the row; the list must still load if one audience resolve fails.
+      }
+    }
+
+    return rows;
   }
 
   async get(tenantId: string, id: string) {

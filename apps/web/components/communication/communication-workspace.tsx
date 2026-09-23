@@ -454,16 +454,14 @@ export function CommunicationWorkspace() {
                   typeof meta.estimatedRecipients === 'number' ? meta.estimatedRecipients : null;
                 const failureReason =
                   typeof meta.failureReason === 'string' ? meta.failureReason : null;
+                const push = typeof meta.estimatedPush === 'number' ? meta.estimatedPush : null;
+                const pushBit = push != null ? ` · ${push} with push` : '';
                 const recipientLabel =
                   materialised > 0
-                    ? `${materialised} recipients`
-                    : ['DRAFT', 'SCHEDULED', 'SENDING'].includes(c.status) &&
-                        estimated != null &&
-                        estimated > 0
-                      ? `~${estimated} estimated`
-                      : materialised === 0 && c.status === 'FAILED'
-                        ? '0 recipients'
-                        : `${materialised} recipients`;
+                    ? `${materialised} recipients${pushBit}`
+                    : estimated != null && estimated > 0
+                      ? `${estimated} recipients${pushBit}`
+                      : `${materialised} recipients`;
                 return (
                   <div
                     key={c.id}

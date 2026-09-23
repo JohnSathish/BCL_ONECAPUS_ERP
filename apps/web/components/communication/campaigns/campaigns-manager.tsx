@@ -12,12 +12,26 @@ import {
   fetchCampaignRecipients,
   sendCommunicationCampaign,
 } from '@/services/communication';
+import type { CommunicationCampaign } from '@/types/communication';
+import { apiErrorMessage } from '@/utils/api-error';
+
+function campaignRecipientLabel(campaign: CommunicationCampaign) {
+  const meta = (campaign.metadata ?? {}) as Record<string, unknown>;
+  const materialised = campaign._count?.recipients ?? 0;
+  const estimated = typeof meta.estimatedRecipients === 'number' ? meta.estimatedRecipients : null;
+  const push = typeof meta.estimatedPush === 'number' ? meta.estimatedPush : null;
+  const pushBit = push != null ? ` · ${push} with push` : '';
+  if (materialised > 0) return `${materialised} recipients${pushBit}`;
+  if (estimated != null) return `${estimated} recipients${pushBit}`;
+  return '0 recipients';
+}
 
 export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
   const enabled = useAuthQueryEnabled();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'automated' | 'manual'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const campaigns = useQuery({
     queryKey: ['communication', 'campaigns', statusFilter],
@@ -33,7 +47,11 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
 
   const send = useMutation({
     mutationFn: sendCommunicationCampaign,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['communication'] }),
+    onSuccess: () => {
+      setActionError(null);
+      qc.invalidateQueries({ queryKey: ['communication'] });
+    },
+    onError: (err) => setActionError(apiErrorMessage(err, 'Could not send this campaign')),
   });
 
   const cancel = useMutation({
@@ -71,6 +89,12 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
         </div>
       ) : null}
 
+      {actionError ? (
+        <p className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {actionError}
+        </p>
+      ) : null}
+
       {campaigns.isError ? (
         <QueryErrorPanel
           title="Unable to load campaigns"
@@ -81,9 +105,10 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
       ) : null}
 
       {filtered.map((c) => {
-        const trigger = (c.metadata as Record<string, unknown> | undefined)?.trigger as
-          | string
-          | undefined;
+        const meta = (c.metadata ?? {}) as Record<string, unknown>;
+        const trigger = meta.trigger as string | undefined;
+        const failureReason = typeof meta.failureReason === 'string' ? meta.failureReason : null;
+        const awaitingApproval = Boolean(c.requiresApproval) && c.approvalStatus !== 'APPROVED';
         return (
           <div key={c.id} className="rounded-2xl border border-border/80 bg-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -97,8 +122,14 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                   ) : null}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {c.audienceType} · {c.status} · {c._count?.recipients ?? 0} recipients
+                  {c.audienceType} · {c.status} · {campaignRecipientLabel(c)}
                 </p>
+                {failureReason ? <p className="text-xs text-destructive">{failureReason}</p> : null}
+                {awaitingApproval ? (
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    Large broadcast is waiting for approval before it can send.
+                  </p>
+                ) : null}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -110,9 +141,11 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                 </Button>
                 {['DRAFT', 'SCHEDULED'].includes(c.status) ? (
                   <>
-                    <Button size="sm" onClick={() => send.mutate(c.id)} disabled={send.isPending}>
-                      Send
-                    </Button>
+                    {awaitingApproval ? null : (
+                      <Button size="sm" onClick={() => send.mutate(c.id)} disabled={send.isPending}>
+                        Send
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"

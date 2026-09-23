@@ -160,6 +160,7 @@ export function SmartComposeForm() {
           recurrence: compose.recurrence,
           requiresApproval,
           estimatedRecipients: audienceCount?.total ?? null,
+          estimatedPush: audienceCount?.withPush ?? null,
         },
       });
       if (sendNow) {
