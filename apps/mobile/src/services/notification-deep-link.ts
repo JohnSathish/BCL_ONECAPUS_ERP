@@ -115,8 +115,9 @@ export function resolveMobileDeepLink(link?: string | null): Href | null {
   if (lower.includes('/student/certificates')) {
     return '/(student)/(tabs)' as Href;
   }
-  // Remaining /student/* → Home (not Notifications)
-  if (lower.startsWith('/student') && !lower.includes('/staff')) {
+  // Bare student home paths → Home tab. Other unmatched /student/* → null
+  // (callers treat null as inbox / message modal — push taps always open Notifications).
+  if (lower === '/student' || lower === '/student/dashboard' || lower === '/student/home') {
     return '/(student)/(tabs)' as Href;
   }
 
@@ -189,8 +190,11 @@ export function isGenericNotificationLink(link?: string | null): boolean {
     lower === '/student' ||
     lower === '/student/dashboard' ||
     lower === '/student/home' ||
+    lower === '/student/notifications' ||
+    lower === '/student/alerts' ||
     lower === '/staff' ||
     lower === '/staff/dashboard' ||
+    lower === '/staff/notifications' ||
     lower === '/faculty'
   );
 }

@@ -42,7 +42,8 @@ export function resolveNotificationLink(input: {
     if (trigger.includes('library')) return '/student/library';
     if (trigger.includes('transport')) return '/student';
     if (trigger.includes('birthday')) return '/student#birthdays';
-    return '/student';
+    // Manual / campaign pushes open the in-app Notifications inbox (not Home).
+    return '/student/notifications';
   }
 
   if (

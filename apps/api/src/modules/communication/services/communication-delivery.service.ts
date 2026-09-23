@@ -200,6 +200,11 @@ export class CommunicationDeliveryService {
     const channels = options?.channel
       ? [options.channel]
       : ((campaign.channels as string[]) ?? ['IN_APP']);
+    // Create inbox rows before PUSH so the FCM payload can carry notificationId.
+    const orderedChannels = [...channels].sort((a, b) => {
+      const rank = (c: string) => (c === 'IN_APP' ? 0 : c === 'PUSH' ? 1 : 2);
+      return rank(a) - rank(b);
+    });
     const metadata = (campaign.metadata ?? {}) as Record<string, unknown>;
     const variables = (metadata.variables ?? {}) as Record<string, string>;
     const brandingCtx = await this.brandedLayout.resolveContext(tenantId);
@@ -246,7 +251,7 @@ export class CommunicationDeliveryService {
     let failedCount = 0;
 
     for (const recipient of recipients) {
-      for (const channel of channels) {
+      for (const channel of orderedChannels) {
         if (
           await this.channelAlreadySucceeded(
             tenantId,
@@ -394,6 +399,21 @@ export class CommunicationDeliveryService {
           const tokens = devices
             .map((d) => d.pushToken)
             .filter((t): t is string => Boolean(t));
+          const inboxRow = await this.prisma.userNotification.findFirst({
+            where: {
+              tenantId,
+              userId: recipient.userId,
+              campaignId,
+            },
+            select: { id: true },
+            orderBy: { createdAt: 'desc' },
+          });
+          const pushLink =
+            resolveNotificationLink({
+              recipientType: recipient.recipientType,
+              triggerKey: String(metadata.trigger ?? ''),
+              entityType: String(metadata.entityType ?? ''),
+            }) ?? '/student/notifications';
           const result = await this.fcm.sendToTokens(tokens, {
             title: subject,
             body: bodyText ?? subject,
@@ -402,13 +422,16 @@ export class CommunicationDeliveryService {
               : undefined,
             data: {
               campaignId,
+              notificationId: inboxRow?.id ?? '',
               category,
-              link:
-                resolveNotificationLink({
-                  recipientType: recipient.recipientType,
-                  triggerKey: String(metadata.trigger ?? ''),
-                  entityType: String(metadata.entityType ?? ''),
-                }) ?? '',
+              link: pushLink,
+              mobilePath:
+                recipient.recipientType === 'STUDENT'
+                  ? '/(student)/(tabs)/notifications'
+                  : recipient.recipientType === 'STAFF' ||
+                      recipient.recipientType === 'FACULTY'
+                    ? '/(staff)/(tabs)/notifications'
+                    : '',
               imageUrl: imageAttachment
                 ? this.toAbsoluteUrl(imageAttachment.url)
                 : '',

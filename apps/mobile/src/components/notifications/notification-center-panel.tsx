@@ -26,7 +26,10 @@ import {
   resolveMobileDeepLink,
   isGenericNotificationLink,
 } from '@/services/notification-deep-link';
-import { onNotificationsInvalidated } from '@/services/notifications-sync';
+import {
+  onNotificationsInvalidated,
+  consumePendingNotificationOpen,
+} from '@/services/notifications-sync';
 import { openNotificationAttachment, trackPushOpened } from '@/services/push-notifications';
 import { NotificationMessageModal } from '@/components/notifications/notification-message-modal';
 import type { UserNotification } from '@/types/notifications';
@@ -78,6 +81,7 @@ export function NotificationCenterPanel({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [detail, setDetail] = useState<MessageModalState | null>(null);
+  const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,6 +90,14 @@ export function NotificationCenterPanel({
       setItems(list);
       setUnread(count.count);
       setMessage('');
+
+      const pending = consumePendingNotificationOpen();
+      if (pending && filter !== 'archived') {
+        const match =
+          list.find((n) => pending.notificationId && n.id === pending.notificationId) ??
+          list.find((n) => pending.campaignId && n.campaignId === pending.campaignId);
+        if (match) setPendingOpenId(match.id);
+      }
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Failed to load notifications');
     } finally {
@@ -135,7 +147,7 @@ export function NotificationCenterPanel({
     );
   }, [items, query]);
 
-  async function onOpen(item: UserNotification) {
+  async function onOpen(item: UserNotification, opts?: { forceInboxDetail?: boolean }) {
     if (!item.readAt && filter !== 'archived') {
       try {
         await markNotificationRead(item.id);
@@ -151,22 +163,27 @@ export function NotificationCenterPanel({
     void trackPushOpened(item.link ?? undefined);
 
     const { imageUrl, pdfUrl, files, all } = attachmentUrlsFromMeta(item);
-    if (pdfUrl) {
-      const opened = await openNotificationAttachment(pdfUrl, 'PDF attachment');
-      if (opened) return;
-    }
-    if (files[0]) {
-      const opened = await openNotificationAttachment(
-        files[0].url,
-        files[0].name ?? 'File attachment',
-      );
-      if (opened) return;
+    if (!opts?.forceInboxDetail) {
+      if (pdfUrl) {
+        const opened = await openNotificationAttachment(pdfUrl, 'PDF attachment');
+        if (opened) return;
+      }
+      if (files[0]) {
+        const opened = await openNotificationAttachment(
+          files[0].url,
+          files[0].name ?? 'File attachment',
+        );
+        if (opened) return;
+      }
     }
 
     const href = resolveMobileDeepLink(item.link);
     const hrefStr = href ? String(href) : '';
     const landsOnInbox =
-      !href || hrefStr.includes('/notifications') || isGenericNotificationLink(item.link);
+      opts?.forceInboxDetail ||
+      !href ||
+      hrefStr.includes('/notifications') ||
+      isGenericNotificationLink(item.link);
 
     // Campaign / generic links: show the enhanced message popup.
     if (landsOnInbox) {
@@ -198,18 +215,24 @@ export function NotificationCenterPanel({
         });
         return;
       }
-      if (all.length) {
+      if (all.length || pdfUrl || files[0]) {
+        const first =
+          all[0] ??
+          (pdfUrl ? { url: pdfUrl, name: 'PDF attachment' } : null) ??
+          (files[0] ? { url: files[0].url, name: files[0].name ?? 'File' } : null);
         setDetail({
           title,
           body: body === 'No additional details.' ? 'Attachment available.' : body,
-          actions: [
-            {
-              label: 'Open attachment',
-              onPress: () =>
-                void openNotificationAttachment(all[0].url, all[0].name ?? 'Attachment'),
-            },
-            { label: 'OK', primary: true, onPress: () => undefined },
-          ],
+          actions: first
+            ? [
+                {
+                  label: 'Open attachment',
+                  onPress: () =>
+                    void openNotificationAttachment(first.url, first.name ?? 'Attachment'),
+                },
+                { label: 'OK', primary: true, onPress: () => undefined },
+              ]
+            : undefined,
         });
         return;
       }
@@ -218,6 +241,19 @@ export function NotificationCenterPanel({
     }
     router.push(href as never);
   }
+
+  useEffect(() => {
+    if (!pendingOpenId || loading) return;
+    const match = items.find((n) => n.id === pendingOpenId);
+    if (!match) {
+      setPendingOpenId(null);
+      return;
+    }
+    setPendingOpenId(null);
+    void onOpen(match, { forceInboxDetail: true });
+    // Intentionally only when a push-tap pending id arrives; onOpen closes over latest state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingOpenId, loading, items]);
 
   async function onMarkAll() {
     try {

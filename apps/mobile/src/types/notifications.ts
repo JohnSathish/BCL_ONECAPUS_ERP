@@ -4,6 +4,7 @@ export type UserNotification = {
   title: string;
   body: string;
   link?: string | null;
+  campaignId?: string | null;
   readAt?: string | null;
   archivedAt?: string | null;
   dismissedAt?: string | null;

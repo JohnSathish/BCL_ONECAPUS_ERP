@@ -12,7 +12,10 @@ import {
   resolveMobileDeepLink,
   fallbackNotificationCenter,
 } from '@/services/notification-deep-link';
-import { emitNotificationsInvalidated } from '@/services/notifications-sync';
+import {
+  emitNotificationsInvalidated,
+  setPendingNotificationOpen,
+} from '@/services/notifications-sync';
 import { getNotificationAttachments } from '@/utils/notification-attachments';
 
 try {
@@ -200,6 +203,24 @@ export function extractLinkFromNotification(
   return undefined;
 }
 
+function extractOpenTargets(content: Notifications.NotificationContent): {
+  notificationId?: string;
+  campaignId?: string;
+} {
+  const data = (content.data ?? {}) as Record<string, unknown>;
+  const notificationId =
+    typeof data.notificationId === 'string'
+      ? data.notificationId.trim()
+      : typeof data.inboxId === 'string'
+        ? data.inboxId.trim()
+        : undefined;
+  const campaignId = typeof data.campaignId === 'string' ? data.campaignId.trim() : undefined;
+  return {
+    notificationId: notificationId || undefined,
+    campaignId: campaignId || undefined,
+  };
+}
+
 export function extractAttachmentUrls(content: Notifications.NotificationContent): {
   imageUrl?: string;
   pdfUrl?: string;
@@ -283,10 +304,20 @@ function scheduleInboxRefresh(source: 'push-received' | 'push-tap') {
   }, 2500);
 }
 
-export function navigateFromPushLink(link?: string | null) {
+export function navigateFromPushLink(
+  link?: string | null,
+  openTargets?: { notificationId?: string; campaignId?: string },
+) {
   void (async () => {
     const [appType, snapshot] = await Promise.all([getStoredAppType(), getUserSnapshot()]);
     const isPrincipal = (snapshot?.permissions ?? []).includes('principal-mobile:access');
+
+    if (openTargets?.notificationId || openTargets?.campaignId) {
+      setPendingNotificationOpen({
+        notificationId: openTargets.notificationId,
+        campaignId: openTargets.campaignId,
+      });
+    }
 
     // Principal Command Center users share appType "staff" for device APIs, but must
     // never be routed into Faculty Workspace on push tap.
@@ -317,12 +348,9 @@ export function navigateFromPushLink(link?: string | null) {
       return;
     }
 
+    // Students: always open Notifications inbox on push tap (never Home),
+    // even when the payload link is a generic /student home path.
     scheduleInboxRefresh('push-tap');
-    const href = resolveMobileDeepLink(link);
-    if (href) {
-      router.push(href as never);
-      return;
-    }
     router.push(fallbackNotificationCenter('student') as never);
   })();
 }
@@ -330,32 +358,12 @@ export function navigateFromPushLink(link?: string | null) {
 function handleNotificationResponse(response: Notifications.NotificationResponse) {
   const content = response.notification.request.content;
   const link = extractLinkFromNotification(content);
-  const { imageUrl, pdfUrl, fileUrl, fileName } = extractAttachmentUrls(content);
+  const openTargets = extractOpenTargets(content);
   void trackPushOpened(link);
 
-  // Prefer opening attached media when present (PDF / file / image).
-  if (pdfUrl) {
-    void openNotificationAttachment(pdfUrl, 'PDF attachment').then((opened) => {
-      if (!opened) navigateFromPushLink(link);
-      else scheduleInboxRefresh('push-tap');
-    });
-    return;
-  }
-  if (fileUrl) {
-    void openNotificationAttachment(fileUrl, fileName ?? 'File attachment').then((opened) => {
-      if (!opened) navigateFromPushLink(link);
-      else scheduleInboxRefresh('push-tap');
-    });
-    return;
-  }
-  if (imageUrl && !link) {
-    void openNotificationAttachment(imageUrl, 'Image attachment').then((opened) => {
-      if (!opened) navigateFromPushLink(link);
-      else scheduleInboxRefresh('push-tap');
-    });
-    return;
-  }
-  navigateFromPushLink(link);
+  // Always land on the Notifications menu first so the tapped item is visible.
+  // Attachments remain available from the inbox detail modal.
+  navigateFromPushLink(link, openTargets);
 }
 
 /**
