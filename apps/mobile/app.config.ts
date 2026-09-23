@@ -101,8 +101,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'edu.onecampus.mobile',
-    // Icon + branding refresh after ITMS-90683 build 4.
-    buildNumber: '5',
+    // Icon + branding refresh (Play 1.0.24 / App Store build after logo update).
+    buildNumber: '6',
     ...(hasGoogleServiceInfo && googleServiceInfoFile
       ? { googleServicesFile: googleServiceInfoFile }
       : {}),
