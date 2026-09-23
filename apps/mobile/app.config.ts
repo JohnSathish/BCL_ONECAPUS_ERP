@@ -62,22 +62,41 @@ if (
   );
 }
 /** Expo Go shows the app icon while bundling — use a solid asset in dev to avoid a second logo splash. */
-const appIcon = isNativeReleaseBuild ? './assets/icon.png' : './assets/splash-solid.png';
+const isStLukesSis =
+  process.env.EXPO_PUBLIC_TENANT_SLUG === 'st-lukes-tura' ||
+  /st\.?\s*luke/i.test(process.env.EXPO_PUBLIC_APP_NAME ?? '');
+const schoolIcon = './assets/school-sis/icon.png';
+const appIcon = isStLukesSis
+  ? schoolIcon
+  : isNativeReleaseBuild
+    ? './assets/icon.png'
+    : './assets/splash-solid.png';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
   slug: 'onecampus-mobile',
-  version: '1.0.22',
+  version: '1.0.24',
   scheme: ['onecampus', 'schoolerp'],
-  orientation: 'portrait',
+  // Play large-screen guidance: do not lock to portrait in the manifest.
+  orientation: 'default',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   icon: appIcon,
   splash: {
-    image: './assets/icon.png',
+    image: isStLukesSis ? schoolIcon : './assets/icon.png',
     resizeMode: 'contain',
-    backgroundColor: '#261265',
+    backgroundColor: isStLukesSis ? '#0b1640' : '#261265',
+  },
+  // Edge-to-edge: avoid solid status/nav bar colors (deprecated on Android 15+).
+  androidStatusBar: {
+    barStyle: 'dark-content',
+    translucent: true,
+    backgroundColor: '#00000000',
+  },
+  androidNavigationBar: {
+    barStyle: 'dark-content',
+    backgroundColor: '#00000000',
   },
   ios: {
     supportsTablet: true,
@@ -93,7 +112,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         'Don Bosco College campus app uses Face ID so enrolled students and staff can unlock the app and sign in without re-entering a password. Face data stays on your device and is never uploaded to college servers.',
       // Required by expo-camera (QR login). Must stay present — see image-picker note below.
       NSCameraUsageDescription:
-        'Don Bosco College campus app uses the camera only to scan one-time login QR codes shown on the student or staff web portal. The app does not take photographs or record video.',
+        'Don Bosco College campus app uses the camera to scan one-time login QR codes from the student or staff web portal, and for staff to scan student ID card QR codes or barcodes when marking class attendance. The app does not take photographs or record video.',
       NSPhotoLibraryUsageDescription:
         'Don Bosco College campus app needs access to your photo library so students and staff can choose an existing passport-style photo to upload for profile or admission documentation. Selected photos are uploaded to your college account for verification and are not shared with other users.',
       // Standard HTTPS / OS crypto only — no custom non-exempt encryption.
@@ -102,11 +121,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 42,
+    versionCode: 44,
+    edgeToEdgeEnabled: true,
+    allowBackup: false,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
     adaptiveIcon: {
-      foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#261265',
+      foregroundImage: isStLukesSis
+        ? './assets/school-sis/adaptive-icon.png'
+        : './assets/adaptive-icon.png',
+      backgroundColor: isStLukesSis ? '#0b1640' : '#261265',
     },
     permissions: [
       'INTERNET',
@@ -201,7 +224,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         photosPermission:
           'Don Bosco College campus app needs access to your photo library so students and staff can choose an existing passport-style photo to upload for profile or admission documentation. Selected photos are uploaded to your college account for verification and are not shared with other users.',
         cameraPermission:
-          'Don Bosco College campus app uses the camera only to scan one-time login QR codes shown on the student or staff web portal. The app does not take photographs or record video.',
+          'Don Bosco College campus app uses the camera to scan one-time login QR codes from the student or staff web portal, and for staff to scan student ID card QR codes or barcodes when marking class attendance. The app does not take photographs or record video.',
         // Explicit false so a later image-picker mod does not re-add a default mic string.
         microphonePermission: false,
       },
@@ -210,7 +233,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-camera',
       {
         cameraPermission:
-          'Don Bosco College campus app uses the camera only to scan one-time login QR codes shown on the student or staff web portal. The app does not take photographs or record video.',
+          'Don Bosco College campus app uses the camera to scan one-time login QR codes from the student or staff web portal, and for staff to scan student ID card QR codes or barcodes when marking class attendance. The app does not take photographs or record video.',
         microphonePermission: false,
         recordAudioAndroid: false,
       },
@@ -220,7 +243,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     'expo-asset',
     'expo-font',
+    'expo-system-ui',
     '@react-native-community/datetimepicker',
+    [
+      'react-native-edge-to-edge',
+      {
+        android: {
+          parentTheme: 'Default',
+          enforceNavigationBarContrast: false,
+        },
+      },
+    ],
+    './plugins/with-android-target-sdk-36',
     ...(isDevClientBuild ? ['expo-dev-client'] : []),
   ],
   experiments: {

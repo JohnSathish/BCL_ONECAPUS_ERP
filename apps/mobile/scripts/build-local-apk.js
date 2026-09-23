@@ -87,8 +87,27 @@ function patchGradleProperties() {
   } else {
     text = text.replace(/^org\.gradle\.workers\.max=.*$/m, 'org.gradle.workers.max=2');
   }
+  const sdkProps = {
+    'android.compileSdkVersion': '36',
+    'android.targetSdkVersion': '36',
+    'android.buildToolsVersion': '36.0.0',
+    'android.enableProguardInReleaseBuilds': 'true',
+    'android.enableShrinkResourcesInReleaseBuilds': 'true',
+    'android.enablePngCrunchInReleaseBuilds': 'true',
+    'expo.edgeToEdgeEnabled': 'true',
+  };
+  for (const [key, value] of Object.entries(sdkProps)) {
+    const line = `${key}=${value}`;
+    if (new RegExp(`^${key.replace(/\./g, '\\.')}=`, 'm').test(text)) {
+      text = text.replace(new RegExp(`^${key.replace(/\./g, '\\.')}=.*$`, 'm'), line);
+    } else {
+      text += `\n${line}\n`;
+    }
+  }
   fs.writeFileSync(gp, text);
-  console.log(`Patched android/gradle.properties → architectures=${arches}, workers=2`);
+  console.log(
+    `Patched android/gradle.properties → architectures=${arches}, workers=2, targetSdk=36`,
+  );
 }
 
 console.log('JAVA_HOME =', javaHome);
@@ -141,7 +160,7 @@ console.log('\n=== Build complete ===');
 if (apks.length) {
   for (const f of apks) {
     const src = path.join(apkDir, f);
-    const destName = `DonBoscoCollege-Tura-v1.0.22-vc42-${arches.replace(/,/g, '-')}.apk`;
+    const destName = `DonBoscoCollege-Tura-v${require('../package.json').version}-vc44-${arches.replace(/,/g, '-')}.apk`;
     const dest = path.join(distDir, destName);
     fs.copyFileSync(src, dest);
     console.log('APK:', src);

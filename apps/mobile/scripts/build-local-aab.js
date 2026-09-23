@@ -1,16 +1,21 @@
 /**
- * Local Android App Bundle (AAB) for Play upload testing.
- * Prefer EAS production for real Play signing: npm run build:prod:android
- *
- * Requires upload keystore via android/keystore.properties (see keystore.properties.example).
+ * Local Android App Bundle (AAB) for Play upload.
+ * Requires upload keystore via credentials.json or android/keystore.properties.
  * Usage: npm run build:aab
+ *
+ * Enforces API 36+, edge-to-edge gradle flags, R8, and bitmap crunch for Play scores.
  */
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const root = path.join(__dirname, '..');
 process.chdir(root);
+
+const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const appVersion = pkg.version || '1.0.24';
+const versionCode = '44';
 
 const jdkCandidates = [
   process.env.JAVA_HOME,
@@ -78,7 +83,6 @@ const env = {
   PATH: `${path.join(javaHome, 'bin')}${path.delimiter}${process.env.PATH || ''}`,
   LOCAL_NATIVE_RELEASE: '1',
   EAS_BUILD_PROFILE: process.env.EAS_BUILD_PROFILE || 'production',
-  // Force app.config to wire Firebase even when EAS_BUILD_PROFILE is set.
   GOOGLE_SERVICES_JSON: process.env.GOOGLE_SERVICES_JSON || googleServices,
   EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL || 'https://erp.donboscocollege.ac.in/api',
   EXPO_PUBLIC_TENANT_SLUG: process.env.EXPO_PUBLIC_TENANT_SLUG || 'demo',
@@ -97,21 +101,252 @@ function run(cmd, args, opts = {}) {
   if (r.status !== 0) process.exit(r.status || 1);
 }
 
-console.log('Building release AAB…');
-const prebuildArgs = ['expo', 'prebuild', '--platform', 'android'];
-if (!skipClean) prebuildArgs.push('--clean');
-run('npx', prebuildArgs);
+function copyOut(src, name) {
+  const distDir = path.join(root, 'dist');
+  fs.mkdirSync(distDir, { recursive: true });
+  const dest = path.join(distDir, name);
+  fs.copyFileSync(src, dest);
+  const desktop = path.join(os.homedir(), 'Desktop', name);
+  try {
+    fs.copyFileSync(src, desktop);
+    console.log('Desktop:', desktop);
+  } catch {
+    console.warn('Could not copy to Desktop:', desktop);
+  }
+  console.log('Copy:', dest);
+  return dest;
+}
 
-// Ensure monorepo Metro assets survive R8 resource shrinking after clean prebuild.
-const keepDir = path.join(root, 'android', 'app', 'src', 'main', 'res', 'raw');
-fs.mkdirSync(keepDir, { recursive: true });
-fs.writeFileSync(
-  path.join(keepDir, 'keep.xml'),
-  `<?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@raw/*,@drawable/*,@mipmap/*" />
+function patchGradleProperties() {
+  const gp = path.join(root, 'android', 'gradle.properties');
+  if (!fs.existsSync(gp)) return;
+  let text = fs.readFileSync(gp, 'utf8');
+  if (/^reactNativeArchitectures=/m.test(text)) {
+    text = text.replace(/^reactNativeArchitectures=.*$/m, `reactNativeArchitectures=${arches}`);
+  } else {
+    text += `\nreactNativeArchitectures=${arches}\n`;
+  }
+  if (!/^org\.gradle\.jvmargs=/m.test(text)) {
+    text +=
+      '\norg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError\n';
+  } else {
+    text = text.replace(
+      /^org\.gradle\.jvmargs=.*$/m,
+      'org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError',
+    );
+  }
+  if (!/^org\.gradle\.workers\.max=/m.test(text)) {
+    text += '\norg.gradle.workers.max=1\n';
+  } else {
+    text = text.replace(/^org\.gradle\.workers\.max=.*$/m, 'org.gradle.workers.max=1');
+  }
+  const sdkProps = {
+    'android.compileSdkVersion': '36',
+    'android.targetSdkVersion': '36',
+    'android.buildToolsVersion': '36.0.0',
+    'android.enableProguardInReleaseBuilds': 'true',
+    'android.enableShrinkResourcesInReleaseBuilds': 'true',
+    'android.enablePngCrunchInReleaseBuilds': 'true',
+    'expo.edgeToEdgeEnabled': 'true',
+  };
+  for (const [key, value] of Object.entries(sdkProps)) {
+    const line = `${key}=${value}`;
+    if (new RegExp(`^${key.replace(/\./g, '\\.')}=`, 'm').test(text)) {
+      text = text.replace(new RegExp(`^${key.replace(/\./g, '\\.')}=.*$`, 'm'), line);
+    } else {
+      text += `\n${line}\n`;
+    }
+  }
+  fs.writeFileSync(gp, text);
+  console.log(
+    `Patched android/gradle.properties → architectures=${arches}, workers=1, heap=4g, targetSdk=36`,
+  );
+}
+
+function patchAndroidSdkGradleFiles() {
+  const files = [
+    path.join(root, 'android', 'build.gradle'),
+    path.join(root, 'android', 'app', 'build.gradle'),
+  ];
+  for (const file of files) {
+    if (!fs.existsSync(file)) continue;
+    const before = fs.readFileSync(file, 'utf8');
+    const after = before
+      .replace(
+        /findProperty\('android\.compileSdkVersion'\)\s*\?:\s*'\d+'/g,
+        "findProperty('android.compileSdkVersion') ?: '36'",
+      )
+      .replace(
+        /findProperty\('android\.targetSdkVersion'\)\s*\?:\s*'\d+'/g,
+        "findProperty('android.targetSdkVersion') ?: '36'",
+      )
+      .replace(
+        /findProperty\('android\.buildToolsVersion'\)\s*\?:\s*'[\d.]+'/g,
+        "findProperty('android.buildToolsVersion') ?: '36.0.0'",
+      );
+    if (after !== before) {
+      fs.writeFileSync(file, after);
+      console.log(`Patched ${path.relative(root, file)} → SDK 36 defaults`);
+    }
+  }
+}
+
+function assertTargetSdk36() {
+  const gp = path.join(root, 'android', 'gradle.properties');
+  const text = fs.existsSync(gp) ? fs.readFileSync(gp, 'utf8') : '';
+  const target = (text.match(/^android\.targetSdkVersion=(\d+)/m) || [])[1];
+  const compile = (text.match(/^android\.compileSdkVersion=(\d+)/m) || [])[1];
+  if (Number(target) < 36 || Number(compile) < 36) {
+    throw new Error(
+      `Play Console requires API 36+. Found android.targetSdkVersion=${target || 'unset'} ` +
+        `android.compileSdkVersion=${compile || 'unset'} in android/gradle.properties.`,
+    );
+  }
+  console.log(`Android SDK OK → compileSdk ${compile}, targetSdk ${target}`);
+}
+
+function ensureProguardRules() {
+  const rules = path.join(root, 'android', 'app', 'proguard-rules.pro');
+  const dir = path.dirname(rules);
+  fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(rules)) {
+    fs.writeFileSync(
+      rules,
+      `# OneCampus college release R8
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 `,
-);
+    );
+  }
+  console.log('Wrote android/app/proguard-rules.pro for R8 release builds');
+}
+
+function shrinkSplashLogos() {
+  const pyPath = path.join(root, 'scripts', '_shrink_splash.py');
+  fs.writeFileSync(
+    pyPath,
+    `from PIL import Image
+import os
+root = r'''${path.join(root, 'android', 'app', 'src', 'main', 'res')}'''
+sizes = {
+    'drawable-mdpi': 160,
+    'drawable-hdpi': 240,
+    'drawable-xhdpi': 320,
+    'drawable-xxhdpi': 480,
+    'drawable-xxxhdpi': 640,
+}
+for folder, px in sizes.items():
+    p = os.path.join(root, folder, 'splashscreen_logo.png')
+    if not os.path.exists(p):
+        continue
+    im = Image.open(p).convert('RGBA')
+    im.thumbnail((px, px), Image.Resampling.LANCZOS)
+    canvas = Image.new('RGBA', (px, px), (0, 0, 0, 0))
+    x = (px - im.width) // 2
+    y = (px - im.height) // 2
+    canvas.paste(im, (x, y), im)
+    canvas.save(p, 'PNG', optimize=True, compress_level=9)
+    print('splash', folder, canvas.size, os.path.getsize(p))
+
+for dirpath, _, files in os.walk(root):
+    for name in files:
+        if not name.lower().endswith('.png'):
+            continue
+        p = os.path.join(dirpath, name)
+        try:
+            before = os.path.getsize(p)
+            if before < 40_000:
+                continue
+            im = Image.open(p).convert('RGBA')
+            im.save(p, 'PNG', optimize=True, compress_level=9)
+            after = os.path.getsize(p)
+            if after < before:
+                print('crunch', os.path.relpath(p, root), before, '->', after)
+        except Exception as e:
+            print('skip', p, e)
+`,
+  );
+  const r = spawnSync('python', [pyPath], { stdio: 'inherit', cwd: root });
+  try {
+    fs.unlinkSync(pyPath);
+  } catch {
+    /* ignore */
+  }
+  if (r.status !== 0) {
+    console.warn('Could not shrink splash logos; continuing.');
+  }
+}
+
+function verifyReleaseManifest() {
+  const candidates = [
+    path.join(
+      root,
+      'android',
+      'app',
+      'build',
+      'intermediates',
+      'merged_manifests',
+      'release',
+      'processReleaseManifest',
+      'AndroidManifest.xml',
+    ),
+    path.join(
+      root,
+      'android',
+      'app',
+      'build',
+      'intermediates',
+      'merged_manifests',
+      'release',
+      'AndroidManifest.xml',
+    ),
+    path.join(
+      root,
+      'android',
+      'app',
+      'build',
+      'intermediates',
+      'packaged_manifests',
+      'release',
+      'AndroidManifest.xml',
+    ),
+  ];
+  const manifest = candidates.find((p) => fs.existsSync(p));
+  if (!manifest) {
+    console.warn('Could not find merged release manifest to verify targetSdk.');
+    return;
+  }
+  const xml = fs.readFileSync(manifest, 'utf8');
+  const target = (xml.match(/android:targetSdkVersion="(\d+)"/) || [])[1];
+  const compileHint = (xml.match(/android:compileSdkVersion="(\d+)"/) || [])[1];
+  const pkgName = (xml.match(/package="([^"]+)"/) || [])[1];
+  const vc = (xml.match(/android:versionCode="(\d+)"/) || [])[1];
+  const vn = (xml.match(/android:versionName="([^"]+)"/) || [])[1];
+  console.log(
+    `Release manifest → package=${pkgName || 'edu.onecampus.mobile'} versionName=${vn || appVersion} versionCode=${vc || versionCode} compileSdk=${compileHint || 'n/a'} targetSdk=${target || 'unset'}`,
+  );
+  if (Number(target) < 36) {
+    throw new Error(`Release manifest still targets API ${target}. Play Console requires 36+.`);
+  }
+}
+
+function copyMappingFile(base) {
+  const mapping = path.join(
+    root,
+    'android',
+    'app',
+    'build',
+    'outputs',
+    'mapping',
+    'release',
+    'mapping.txt',
+  );
+  if (!fs.existsSync(mapping)) {
+    console.log('No R8 mapping.txt found (Play deobfuscation upload optional).');
+    return;
+  }
+  copyOut(mapping, `${base}-mapping.txt`);
+}
 
 /**
  * Expo prebuild --clean regenerates app/build.gradle with debug release signing.
@@ -199,6 +434,32 @@ $1}$2`,
   }
 }
 
+console.log('JAVA_HOME =', javaHome);
+console.log(`Package = edu.onecampus.mobile`);
+console.log(`Version = ${appVersion} versionCode ${versionCode}`);
+console.log('Architectures =', arches);
+console.log('Building Don Bosco College Play AAB (API 36)…');
+
+const prebuildArgs = ['expo', 'prebuild', '--platform', 'android'];
+if (!skipClean) prebuildArgs.push('--clean');
+run('npx', prebuildArgs);
+
+patchGradleProperties();
+patchAndroidSdkGradleFiles();
+assertTargetSdk36();
+ensureProguardRules();
+shrinkSplashLogos();
+
+const keepDir = path.join(root, 'android', 'app', 'src', 'main', 'res', 'raw');
+fs.mkdirSync(keepDir, { recursive: true });
+fs.writeFileSync(
+  path.join(keepDir, 'keep.xml'),
+  `<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/*,@drawable/*,@mipmap/*" />
+`,
+);
+
 ensureUploadSigningInGradle();
 
 const appGradle = path.join(root, 'android', 'app', 'build.gradle');
@@ -214,12 +475,14 @@ if (fs.existsSync(appGradle)) {
 const gradleArgs = [
   'bundleRelease',
   '--no-daemon',
-  '--max-workers=2',
+  '--max-workers=1',
   `-PreactNativeArchitectures=${arches}`,
 ];
 if (allowDebug) gradleArgs.push('-PALLOW_DEBUG_RELEASE_SIGNING=true');
 
 run('.\\gradlew.bat', gradleArgs, { cwd: path.join(root, 'android') });
+
+verifyReleaseManifest();
 
 const aabPath = path.join(
   root,
@@ -231,20 +494,18 @@ const aabPath = path.join(
   'release',
   'app-release.aab',
 );
-const distDir = path.join(root, 'dist');
-fs.mkdirSync(distDir, { recursive: true });
-if (fs.existsSync(aabPath)) {
-  const dest = path.join(distDir, 'DonBoscoCollege-Tura-v1.0.22-vc42.aab');
-  const destR8 = path.join(distDir, 'onecampus-v42-sdk36.aab');
-  fs.copyFileSync(aabPath, dest);
-  fs.copyFileSync(aabPath, destR8);
-  console.log('\nAAB:', aabPath);
-  console.log('Copy:', dest);
-  console.log('Copy:', destR8);
-  if (allowDebug) {
-    console.log('WARNING: debug-signed — do not upload to Play Console.');
-  }
-} else {
-  console.log('Expected AAB missing at', aabPath);
+const base = `DonBoscoCollege-Tura-v${appVersion}-vc${versionCode}`;
+if (!fs.existsSync(aabPath)) {
+  console.error('Expected AAB missing at', aabPath);
   process.exit(1);
+}
+
+console.log('\n=== Don Bosco College Android release complete ===');
+console.log('AAB:', aabPath);
+copyOut(aabPath, `${base}.aab`);
+copyMappingFile(base);
+console.log('Android package: edu.onecampus.mobile');
+console.log('Play Console: upload the .aab (targetSdk 36).');
+if (allowDebug) {
+  console.log('WARNING: debug-signed — do not upload to Play Console.');
 }
