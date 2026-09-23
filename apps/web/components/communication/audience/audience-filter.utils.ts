@@ -174,8 +174,6 @@ export function migrateLegacyAudience(
   return { audienceType, filter: resetFilterForAudience(audienceType, filter) };
 }
 
-export const LARGE_BROADCAST_THRESHOLD = 1000;
-
 const ROMAN: Record<number, string> = {
   1: 'I',
   2: 'II',

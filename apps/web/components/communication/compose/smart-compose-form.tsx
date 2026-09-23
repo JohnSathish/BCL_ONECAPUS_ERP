@@ -3,22 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  AlertTriangle,
-  FileText,
-  ImagePlus,
-  Paperclip,
-  Send,
-  Sparkles,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { FileText, ImagePlus, Paperclip, Send, Sparkles, Trash2, X } from 'lucide-react';
 
 import { AdvancedAudiencePanel } from '@/components/communication/audience/advanced-audience-panel';
 import {
   compactAudienceFilter,
   EMPTY_AUDIENCE_FILTER,
-  LARGE_BROADCAST_THRESHOLD,
   migrateLegacyAudience,
   titleAudienceSuggestions,
 } from '@/components/communication/audience/audience-filter.utils';
@@ -33,7 +23,6 @@ import {
   fetchChannelHealth,
   fetchCommunicationTemplates,
   sendCommunicationCampaign,
-  submitApproval,
   uploadCommunicationAttachment,
   type CommunicationAttachment,
 } from '@/services/communication';
@@ -67,7 +56,6 @@ export function SmartComposeForm() {
   const [attachments, setAttachments] = useState<CommunicationAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [audienceCount, setAudienceCount] = useState<AudienceCountResult | null>(null);
-  const [approvalAck, setApprovalAck] = useState(false);
   const defaultChannels = useMemo(() => initialChannels(channelParam), [channelParam]);
 
   const [compose, setCompose] = useState({
@@ -135,15 +123,8 @@ export function SmartComposeForm() {
     [compose.subject, compose.name],
   );
 
-  const requiresApproval = (audienceCount?.total ?? 0) >= LARGE_BROADCAST_THRESHOLD;
-
   const save = useMutation({
     mutationFn: async (sendNow: boolean) => {
-      if (sendNow && requiresApproval && !approvalAck) {
-        throw new Error(
-          `This broadcast reaches ${audienceCount?.total ?? 0} recipients (≥ ${LARGE_BROADCAST_THRESHOLD}). Acknowledge the approval warning or save as draft for review.`,
-        );
-      }
       const campaign = await createCommunicationCampaign({
         name: compose.name || compose.subject,
         subject: compose.subject,
@@ -158,37 +139,18 @@ export function SmartComposeForm() {
         metadata: {
           messageType: compose.messageType,
           recurrence: compose.recurrence,
-          requiresApproval,
+          requiresApproval: false,
           estimatedRecipients: audienceCount?.total ?? null,
           estimatedPush: audienceCount?.withPush ?? null,
         },
       });
       if (sendNow) {
-        if (requiresApproval) {
-          try {
-            await submitApproval(campaign.id);
-          } catch {
-            /* Campaign already has requiresApproval; Approvals list still shows it. */
-          }
-          return {
-            campaign,
-            sendNow: false,
-            pendingApproval: true,
-          };
-        }
         await sendCommunicationCampaign(campaign.id);
       }
-      return { campaign, sendNow, pendingApproval: false };
+      return { campaign, sendNow };
     },
-    onSuccess: ({ sendNow, pendingApproval }) => {
+    onSuccess: ({ sendNow }) => {
       qc.invalidateQueries({ queryKey: ['communication'] });
-      if (pendingApproval) {
-        setMessage({
-          text: `Campaign saved and marked for approval (≥ ${LARGE_BROADCAST_THRESHOLD} recipients). Send from Approvals after review.`,
-          tone: 'ok',
-        });
-        return;
-      }
       setMessage({
         text: sendNow
           ? 'Campaign queued for delivery. Check Logs / Push Center for status.'
@@ -238,19 +200,6 @@ export function SmartComposeForm() {
           }`}
         >
           {message.text}
-        </div>
-      ) : null}
-
-      {requiresApproval ? (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <div className="space-y-1">
-            <p>
-              Large broadcast: <strong>{audienceCount?.total ?? '…'}</strong> recipients (threshold{' '}
-              {LARGE_BROADCAST_THRESHOLD}). This cannot send immediately — confirm below the message
-              to enable <strong>Submit for approval</strong>.
-            </p>
-          </div>
         </div>
       ) : null}
 
@@ -516,24 +465,6 @@ export function SmartComposeForm() {
 
           <VariablePicker onInsert={insertVariable} />
 
-          {requiresApproval ? (
-            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
-              <p className="mb-2">
-                You are targeting <strong>{audienceCount?.total ?? 0}</strong> people (everyone with
-                no extra filters). Confirm to unlock approval submit.
-              </p>
-              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-border"
-                  checked={approvalAck}
-                  onChange={(e) => setApprovalAck(e.target.checked)}
-                />
-                I understand this requires approval before delivery
-              </label>
-            </div>
-          ) : null}
-
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
@@ -544,23 +475,14 @@ export function SmartComposeForm() {
             </Button>
             <Button
               onClick={() => save.mutate(true)}
-              disabled={
-                save.isPending ||
-                uploading ||
-                !compose.subject.trim() ||
-                (requiresApproval && !approvalAck)
-              }
+              disabled={save.isPending || uploading || !compose.subject.trim()}
             >
               <Send className="mr-2 h-4 w-4" />
-              {requiresApproval ? 'Submit for approval' : 'Send now'}
+              Send now
             </Button>
             {!compose.subject.trim() ? (
               <p className="w-full text-xs text-muted-foreground">
                 Add a title/subject to enable send.
-              </p>
-            ) : requiresApproval && !approvalAck ? (
-              <p className="w-full text-xs text-amber-800 dark:text-amber-200">
-                Tick the approval checkbox above to enable Submit for approval.
               </p>
             ) : null}
           </div>
@@ -571,11 +493,9 @@ export function SmartComposeForm() {
             audienceType={compose.audienceType}
             filter={compose.audienceFilter}
             onAudienceTypeChange={(audienceType) => {
-              setApprovalAck(false);
               setCompose((c) => ({ ...c, audienceType }));
             }}
             onFilterChange={(audienceFilter) => {
-              setApprovalAck(false);
               setCompose((c) => ({ ...c, audienceFilter }));
             }}
             onCountChange={setAudienceCount}

@@ -108,7 +108,6 @@ export class CommunicationCampaignsService {
     }
 
     const metadata = (dto.metadata ?? {}) as Record<string, unknown>;
-    const requiresApproval = Boolean(metadata.requiresApproval);
 
     return this.prisma.communicationCampaign.create({
       data: {
@@ -129,8 +128,8 @@ export class CommunicationCampaignsService {
         status: dto.scheduledAt ? 'SCHEDULED' : 'DRAFT',
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         createdById: user.sub,
-        requiresApproval,
-        approvalStatus: requiresApproval ? 'PENDING_HOD' : 'NONE',
+        requiresApproval: false,
+        approvalStatus: 'NONE',
       },
     });
   }
@@ -159,15 +158,14 @@ export class CommunicationCampaignsService {
       );
     }
 
-    if (campaign.requiresApproval && campaign.approvalStatus !== 'APPROVED') {
-      throw new BadRequestException(
-        'Campaign requires approval before sending',
-      );
-    }
-
     await this.prisma.communicationCampaign.update({
       where: { id: campaignId },
-      data: { status: 'SENDING' },
+      data: {
+        status: 'SENDING',
+        // Large broadcasts no longer require an approval gate before delivery.
+        requiresApproval: false,
+        approvalStatus: 'NONE',
+      },
     });
 
     // Resolve audience + deliver in the worker so the HTTP request stays under the web timeout.

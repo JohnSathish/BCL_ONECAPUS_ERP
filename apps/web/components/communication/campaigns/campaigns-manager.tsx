@@ -108,7 +108,6 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
         const meta = (c.metadata ?? {}) as Record<string, unknown>;
         const trigger = meta.trigger as string | undefined;
         const failureReason = typeof meta.failureReason === 'string' ? meta.failureReason : null;
-        const awaitingApproval = Boolean(c.requiresApproval) && c.approvalStatus !== 'APPROVED';
         return (
           <div key={c.id} className="rounded-2xl border border-border/80 bg-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -125,11 +124,6 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                   {c.audienceType} · {c.status} · {campaignRecipientLabel(c)}
                 </p>
                 {failureReason ? <p className="text-xs text-destructive">{failureReason}</p> : null}
-                {awaitingApproval ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
-                    Large broadcast is waiting for approval before it can send.
-                  </p>
-                ) : null}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -141,11 +135,9 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                 </Button>
                 {['DRAFT', 'SCHEDULED'].includes(c.status) ? (
                   <>
-                    {awaitingApproval ? null : (
-                      <Button size="sm" onClick={() => send.mutate(c.id)} disabled={send.isPending}>
-                        Send
-                      </Button>
-                    )}
+                    <Button size="sm" onClick={() => send.mutate(c.id)} disabled={send.isPending}>
+                      Send
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
