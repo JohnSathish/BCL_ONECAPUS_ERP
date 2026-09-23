@@ -18,12 +18,12 @@ web-build/
 *.aab
 onecampus-*.apk
 
-# Native build caches (keep project tiny for EAS upload)
-android/app/build/
-android/build/
-android/.gradle/
-android/keystore.properties
-android/**/build/
+# Native build caches (keep project tiny for EAS upload; avoid Windows file locks)
+android/
+ios/
 **/.gradle/
+**/*.lock
+**/checksums.lock
 **/build/
 !android/app/src/**/build/
+android/keystore.properties
