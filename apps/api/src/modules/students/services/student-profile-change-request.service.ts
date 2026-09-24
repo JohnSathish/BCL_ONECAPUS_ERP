@@ -16,6 +16,7 @@ import {
 import { isTemporaryStudentLoginEmail } from '../student-credentials.util';
 import { StudentProfileUpdatePolicyService } from './student-profile-update-policy.service';
 import { Class12SubjectsService } from './class12-subjects.service';
+import { StudentAbcService } from './student-abc.service';
 import { isExcelImportedStudent } from '../domain/class12-subjects.util';
 
 function serializeValue(value: unknown): string | null {
@@ -56,6 +57,7 @@ export class StudentProfileChangeRequestService {
     private readonly policy: StudentProfileUpdatePolicyService,
     private readonly notifications: UserNotificationsService,
     private readonly class12Subjects: Class12SubjectsService,
+    private readonly abcService: StudentAbcService,
   ) {}
 
   private db() {
@@ -63,7 +65,7 @@ export class StudentProfileChangeRequestService {
   }
 
   async getCompletion(tenantId: string, studentId: string) {
-    const [profile, guardians, addresses, boardExam, documents] =
+    const [profile, guardians, addresses, boardExam, documents, abcAccount] =
       await Promise.all([
         this.prisma.studentProfile.findFirst({
           where: { tenantId, studentId },
@@ -79,6 +81,10 @@ export class StudentProfileChangeRequestService {
         this.prisma.studentDocument.findMany({
           where: { tenantId, studentId },
           select: { documentType: true, verificationStatus: true },
+        }),
+        this.prisma.abcAccount.findFirst({
+          where: { tenantId, studentId, deletedAt: null },
+          select: { abcId: true },
         }),
       ]);
 
@@ -101,6 +107,9 @@ export class StudentProfileChangeRequestService {
       switch (check.key) {
         case 'aadhaar':
           filled = Boolean(profile?.nationalId?.trim());
+          break;
+        case 'abcId':
+          filled = Boolean(abcAccount?.abcId?.trim());
           break;
         case 'bloodGroup':
           filled = Boolean(profile?.bloodGroupLookupId);
@@ -188,6 +197,13 @@ export class StudentProfileChangeRequestService {
     if (!profile) throw new NotFoundException('Student profile not found');
 
     if (section === 'personal' || section === 'contact') {
+      const abcAccount =
+        section === 'personal'
+          ? await this.prisma.abcAccount.findFirst({
+              where: { tenantId, studentId, deletedAt: null },
+              select: { abcId: true },
+            })
+          : null;
       return {
         section,
         data: {
@@ -204,6 +220,7 @@ export class StudentProfileChangeRequestService {
           maritalStatus: profile.maritalStatus,
           nationalId: profile.nationalId,
           panNumber: (profile as any).panNumber ?? null,
+          abcId: abcAccount?.abcId ?? null,
           whatsappNumber: profile.whatsappNumber,
           emergencyContactMobile:
             (profile as any).emergencyContactMobile ?? null,
@@ -962,39 +979,51 @@ export class StudentProfileChangeRequestService {
     const field = item.fieldKey;
 
     if (section === 'personal' || section === 'contact') {
-      const data: Record<string, unknown> = {};
-      if (
-        [
-          'fullName',
-          'mobileNumber',
-          'alternateMobile',
-          'email',
-          'gender',
-          'maritalStatus',
-          'nationalId',
-          'panNumber',
-          'whatsappNumber',
-          'bloodGroupLookupId',
-          'nationalityLookupId',
-          'religionLookupId',
-          'categoryLookupId',
-          'emergencyContactMobile',
-        ].includes(field)
-      ) {
-        const next = coalesceText(value);
-        // Never wipe an existing value with blank from the client.
-        if (next !== null || value === null) data[field] = next;
-      }
-      if (field === 'dateOfBirth' && value) {
-        data.dateOfBirth = new Date(String(value));
-      }
-      if (Object.keys(data).length) {
-        await this.prisma.studentProfile.update({
-          where: { studentId },
-          data: data as any,
-        });
-        if (field === 'email' && typeof data.email === 'string' && data.email) {
-          await this.softSyncLoginEmail(tenantId, studentId, data.email);
+      if (section === 'personal' && field === 'abcId') {
+        await this.abcService.upsertForStudent(
+          tenantId,
+          studentId,
+          coalesceText(value) ?? null,
+        );
+      } else {
+        const data: Record<string, unknown> = {};
+        if (
+          [
+            'fullName',
+            'mobileNumber',
+            'alternateMobile',
+            'email',
+            'gender',
+            'maritalStatus',
+            'nationalId',
+            'panNumber',
+            'whatsappNumber',
+            'bloodGroupLookupId',
+            'nationalityLookupId',
+            'religionLookupId',
+            'categoryLookupId',
+            'emergencyContactMobile',
+          ].includes(field)
+        ) {
+          const next = coalesceText(value);
+          // Never wipe an existing value with blank from the client.
+          if (next !== null || value === null) data[field] = next;
+        }
+        if (field === 'dateOfBirth' && value) {
+          data.dateOfBirth = new Date(String(value));
+        }
+        if (Object.keys(data).length) {
+          await this.prisma.studentProfile.update({
+            where: { studentId },
+            data: data as any,
+          });
+          if (
+            field === 'email' &&
+            typeof data.email === 'string' &&
+            data.email
+          ) {
+            await this.softSyncLoginEmail(tenantId, studentId, data.email);
+          }
         }
       }
     } else if (

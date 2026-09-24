@@ -99,6 +99,13 @@ export const DEFAULT_PROFILE_UPDATE_POLICIES: ProfilePolicySeed[] = [
     approvalMode: 'APPROVAL_REQUIRED',
     sortOrder: 120,
   },
+  {
+    sectionKey: 'personal',
+    fieldKey: 'abcId',
+    approvalMode: 'AUTO_APPROVE',
+    mandatory: true,
+    sortOrder: 130,
+  },
   // Contact
   {
     sectionKey: 'contact',
@@ -300,6 +307,12 @@ export const PROFILE_COMPLETION_CHECKS: Array<{
     label: 'Aadhaar Number',
     sectionKey: 'personal',
     fieldKey: 'nationalId',
+  },
+  {
+    key: 'abcId',
+    label: 'ABC ID',
+    sectionKey: 'personal',
+    fieldKey: 'abcId',
   },
   {
     key: 'bloodGroup',

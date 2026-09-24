@@ -56,6 +56,7 @@ export default function CompleteProfileScreen() {
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [aadhaar, setAadhaar] = useState('');
+  const [abcId, setAbcId] = useState('');
   const [bank, setBank] = useState({
     bankName: '',
     accountHolderName: '',
@@ -108,6 +109,7 @@ export default function CompleteProfileScreen() {
     setMobile(String(personal.mobileNumber ?? ''));
     setEmail(String(personal.email ?? ''));
     setAadhaar(String(personal.nationalId ?? ''));
+    setAbcId(String(personal.abcId ?? ''));
 
     const bankData = data.sections?.bank ?? {};
     setBank({
@@ -264,6 +266,9 @@ export default function CompleteProfileScreen() {
       if (aadhaar && !AADHAAR_RE.test(aadhaar.replace(/\s/g, ''))) {
         throw new Error('Aadhaar must be exactly 12 digits');
       }
+      if (abcId.trim() && abcId.trim().length < 8) {
+        throw new Error('Enter a valid ABC ID');
+      }
       await submitMyProfileChanges([
         { sectionKey: 'personal', fieldKey: 'mobileNumber', newValue: mobile || null },
         { sectionKey: 'personal', fieldKey: 'email', newValue: email || null },
@@ -272,9 +277,14 @@ export default function CompleteProfileScreen() {
           fieldKey: 'nationalId',
           newValue: aadhaar.replace(/\s/g, '') || null,
         },
+        {
+          sectionKey: 'personal',
+          fieldKey: 'abcId',
+          newValue: abcId.trim() || null,
+        },
       ]);
       setMessage(
-        'Personal details saved. Your email can be used for login (along with roll number). Aadhaar still awaits office verification.',
+        'Personal details saved. Email can be used for login. ABC ID and Aadhaar are recorded for office verification.',
       );
       await refresh();
     } catch (e) {
@@ -531,6 +541,15 @@ export default function CompleteProfileScreen() {
             onChangeText={(t) => setAadhaar(t.replace(/\D/g, '').slice(0, 12))}
             keyboardType="number-pad"
             maxLength={12}
+          />
+          <Text style={styles.label}>ABC ID *</Text>
+          <TextInput
+            style={styles.input}
+            value={abcId}
+            onChangeText={(t) => setAbcId(t.trim().slice(0, 20))}
+            autoCapitalize="characters"
+            maxLength={20}
+            placeholder="Academic Bank of Credits ID"
           />
           <Pressable
             style={[styles.button, !canEditProfile && { opacity: 0.5 }]}

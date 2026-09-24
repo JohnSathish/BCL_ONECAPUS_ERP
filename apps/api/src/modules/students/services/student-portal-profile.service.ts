@@ -77,6 +77,7 @@ export class StudentPortalProfileService {
     const nepProfile =
       (academicSettings?.nepProfile as Record<string, unknown> | null) ?? {};
     const abcEnabled = nepProfile.abcEnabled !== false;
+    // Default on: students must be able to enter ABC ID unless explicitly disabled.
     const studentCanUpdateAbcId =
       abcEnabled && nepProfile.studentCanUpdateAbcId !== false;
 
@@ -380,6 +381,7 @@ export class StudentPortalProfileService {
     const nepProfile =
       (settings?.nepProfile as Record<string, unknown> | null) ?? {};
     const abcEnabled = nepProfile.abcEnabled !== false;
+    // Default on: students must be able to enter ABC ID unless explicitly disabled.
     const studentCanUpdateAbcId =
       abcEnabled && nepProfile.studentCanUpdateAbcId !== false;
     if (!studentCanUpdateAbcId) {

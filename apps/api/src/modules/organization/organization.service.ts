@@ -31,6 +31,7 @@ import {
 const DEFAULT_NEP_PROFILE = {
   multipleEntryExit: true,
   abcEnabled: true,
+  studentCanUpdateAbcId: true,
   interdisciplinaryEnabled: true,
   skillCoursesRequired: true,
 };

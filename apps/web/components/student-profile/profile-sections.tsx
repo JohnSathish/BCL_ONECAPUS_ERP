@@ -37,7 +37,8 @@ import { fetchStudentRollShiftHistory } from '@/services/roll-number';
 import { emptyBoardExamSubjectRows, sanitizeBoardExamPayload } from '@/lib/board-exam-form';
 import { isExcelImportedStudent } from '@/lib/student-admission-source';
 import { formatCourseDisplayTitle } from '@/utils/format-course-title';
-
+import { resolveUploadAssetUrl } from '@/lib/branding-asset';
+import { ExternalLink } from 'lucide-react';
 const STUDENT_STATUSES = ['STUDYING', 'ALUMNI', 'LEAVING', 'DETAINED', 'DROPPED'] as const;
 
 const DOC_TYPES = [
@@ -1121,16 +1122,62 @@ export function DocumentsSection({
 }) {
   const qc = useQueryClient();
   const verifyMut = useMutation({
-    mutationFn: ({ docId, status }: { docId: string; status: 'VERIFIED' | 'REJECTED' }) =>
-      verifyStudentDocument(profile.id, docId, { verificationStatus: status }),
+    mutationFn: ({
+      docId,
+      status,
+      remarks,
+    }: {
+      docId: string;
+      status: 'VERIFIED' | 'REJECTED';
+      remarks?: string;
+    }) =>
+      verifyStudentDocument(profile.id, docId, {
+        verificationStatus: status,
+        verificationRemarks: remarks,
+      }),
     onSuccess: () => {
       onRefresh();
       void qc.invalidateQueries({ queryKey: ['students', profile.id, 'profile'] });
     },
   });
 
+  const openDocument = (filePath?: string | null) => {
+    const url = resolveUploadAssetUrl(filePath);
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const rejectDocument = (docId: string) => {
+    const remarks = window.prompt(
+      'Optional rejection reason (shown to the student / office notes):',
+      '',
+    );
+    if (remarks === null) return;
+    verifyMut.mutate({
+      docId,
+      status: 'REJECTED',
+      remarks: remarks.trim() || 'Rejected — please re-upload a clear matching document',
+    });
+  };
+
+  const photoUrl = resolveUploadAssetUrl(profile.photoPath);
+
   return (
     <SectionCard title="Documents & Verification">
+      {photoUrl ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+          <div>
+            <p className="font-medium">Passport photo (profile)</p>
+            <p className="text-xs text-muted-foreground">
+              Use View to check the face photo before verifying document uploads.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => openDocument(profile.photoPath)}>
+            <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+            View photo
+          </Button>
+        </div>
+      ) : null}
       {canEdit ? (
         <div className="flex flex-wrap gap-2">
           {DOC_TYPES.map((type) => (
@@ -1158,41 +1205,61 @@ export function DocumentsSection({
         {(profile.documents ?? []).length === 0 ? (
           <li className="px-3 py-4 text-sm text-muted-foreground">No documents uploaded</li>
         ) : (
-          profile.documents!.map((doc) => (
-            <li
-              key={doc.id}
-              className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
-            >
-              <div>
-                <p className="font-medium">
-                  {doc.documentType} — {doc.fileName}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Status: {doc.verificationStatus ?? 'PENDING'}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                {canEdit ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => verifyMut.mutate({ docId: doc.id, status: 'VERIFIED' })}
-                    >
-                      Verify
+          profile.documents!.map((doc) => {
+            const viewUrl = resolveUploadAssetUrl(doc.filePath);
+            return (
+              <li
+                key={doc.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">
+                    {doc.documentType} — {doc.fileName}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Status: {doc.verificationStatus ?? 'PENDING'}
+                    {doc.verificationRemarks ? ` · ${doc.verificationRemarks}` : ''}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {viewUrl ? (
+                    <Button size="sm" variant="outline" onClick={() => openDocument(doc.filePath)}>
+                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                      View
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => deleteStudentDocument(profile.id, doc.id).then(onRefresh)}
-                    >
-                      Delete
-                    </Button>
-                  </>
-                ) : null}
-              </div>
-            </li>
-          ))
+                  ) : null}
+                  {canEdit ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={verifyMut.isPending}
+                        onClick={() => verifyMut.mutate({ docId: doc.id, status: 'VERIFIED' })}
+                      >
+                        Verify
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive hover:text-destructive"
+                        disabled={verifyMut.isPending}
+                        onClick={() => rejectDocument(doc.id)}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deleteStudentDocument(profile.id, doc.id).then(onRefresh)}
+                      >
+                        Delete
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })
         )}
       </ul>
     </SectionCard>

@@ -716,6 +716,7 @@ function PersonalForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
     maritalStatus: String(data.maritalStatus ?? ''),
     nationalId: String(data.nationalId ?? ''),
     panNumber: String(data.panNumber ?? ''),
+    abcId: String(data.abcId ?? ''),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -740,6 +741,9 @@ function PersonalForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
     if (form.panNumber && !PAN_RE.test(form.panNumber.toUpperCase())) {
       next.panNumber = 'PAN format must be ABCDE1234F';
     }
+    if (form.abcId && form.abcId.trim().length < 8) {
+      next.abcId = 'Enter a valid ABC ID';
+    }
     if (form.mobileNumber && !MOBILE_RE.test(form.mobileNumber.replace(/\s/g, ''))) {
       next.mobileNumber = 'Enter a valid 10-digit mobile number';
     }
@@ -763,7 +767,9 @@ function PersonalForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
               : null
             : fieldKey === 'nationalId'
               ? newValue.replace(/\s/g, '') || null
-              : newValue || null,
+              : fieldKey === 'abcId'
+                ? newValue.trim() || null
+                : newValue || null,
       }));
       return submitMyProfileChanges(changes);
     },
@@ -854,6 +860,14 @@ function PersonalForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
             inputMode="numeric"
             value={form.nationalId}
             onChange={(e) => set('nationalId', e.target.value.replace(/\D/g, '').slice(0, 12))}
+          />
+        </Field>
+        <Field label="ABC ID" required error={errors.abcId}>
+          <Input
+            value={form.abcId}
+            maxLength={20}
+            placeholder="Academic Bank of Credits ID"
+            onChange={(e) => set('abcId', e.target.value.trim().slice(0, 20))}
           />
         </Field>
         <Field label="PAN Number" error={errors.panNumber}>
