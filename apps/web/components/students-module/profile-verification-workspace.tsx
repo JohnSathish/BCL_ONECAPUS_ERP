@@ -1,13 +1,14 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Download, Loader2, Printer, X } from 'lucide-react';
+import { Check, Download, ExternalLink, Loader2, Printer, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
+import { resolveUploadAssetUrl } from '@/lib/branding-asset';
 import {
   bulkReviewProfileRequests,
   exportProfileVerificationReport,
@@ -33,6 +34,12 @@ import {
 import { verifyStudentDocument } from '@/services/students';
 import { apiErrorMessage } from '@/utils/api-error';
 import { downloadBlob } from '@/utils/download-blob';
+
+function openUploadedDocument(filePath?: string | null) {
+  const url = resolveUploadAssetUrl(filePath);
+  if (!url) return;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
 
 type Mode = 'pending' | 'class-xii' | 'documents' | 'completion' | 'history' | 'policy';
 
@@ -114,17 +121,41 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
       studentId,
       docId,
       status,
+      remarks,
     }: {
       studentId: string;
       docId: string;
       status: 'VERIFIED' | 'REJECTED';
-    }) => verifyStudentDocument(studentId, docId, { verificationStatus: status }),
+      remarks?: string;
+    }) =>
+      verifyStudentDocument(studentId, docId, {
+        verificationStatus: status,
+        verificationRemarks: remarks,
+      }),
     onSuccess: async () => {
       setMessage('Document updated');
       await qc.invalidateQueries({ queryKey: ['profile-verification', 'documents'] });
     },
     onError: (e) => setMessage(apiErrorMessage(e, 'Document verify failed')),
   });
+
+  const rejectPendingDocument = (doc: {
+    id: string;
+    studentId?: string;
+    student?: { id?: string };
+  }) => {
+    const remarks = window.prompt(
+      'Optional rejection reason (shown to the student / office notes):',
+      '',
+    );
+    if (remarks === null) return;
+    verifyDocMut.mutate({
+      studentId: doc.studentId ?? doc.student?.id ?? '',
+      docId: doc.id,
+      status: 'REJECTED',
+      remarks: remarks.trim() || 'Rejected — please re-upload a clear matching document',
+    });
+  };
 
   const policyMut = useMutation({
     mutationFn: (rows: Array<{ sectionKey: string; fieldKey: string; approvalMode: string }>) =>
@@ -348,51 +379,65 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
               </tr>
             </thead>
             <tbody>
-              {((docsQ.data as any[]) ?? []).map((doc) => (
-                <tr key={doc.id} className="border-t border-border">
-                  <td className="px-3 py-2">
-                    <p className="font-medium">{doc.student?.masterProfile?.fullName ?? '—'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {doc.student?.rollNumber ?? '—'}
-                    </p>
-                  </td>
-                  <td className="px-3 py-2">{doc.documentType}</td>
-                  <td className="px-3 py-2 text-xs">
-                    {doc.createdAt ? new Date(doc.createdAt).toLocaleString() : '—'}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          verifyDocMut.mutate({
-                            studentId: doc.studentId ?? doc.student?.id,
-                            docId: doc.id,
-                            status: 'VERIFIED',
-                          })
-                        }
-                      >
-                        <Check className="mr-1 h-3 w-3" />
-                        Verify
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          verifyDocMut.mutate({
-                            studentId: doc.studentId ?? doc.student?.id,
-                            docId: doc.id,
-                            status: 'REJECTED',
-                          })
-                        }
-                      >
-                        <X className="mr-1 h-3 w-3" />
-                        Reject
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {((docsQ.data as any[]) ?? []).map((doc) => {
+                const viewUrl = resolveUploadAssetUrl(doc.filePath);
+                return (
+                  <tr key={doc.id} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <p className="font-medium">{doc.student?.masterProfile?.fullName ?? '—'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {doc.student?.rollNumber ?? '—'}
+                      </p>
+                    </td>
+                    <td className="px-3 py-2">
+                      <p className="font-medium">{doc.documentType}</p>
+                      {doc.fileName ? (
+                        <p className="text-xs text-muted-foreground">{doc.fileName}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {doc.createdAt ? new Date(doc.createdAt).toLocaleString() : '—'}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-wrap gap-2">
+                        {viewUrl ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openUploadedDocument(doc.filePath)}
+                          >
+                            <ExternalLink className="mr-1 h-3 w-3" />
+                            View
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          disabled={verifyDocMut.isPending}
+                          onClick={() =>
+                            verifyDocMut.mutate({
+                              studentId: doc.studentId ?? doc.student?.id,
+                              docId: doc.id,
+                              status: 'VERIFIED',
+                            })
+                          }
+                        >
+                          <Check className="mr-1 h-3 w-3" />
+                          Verify
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={verifyDocMut.isPending}
+                          onClick={() => rejectPendingDocument(doc)}
+                        >
+                          <X className="mr-1 h-3 w-3" />
+                          Reject
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {!docsQ.isLoading && !(docsQ.data as any[])?.length ? (
                 <tr>
                   <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">

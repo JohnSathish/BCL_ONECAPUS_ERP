@@ -22,25 +22,34 @@ export function ChartContainer({ height, className, children }: Props) {
     const el = ref.current;
     if (!el) return;
 
+    let raf = 0;
     const update = () => {
-      setReady(el.clientWidth > 0);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        if (!el.isConnected) return;
+        // Require real layout box — Recharts warns when either axis is still -1 / 0.
+        setReady(el.clientWidth > 1 && el.clientHeight > 1);
+      });
     };
 
     update();
     const observer = new ResizeObserver(update);
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
   }, [height]);
 
   return (
     <div
       ref={ref}
       className={cn('w-full min-w-0', className)}
-      style={{ height }}
+      style={{ height, minHeight: height }}
       aria-hidden={!ready}
     >
       {ready ? (
-        <ResponsiveContainer width="100%" height={height}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
           {children}
         </ResponsiveContainer>
       ) : null}
