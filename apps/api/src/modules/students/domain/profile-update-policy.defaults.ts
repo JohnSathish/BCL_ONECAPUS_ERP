@@ -377,7 +377,6 @@ export const PROFILE_COMPLETION_CHECKS: Array<{
 ];
 
 export const PORTAL_DOCUMENT_TYPES = [
-  'PHOTO',
   'SIGNATURE',
   'AADHAAR',
   'PAN',
@@ -391,3 +390,26 @@ export const PORTAL_DOCUMENT_TYPES = [
   'DISABILITY',
   'OTHER',
 ] as const;
+
+/** Document types students may upload themselves (office uploads passport photo). */
+export const STUDENT_SELF_UPLOAD_DOCUMENT_TYPES = [
+  'AADHAAR',
+  'PAN',
+  'CLASS_XII_MARKSHEET',
+  'CLASS_XII_PASSING',
+  'MIGRATION',
+  'CHARACTER',
+  'TC',
+  'INCOME',
+  'COMMUNITY',
+  'DISABILITY',
+  'SIGNATURE',
+  'OTHER',
+] as const;
+
+export const STUDENT_MARKSHEET_IMAGE_MIMES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+]);

@@ -11,7 +11,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
 import { studentTheme } from '@/components/student-portal/theme';
@@ -57,6 +56,7 @@ export default function CompleteProfileScreen() {
   const [email, setEmail] = useState('');
   const [aadhaar, setAadhaar] = useState('');
   const [abcId, setAbcId] = useState('');
+  const [abcIdLocked, setAbcIdLocked] = useState(false);
   const [bank, setBank] = useState({
     bankName: '',
     accountHolderName: '',
@@ -109,7 +109,9 @@ export default function CompleteProfileScreen() {
     setMobile(String(personal.mobileNumber ?? ''));
     setEmail(String(personal.email ?? ''));
     setAadhaar(String(personal.nationalId ?? ''));
-    setAbcId(String(personal.abcId ?? ''));
+    const existingAbc = String(personal.abcId ?? '').trim();
+    setAbcId(existingAbc);
+    setAbcIdLocked(Boolean(existingAbc));
 
     const bankData = data.sections?.bank ?? {};
     setBank({
@@ -266,10 +268,12 @@ export default function CompleteProfileScreen() {
       if (aadhaar && !AADHAAR_RE.test(aadhaar.replace(/\s/g, ''))) {
         throw new Error('Aadhaar must be exactly 12 digits');
       }
-      if (abcId.trim() && abcId.trim().length < 8) {
-        throw new Error('Enter a valid ABC ID');
+      if (!abcIdLocked) {
+        if (abcId.trim() && abcId.trim().length < 8) {
+          throw new Error('Enter a valid ABC ID');
+        }
       }
-      await submitMyProfileChanges([
+      const changes: Array<{ sectionKey: string; fieldKey: string; newValue: string | null }> = [
         { sectionKey: 'personal', fieldKey: 'mobileNumber', newValue: mobile || null },
         { sectionKey: 'personal', fieldKey: 'email', newValue: email || null },
         {
@@ -277,12 +281,15 @@ export default function CompleteProfileScreen() {
           fieldKey: 'nationalId',
           newValue: aadhaar.replace(/\s/g, '') || null,
         },
-        {
+      ];
+      if (!abcIdLocked) {
+        changes.push({
           sectionKey: 'personal',
           fieldKey: 'abcId',
           newValue: abcId.trim() || null,
-        },
-      ]);
+        });
+      }
+      await submitMyProfileChanges(changes);
       setMessage(
         'Personal details saved. Email can be used for login. ABC ID and Aadhaar are recorded for office verification.',
       );
@@ -427,47 +434,33 @@ export default function CompleteProfileScreen() {
     }
   }
 
-  async function pickAndUpload(documentType: 'PHOTO' | 'CLASS_XII_MARKSHEET') {
-    setUploadingDoc(documentType);
+  async function pickAndUploadMarksheet() {
+    setUploadingDoc('CLASS_XII_MARKSHEET');
     setMessage('');
     try {
-      let file: { uri: string; name: string; mimeType: string } | null = null;
-      if (documentType === 'PHOTO') {
-        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!perm.granted) {
-          throw new Error('Photo library permission is required');
-        }
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 0.85,
-        });
-        if (result.canceled || !result.assets?.[0]) return;
-        const asset = result.assets[0];
-        const ext = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
-        file = {
-          uri: asset.uri,
-          name: asset.fileName ?? `passport-photo.${ext}`,
-          mimeType: asset.mimeType ?? `image/${ext === 'png' ? 'png' : 'jpeg'}`,
-        };
-      } else {
-        const result = await DocumentPicker.getDocumentAsync({
-          type: ['application/pdf', 'image/*'],
-          copyToCacheDirectory: true,
-        });
-        if (result.canceled || !result.assets?.[0]) return;
-        const asset = result.assets[0];
-        file = {
-          uri: asset.uri,
-          name: asset.name || 'class-xii-marksheet.pdf',
-          mimeType: asset.mimeType || 'application/pdf',
-        };
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        throw new Error('Photo library permission is required');
       }
-      await uploadMyDocument(documentType, file);
-      setMessage(
-        documentType === 'PHOTO'
-          ? 'Passport photo uploaded. Your profile photo was updated and is pending verification.'
-          : 'Class XII marksheet uploaded for verification.',
-      );
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.85,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      const ext = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const mime =
+        asset.mimeType ??
+        (ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg');
+      if (!mime.startsWith('image/')) {
+        throw new Error('Class XII marksheet must be an image (JPEG, PNG, or WebP)');
+      }
+      await uploadMyDocument('CLASS_XII_MARKSHEET', {
+        uri: asset.uri,
+        name: asset.fileName ?? `class-xii-marksheet.${ext === 'png' ? 'png' : 'jpg'}`,
+        mimeType: mime,
+      });
+      setMessage('Class XII marksheet uploaded for verification.');
       await refresh();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Upload failed');
@@ -542,15 +535,21 @@ export default function CompleteProfileScreen() {
             keyboardType="number-pad"
             maxLength={12}
           />
-          <Text style={styles.label}>ABC ID *</Text>
+          <Text style={styles.label}>ABC ID{abcIdLocked ? '' : ' *'}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, abcIdLocked && { backgroundColor: '#f3f4f6', color: '#6b7280' }]}
             value={abcId}
+            editable={!abcIdLocked && canEditProfile}
             onChangeText={(t) => setAbcId(t.trim().slice(0, 20))}
             autoCapitalize="characters"
             maxLength={20}
-            placeholder="Academic Bank of Credits ID"
+            placeholder={abcIdLocked ? undefined : 'Enter Academic Bank of Credits ID'}
           />
+          {abcIdLocked ? (
+            <Text style={styles.hint}>ABC ID on file (managed by the college office).</Text>
+          ) : (
+            <Text style={styles.hint}>Enter your ABC ID if you have one from ABC portal.</Text>
+          )}
           <Pressable
             style={[styles.button, !canEditProfile && { opacity: 0.5 }]}
             onPress={() => void onSavePersonal()}
@@ -957,25 +956,19 @@ export default function CompleteProfileScreen() {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Documents</Text>
-          <Text style={styles.hint}>Upload passport photo and Class XII marksheet.</Text>
+          <Text style={styles.hint}>
+            Upload Class XII marksheet as an image. Passport photo is uploaded by the college
+            office.
+          </Text>
           <Pressable
             style={styles.button}
-            onPress={() => void pickAndUpload('PHOTO')}
-            disabled={uploadingDoc === 'PHOTO'}
+            onPress={() => void pickAndUploadMarksheet()}
+            disabled={uploadingDoc === 'CLASS_XII_MARKSHEET' || !canEditProfile}
           >
             <Text style={styles.buttonText}>
-              {uploadingDoc === 'PHOTO' ? 'Uploading…' : 'Upload passport photo'}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => void pickAndUpload('CLASS_XII_MARKSHEET')}
-            disabled={uploadingDoc === 'CLASS_XII_MARKSHEET'}
-          >
-            <Text style={styles.secondaryButtonText}>
               {uploadingDoc === 'CLASS_XII_MARKSHEET'
                 ? 'Uploading…'
-                : 'Upload Class XII marksheet (PDF/image)'}
+                : 'Upload Class XII marksheet (image only)'}
             </Text>
           </Pressable>
           {docs.length ? (

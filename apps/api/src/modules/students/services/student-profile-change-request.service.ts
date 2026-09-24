@@ -9,9 +9,9 @@ import { PrismaService } from '../../../database/prisma.service';
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
 import {
   BANK_SECTION_VISIBLE,
-  PORTAL_DOCUMENT_TYPES,
   PROFILE_COMPLETION_CHECKS,
   STUDENT_EDITABLE_SECTIONS,
+  STUDENT_SELF_UPLOAD_DOCUMENT_TYPES,
 } from '../domain/profile-update-policy.defaults';
 import { isTemporaryStudentLoginEmail } from '../student-credentials.util';
 import { StudentProfileUpdatePolicyService } from './student-profile-update-policy.service';
@@ -294,7 +294,10 @@ export class StudentProfileChangeRequestService {
       });
       return {
         section,
-        data: { documents, allowedTypes: PORTAL_DOCUMENT_TYPES },
+        data: {
+          documents,
+          allowedTypes: [...STUDENT_SELF_UPLOAD_DOCUMENT_TYPES],
+        },
       };
     }
     return { section, data: {} };

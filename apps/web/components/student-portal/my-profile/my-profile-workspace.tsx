@@ -1398,12 +1398,18 @@ function DocumentsForm({
   refresh: () => Promise<void>;
 }) {
   const docs = bootstrap.sections.documents?.documents ?? [];
-  const allowed = bootstrap.sections.documents?.allowedTypes ?? [];
-  const [docType, setDocType] = useState(String(allowed[0] ?? 'PHOTO'));
+  const allowed = (bootstrap.sections.documents?.allowedTypes ?? []).filter(
+    (t) => !['PHOTO', 'PASSPORT_PHOTO'].includes(String(t).toUpperCase()),
+  );
+  const [docType, setDocType] = useState(String(allowed[0] ?? 'CLASS_XII_MARKSHEET'));
   const [file, setFile] = useState<File | null>(null);
+  const marksheetOnlyImage = String(docType).toUpperCase() === 'CLASS_XII_MARKSHEET';
   const mut = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error('Choose a file');
+      if (marksheetOnlyImage && !file.type.startsWith('image/')) {
+        throw new Error('Class XII marksheet must be an image (JPEG, PNG, or WebP)');
+      }
       const fd = new FormData();
       fd.append('file', file);
       fd.append('documentType', docType);
@@ -1419,13 +1425,21 @@ function DocumentsForm({
 
   return (
     <SectionCard title="Documents" subtitle="Upload and track verification status">
+      <p className="mb-3 text-xs text-muted-foreground">
+        Passport photo is uploaded by the college office. Class XII marksheet must be an image (not
+        PDF).
+      </p>
       <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
         <SelectBox
           value={docType}
           onChange={setDocType}
           options={(allowed as string[]).map((t) => ({ value: t, label: t }))}
         />
-        <Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <Input
+          type="file"
+          accept={marksheetOnlyImage ? 'image/jpeg,image/png,image/webp' : undefined}
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
         <Button onClick={() => mut.mutate()} disabled={mut.isPending || !file}>
           <Upload className="mr-1 h-4 w-4" /> Upload
         </Button>
