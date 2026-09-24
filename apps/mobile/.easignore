@@ -21,6 +21,8 @@ onecampus-*.apk
 # Native build caches (keep project tiny for EAS upload; avoid Windows file locks)
 android/
 ios/
+android.bak/
+android.bak/**
 **/.gradle/
 **/*.lock
 **/checksums.lock
