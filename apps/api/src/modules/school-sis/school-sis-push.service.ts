@@ -177,21 +177,15 @@ export class SchoolSisPushService {
 
   async sendTest(tenantId: string, actor: PushActor) {
     this.assert(actor, true);
-    const devices = await this.prisma.schoolMobileDevice.findMany({
-      where: {
-        tenantId,
-        userId: actor.userId,
-        revokedAt: null,
-        pushToken: { not: null },
-      },
-    });
-    if (!devices.length) {
+    const devices = await this.devicesForUsers(tenantId, [actor.userId]);
+    const withToken = devices.filter((d) => d.pushToken);
+    if (!withToken.length) {
       throw new BadRequestException(
         'No registered app on this account. Open the St. Luke’s School app while signed in.',
       );
     }
     const result = await this.fcm.send({
-      tokens: devices.map((d) => d.pushToken!).filter(Boolean),
+      tokens: withToken.map((d) => d.pushToken!).filter(Boolean),
       title: "St. Luke's School",
       body: 'Test notification from the school office.',
       category: 'GENERAL',
@@ -204,6 +198,14 @@ export class SchoolSisPushService {
         notificationId: 'test',
       },
     });
+    if ('tokenUpgrades' in result && result.tokenUpgrades?.length) {
+      for (const up of result.tokenUpgrades) {
+        await this.prisma.schoolMobileDevice.updateMany({
+          where: { tenantId, pushToken: up.from },
+          data: { pushToken: up.to, pushEnabled: true },
+        });
+      }
+    }
     if (result.invalidTokens.length) {
       await this.prisma.schoolMobileDevice.updateMany({
         where: { tenantId, pushToken: { in: result.invalidTokens } },
@@ -216,7 +218,7 @@ export class SchoolSisPushService {
     });
     return {
       ok: result.ok,
-      devices: devices.length,
+      devices: withToken.length,
       successCount: result.successCount,
       failureCount: result.failureCount,
       engine: this.fcm.connectionStatus().engine,
@@ -246,14 +248,39 @@ export class SchoolSisPushService {
 
   private async devicesForUsers(tenantId: string, userIds: string[]) {
     if (!userIds.length) return [];
-    return this.prisma.schoolMobileDevice.findMany({
+    const rows = await this.prisma.schoolMobileDevice.findMany({
       where: {
         tenantId,
         userId: { in: userIds },
         deviceStatus: { notIn: ['BLOCKED', 'REVOKED', 'SIGNED_OUT'] },
         revokedAt: null,
       },
+      orderBy: [{ lastActiveAt: 'desc' }, { lastPushAt: 'desc' }],
     });
+    // One active device per user (latest). Prefer rows that still have a push token.
+    const byUser = new Map<string, (typeof rows)[number]>();
+    for (const row of rows) {
+      const existing = byUser.get(row.userId);
+      if (!existing) {
+        byUser.set(row.userId, row);
+        continue;
+      }
+      if (!existing.pushToken && row.pushToken) {
+        byUser.set(row.userId, row);
+      }
+    }
+    const preferred = [...byUser.values()];
+    // Identical FCM/APNs tokens must only produce one push (shared/reused tokens).
+    const byToken = new Map<string, (typeof rows)[number]>();
+    const withoutToken: typeof preferred = [];
+    for (const row of preferred) {
+      if (!row.pushToken) {
+        withoutToken.push(row);
+        continue;
+      }
+      if (!byToken.has(row.pushToken)) byToken.set(row.pushToken, row);
+    }
+    return [...byToken.values(), ...withoutToken];
   }
 
   private async ensureInbox(
@@ -313,10 +340,14 @@ export class SchoolSisPushService {
     }
     if (kind === 'INDIVIDUAL_STUDENT' || kind === 'PARENT') {
       const studentIds = audience.studentIds ?? [];
+      // Individual student = student persona only (parents are a separate audience).
+      // includeParents: true opts back into notifying linked parent/guardian apps.
       const personTypes =
         kind === 'PARENT'
           ? ['GUARDIAN', 'PARENT']
-          : ['STUDENT', 'GUARDIAN', 'PARENT'];
+          : audience.includeParents
+            ? ['STUDENT', 'GUARDIAN', 'PARENT']
+            : ['STUDENT'];
       const accounts = await this.prisma.schoolPersonAccount.findMany({
         where: {
           tenantId,
@@ -1186,7 +1217,16 @@ export class SchoolSisPushService {
             code?: string;
             reason?: string;
           }>,
+          tokenUpgrades: [] as Array<{ from: string; to: string }>,
         };
+    if ('tokenUpgrades' in result && result.tokenUpgrades?.length) {
+      for (const up of result.tokenUpgrades) {
+        await this.prisma.schoolMobileDevice.updateMany({
+          where: { tenantId, pushToken: up.from },
+          data: { pushToken: up.to, pushEnabled: true },
+        });
+      }
+    }
     const byToken = new Map(result.perToken.map((p) => [p.token, p]));
     for (const rec of recipients) {
       const device = rec.deviceId ? tokenByDevice.get(rec.deviceId) : undefined;
@@ -1346,7 +1386,12 @@ export class SchoolSisPushService {
     dto: RegisterPushDeviceDto,
   ) {
     const platform = dto.platform.toLowerCase() === 'ios' ? 'ios' : 'android';
-    const deviceId = dto.deviceId || `push:${dto.token.slice(-24)}`;
+    const resolved = await this.fcm.toFcmRegistrationToken(dto.token);
+    if (!resolved.token) {
+      return { ok: false, reason: 'Invalid push token' };
+    }
+    const token = resolved.token;
+    const deviceId = dto.deviceId || `push:${token.slice(-24)}`;
     const existing = await this.prisma.schoolMobileDevice.findUnique({
       where: { tenantId_deviceId: { tenantId: user.tid, deviceId } },
     });
@@ -1363,7 +1408,7 @@ export class SchoolSisPushService {
         platform,
         persona: dto.persona || 'student',
         appVersion: dto.appVersion,
-        pushToken: dto.token,
+        pushToken: token,
         deviceModel: dto.deviceModel,
         osVersion: dto.osVersion,
         pushEnabled: true,
@@ -1372,7 +1417,7 @@ export class SchoolSisPushService {
       },
       update: {
         userId: user.sub,
-        pushToken: dto.token,
+        pushToken: token,
         platform,
         appVersion: dto.appVersion ?? undefined,
         deviceModel: dto.deviceModel ?? undefined,
@@ -1383,6 +1428,14 @@ export class SchoolSisPushService {
         revokedAt:
           existing?.deviceStatus === 'BLOCKED' ? existing.revokedAt : null,
       },
+    });
+    await this.prisma.schoolMobileDevice.updateMany({
+      where: {
+        tenantId: user.tid,
+        pushToken: token,
+        id: { not: row.id },
+      },
+      data: { pushToken: null, pushEnabled: false },
     });
     const { pushToken: _hidden, ...safe } = row;
     void _hidden;

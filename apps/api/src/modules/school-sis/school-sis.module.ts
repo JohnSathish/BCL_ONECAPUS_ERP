@@ -188,6 +188,7 @@ import { SchoolSisAppearanceController } from './school-sis-appearance.controlle
     SchoolSisCalendarService,
     SchoolSisWhatsappService,
     SchoolSisPushService,
+    SchoolSisFcmProvider,
     SchoolSisEventBus,
     SchoolSisAutomationService,
     SchoolSisAccessService,

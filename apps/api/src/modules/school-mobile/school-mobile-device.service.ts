@@ -6,6 +6,7 @@ import {
 import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
+import { SchoolSisFcmProvider } from '../school-sis/school-sis-push.provider';
 import { SchoolMobileAccessService } from './school-mobile-access.service';
 import type {
   PatchSchoolMobileDeviceDto,
@@ -19,12 +20,22 @@ export class SchoolMobileDeviceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: SchoolMobileAccessService,
+    private readonly fcm: SchoolSisFcmProvider,
   ) {}
 
   private publicRow<T extends { pushToken?: string | null }>(row: T) {
     const { pushToken: _hidden, ...rest } = row;
     void _hidden;
     return rest;
+  }
+
+  private async normalizePushToken(
+    raw?: string | null,
+  ): Promise<string | null | undefined> {
+    if (raw === undefined) return undefined;
+    if (raw === null || raw === '') return null;
+    const resolved = await this.fcm.toFcmRegistrationToken(raw);
+    return resolved.token;
   }
 
   async register(
@@ -46,7 +57,18 @@ export class SchoolMobileDeviceService {
     const ipChanged = Boolean(
       ip && existing?.lastIpAddress && existing.lastIpAddress !== ip,
     );
-    const pushEnabled = Boolean(dto.pushToken ?? dto.pushCapability);
+    const normalizedToken = await this.normalizePushToken(dto.pushToken);
+    // Reject Expo / unconvertible APNs tokens rather than storing a dead destination.
+    const pushToken =
+      dto.pushToken !== undefined
+        ? normalizedToken === undefined
+          ? null
+          : normalizedToken
+        : undefined;
+    const pushEnabled = Boolean(
+      (pushToken !== undefined ? pushToken : dto.pushToken) ??
+      dto.pushCapability,
+    );
     const row = await this.prisma.schoolMobileDevice.upsert({
       where: {
         tenantId_deviceId: { tenantId: user.tid, deviceId: dto.deviceId },
@@ -59,7 +81,7 @@ export class SchoolMobileDeviceService {
         platform: dto.platform,
         persona,
         appVersion: dto.appVersion ?? null,
-        pushToken: dto.pushToken ?? null,
+        pushToken: pushToken ?? null,
         deviceLabel: dto.deviceLabel ?? dto.deviceName ?? null,
         deviceModel: dto.deviceModel ?? null,
         osVersion: dto.osVersion ?? null,
@@ -74,7 +96,7 @@ export class SchoolMobileDeviceService {
         deviceStatus: 'ACTIVE',
         pushEnabled,
         biometricEnabled: dto.biometricEnabled ?? false,
-        lastTokenRefreshAt: dto.pushToken ? now : null,
+        lastTokenRefreshAt: pushToken ? now : null,
         lastActiveAt: now,
         lastLoginAt: now,
         lastSyncAt: now,
@@ -84,7 +106,7 @@ export class SchoolMobileDeviceService {
         platform: dto.platform,
         persona,
         appVersion: dto.appVersion ?? undefined,
-        pushToken: dto.pushToken ?? undefined,
+        pushToken: pushToken === undefined ? undefined : pushToken,
         deviceLabel: dto.deviceLabel ?? dto.deviceName ?? undefined,
         deviceModel: dto.deviceModel ?? undefined,
         osVersion: dto.osVersion ?? undefined,
@@ -99,9 +121,13 @@ export class SchoolMobileDeviceService {
         lastIpAddress: ip ?? undefined,
         deviceStatus: 'ACTIVE',
         pushEnabled:
-          dto.pushToken !== undefined ? Boolean(dto.pushToken) : undefined,
+          pushToken !== undefined
+            ? Boolean(pushToken)
+            : dto.pushToken !== undefined
+              ? Boolean(dto.pushToken)
+              : undefined,
         biometricEnabled: dto.biometricEnabled ?? undefined,
-        lastTokenRefreshAt: dto.pushToken ? now : undefined,
+        lastTokenRefreshAt: pushToken ? now : undefined,
         lastActiveAt: now,
         lastSyncAt: now,
         revokedAt: null,
@@ -109,6 +135,16 @@ export class SchoolMobileDeviceService {
         signedOutAt: null,
       },
     });
+    if (pushToken) {
+      await this.prisma.schoolMobileDevice.updateMany({
+        where: {
+          tenantId: user.tid,
+          pushToken,
+          id: { not: row.id },
+        },
+        data: { pushToken: null, pushEnabled: false },
+      });
+    }
     if (ip) {
       await this.recordIp(user.tid, row.id, user.sub, ip, dto.networkType);
     }
@@ -199,12 +235,16 @@ export class SchoolMobileDeviceService {
     if (!row) throw new NotFoundException('Device not found');
     if (row.deviceStatus === 'BLOCKED')
       throw new ForbiddenException('DEVICE_BLOCKED');
+    const pushToken =
+      dto.pushToken !== undefined
+        ? ((await this.normalizePushToken(dto.pushToken)) ?? null)
+        : undefined;
     const updated = await this.prisma.schoolMobileDevice.update({
       where: { id: row.id },
       data: {
         ...(dto.appVersion !== undefined ? { appVersion: dto.appVersion } : {}),
-        ...(dto.pushToken !== undefined
-          ? { pushToken: dto.pushToken, pushEnabled: Boolean(dto.pushToken) }
+        ...(pushToken !== undefined
+          ? { pushToken, pushEnabled: Boolean(pushToken) }
           : {}),
         ...(dto.deviceLabel !== undefined
           ? { deviceLabel: dto.deviceLabel }
@@ -212,6 +252,16 @@ export class SchoolMobileDeviceService {
         lastActiveAt: new Date(),
       },
     });
+    if (pushToken) {
+      await this.prisma.schoolMobileDevice.updateMany({
+        where: {
+          tenantId: user.tid,
+          pushToken,
+          id: { not: row.id },
+        },
+        data: { pushToken: null, pushEnabled: false },
+      });
+    }
     return this.publicRow(updated);
   }
 

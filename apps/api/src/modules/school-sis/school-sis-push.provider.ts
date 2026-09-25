@@ -5,6 +5,7 @@ import { createSign } from 'crypto';
 import * as admin from 'firebase-admin';
 import { PUSH_CHANNELS } from './school-sis-push.catalog';
 import { classifyPushFailure } from './school-sis-push-errors';
+import { isApnsDeviceToken } from './school-sis-push-token.util';
 
 export type PushSendResult = {
   ok: boolean;
@@ -36,6 +37,7 @@ export interface NotificationProvider {
 
 const APP_NAME = 'stlukes-school-sis';
 const MULTICAST_LIMIT = 500;
+const IOS_BUNDLE_ID = 'in.stlukestura.school';
 /** expo-notifications plugin copies assets/notification-icon.png to this drawable. */
 const ANDROID_SMALL_ICON = 'notification_icon';
 const ANDROID_ICON_COLOR = '#1A237E';
@@ -195,6 +197,143 @@ export class SchoolSisFcmProvider implements NotificationProvider {
     }
   }
 
+  /**
+   * Expo iOS returns a raw APNs device token. FCM HTTP v1 / Admin SDK need an
+   * FCM registration token — import APNs via IID batchImport when needed.
+   */
+  async toFcmRegistrationToken(
+    token: string,
+  ): Promise<{ token: string | null; upgraded: boolean; invalid?: boolean }> {
+    const raw = token?.trim() ?? '';
+    if (
+      !raw ||
+      raw.startsWith('ExponentPushToken') ||
+      raw.startsWith('ExpoPushToken')
+    ) {
+      return { token: null, upgraded: false, invalid: true };
+    }
+    if (!isApnsDeviceToken(raw)) {
+      return { token: raw, upgraded: false };
+    }
+    if (this.isDemo()) {
+      return {
+        token: `demo-fcm-from-apns:${raw.slice(0, 12)}`,
+        upgraded: true,
+      };
+    }
+    const imported = await this.importApnsToken(raw);
+    if (imported) return { token: imported, upgraded: true };
+    return { token: null, upgraded: false, invalid: true };
+  }
+
+  private async importApnsToken(apnsToken: string): Promise<string | null> {
+    const bearer = await this.accessToken();
+    if (!bearer) return null;
+    // Production App Store / TestFlight first; then sandbox for local/dev builds.
+    for (const sandbox of [false, true]) {
+      try {
+        const res = await fetch(
+          'https://iid.googleapis.com/iid/v1:batchImport',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${bearer}`,
+              'Content-Type': 'application/json',
+              access_token_auth: 'true',
+            },
+            body: JSON.stringify({
+              application: IOS_BUNDLE_ID,
+              sandbox,
+              apns_tokens: [apnsToken],
+            }),
+          },
+        );
+        const body = (await res.json()) as {
+          results?: Array<{
+            apns_token?: string;
+            status?: string;
+            registration_token?: string;
+          }>;
+          error?: string;
+        };
+        if (!res.ok) {
+          this.logger.warn(
+            `APNs→FCM import failed (${sandbox ? 'sandbox' : 'prod'}): ${body.error ?? res.status}`,
+          );
+          continue;
+        }
+        const row = body.results?.find(
+          (r) =>
+            (r.apns_token ?? '').toLowerCase() === apnsToken.toLowerCase() ||
+            Boolean(r.registration_token),
+        );
+        if (row?.status === 'OK' && row.registration_token) {
+          this.logger.log(
+            `Imported APNs token as FCM (${sandbox ? 'sandbox' : 'production'})`,
+          );
+          return row.registration_token;
+        }
+        this.logger.warn(
+          `APNs→FCM import status (${sandbox ? 'sandbox' : 'prod'}): ${row?.status ?? 'empty'}`,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `APNs→FCM import error: ${err instanceof Error ? err.message : 'error'}`,
+        );
+      }
+    }
+    return null;
+  }
+
+  private async resolveSendTokens(tokens: string[]): Promise<{
+    sendTokens: string[];
+    /** Maps FCM send token → original stored token (for recipient matching). */
+    originalBySend: Map<string, string>;
+    /** APNs tokens successfully upgraded — persist FCM token on the device row. */
+    upgrades: Array<{ from: string; to: string }>;
+    invalidOriginals: string[];
+  }> {
+    const unique = [
+      ...new Set(
+        tokens.filter(
+          (t) =>
+            t &&
+            !t.startsWith('ExponentPushToken') &&
+            !t.startsWith('ExpoPushToken'),
+        ),
+      ),
+    ];
+    const originalBySend = new Map<string, string>();
+    const upgrades: Array<{ from: string; to: string }> = [];
+    const invalidOriginals: string[] = [];
+    const sendTokens: string[] = [];
+    for (const original of unique) {
+      const resolved = await this.toFcmRegistrationToken(original);
+      if (!resolved.token) {
+        invalidOriginals.push(original);
+        continue;
+      }
+      if (resolved.upgraded) {
+        upgrades.push({ from: original, to: resolved.token });
+      }
+      if (!originalBySend.has(resolved.token)) {
+        originalBySend.set(resolved.token, original);
+        sendTokens.push(resolved.token);
+      }
+    }
+    return { sendTokens, originalBySend, upgrades, invalidOriginals };
+  }
+
+  private remapPerToken(
+    perToken: PushSendResult['perToken'],
+    originalBySend: Map<string, string>,
+  ): PushSendResult['perToken'] {
+    return perToken.map((row) => ({
+      ...row,
+      token: originalBySend.get(row.token) ?? row.token,
+    }));
+  }
+
   async send(input: {
     tokens: string[];
     title: string;
@@ -203,25 +342,26 @@ export class SchoolSisFcmProvider implements NotificationProvider {
     priority?: string;
     imageUrl?: string;
     data?: Record<string, string>;
-  }): Promise<PushSendResult> {
-    const tokens = [
-      ...new Set(
-        input.tokens.filter(
-          (t) =>
-            t &&
-            !t.startsWith('ExponentPushToken') &&
-            !t.startsWith('ExpoPushToken'),
-        ),
-      ),
-    ];
+  }): Promise<
+    PushSendResult & { tokenUpgrades?: Array<{ from: string; to: string }> }
+  > {
+    const resolved = await this.resolveSendTokens(input.tokens);
+    const tokens = resolved.sendTokens;
     if (!tokens.length) {
       return {
         ok: false,
         provider: 'fcm',
         successCount: 0,
-        failureCount: 0,
-        invalidTokens: [],
-        perToken: [],
+        failureCount: resolved.invalidOriginals.length,
+        invalidTokens: resolved.invalidOriginals,
+        perToken: resolved.invalidOriginals.map((token) => ({
+          token,
+          ok: false,
+          code: 'INVALID_ARGUMENT',
+          reason: 'Invalid destination',
+          retryable: false,
+        })),
+        tokenUpgrades: resolved.upgrades,
       };
     }
     if (this.isDemo()) {
@@ -233,17 +373,39 @@ export class SchoolSisFcmProvider implements NotificationProvider {
         failureCount: 0,
         invalidTokens: [],
         perToken: tokens.map((token) => ({
-          token,
+          token: resolved.originalBySend.get(token) ?? token,
           ok: true,
           ref: `demo-${Date.now()}`,
         })),
+        tokenUpgrades: resolved.upgrades,
       };
     }
     const messaging = this.messaging();
-    if (messaging) {
-      return this.sendWithAdmin(messaging, tokens, input);
-    }
-    return this.sendWithHttpV1(tokens, input);
+    const result = messaging
+      ? await this.sendWithAdmin(messaging, tokens, input)
+      : await this.sendWithHttpV1(tokens, input);
+    return {
+      ...result,
+      invalidTokens: [
+        ...new Set([
+          ...result.invalidTokens.map(
+            (t) => resolved.originalBySend.get(t) ?? t,
+          ),
+          ...resolved.invalidOriginals,
+        ]),
+      ],
+      perToken: [
+        ...this.remapPerToken(result.perToken, resolved.originalBySend),
+        ...resolved.invalidOriginals.map((token) => ({
+          token,
+          ok: false,
+          code: 'INVALID_ARGUMENT',
+          reason: 'Invalid destination',
+          retryable: false,
+        })),
+      ],
+      tokenUpgrades: resolved.upgrades,
+    };
   }
 
   private async sendWithAdmin(
@@ -488,7 +650,8 @@ export class SchoolSisFcmProvider implements NotificationProvider {
     const claim = Buffer.from(
       JSON.stringify({
         iss: clientEmail,
-        scope: 'https://www.googleapis.com/auth/firebase.messaging',
+        scope:
+          'https://www.googleapis.com/auth/firebase.messaging https://www.googleapis.com/auth/cloud-platform',
         aud: 'https://oauth2.googleapis.com/token',
         iat: now,
         exp: now + 3600,
