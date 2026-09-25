@@ -59,23 +59,21 @@ export class SchoolSisFcmProvider implements NotificationProvider {
 
   isConfigured() {
     if (this.isDemo()) return true;
-    return Boolean(
-      this.projectId() && (this.serviceAccount() || this.legacyKeyPair()),
-    );
+    return Boolean(this.serviceAccount()?.project_id);
   }
 
   connectionStatus() {
+    const account = this.serviceAccount();
     return {
       configured: this.isConfigured(),
       demo: this.isDemo(),
       engine: this.isDemo()
         ? 'demo'
-        : this.adminApp || this.serviceAccount()
+        : this.adminApp || account
           ? 'firebase-admin'
-          : this.legacyKeyPair()
-            ? 'fcm-http-v1'
-            : 'unconfigured',
-      projectId: this.projectId(),
+          : 'unconfigured',
+      projectId: account?.project_id ?? null,
+      expectedProjectId: 'st-lukes-school-6f471',
     };
   }
 
@@ -135,39 +133,20 @@ export class SchoolSisFcmProvider implements NotificationProvider {
     if (
       this.config.get('SCHOOL_FIREBASE_SERVICE_ACCOUNT_FILE') ||
       this.config.get('SCHOOL_FIREBASE_SERVICE_ACCOUNT_JSON') ||
-      this.config.get('SCHOOL_FCM_CLIENT_EMAIL')
+      this.config.get('SCHOOL_FCM_CLIENT_EMAIL') ||
+      this.config.get('SCHOOL_FCM_PROJECT_ID')
     ) {
       this.logger.warn(
         'School FCM env is set but incomplete. Use st-lukes-school-6f471 credentials (not the college Firebase project).',
       );
       return null;
     }
-    const json = this.parseJsonAccount(
-      this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_JSON'),
+    // Never fall back to college FIREBASE_* / FCM_* — that project does not hold
+    // APNs for in.stlukestura.school and produces messaging/third-party-auth-error.
+    this.logger.warn(
+      'School FCM is not configured. Set SCHOOL_FIREBASE_SERVICE_ACCOUNT_JSON (or SCHOOL_FCM_* for st-lukes-school-6f471).',
     );
-    if (json) return json;
-    const file = this.readAccountFile(
-      this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_FILE') ||
-        this.config.get<string>('GOOGLE_APPLICATION_CREDENTIALS'),
-    );
-    if (file) return file;
-    return this.accountFromParts(
-      this.config.get<string>('FIREBASE_CLIENT_EMAIL') ||
-        this.config.get<string>('FCM_CLIENT_EMAIL'),
-      this.config.get<string>('FIREBASE_PRIVATE_KEY') ??
-        this.config.get<string>('FCM_PRIVATE_KEY'),
-      this.config.get<string>('FIREBASE_PROJECT_ID') ||
-        this.config.get<string>('FCM_PROJECT_ID'),
-    );
-  }
-
-  private legacyKeyPair() {
-    return Boolean(
-      (this.config.get('FIREBASE_CLIENT_EMAIL') ||
-        this.config.get('FCM_CLIENT_EMAIL')) &&
-      (this.config.get('FIREBASE_PRIVATE_KEY') ||
-        this.config.get('FCM_PRIVATE_KEY')),
-    );
+    return null;
   }
 
   private messaging(): admin.messaging.Messaging | null {
