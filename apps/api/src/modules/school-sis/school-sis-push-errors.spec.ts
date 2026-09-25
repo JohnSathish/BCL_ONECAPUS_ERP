@@ -13,4 +13,11 @@ describe('classifyPushFailure', () => {
       true,
     );
   });
+
+  it('maps APNs auth failures to a clear Firebase console action', () => {
+    const row = classifyPushFailure('messaging/third-party-auth-error');
+    expect(row.key).toBe('APNS_CONFIG');
+    expect(row.label).toBe('Apple Push (APNs) not configured in Firebase');
+    expect(row.retryable).toBe(false);
+  });
 });

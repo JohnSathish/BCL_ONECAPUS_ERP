@@ -128,6 +128,7 @@ export type SchoolPushDeliveryReport = {
     deliveredAt?: string | null;
     openedAt?: string | null;
     failedAt?: string | null;
+    failureCode?: string | null;
     failureLabel?: string | null;
     retryable: boolean;
   }>;

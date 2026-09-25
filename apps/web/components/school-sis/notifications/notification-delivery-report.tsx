@@ -977,7 +977,19 @@ export function NotificationDeliveryReport({
                 <dd>{fmtWhen(viewRow.openedAt)}</dd>
               </div>
               {viewRow.failureLabel ? (
-                <p className="text-rose-700">{viewRow.failureLabel}</p>
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+                  <p className="font-medium">{viewRow.failureLabel}</p>
+                  {viewRow.failureCode ? (
+                    <p className="mt-1 font-mono text-xs text-rose-700/80">{viewRow.failureCode}</p>
+                  ) : null}
+                  {/APNs|Apple Push/i.test(viewRow.failureLabel) ? (
+                    <p className="mt-2 text-xs leading-relaxed">
+                      In Firebase → Project settings → Cloud Messaging → Apple app
+                      (`in.stlukestura.school`), upload an APNs Authentication Key (.p8) from Apple
+                      Developer. Android can work without this; iOS cannot.
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
             </dl>
           ) : null}

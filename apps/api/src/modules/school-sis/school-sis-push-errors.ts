@@ -28,6 +28,13 @@ const RULES: Array<{
     label: 'App notification permission disabled',
     retryable: false,
   },
+  // FCM cannot reach APNs when the Firebase iOS app has no APNs auth key/cert.
+  {
+    test: /THIRD.PARTY.AUTH|APNS.AUTH|APNS_AUTH|AUTH-ERROR.*APNS|APNS.*AUTH/i,
+    key: 'APNS_CONFIG',
+    label: 'Apple Push (APNs) not configured in Firebase',
+    retryable: false,
+  },
   {
     test: /UNAVAILABLE|INTERNAL|UNKNOWN|QUOTA|RESOURCE-EXHAUSTED|TIMEOUT|UNAVAILABLE/i,
     key: 'TEMPORARY',

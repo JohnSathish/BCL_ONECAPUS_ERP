@@ -805,6 +805,7 @@ export class SchoolSisPushService {
         deliveredAt: r.deliveredAt,
         openedAt: r.openedAt,
         failedAt: r.failedAt,
+        failureCode: r.failureCode,
         failureLabel: fail?.label ?? r.failureReason,
         retryable: fail?.retryable ?? false,
       };
