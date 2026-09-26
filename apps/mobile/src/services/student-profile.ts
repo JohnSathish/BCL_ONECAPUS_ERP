@@ -29,10 +29,14 @@ export type ProfileBootstrap = {
     reopenUntil?: string | null;
   };
   visibleSections?: { bank?: boolean };
+  lookups?: {
+    gender?: Array<{ id?: string; code?: string | null; label: string }>;
+  };
   staticOptions?: {
     board?: string[];
     stream?: Array<{ value: string; label: string } | string>;
     yearOfPassing?: number[];
+    genderFallback?: Array<{ value: string; label: string }>;
   };
 };
 

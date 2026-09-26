@@ -25,6 +25,7 @@ import {
   type ProfileBootstrap,
 } from '@/services/student-profile';
 import { useSyncGuard } from '@/state/sync-guard';
+import { GENDER_OPTIONS, normalizeGenderCode } from '@/utils/gender';
 
 const AADHAAR_RE = /^\d{12}$/;
 const MOBILE_RE = /^(\+?\d{1,3}[- ]?)?\d{10}$/;
@@ -55,6 +56,7 @@ export default function CompleteProfileScreen() {
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [aadhaar, setAadhaar] = useState('');
+  const [gender, setGender] = useState('');
   const [abcId, setAbcId] = useState('');
   const [abcIdLocked, setAbcIdLocked] = useState(false);
   const [bank, setBank] = useState({
@@ -109,6 +111,7 @@ export default function CompleteProfileScreen() {
     setMobile(String(personal.mobileNumber ?? ''));
     setEmail(String(personal.email ?? ''));
     setAadhaar(String(personal.nationalId ?? ''));
+    setGender(normalizeGenderCode(String(personal.gender ?? '')));
     const existingAbc = String(personal.abcId ?? '').trim();
     setAbcId(existingAbc);
     setAbcIdLocked(Boolean(existingAbc));
@@ -230,6 +233,20 @@ export default function CompleteProfileScreen() {
   const boards = bootstrap?.staticOptions?.board ?? ['MBOSE', 'CBSE', 'ISC', 'NIOS', 'State Board'];
   const years = bootstrap?.staticOptions?.yearOfPassing ?? [];
 
+  const genderOptions = useMemo(() => {
+    const byValue = new Map<string, { value: string; label: string }>();
+    for (const o of GENDER_OPTIONS) byValue.set(o.value, { value: o.value, label: o.label });
+    for (const g of bootstrap?.lookups?.gender ?? []) {
+      const value = normalizeGenderCode(g.code || g.label);
+      if (value) byValue.set(value, { value, label: g.label });
+    }
+    for (const o of bootstrap?.staticOptions?.genderFallback ?? []) {
+      const value = normalizeGenderCode(o.value) || o.value;
+      if (value) byValue.set(value, { value, label: o.label });
+    }
+    return Array.from(byValue.values());
+  }, [bootstrap?.lookups?.gender, bootstrap?.staticOptions?.genderFallback]);
+
   const selectedSubjectNames = useMemo(() => {
     return new Set(subjects.map((s) => s.subjectName.trim()).filter(Boolean));
   }, [subjects]);
@@ -259,6 +276,9 @@ export default function CompleteProfileScreen() {
     setSavingPersonal(true);
     setMessage('');
     try {
+      if (!gender) {
+        throw new Error('Please select gender');
+      }
       if (mobile && !MOBILE_RE.test(mobile.replace(/\s/g, ''))) {
         throw new Error('Enter a valid 10-digit mobile number');
       }
@@ -273,7 +293,9 @@ export default function CompleteProfileScreen() {
           throw new Error('Enter a valid ABC ID');
         }
       }
+      const genderValue = normalizeGenderCode(gender) || gender;
       const changes: Array<{ sectionKey: string; fieldKey: string; newValue: string | null }> = [
+        { sectionKey: 'personal', fieldKey: 'gender', newValue: genderValue || null },
         { sectionKey: 'personal', fieldKey: 'mobileNumber', newValue: mobile || null },
         { sectionKey: 'personal', fieldKey: 'email', newValue: email || null },
         {
@@ -291,7 +313,7 @@ export default function CompleteProfileScreen() {
       }
       await submitMyProfileChanges(changes);
       setMessage(
-        'Personal details saved. Email can be used for login. ABC ID and Aadhaar are recorded for office verification.',
+        'Personal details saved. Gender updates immediately. Email can be used for login. ABC ID and Aadhaar are recorded for office verification.',
       );
       await refresh();
     } catch (e) {
@@ -512,6 +534,28 @@ export default function CompleteProfileScreen() {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Personal details</Text>
+          <Text style={styles.label}>Gender *</Text>
+          <View style={styles.chipRow}>
+            {genderOptions.map((opt) => {
+              const active = gender === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  style={[
+                    styles.chip,
+                    active && styles.chipActive,
+                    !canEditProfile && { opacity: 0.5 },
+                  ]}
+                  disabled={!canEditProfile}
+                  onPress={() => setGender(opt.value)}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <Text style={styles.label}>Mobile Number *</Text>
           <TextInput
             style={styles.input}
