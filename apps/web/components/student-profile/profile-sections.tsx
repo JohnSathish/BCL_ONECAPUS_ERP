@@ -38,6 +38,7 @@ import { emptyBoardExamSubjectRows, sanitizeBoardExamPayload } from '@/lib/board
 import { isExcelImportedStudent } from '@/lib/student-admission-source';
 import { formatCourseDisplayTitle } from '@/utils/format-course-title';
 import { resolveUploadAssetUrl } from '@/lib/branding-asset';
+import { GENDER_OPTIONS, normalizeGenderCode } from '@/lib/students/gender';
 import { ExternalLink } from 'lucide-react';
 const STUDENT_STATUSES = ['STUDYING', 'ALUMNI', 'LEAVING', 'DETAINED', 'DROPPED'] as const;
 
@@ -106,7 +107,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
     email: profile.email ?? '',
     mobileNumber: profile.mobileNumber ?? '',
     dateOfBirth: profile.dateOfBirth?.slice(0, 10) ?? '',
-    gender: profile.gender ?? '',
+    gender: normalizeGenderCode(profile.gender) || profile.gender || '',
     maritalStatus: profile.maritalStatus ?? '',
     studentStatus: profile.studentStatus ?? 'STUDYING',
     rfidNumber: profile.rfidNumber ?? '',
@@ -179,7 +180,6 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
             ['Personal email', 'email'],
             ['Mobile', 'mobileNumber'],
             ['Date of Birth', 'dateOfBirth'],
-            ['Gender', 'gender'],
             ['Marital Status', 'maritalStatus'],
             ['RFID Number', 'rfidNumber'],
           ] as const
@@ -209,6 +209,26 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
             ) : null}
           </Field>
         ))}
+        <Field label="Gender">
+          <select
+            className={inputClass}
+            disabled={!canEdit}
+            value={normalizeGenderCode(form.gender) || form.gender || ''}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                gender: normalizeGenderCode(e.target.value) || e.target.value,
+              }))
+            }
+          >
+            <option value="">Select gender</option>
+            {GENDER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label="Student Status">
           <select
             className={inputClass}

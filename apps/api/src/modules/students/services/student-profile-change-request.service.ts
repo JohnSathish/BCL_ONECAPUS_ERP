@@ -13,6 +13,7 @@ import {
   STUDENT_EDITABLE_SECTIONS,
   STUDENT_SELF_UPLOAD_DOCUMENT_TYPES,
 } from '../domain/profile-update-policy.defaults';
+import { normalizeGenderCode } from '../domain/gender';
 import { isTemporaryStudentLoginEmail } from '../student-credentials.util';
 import { StudentProfileUpdatePolicyService } from './student-profile-update-policy.service';
 import { Class12SubjectsService } from './class12-subjects.service';
@@ -122,6 +123,9 @@ export class StudentProfileChangeRequestService {
           break;
         case 'dob':
           filled = Boolean(profile?.dateOfBirth);
+          break;
+        case 'gender':
+          filled = Boolean(profile?.gender?.trim());
           break;
         case 'fatherMobile':
           filled = Boolean(
@@ -447,6 +451,7 @@ export class StudentProfileChangeRequestService {
           { value: 'MALE', label: 'Male' },
           { value: 'FEMALE', label: 'Female' },
           { value: 'TRANSGENDER', label: 'Transgender' },
+          { value: 'OTHER', label: 'Other' },
           { value: 'PREFER_NOT_TO_SAY', label: 'Prefer Not To Say' },
         ],
         maritalStatus: [
@@ -1008,7 +1013,10 @@ export class StudentProfileChangeRequestService {
             'emergencyContactMobile',
           ].includes(field)
         ) {
-          const next = coalesceText(value);
+          let next = coalesceText(value);
+          if (field === 'gender' && next) {
+            next = normalizeGenderCode(next) || next.toUpperCase();
+          }
           // Never wipe an existing value with blank from the client.
           if (next !== null || value === null) data[field] = next;
         }

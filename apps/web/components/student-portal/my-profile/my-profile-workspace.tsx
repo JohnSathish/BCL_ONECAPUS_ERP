@@ -30,6 +30,7 @@ import {
 import { ClassXiiSubjectMarksEditor } from '@/components/students-module/class-xii-subject-marks-editor';
 import { normalizeClass12Stream } from '@/services/class12-subjects';
 import { resolveUploadAvatarUrl } from '@/lib/branding-asset';
+import { GENDER_OPTIONS, normalizeGenderCode } from '@/lib/students/gender';
 import { api } from '@/services/api';
 import { uploadStudentPortalPhoto } from '@/services/student-portal';
 import { apiErrorMessage } from '@/utils/api-error';
@@ -466,7 +467,8 @@ function Stepper({
       {steps.map((step, idx) => {
         const active = pathname === step.href || activeKey === step.key;
         const sectionMissing =
-          (step.key === 'personal' && (missingKeys.has('aadhaar') || missingKeys.has('dob'))) ||
+          (step.key === 'personal' &&
+            (missingKeys.has('aadhaar') || missingKeys.has('dob') || missingKeys.has('gender'))) ||
           (step.key === 'guardians' && missingKeys.has('fatherMobile')) ||
           (step.key === 'address' && missingKeys.has('address')) ||
           (step.key === 'class_xii' && missingKeys.has('classXii')) ||
@@ -613,6 +615,7 @@ function CompletionPanel({
     mobile: '/student/my-profile/contact',
     email: '/student/my-profile/contact',
     dob: '/student/my-profile/personal',
+    gender: '/student/my-profile/personal',
     fatherMobile: '/student/my-profile/guardians',
     address: '/student/my-profile/address',
     bank: '/student/my-profile/bank',
@@ -708,7 +711,7 @@ function PersonalForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
     alternateMobile: String(data.alternateMobile ?? ''),
     email: String(data.email ?? ''),
     dateOfBirth: isoDate(data.dateOfBirth),
-    gender: String(data.gender ?? ''),
+    gender: normalizeGenderCode(String(data.gender ?? '')),
     bloodGroupLookupId: String(data.bloodGroupLookupId ?? ''),
     nationalityLookupId: String(data.nationalityLookupId ?? ''),
     religionLookupId: String(data.religionLookupId ?? ''),
@@ -720,13 +723,25 @@ function PersonalForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const genderOptions =
-    bootstrap.lookups.gender.length > 0
-      ? bootstrap.lookups.gender.map((g) => ({
-          value: g.code || g.label.toUpperCase(),
-          label: g.label,
-        }))
-      : bootstrap.staticOptions.genderFallback;
+  const genderOptions = useMemo(() => {
+    const fromLookups =
+      bootstrap.lookups.gender.length > 0
+        ? bootstrap.lookups.gender
+            .map((g) => {
+              const value = normalizeGenderCode(g.code || g.label);
+              return value ? { value, label: g.label } : null;
+            })
+            .filter((o): o is { value: string; label: string } => Boolean(o))
+        : [];
+    const byValue = new Map<string, { value: string; label: string }>();
+    for (const o of GENDER_OPTIONS) byValue.set(o.value, { value: o.value, label: o.label });
+    for (const o of fromLookups) byValue.set(o.value, o);
+    for (const o of bootstrap.staticOptions.genderFallback ?? []) {
+      const value = normalizeGenderCode(o.value) || o.value;
+      if (value) byValue.set(value, { value, label: o.label });
+    }
+    return Array.from(byValue.values());
+  }, [bootstrap.lookups.gender, bootstrap.staticOptions.genderFallback]);
 
   const set = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -735,6 +750,9 @@ function PersonalForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
 
   const validate = () => {
     const next: Record<string, string> = {};
+    if (!form.gender) {
+      next.gender = 'Please select gender';
+    }
     if (form.nationalId && !AADHAAR_RE.test(form.nationalId.replace(/\s/g, ''))) {
       next.nationalId = 'Aadhaar must be exactly 12 digits';
     }
@@ -791,11 +809,12 @@ function PersonalForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
         <Field label="Date of Birth" required error={errors.dateOfBirth}>
           <DateInput value={form.dateOfBirth} onChange={(v) => set('dateOfBirth', v)} />
         </Field>
-        <Field label="Gender" required>
+        <Field label="Gender" required error={errors.gender}>
           <SelectBox
             value={form.gender}
-            onChange={(v) => set('gender', v)}
+            onChange={(v) => set('gender', normalizeGenderCode(v) || v)}
             options={genderOptions}
+            placeholder="Select gender"
           />
         </Field>
         <Field label="Blood Group" required>

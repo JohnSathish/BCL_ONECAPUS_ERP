@@ -52,7 +52,8 @@ export const DEFAULT_PROFILE_UPDATE_POLICIES: ProfilePolicySeed[] = [
   {
     sectionKey: 'personal',
     fieldKey: 'gender',
-    approvalMode: 'APPROVAL_REQUIRED',
+    approvalMode: 'AUTO_APPROVE',
+    mandatory: true,
     sortOrder: 50,
   },
   {
@@ -337,6 +338,12 @@ export const PROFILE_COMPLETION_CHECKS: Array<{
     label: 'Date of Birth',
     sectionKey: 'personal',
     fieldKey: 'dateOfBirth',
+  },
+  {
+    key: 'gender',
+    label: 'Gender',
+    sectionKey: 'personal',
+    fieldKey: 'gender',
   },
   {
     key: 'fatherMobile',

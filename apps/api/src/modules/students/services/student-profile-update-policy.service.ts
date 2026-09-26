@@ -48,9 +48,30 @@ export class StudentProfileUpdatePolicyService {
         })),
         skipDuplicates: true,
       });
-      return this.fetchFieldPolicies(tenantId);
     }
-    return existing;
+    // Gender must be student-editable and apply immediately — many profiles lack it.
+    await this.db().studentProfileUpdatePolicy.updateMany({
+      where: {
+        tenantId,
+        sectionKey: 'personal',
+        fieldKey: 'gender',
+        OR: [
+          {
+            approvalMode: {
+              in: ['APPROVAL_REQUIRED', 'VERIFICATION_REQUIRED'],
+            },
+          },
+          { enabled: false },
+          { mandatory: false },
+        ],
+      },
+      data: {
+        approvalMode: 'AUTO_APPROVE',
+        mandatory: true,
+        enabled: true,
+      },
+    });
+    return this.fetchFieldPolicies(tenantId);
   }
 
   async list(tenantId: string) {
