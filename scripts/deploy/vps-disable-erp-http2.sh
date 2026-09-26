@@ -37,11 +37,13 @@ fi
 
 "${COMPOSE[@]}" run --rm --no-deps nginx nginx -t
 
-echo "Recreating api → web → nginx…"
-"${COMPOSE[@]}" up -d --force-recreate --no-deps api
-"${COMPOSE[@]}" up -d --wait --wait-timeout 180 api
-"${COMPOSE[@]}" up -d --force-recreate --no-deps web
+echo "Recreating nginx only (apply HTTP/1.1 + Connection close)…"
 "${COMPOSE[@]}" up -d --force-recreate --no-deps nginx
+
+# Also bounce API once so any half-open upstream sockets die.
+"${COMPOSE[@]}" restart api
+"${COMPOSE[@]}" up -d --wait --wait-timeout 180 api
+"${COMPOSE[@]}" restart web
 
 ERP_NET="$(pick_erp_docker_net "$("${COMPOSE[@]}" ps -q nginx 2>/dev/null | head -1 || true)" "$(basename "$APP_DIR")_default")"
 if docker ps --format '{{.Names}}' | grep -qx 'donboscocollege-web'; then
