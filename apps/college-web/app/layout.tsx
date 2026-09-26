@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Libre_Baskerville } from 'next/font/google';
 import localFont from 'next/font/local';
 import { Header } from '@/components/interactive';
 import { SiteFooter } from '@/components/site-footer';
@@ -30,18 +29,26 @@ import './biography-feature.css';
 import './important-links.css';
 import './mobile-layout-fix.css';
 
-const inter = Inter({
-  subsets: ['latin'],
+/** Self-hosted so Docker builds do not depend on fonts.googleapis.com. */
+const inter = localFont({
+  src: [
+    { path: './fonts/inter-latin-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/inter-latin-500-normal.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/inter-latin-600-normal.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/inter-latin-700-normal.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/inter-latin-800-normal.woff2', weight: '800', style: 'normal' },
+  ],
   variable: '--font-sans',
   display: 'swap',
-  weight: ['400', '500', '600', '700', '800'],
 });
-const serif = Libre_Baskerville({
-  subsets: ['latin'],
+const serif = localFont({
+  src: [
+    { path: './fonts/libre-baskerville-latin-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/libre-baskerville-latin-400-italic.woff2', weight: '400', style: 'italic' },
+    { path: './fonts/libre-baskerville-latin-700-normal.woff2', weight: '700', style: 'normal' },
+  ],
   variable: '--font-serif',
   display: 'swap',
-  weight: ['400', '700'],
-  style: ['normal', 'italic'],
 });
 const oswald = localFont({
   src: [
