@@ -34,12 +34,104 @@
 .website-popup-image{display:block!important;width:auto!important;height:auto!important;max-width:min(92vw,900px)!important;max-height:calc(100dvh - 32px)!important;object-fit:contain!important;object-position:center!important}
 .website-popup-close-floating{position:absolute;top:10px;right:10px;z-index:2;border:0;border-radius:999px;background:rgba(255,255,255,.95);padding:8px;color:#0b2e59;box-shadow:0 4px 16px rgba(6,31,61,.18);cursor:pointer}
 
-/* Temporary: hide ERP Login + Mobile App CTAs until relaunch (see lib/feature-flags.ts). */
-.nav-erp,
-.nav-app,
-.footer-cta-erp,
-.footer-cta-app,
-.drawer .nav-erp,
-.drawer .nav-app {
-  display: none !important;
+/* Website Quick Links — header brand bar + hero CTAs (CMS-controlled). */
+.brand-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: min(420px, 48vw);
 }
+.brand-quick-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 6px;
+  color: #fff;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.brand-quick-link:hover,
+.brand-quick-link:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--gold);
+  color: #fff;
+  outline: none;
+}
+.brand-quick-link-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+.drawer-quick-links {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.drawer-quick-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+}
+.hero-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.hero-quick-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.hero-quick-link-icon {
+  width: 16px;
+  height: 16px;
+}
+.footer-cta-icon {
+  width: 18px;
+  height: 18px;
+}
+@media (max-width: 980px) {
+  .brand-quick-links {
+    max-width: min(360px, 52vw);
+    gap: 6px;
+  }
+  .brand-quick-link {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+}
+@media (max-width: 760px) {
+  .brand-quick-links.desktop-only {
+    display: none;
+  }
+  .hero-quick-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .hero-quick-link {
+    justify-content: center;
+    width: 100%;
+    padding-inline: 10px;
+    font-size: 12px;
+  }
+}
+

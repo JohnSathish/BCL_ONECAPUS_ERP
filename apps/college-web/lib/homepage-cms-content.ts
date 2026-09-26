@@ -3,6 +3,17 @@
  * Seeds are offline fallback only when CMS is unreachable.
  */
 
+import {
+  DEFAULT_WEBSITE_QUICK_LINKS,
+  normalizeWebsiteQuickLinks,
+  type WebsiteQuickLinks,
+} from '@/lib/website-quick-links';
+
+export type {
+  WebsiteQuickLink as HomepageQuickLink,
+  WebsiteQuickLinks as HomepageHeaderCtas,
+} from '@/lib/website-quick-links';
+
 export type HomepageHeroChrome = {
   eyebrow: string;
   title: string;
@@ -47,17 +58,6 @@ export type HomepageFooterContent = {
   exploreLinks: Array<{ label: string; href: string }>;
   socialLinks: Array<{ label: string; href: string; mark: string }>;
   badges: Array<{ label: string; value: string }>;
-};
-
-export type HomepageHeaderCtaButton = {
-  label: string;
-  href: string;
-};
-
-export type HomepageHeaderCtas = {
-  erpLogin: HomepageHeaderCtaButton;
-  onlineAdmission: HomepageHeaderCtaButton;
-  mobileApp: HomepageHeaderCtaButton;
 };
 
 export type HomepageCoatOfArms = {
@@ -118,7 +118,7 @@ export type HomepageCmsContent = {
   hero: HomepageHeroChrome;
   whyChooseUs: HomepageWhyChooseUs;
   footer: HomepageFooterContent;
-  headerCtas: HomepageHeaderCtas;
+  headerCtas: WebsiteQuickLinks;
   coatOfArms: HomepageCoatOfArms;
   researchLinks: HomepageResearchLinks;
   visionMission: HomepageVisionMission;
@@ -129,14 +129,14 @@ export type HomepageCmsContent = {
 
 export const seedHomepageCmsContent: HomepageCmsContent = {
   hero: {
-    eyebrow: 'Welcome to',
-    title: 'Don Bosco\nCollege, Tura',
+    eyebrow: 'Don Bosco College, Tura',
+    title: 'In Pursuit of Excellence',
     subtitle:
       'A premier institution committed to academic excellence, character formation and holistic development.',
-    primaryCtaLabel: 'Discover more',
-    primaryCtaHref: '/about/history',
-    secondaryCtaLabel: 'Admissions open 2026',
-    secondaryCtaHref: '/admission/apply',
+    primaryCtaLabel: 'ERP Login',
+    primaryCtaHref: 'https://erp.donboscocollege.ac.in',
+    secondaryCtaLabel: 'Explore Programmes',
+    secondaryCtaHref: '/academics/programmes',
     features: [
       { label: 'Quality Education' },
       { label: 'Research' },
@@ -282,20 +282,7 @@ export const seedHomepageCmsContent: HomepageCmsContent = {
       { label: 'NEHU', value: 'Affiliated' },
     ],
   },
-  headerCtas: {
-    erpLogin: {
-      label: 'ERP Login',
-      href: 'https://erp.donboscocollege.ac.in',
-    },
-    onlineAdmission: {
-      label: 'Online Admission',
-      href: '/admission/apply',
-    },
-    mobileApp: {
-      label: 'Mobile App',
-      href: 'https://play.google.com/store/apps/details?id=edu.onecampus.mobile&pcampaignid=web_share',
-    },
-  },
+  headerCtas: { ...DEFAULT_WEBSITE_QUICK_LINKS },
   coatOfArms: {
     title: 'Coat of Arms',
     body: 'The Coat of Arms of the college contains the motto of the college, “In Pursuit of Excellence” and three distinct components – sun, eagle and mountains. The radiant sun is the source, the giver that bestows light, energy, inspiration and divine guidance. The soaring eagle is the seeker that looks for all that is good, noble and uplifting in the world of knowledge, skills and values. The green mountains and valleys represent the process whereby the seeker ascends, descends and strives until he/she arrives at the top. True to our motto, we are passionate about excellence in every sphere of our academic, professional and social life.',
@@ -456,34 +443,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function normalizeCollegeHeaderCtas(value: unknown): HomepageHeaderCtas {
-  const defaults = seedHomepageCmsContent.headerCtas;
-  const source = isRecord(value) ? value : {};
-  const pick = (
-    preferred: unknown,
-    legacy: unknown,
-    fallback: HomepageHeaderCtaButton,
-  ): HomepageHeaderCtaButton => {
-    for (const candidate of [preferred, legacy]) {
-      if (!isRecord(candidate)) continue;
-      const label = typeof candidate.label === 'string' ? candidate.label.trim() : '';
-      const href = typeof candidate.href === 'string' ? candidate.href.trim() : '';
-      if (label || href) {
-        return { label: label || fallback.label, href: href || fallback.href };
-      }
-    }
-    return { ...fallback };
-  };
-  const secondary = isRecord(source.secondary) ? source.secondary : null;
-  const secondaryHref = secondary && typeof secondary.href === 'string' ? secondary.href : '';
-  const secondaryLooksLikeApp = /play\.google\.com|mobile.?app/i.test(
-    `${typeof secondary?.label === 'string' ? secondary.label : ''} ${secondaryHref}`,
-  );
-  return {
-    erpLogin: pick(source.erpLogin, secondaryLooksLikeApp ? null : secondary, defaults.erpLogin),
-    onlineAdmission: pick(source.onlineAdmission, source.primary, defaults.onlineAdmission),
-    mobileApp: pick(source.mobileApp, secondaryLooksLikeApp ? secondary : null, defaults.mobileApp),
-  };
+function normalizeCollegeHeaderCtas(value: unknown) {
+  return normalizeWebsiteQuickLinks(value);
 }
 
 export function readHomepageCmsContent(value: unknown): Partial<HomepageCmsContent> {

@@ -119,6 +119,7 @@ import { NewsEditorView } from './news-editor-view';
 import { HomepageContentEditors } from './homepage-content-editors';
 import { LifeAtCampusEditor } from './life-at-campus-editor';
 import { ReorderableList } from './reorderable-list';
+import { WebsiteQuickLinksSettingsView } from './website-quick-links-settings';
 import { WEBSITE_CMS_GROUPS, WEBSITE_CMS_NAV } from './website-cms-nav';
 
 export type WebsiteCmsSection =
@@ -226,7 +227,7 @@ export function WebsiteCmsWorkspace({ section }: { section: WebsiteCmsSection })
           {section === 'settings' ? (
             <>
               <SettingsView onMessage={setMessage} />
-              <HeaderCtasView onMessage={setMessage} />
+              <WebsiteQuickLinksSettingsView onMessage={setMessage} />
             </>
           ) : null}
           {section === 'pages' ? <PagesView onMessage={setMessage} /> : null}
@@ -1800,142 +1801,6 @@ function ThemeView({ onMessage }: { onMessage: (message: string) => void }) {
         );
       })}
     </div>
-  );
-}
-
-function HeaderCtasView({ onMessage }: { onMessage: (message: string) => void }) {
-  const queryClient = useQueryClient();
-  const content = useQuery({
-    queryKey: ['website', 'homepage-content'],
-    queryFn: fetchWebsiteHomepageContent,
-  });
-  const [draft, setDraft] = useState({
-    erpLabel: 'ERP Login',
-    erpHref: 'https://erp.donboscocollege.ac.in',
-    admissionLabel: 'Online Admission',
-    admissionHref: '/admission/apply',
-    appLabel: 'Mobile App',
-    appHref:
-      'https://play.google.com/store/apps/details?id=edu.onecampus.mobile&pcampaignid=web_share',
-  });
-  useEffect(() => {
-    const headerCtas = content.data?.headerCtas;
-    if (!headerCtas || typeof headerCtas !== 'object') return;
-    const value = headerCtas as {
-      erpLogin?: { label?: string; href?: string };
-      onlineAdmission?: { label?: string; href?: string };
-      mobileApp?: { label?: string; href?: string };
-      secondary?: { label?: string; href?: string };
-      primary?: { label?: string; href?: string };
-    };
-    const secondaryLooksLikeApp = /play\.google\.com|mobile.?app/i.test(
-      `${value.secondary?.label ?? ''} ${value.secondary?.href ?? ''}`,
-    );
-    setDraft({
-      erpLabel:
-        value.erpLogin?.label?.trim() ||
-        (!secondaryLooksLikeApp ? value.secondary?.label?.trim() : '') ||
-        'ERP Login',
-      erpHref:
-        value.erpLogin?.href?.trim() ||
-        (!secondaryLooksLikeApp ? value.secondary?.href?.trim() : '') ||
-        'https://erp.donboscocollege.ac.in',
-      admissionLabel:
-        value.onlineAdmission?.label?.trim() || value.primary?.label?.trim() || 'Online Admission',
-      admissionHref:
-        value.onlineAdmission?.href?.trim() || value.primary?.href?.trim() || '/admission/apply',
-      appLabel:
-        value.mobileApp?.label?.trim() ||
-        (secondaryLooksLikeApp ? value.secondary?.label?.trim() : '') ||
-        'Mobile App',
-      appHref:
-        value.mobileApp?.href?.trim() ||
-        (secondaryLooksLikeApp ? value.secondary?.href?.trim() : '') ||
-        'https://play.google.com/store/apps/details?id=edu.onecampus.mobile&pcampaignid=web_share',
-    });
-  }, [content.data]);
-  const save = useMutation({
-    mutationFn: () =>
-      updateWebsiteHomepageContent({
-        headerCtas: {
-          erpLogin: {
-            label: draft.erpLabel.trim() || 'ERP Login',
-            href: draft.erpHref.trim(),
-          },
-          onlineAdmission: {
-            label: draft.admissionLabel.trim() || 'Online Admission',
-            href: draft.admissionHref.trim(),
-          },
-          mobileApp: {
-            label: draft.appLabel.trim() || 'Mobile App',
-            href: draft.appHref.trim(),
-          },
-        },
-      }),
-    onSuccess: () => {
-      onMessage('Header button URLs saved.');
-      void queryClient.invalidateQueries({ queryKey: ['website', 'homepage-content'] });
-      void queryClient.invalidateQueries({ queryKey: ['website', 'appearance'] });
-    },
-    onError: (error) => onMessage(apiErrorMessage(error, 'Could not save header buttons')),
-  });
-  if (!content.data) return <QueryState loading={content.isLoading} error={content.error} />;
-  return (
-    <CompactCard>
-      <CompactCardHeader
-        title="Header buttons"
-        description="ERP Login and Online Admission sit on the navy brand bar. Mobile App (with Play Store icon) sits on the white nav bar next to search. All labels and URLs are editable here."
-      />
-      <CompactCardBody className="grid gap-3 md:grid-cols-2">
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">ERP Login label</span>
-          <Input
-            value={draft.erpLabel}
-            onChange={(event) => setDraft({ ...draft, erpLabel: event.target.value })}
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">ERP Login URL</span>
-          <Input
-            value={draft.erpHref}
-            onChange={(event) => setDraft({ ...draft, erpHref: event.target.value })}
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">Online Admission label</span>
-          <Input
-            value={draft.admissionLabel}
-            onChange={(event) => setDraft({ ...draft, admissionLabel: event.target.value })}
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">Online Admission URL</span>
-          <Input
-            value={draft.admissionHref}
-            onChange={(event) => setDraft({ ...draft, admissionHref: event.target.value })}
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">Mobile App label</span>
-          <Input
-            value={draft.appLabel}
-            onChange={(event) => setDraft({ ...draft, appLabel: event.target.value })}
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">Mobile App / Play Store URL</span>
-          <Input
-            value={draft.appHref}
-            onChange={(event) => setDraft({ ...draft, appHref: event.target.value })}
-          />
-        </label>
-        <div className="md:col-span-2">
-          <Button disabled={save.isPending} onClick={() => save.mutate()}>
-            Save header buttons
-          </Button>
-        </div>
-      </CompactCardBody>
-    </CompactCard>
   );
 }
 

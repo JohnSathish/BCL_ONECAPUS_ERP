@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { forwardRef, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import useEmblaCarousel from 'embla-carousel-react';
 import { ChevronDown, ChevronLeft, ChevronRight, Menu, Search, X } from 'lucide-react';
@@ -12,11 +12,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Button } from '@/components/ui/button';
 import { NavMegaMenu } from '@/components/nav-mega-menu';
+import { QuickLinkAnchor, QuickLinkIcon } from '@/components/website-quick-link';
 import type { HomepageHeaderCtas } from '@/lib/homepage-cms-content';
 import { seedHomepageCmsContent } from '@/lib/homepage-cms-content';
-import { SHOW_ERP_AND_MOBILE_APP_CTAS } from '@/lib/feature-flags';
+import { listVisibleWebsiteQuickLinks } from '@/lib/website-quick-links';
 import { navigation as seedNavigation } from '@/lib/navigation';
 
 type NewsItem = {
@@ -29,51 +29,6 @@ type NewsItem = {
 };
 type NavGroup = { label: string; items: ReadonlyArray<readonly [string, string]> };
 type UtilityLink = { label: string; href: string };
-
-function isExternalHref(href: string) {
-  return /^https?:\/\//i.test(href);
-}
-
-function PlayStoreMark({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden focusable="false">
-      <path fill="#EA4335" d="M3.6 2.3c-.4.2-.6.6-.6 1.1v17.2c0 .5.2.9.6 1.1l9.6-9.7L3.6 2.3z" />
-      <path fill="#FBBC04" d="M14.7 13.5 12.1 12l-8.5 8.6 11.1-7.1z" />
-      <path fill="#4285F4" d="M21.2 10.3 17 7.6l-2.9 2.9 2.9 2.9 4.2-2.7c.7-.4.7-1.4 0-1.8z" />
-      <path fill="#34A853" d="M12.1 12 17 7.6 5.9 1.4 12.1 12z" />
-    </svg>
-  );
-}
-
-const HeaderCtaLink = forwardRef<
-  HTMLAnchorElement,
-  {
-    href: string;
-    className?: string;
-    children: React.ReactNode;
-    onClick?: () => void;
-  }
->(function HeaderCtaLink({ href, className, children, onClick }, ref) {
-  if (isExternalHref(href)) {
-    return (
-      <a
-        ref={ref}
-        className={className}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={onClick}
-      >
-        {children}
-      </a>
-    );
-  }
-  return (
-    <Link ref={ref} className={className} href={href} onClick={onClick}>
-      {children}
-    </Link>
-  );
-});
 
 const defaultUtility: UtilityLink[] = [
   { label: 'Students', href: '/students' },
@@ -95,7 +50,7 @@ export function Header({
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<string | null>(null);
-  const { erpLogin, onlineAdmission, mobileApp } = headerCtas;
+  const headerLinks = listVisibleWebsiteQuickLinks(headerCtas, 'header');
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     return () => {
@@ -131,14 +86,20 @@ export function Header({
             </span>
           </Link>
           <div className="brand-actions">
-            {SHOW_ERP_AND_MOBILE_APP_CTAS ? (
-              <HeaderCtaLink className="nav-erp desktop-only" href={erpLogin.href}>
-                {erpLogin.label}
-              </HeaderCtaLink>
+            {headerLinks.length ? (
+              <nav className="brand-quick-links desktop-only" aria-label="Campus access">
+                {headerLinks.map(({ key, link }) => (
+                  <QuickLinkAnchor
+                    key={key}
+                    link={link}
+                    className={`brand-quick-link brand-quick-link-${key}`}
+                  >
+                    <QuickLinkIcon linkKey={key} className="brand-quick-link-icon" />
+                    <span>{link.label}</span>
+                  </QuickLinkAnchor>
+                ))}
+              </nav>
             ) : null}
-            <Button asChild variant="gold" className="compact desktop-only">
-              <HeaderCtaLink href={onlineAdmission.href}>{onlineAdmission.label}</HeaderCtaLink>
-            </Button>
             <button
               type="button"
               className="icon-button mobile-menu brand-menu"
@@ -178,12 +139,6 @@ export function Header({
             <Link href="/naac">NAAC</Link>
           </nav>
           <div className="nav-actions desktop-nav-actions">
-            {SHOW_ERP_AND_MOBILE_APP_CTAS ? (
-              <HeaderCtaLink className="nav-app" href={mobileApp.href}>
-                <PlayStoreMark className="nav-app-icon" />
-                <span>{mobileApp.label}</span>
-              </HeaderCtaLink>
-            ) : null}
             <Link className="icon-button" href="/search" aria-label="Search">
               <Search size={19} />
             </Link>
@@ -253,30 +208,21 @@ export function Header({
               <Link href="/search" onClick={() => setOpen(false)}>
                 Search
               </Link>
-              {SHOW_ERP_AND_MOBILE_APP_CTAS ? (
-                <>
-                  <HeaderCtaLink
-                    className="nav-app"
-                    href={mobileApp.href}
-                    onClick={() => setOpen(false)}
-                  >
-                    <PlayStoreMark className="nav-app-icon" />
-                    <span>{mobileApp.label}</span>
-                  </HeaderCtaLink>
-                  <HeaderCtaLink
-                    className="nav-erp"
-                    href={erpLogin.href}
-                    onClick={() => setOpen(false)}
-                  >
-                    {erpLogin.label}
-                  </HeaderCtaLink>
-                </>
+              {headerLinks.length ? (
+                <div className="drawer-quick-links">
+                  {headerLinks.map(({ key, link }) => (
+                    <QuickLinkAnchor
+                      key={key}
+                      link={link}
+                      className="drawer-quick-link"
+                      onClick={() => setOpen(false)}
+                    >
+                      <QuickLinkIcon linkKey={key} className="brand-quick-link-icon" />
+                      <span>{link.label}</span>
+                    </QuickLinkAnchor>
+                  ))}
+                </div>
               ) : null}
-              <Button asChild variant="gold">
-                <HeaderCtaLink href={onlineAdmission.href} onClick={() => setOpen(false)}>
-                  {onlineAdmission.label}
-                </HeaderCtaLink>
-              </Button>
             </aside>
           </>,
           document.body,

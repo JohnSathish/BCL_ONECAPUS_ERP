@@ -102,22 +102,26 @@ export type HomepageFooterContent = {
   badges: Array<{ label: string; value: string }>;
 };
 
-/** Brand-bar + nav CTAs on the public college site header. */
+/** Brand-bar + hero CTAs on the public college site (CMS Quick Links). */
 export type HomepageHeaderCtaButton = {
   label: string;
   href: string;
+  enabled?: boolean;
+  openInNewTab?: boolean;
 };
 
 export type HomepageHeaderCtasContent = {
-  /** Outlined brand-bar button */
   erpLogin: HomepageHeaderCtaButton;
-  /** Gold brand-bar button */
-  onlineAdmission: HomepageHeaderCtaButton;
-  /** Play Store download (nav bar / drawer) */
-  mobileApp: HomepageHeaderCtaButton;
-  /** @deprecated Prefer erpLogin / onlineAdmission / mobileApp */
+  androidApp: HomepageHeaderCtaButton;
+  iosApp: HomepageHeaderCtaButton;
+  exploreProgrammes: HomepageHeaderCtaButton;
+  /** @deprecated Prefer androidApp */
+  mobileApp?: HomepageHeaderCtaButton;
+  /** @deprecated Removed from homepage; kept for older CMS payloads */
+  onlineAdmission?: HomepageHeaderCtaButton;
+  /** @deprecated Prefer erpLogin / androidApp */
   secondary?: HomepageHeaderCtaButton;
-  /** @deprecated Prefer onlineAdmission */
+  /** @deprecated Prefer exploreProgrammes / onlineAdmission */
   primary?: HomepageHeaderCtaButton;
 };
 
@@ -439,16 +443,28 @@ export const DEFAULT_HOMEPAGE_CONTENT: WebsiteHomepageContent = {
   },
   headerCtas: {
     erpLogin: {
+      enabled: true,
       label: 'ERP Login',
       href: 'https://erp.donboscocollege.ac.in',
+      openInNewTab: true,
     },
-    onlineAdmission: {
-      label: 'Online Admission',
-      href: '/admission/apply',
-    },
-    mobileApp: {
-      label: 'Mobile App',
+    androidApp: {
+      enabled: true,
+      label: 'Android App',
       href: 'https://play.google.com/store/apps/details?id=edu.onecampus.mobile&pcampaignid=web_share',
+      openInNewTab: true,
+    },
+    iosApp: {
+      enabled: true,
+      label: 'iOS App',
+      href: 'https://apps.apple.com/app/id6798552213',
+      openInNewTab: true,
+    },
+    exploreProgrammes: {
+      enabled: true,
+      label: 'Explore Programmes',
+      href: '/academics/programmes',
+      openInNewTab: false,
     },
   },
   coatOfArms: {
@@ -783,37 +799,50 @@ export function normalizeHeaderCtas(value: unknown): HomepageHeaderCtasContent {
       const href =
         typeof candidate.href === 'string' ? candidate.href.trim() : '';
       if (label || href) {
+        const enabled =
+          typeof candidate.enabled === 'boolean'
+            ? candidate.enabled
+            : typeof candidate.visible === 'boolean'
+              ? candidate.visible
+              : (fallbackB.enabled ?? true);
+        const openInNewTab =
+          typeof candidate.openInNewTab === 'boolean'
+            ? candidate.openInNewTab
+            : typeof candidate.newTab === 'boolean'
+              ? candidate.newTab
+              : (fallbackB.openInNewTab ??
+                /^https?:\/\//i.test(href || fallbackB.href));
         return {
           label: label || fallbackB.label,
           href: href || fallbackB.href,
+          enabled,
+          openInNewTab,
         };
       }
     }
     return { ...fallbackB };
   };
 
+  // Legacy secondary often held Explore Programmes (or occasionally Mobile App).
   const secondary = isRecord(source.secondary) ? source.secondary : null;
-  const secondaryHref =
-    secondary && typeof secondary.href === 'string' ? secondary.href : '';
-  const secondaryLooksLikeApp = /play\.google\.com|mobile.?app/i.test(
-    `${typeof secondary?.label === 'string' ? secondary.label : ''} ${secondaryHref}`,
-  );
+  const secondaryLooksLikeApp = secondary
+    ? /play\.google\.com|apps\.apple\.com|mobile.?app|android|ios.?app/i.test(
+        `${typeof secondary.label === 'string' ? secondary.label : ''} ${typeof secondary.href === 'string' ? secondary.href : ''}`,
+      )
+    : false;
 
   return {
-    erpLogin: button(
-      source.erpLogin,
-      secondaryLooksLikeApp ? null : secondary,
-      defaults.erpLogin,
-    ),
-    onlineAdmission: button(
-      source.onlineAdmission,
-      source.primary,
-      defaults.onlineAdmission,
-    ),
-    mobileApp: button(
-      source.mobileApp,
+    erpLogin: button(source.erpLogin, null, defaults.erpLogin),
+    androidApp: button(
+      source.androidApp ?? source.mobileApp,
       secondaryLooksLikeApp ? secondary : null,
-      defaults.mobileApp,
+      defaults.androidApp,
+    ),
+    iosApp: button(source.iosApp, null, defaults.iosApp),
+    exploreProgrammes: button(
+      source.exploreProgrammes,
+      !secondaryLooksLikeApp ? secondary : null,
+      defaults.exploreProgrammes,
     ),
   };
 }

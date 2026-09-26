@@ -22,14 +22,16 @@ import { ShortTermCoursesSection } from '@/components/short-term-courses-section
 import { VoicesOfBosco } from '@/components/voices-of-bosco';
 import { WhyChooseUs } from '@/components/why-choose-us';
 import { ImportantLinksSection } from '@/components/important-links';
+import { QuickLinkAnchor, QuickLinkIcon } from '@/components/website-quick-link';
 import type { CollegeContent } from '@/lib/content';
-import { SHOW_ERP_AND_MOBILE_APP_CTAS, isErpOrMobileAppLink } from '@/lib/feature-flags';
+import { isErpOrMobileAppLink } from '@/lib/feature-flags';
 import type { HomepageSectionPayload } from '@/lib/homepage';
 import type { DepartmentCard } from '@/lib/academic-types';
 import type { HeroSlide } from '@/lib/hero-slides';
 import { absolutizeMediaUrl } from '@/lib/media-url';
 import type { HubNotice, InformationHubContent } from '@/lib/information-hub';
 import { isRecord } from '@/lib/cms-client';
+import { listVisibleWebsiteQuickLinks } from '@/lib/website-quick-links';
 
 type Props = {
   section: HomepageSectionPayload;
@@ -161,13 +163,20 @@ export function HomepageSectionRenderer({
                 ))}
               </h1>
               <p>{hero.subtitle}</p>
-              <div className="hero-buttons">
-                <Link className="button gold-button" href={hero.primaryCtaHref}>
-                  {hero.primaryCtaLabel} <ArrowRight />
-                </Link>
-                <Link className="button outline" href={hero.secondaryCtaHref}>
-                  {hero.secondaryCtaLabel}
-                </Link>
+              <div className="hero-buttons hero-quick-links">
+                {listVisibleWebsiteQuickLinks(content.homepageCms.headerCtas, 'hero').map(
+                  ({ key, link }) => (
+                    <QuickLinkAnchor
+                      key={key}
+                      link={link}
+                      className={`button outline hero-quick-link hero-quick-link-${key}`}
+                    >
+                      <QuickLinkIcon linkKey={key} className="hero-quick-link-icon" />
+                      <span>{link.label}</span>
+                      <ArrowRight aria-hidden />
+                    </QuickLinkAnchor>
+                  ),
+                )}
               </div>
             </div>
           </div>
@@ -361,9 +370,7 @@ export function HomepageResearchAndLinks({
       },
     ],
   };
-  const visibleLinks = research.links.filter(
-    (link) => SHOW_ERP_AND_MOBILE_APP_CTAS || !isErpOrMobileAppLink(link),
-  );
+  const visibleLinks = research.links.filter((link) => !isErpOrMobileAppLink(link));
   const featured = visibleLinks.slice(0, 3);
 
   const renderCard = (link: { label: string; href: string; description?: string }) => {
