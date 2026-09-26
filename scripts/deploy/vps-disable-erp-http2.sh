@@ -35,9 +35,15 @@ if awk '/server_name/{buf=$0} /http2 on/{print NR":"$0" :: "buf}' nginx/nginx.co
   exit 1
 fi
 
+# Guard: admin JWTs exceed nginx default 8k header buffers → 400 before Nest
+if ! grep -q 'large_client_header_buffers' nginx/nginx.conf; then
+  echo "ERROR: large_client_header_buffers missing from nginx/nginx.conf — aborting" >&2
+  exit 1
+fi
+
 "${COMPOSE[@]}" run --rm --no-deps nginx nginx -t
 
-echo "Recreating nginx only (apply HTTP/1.1 + Connection close)…"
+echo "Recreating nginx only (HTTP/1.1 + Connection close + large header buffers)…"
 "${COMPOSE[@]}" up -d --force-recreate --no-deps nginx
 
 # Also bounce API once so any half-open upstream sockets die.
