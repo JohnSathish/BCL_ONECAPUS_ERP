@@ -20,19 +20,19 @@ export const DEFAULT_WEBSITE_QUICK_LINKS: WebsiteQuickLinks = {
   erpLogin: {
     enabled: true,
     label: 'ERP Login',
-    href: 'https://erp.donboscocollege.ac.in',
+    href: 'https://erp.donboscocollege.ac.in/login',
     openInNewTab: true,
   },
   androidApp: {
     enabled: true,
     label: 'Android App',
-    href: 'https://play.google.com/store/apps/details?id=edu.onecampus.mobile&pcampaignid=web_share',
+    href: 'https://play.google.com/store/apps/details?id=edu.onecampus.mobile&utm_source=chatgpt.com',
     openInNewTab: true,
   },
   iosApp: {
     enabled: true,
     label: 'iOS App',
-    href: 'https://apps.apple.com/app/id6798552213',
+    href: 'https://apps.apple.com/in/app/don-bosco-college-tura/id6798552213',
     openInNewTab: true,
   },
   exploreProgrammes: {

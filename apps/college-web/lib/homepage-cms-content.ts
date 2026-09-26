@@ -134,7 +134,7 @@ export const seedHomepageCmsContent: HomepageCmsContent = {
     subtitle:
       'A premier institution committed to academic excellence, character formation and holistic development.',
     primaryCtaLabel: 'ERP Login',
-    primaryCtaHref: 'https://erp.donboscocollege.ac.in',
+    primaryCtaHref: 'https://erp.donboscocollege.ac.in/login',
     secondaryCtaLabel: 'Explore Programmes',
     secondaryCtaHref: '/academics/programmes',
     features: [
@@ -315,7 +315,7 @@ export const seedHomepageCmsContent: HomepageCmsContent = {
       { label: 'Downloads', href: '/downloads' },
       {
         label: 'ERP Login',
-        href: 'https://erp.donboscocollege.ac.in',
+        href: 'https://erp.donboscocollege.ac.in/login',
         description: 'Staff & student portal',
       },
     ],
