@@ -160,7 +160,7 @@ console.log('\n=== Build complete ===');
 if (apks.length) {
   for (const f of apks) {
     const src = path.join(apkDir, f);
-    const destName = `DonBoscoCollege-Tura-v${require('../package.json').version}-vc47-${arches.replace(/,/g, '-')}.apk`;
+    const destName = `DonBoscoCollege-Tura-v${require('../package.json').version}-vc48-${arches.replace(/,/g, '-')}.apk`;
     const dest = path.join(distDir, destName);
     fs.copyFileSync(src, dest);
     console.log('APK:', src);

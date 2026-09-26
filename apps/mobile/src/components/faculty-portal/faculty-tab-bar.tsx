@@ -1,9 +1,11 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isTeachingStaffProfile } from './drawer-menu';
+import { useFacultyPortal } from './faculty-portal-context';
 import { facultyTheme } from './theme';
 
-const TAB_META: Record<string, { label: string; icon: string }> = {
+const TEACHING_TAB_META: Record<string, { label: string; icon: string }> = {
   index: { label: 'Home', icon: '🏠' },
   academics: { label: 'Academics', icon: '📚' },
   attendance: { label: 'Attendance', icon: '✅' },
@@ -11,17 +13,26 @@ const TAB_META: Record<string, { label: string; icon: string }> = {
   profile: { label: 'Profile', icon: '👤' },
 };
 
+const STAFF_TAB_META: Record<string, { label: string; icon: string }> = {
+  index: { label: 'Home', icon: '🏠' },
+  notifications: { label: 'Alerts', icon: '🔔' },
+  profile: { label: 'Profile', icon: '👤' },
+};
+
 export function FacultyTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { home } = useFacultyPortal();
+  const teaching = isTeachingStaffProfile(home?.profile?.isTeaching);
+  const tabMeta = teaching ? TEACHING_TAB_META : STAFF_TAB_META;
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {state.routes
-        .filter((route) => Boolean(TAB_META[route.name]))
+        .filter((route) => Boolean(tabMeta[route.name]))
         .map((route) => {
           const index = state.routes.findIndex((r) => r.key === route.key);
           const focused = state.index === index;
-          const meta = TAB_META[route.name] ?? { label: route.name, icon: '•' };
+          const meta = tabMeta[route.name] ?? { label: route.name, icon: '•' };
           const { options } = descriptors[route.key];
           const label = options.title ?? meta.label;
 

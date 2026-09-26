@@ -3,9 +3,13 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } 
 import { useRouter } from 'expo-router';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { BirthdaysTodayCard } from '@/components/notifications/birthdays-today-card';
-import { FACULTY_QUICK_ACTIONS } from '@/components/faculty-portal/drawer-menu';
+import {
+  FACULTY_QUICK_ACTIONS,
+  isTeachingStaffProfile,
+} from '@/components/faculty-portal/drawer-menu';
 import { FacultyScreenShell } from '@/components/faculty-portal/faculty-screen-shell';
 import { useFacultyPortal } from '@/components/faculty-portal/faculty-portal-context';
+import { NonTeachingStaffHomeScreen } from '@/components/faculty-portal/non-teaching-staff-home';
 import { facultyTheme } from '@/components/faculty-portal/theme';
 import type { FacultyPendingAction, FacultyTodayClass } from '@/types/faculty-home';
 import { COLLEGE_NAME } from '@/constants/release';
@@ -68,6 +72,20 @@ export default function FacultyHomeScreen() {
       .then((data) => setBirthdays(data))
       .catch(() => setBirthdays(null));
   }, [refreshHome]);
+
+  if (loading && !home) {
+    return (
+      <FacultyScreenShell title="Workspace" subtitle={COLLEGE_NAME}>
+        <View style={styles.bootWrap}>
+          <Text style={styles.bootText}>Loading your workspace…</Text>
+        </View>
+      </FacultyScreenShell>
+    );
+  }
+
+  if (!isTeachingStaffProfile(home?.profile?.isTeaching)) {
+    return <NonTeachingStaffHomeScreen />;
+  }
 
   const profile = home?.profile;
   const workload = home?.workloadSummary;
@@ -533,6 +551,8 @@ function PerfCard({ label, value, tone }: { label: string; value: string; tone: 
 }
 
 const styles = StyleSheet.create({
+  bootWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  bootText: { fontSize: 14, color: facultyTheme.textMuted, fontWeight: '600' },
   container: { padding: 16, gap: 12, paddingBottom: 28 },
   heroCard: {
     backgroundColor: facultyTheme.surface,

@@ -76,7 +76,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
   slug: 'onecampus-mobile',
-  version: '1.0.27',
+  version: '1.0.28',
   scheme: ['onecampus', 'schoolerp'],
   // Play large-screen guidance: do not lock to portrait in the manifest.
   orientation: 'default',
@@ -101,8 +101,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'edu.onecampus.mobile',
-    // Gender field on Complete Profile (1.0.27).
-    buildNumber: '9',
+    // Non-teaching Staff Workspace dashboard (1.0.28).
+    buildNumber: '10',
     ...(hasGoogleServiceInfo && googleServiceInfoFile
       ? { googleServicesFile: googleServiceInfoFile }
       : {}),
@@ -121,7 +121,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 47,
+    versionCode: 48,
     edgeToEdgeEnabled: true,
     allowBackup: false,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),

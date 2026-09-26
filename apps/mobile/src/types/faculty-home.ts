@@ -50,6 +50,7 @@ export type FacultyHomeSnapshot = {
     profileCompletion?: number;
     isTeaching?: boolean;
     isHod?: boolean;
+    staffType?: string | null;
     additionalRoles?: { code: string; label: string }[];
   };
   academicContext?: {

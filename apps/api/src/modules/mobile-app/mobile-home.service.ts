@@ -145,6 +145,8 @@ export class MobileHomeService {
         joiningDate: dashboard.profile.joiningDate,
         isTeaching: dashboard.profile.isTeaching,
         isHod: dashboard.profile.isHod,
+        profileCompletion: dashboard.profile.profileCompletion,
+        staffType: dashboard.profile.staffType,
       },
       academicContext: dashboard.academicContext,
       todayClasses: todaySchedule.map(

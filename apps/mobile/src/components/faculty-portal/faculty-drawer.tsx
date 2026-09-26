@@ -13,7 +13,11 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logout } from '@/auth/logout';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
-import { FACULTY_DRAWER_SECTIONS } from './drawer-menu';
+import {
+  FACULTY_DRAWER_SECTIONS,
+  STAFF_DRAWER_SECTIONS,
+  isTeachingStaffProfile,
+} from './drawer-menu';
 import { useFacultyPortal } from './faculty-portal-context';
 import { facultyTheme } from './theme';
 
@@ -24,6 +28,8 @@ export function FacultyDrawer() {
   const [query, setQuery] = useState('');
   const slide = useRef(new Animated.Value(-facultyTheme.drawerWidth)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
+  const teaching = isTeachingStaffProfile(home?.profile?.isTeaching);
+  const menuSections = teaching ? FACULTY_DRAWER_SECTIONS : STAFF_DRAWER_SECTIONS;
 
   useEffect(() => {
     if (drawerOpen) {
@@ -45,16 +51,18 @@ export function FacultyDrawer() {
 
   const filteredSections = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return FACULTY_DRAWER_SECTIONS;
-    return FACULTY_DRAWER_SECTIONS.map((section) => ({
-      ...section,
-      items: section.items.filter(
-        (item) =>
-          item.label.toLowerCase().includes(q) ||
-          item.keywords?.some((keyword) => keyword.includes(q)),
-      ),
-    })).filter((section) => section.items.length > 0);
-  }, [query]);
+    if (!q) return menuSections;
+    return menuSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter(
+          (item) =>
+            item.label.toLowerCase().includes(q) ||
+            item.keywords?.some((keyword) => keyword.includes(q)),
+        ),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [menuSections, query]);
 
   function badgeCount(item: (typeof FACULTY_DRAWER_SECTIONS)[number]['items'][number]) {
     if (!item.badgeFrom || !home) return 0;
@@ -68,14 +76,19 @@ export function FacultyDrawer() {
     return 0;
   }
 
-  const name = home?.profile?.fullName ?? 'Faculty';
+  const name = home?.profile?.fullName ?? (teaching ? 'Faculty' : 'Staff');
   const designation = home?.profile?.designation ?? 'Staff';
   const department = home?.profile?.department ?? 'Department';
   const classesToday = home?.workloadSummary?.classesToday ?? 0;
-  const pending =
-    (home?.workloadSummary?.attendancePending ?? 0) +
-    (home?.workloadSummary?.marksPending ?? 0) +
-    (home?.unreadNotificationCount ?? 0);
+  const leaveTotal =
+    (home?.leaveBalance?.casual ?? 0) +
+    (home?.leaveBalance?.sick ?? 0) +
+    (home?.leaveBalance?.earned ?? 0);
+  const pending = teaching
+    ? (home?.workloadSummary?.attendancePending ?? 0) +
+      (home?.workloadSummary?.marksPending ?? 0) +
+      (home?.unreadNotificationCount ?? 0)
+    : (home?.unreadNotificationCount ?? 0);
 
   function navigate(href: string) {
     closeDrawer();
@@ -117,8 +130,10 @@ export function FacultyDrawer() {
 
           <View style={styles.statsRow}>
             <View style={styles.statPill}>
-              <Text style={styles.statLabel}>Today</Text>
-              <Text style={styles.statValue}>{classesToday} classes</Text>
+              <Text style={styles.statLabel}>{teaching ? 'Today' : 'Leave'}</Text>
+              <Text style={styles.statValue}>
+                {teaching ? `${classesToday} classes` : `${leaveTotal} days`}
+              </Text>
             </View>
             <View style={styles.statPill}>
               <Text style={styles.statLabel}>Pending</Text>

@@ -171,3 +171,107 @@ export const FACULTY_QUICK_ACTIONS = [
     href: '/(staff)/calendar',
   },
 ] as const;
+
+/** Non-teaching / office staff — no academic teaching shortcuts. */
+export const STAFF_DRAWER_SECTIONS: FacultyDrawerSection[] = [
+  {
+    id: 'workspace',
+    title: 'Workspace',
+    items: [
+      { id: 'dashboard', label: 'Dashboard', icon: '🏠', href: '/(staff)/(tabs)' },
+      {
+        id: 'notifications',
+        label: 'Notifications',
+        icon: '🔔',
+        href: '/(staff)/(tabs)/notifications',
+        keywords: ['alerts', 'inbox'],
+        badgeFrom: 'notifications',
+      },
+      {
+        id: 'calendar',
+        label: 'My Calendar',
+        icon: '📆',
+        href: '/(staff)/calendar',
+        keywords: ['events', 'schedule'],
+      },
+      {
+        id: 'notices',
+        label: 'College Notices',
+        icon: '📢',
+        href: '/(staff)/notices',
+        keywords: ['announcement', 'circular'],
+      },
+    ],
+  },
+  {
+    id: 'administration',
+    title: 'My Office',
+    items: [
+      {
+        id: 'leave',
+        label: 'Leave',
+        icon: '🏖',
+        href: '/(staff)/leave',
+        keywords: ['hr', 'cl', 'el', 'sl'],
+      },
+      {
+        id: 'payroll',
+        label: 'Payroll & Payslips',
+        icon: '💰',
+        href: '/(staff)/payroll',
+        keywords: ['salary', 'payslip', 'pay'],
+      },
+      {
+        id: 'profile',
+        label: 'Profile & Security',
+        icon: '⚙️',
+        href: '/(staff)/(tabs)/profile',
+        keywords: ['password', 'account'],
+      },
+    ],
+  },
+];
+
+export const STAFF_QUICK_ACTIONS = [
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: '🔔',
+    tone: '#7C3AED',
+    href: '/(staff)/(tabs)/notifications',
+  },
+  { id: 'leave', label: 'Leave', icon: '🏖', tone: '#D97706', href: '/(staff)/leave' },
+  {
+    id: 'payroll',
+    label: 'Payslips',
+    icon: '💰',
+    tone: '#0F766E',
+    href: '/(staff)/payroll',
+  },
+  {
+    id: 'calendar',
+    label: 'Calendar',
+    icon: '📆',
+    tone: '#0284C7',
+    href: '/(staff)/calendar',
+  },
+  {
+    id: 'notices',
+    label: 'Notices',
+    icon: '📢',
+    tone: '#2563EB',
+    href: '/(staff)/notices',
+  },
+  {
+    id: 'profile',
+    label: 'My Profile',
+    icon: '👤',
+    tone: '#0D9488',
+    href: '/(staff)/(tabs)/profile',
+  },
+] as const;
+
+export function isTeachingStaffProfile(isTeaching?: boolean | null): boolean {
+  // Default to teaching when unknown so faculty builds keep working.
+  return isTeaching !== false;
+}
