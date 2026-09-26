@@ -2,14 +2,21 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ArrowRight,
   BookOpen,
   CalendarDays,
+  Clock3,
   GraduationCap,
   Hash,
+  Headphones,
   IdCard,
   Layers,
   Lock,
+  Mail,
+  Phone,
   RefreshCw,
+  Search,
+  ShieldCheck,
   UserRound,
 } from 'lucide-react';
 import { PublicFeePortalShell } from '@/components/public-fee-pay/public-fee-portal-shell';
@@ -278,22 +285,30 @@ export default function PublicFeePayPage() {
         <div className="pfp-layout">
           <div className="pfp-stack">
             <section className="pfp-card pfp-search-card">
-              <div className="pfp-card-head">
-                <h3>
-                  <UserRound size={16} aria-hidden /> Search Student
-                </h3>
+              <div className="pfp-card-head" style={{ alignItems: 'flex-start' }}>
+                <div>
+                  <h3>
+                    <GraduationCap size={18} aria-hidden /> Search Student
+                  </h3>
+                  <p className="pfp-card-sub">
+                    Enter your College Roll Number or Registration Number to continue.
+                  </p>
+                </div>
               </div>
               <form className="pfp-card-body" onSubmit={onLookup}>
                 <div>
                   <label htmlFor="identifier">College Roll / Registration Number</label>
-                  <input
-                    id="identifier"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="e.g. BA25-025"
-                    required
-                    autoComplete="off"
-                  />
+                  <div className="pfp-input-wrap">
+                    <UserRound size={16} aria-hidden />
+                    <input
+                      id="identifier"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      placeholder="e.g. BA25-025"
+                      required
+                      autoComplete="off"
+                    />
+                  </div>
                 </div>
 
                 <div style={{ marginTop: 14 }}>
@@ -320,35 +335,38 @@ export default function PublicFeePayPage() {
                   ) : mathPayload ? (
                     <>
                       <label htmlFor="captcha">Solve CAPTCHA: {mathPayload.expression}</label>
-                      <input
-                        id="captcha"
-                        value={mathAnswer}
-                        onChange={(e) => setMathAnswer(e.target.value)}
-                        required
-                        inputMode="numeric"
-                        autoComplete="off"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void loadChallenge()}
-                        style={{
-                          marginTop: 8,
-                          border: 0,
-                          background: 'none',
-                          color: '#0b2e59',
-                          textDecoration: 'underline',
-                          cursor: 'pointer',
-                          fontSize: 12,
-                        }}
-                      >
-                        New CAPTCHA
-                      </button>
+                      <div className="pfp-captcha-row">
+                        <div className="pfp-input-wrap">
+                          <ShieldCheck size={16} aria-hidden />
+                          <input
+                            id="captcha"
+                            value={mathAnswer}
+                            onChange={(e) => setMathAnswer(e.target.value)}
+                            required
+                            inputMode="numeric"
+                            autoComplete="off"
+                            placeholder="Enter answer"
+                          />
+                        </div>
+                        <div className="pfp-captcha-chip">
+                          <span>{mathPayload.expression}</span>
+                          <button
+                            type="button"
+                            onClick={() => void loadChallenge()}
+                            aria-label="Refresh CAPTCHA"
+                          >
+                            <RefreshCw size={15} />
+                          </button>
+                        </div>
+                      </div>
                     </>
                   ) : null}
                 </div>
 
                 <button type="submit" disabled={busy || !identifier.trim()}>
-                  {busy ? 'Searching…' : 'Search fees'}
+                  <Search size={16} aria-hidden />
+                  {busy ? 'Searching…' : 'Search Student'}
+                  <ArrowRight size={16} aria-hidden />
                 </button>
               </form>
             </section>
@@ -356,11 +374,36 @@ export default function PublicFeePayPage() {
 
           <aside className="pfp-stack">
             <div className="pfp-help">
-              <h3>Need Help?</h3>
-              <p>Admission / Accounts Office</p>
-              <p>☎ +91 9402152496</p>
-              <p>✉ accounts@donboscocollege.ac.in</p>
-              <p>🕘 Mon–Fri · 9:00 AM – 4:30 PM</p>
+              <div className="pfp-help-head">
+                <span>
+                  <Headphones size={18} aria-hidden />
+                </span>
+                <div>
+                  <h3>Need Help?</h3>
+                  <p>Admission / Accounts Office</p>
+                </div>
+              </div>
+              <ul className="pfp-help-list">
+                <li>
+                  <Phone size={15} aria-hidden />
+                  <a href="tel:+919402152496">+91 9402152496</a>
+                </li>
+                <li>
+                  <Mail size={15} aria-hidden />
+                  <a href="mailto:accounts@donboscocollege.ac.in">accounts@donboscocollege.ac.in</a>
+                </li>
+                <li>
+                  <Clock3 size={15} aria-hidden />
+                  <span>Mon – Fri · 9:00 AM – 4:30 PM</span>
+                </li>
+              </ul>
+              <div className="pfp-secure-note">
+                <ShieldCheck size={18} aria-hidden />
+                <p style={{ margin: 0 }}>
+                  Your payment is secure. Payments are processed through the college payment gateway
+                  with SSL encryption.
+                </p>
+              </div>
             </div>
           </aside>
         </div>
@@ -528,11 +571,36 @@ export default function PublicFeePayPage() {
             </section>
 
             <div className="pfp-help">
-              <h3>Need Help?</h3>
-              <p>Admission / Accounts Office</p>
-              <p>☎ +91 9402152496</p>
-              <p>✉ accounts@donboscocollege.ac.in</p>
-              <p>🕘 Mon–Fri · 9:00 AM – 4:30 PM</p>
+              <div className="pfp-help-head">
+                <span>
+                  <Headphones size={18} aria-hidden />
+                </span>
+                <div>
+                  <h3>Need Help?</h3>
+                  <p>Admission / Accounts Office</p>
+                </div>
+              </div>
+              <ul className="pfp-help-list">
+                <li>
+                  <Phone size={15} aria-hidden />
+                  <a href="tel:+919402152496">+91 9402152496</a>
+                </li>
+                <li>
+                  <Mail size={15} aria-hidden />
+                  <a href="mailto:accounts@donboscocollege.ac.in">accounts@donboscocollege.ac.in</a>
+                </li>
+                <li>
+                  <Clock3 size={15} aria-hidden />
+                  <span>Mon – Fri · 9:00 AM – 4:30 PM</span>
+                </li>
+              </ul>
+              <div className="pfp-secure-note">
+                <ShieldCheck size={18} aria-hidden />
+                <p style={{ margin: 0 }}>
+                  Your payment is secure. Payments are processed through the college payment gateway
+                  with SSL encryption.
+                </p>
+              </div>
             </div>
           </aside>
         </div>
