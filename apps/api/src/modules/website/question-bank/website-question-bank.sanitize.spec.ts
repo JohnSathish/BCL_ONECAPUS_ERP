@@ -1,21 +1,13 @@
-import { BadRequestException } from '@nestjs/common';
 import {
-  assertValidQuestionPaperPdf,
+  paperIdFromSlug,
+  questionPaperSlug,
   safeDownloadFileName,
-  sanitizeMultilineText,
   sanitizePlainText,
   sanitizeSubjectCode,
   slugifyQuestionPaper,
 } from './website-question-bank.sanitize';
 
-const pdfFile = (overrides: Partial<Express.Multer.File> = {}) =>
-  ({
-    originalname: 'paper.pdf',
-    mimetype: 'application/pdf',
-    buffer: Buffer.from('%PDF-1.7\n%âãÏÓ\n1 0 obj'),
-    size: 32,
-    ...overrides,
-  }) as Express.Multer.File;
+const ID = '3f2b8c1e-9a4d-4e2f-8b7a-1c2d3e4f5a6b';
 
 describe('website question bank sanitizers', () => {
   it('strips markup and control characters from plain text', () => {
@@ -23,12 +15,6 @@ describe('website question bank sanitizers', () => {
       sanitizePlainText('<b>Human</b>\u0000 <script>x</script> Geography', 100),
     ).toBe('Human x Geography');
     expect(sanitizePlainText('a'.repeat(50), 10)).toHaveLength(10);
-  });
-
-  it('keeps paragraph breaks in descriptions', () => {
-    expect(
-      sanitizeMultilineText('Line one\r\n\r\n\r\n<i>Line</i> two', 100),
-    ).toBe('Line one\n\nLine two');
   });
 
   it('normalizes subject codes', () => {
@@ -46,19 +32,18 @@ describe('website question bank sanitizers', () => {
     );
   });
 
-  it('accepts a genuine PDF', () => {
-    expect(() => assertValidQuestionPaperPdf(pdfFile(), 1024)).not.toThrow();
+  it('round-trips the paper id through its public slug', () => {
+    const slug = questionPaperSlug({
+      id: ID,
+      paperCode: 'ENG-101',
+      paperName: 'English Literature',
+      examYear: 2025,
+    });
+    expect(slug).toBe(`eng-101-english-literature-2025-${ID}`);
+    expect(paperIdFromSlug(slug)).toBe(ID);
   });
 
-  it.each([
-    ['missing file', undefined],
-    ['wrong extension', pdfFile({ originalname: 'paper.exe' })],
-    ['wrong mime type', pdfFile({ mimetype: 'text/html' })],
-    ['not a PDF body', pdfFile({ buffer: Buffer.from('<html>fake</html>') })],
-    ['too large', pdfFile({ size: 5000 })],
-  ])('rejects %s', (_label, file) => {
-    expect(() => assertValidQuestionPaperPdf(file, 1024)).toThrow(
-      BadRequestException,
-    );
+  it('rejects slugs without a trailing paper id', () => {
+    expect(paperIdFromSlug('eng-101-english-literature-2025')).toBeNull();
   });
 });

@@ -396,73 +396,8 @@ export type WebsitePublicPopup = Omit<
   'status' | 'audienceJson' | 'createdById' | 'createdByName' | 'createdAt' | 'updatedAt' | 'page'
 >;
 
-export type QuestionBankMasterKind =
-  | 'ACADEMIC_YEAR'
-  | 'PROGRAMME'
-  | 'DEPARTMENT'
-  | 'MAJOR'
-  | 'SUBJECT'
-  | 'EXAM_TYPE';
-
-export type QuestionBankMaster = {
-  id: string;
-  kind: QuestionBankMasterKind;
-  label: string;
-  code: string | null;
-  parentId: string | null;
-  sortOrder: number;
-  isActive: boolean;
-  usageCount: number;
-  updatedAt: string;
-};
-
-export type QuestionPaperStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-
-export type QuestionBankRef = { id: string; label: string; code?: string } | null;
-
-export type WebsiteQuestionPaper = {
-  id: string;
-  slug: string;
-  title: string;
-  subjectName: string;
-  subjectCode: string;
-  semester: number | null;
-  examYear: number | null;
-  description: string;
-  status: QuestionPaperStatus;
-  publishedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  academicYearId: string | null;
-  programmeId: string | null;
-  departmentId: string | null;
-  majorId: string | null;
-  subjectId: string | null;
-  examTypeId: string | null;
-  academicYear: QuestionBankRef;
-  programme: QuestionBankRef;
-  department: QuestionBankRef;
-  major: QuestionBankRef;
-  subject: QuestionBankRef;
-  examType: QuestionBankRef;
-  file: { name: string | null; bytes: number; version: number; updatedAt: string | null } | null;
-  downloadCount: number;
-  publicPath: string;
-};
-
-export type QuestionPaperListResponse = {
-  items: WebsiteQuestionPaper[];
-  total: number;
-  page: number;
-  pageSize: number;
-  pageCount: number;
-  statusCounts: Record<QuestionPaperStatus, number>;
-};
-
 export type QuestionBankSettings = {
   downloadMode: 'NEW_TAB' | 'DOWNLOAD';
-  maxUploadMb: number;
-  hardMaxUploadMb: number;
   pageSize: number;
   intro: string;
 };

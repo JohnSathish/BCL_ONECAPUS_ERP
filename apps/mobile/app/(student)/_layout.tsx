@@ -63,6 +63,7 @@ export default function StudentLayout() {
           <Stack.Screen name="library" />
           <Stack.Screen name="assignments" />
           <Stack.Screen name="syllabus" />
+          <Stack.Screen name="question-papers" />
           <Stack.Screen name="complete-profile" />
           <Stack.Screen name="registration-web" />
           <Stack.Screen name="feedback" />

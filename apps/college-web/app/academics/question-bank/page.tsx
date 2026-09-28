@@ -42,7 +42,7 @@ const EMPTY_FILTERS: QbFilterOptions = {
   academicYears: [],
   programmes: [],
   departments: [],
-  majors: [],
+  categories: [],
   subjects: [],
   examTypes: [],
   semesters: [],

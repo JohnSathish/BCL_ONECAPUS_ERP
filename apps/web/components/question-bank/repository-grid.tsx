@@ -8,6 +8,8 @@ import {
   BookmarkCheck,
   Download,
   Eye,
+  EyeOff,
+  Globe,
   History,
   Pencil,
   Replace,
@@ -37,6 +39,7 @@ import {
   publishQuestionPaper,
   removeQuestionBookmark,
   submitQuestionPaper,
+  updateQuestionPaper,
 } from '@/services/question-bank';
 import type { QuestionPaper, QuestionPaperFilters } from '@/types/question-bank';
 import { apiErrorMessage } from '@/utils/api-error';
@@ -196,6 +199,14 @@ export function RepositoryGrid({
   const submitMut = useMutation({ mutationFn: submitQuestionPaper, onSuccess: onRefresh });
   const publishMut = useMutation({ mutationFn: publishQuestionPaper, onSuccess: onRefresh });
   const archiveMut = useMutation({ mutationFn: archiveQuestionPaper, onSuccess: onRefresh });
+  const websiteMut = useMutation({
+    mutationFn: ({ id, show }: { id: string; show: boolean }) => {
+      const fd = new FormData();
+      fd.append('showOnWebsite', String(show));
+      return updateQuestionPaper(id, fd);
+    },
+    onSuccess: onRefresh,
+  });
   const bookmarkMut = useMutation({ mutationFn: addQuestionBookmark, onSuccess: onRefresh });
   const unbookmarkMut = useMutation({ mutationFn: removeQuestionBookmark, onSuccess: onRefresh });
   const approveMut = useMutation({
@@ -463,9 +474,7 @@ export function RepositoryGrid({
                       ) : null}
                       {showActions && canContribute ? (
                         <>
-                          {canManage ||
-                          (paper.uploadedById === user?.id &&
-                            ['DRAFT', 'REJECTED'].includes(paper.status)) ? (
+                          {canManage || paper.uploadedById === user?.id ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -483,6 +492,31 @@ export function RepositoryGrid({
                           >
                             <Replace className="h-3 w-3" />
                           </Button>
+                          {paper.status === 'PUBLISHED' &&
+                          (canManage || paper.uploadedById === user?.id) ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              title={
+                                paper.showOnWebsite
+                                  ? 'Shown on college website — click to hide'
+                                  : 'Hidden from college website — click to show'
+                              }
+                              aria-label={
+                                paper.showOnWebsite ? 'Hide from website' : 'Show on website'
+                              }
+                              disabled={websiteMut.isPending}
+                              onClick={() =>
+                                websiteMut.mutate({ id: paper.id, show: !paper.showOnWebsite })
+                              }
+                            >
+                              {paper.showOnWebsite ? (
+                                <Globe className="h-3 w-3 text-emerald-600" />
+                              ) : (
+                                <EyeOff className="h-3 w-3" />
+                              )}
+                            </Button>
+                          ) : null}
                           {paper.status === 'PUBLISHED' || canManage ? (
                             <Button
                               size="sm"
@@ -506,7 +540,7 @@ export function RepositoryGrid({
                       ) : null}
                       {showActions &&
                       canPublish &&
-                      ['APPROVED', 'PENDING_REVIEW'].includes(paper.status) ? (
+                      ['APPROVED', 'PENDING_REVIEW', 'DRAFT', 'REJECTED'].includes(paper.status) ? (
                         <Button size="sm" onClick={() => publishMut.mutate(paper.id)}>
                           Publish
                         </Button>
@@ -536,11 +570,21 @@ export function RepositoryGrid({
                           </Button>
                         </>
                       ) : null}
-                      {showActions && (canManage || (canContribute && paper.status === 'DRAFT')) ? (
+                      {showActions && (canManage || paper.uploadedById === user?.id) ? (
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => archiveMut.mutate(paper.id)}
+                          title="Archive"
+                          aria-label={`Archive ${paper.paperName}`}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Archive "${paper.paperCode} — ${paper.paperName}"? It will disappear from the website, student dashboard and app.`,
+                              )
+                            ) {
+                              archiveMut.mutate(paper.id);
+                            }
+                          }}
                         >
                           <Archive className="h-3 w-3" />
                         </Button>

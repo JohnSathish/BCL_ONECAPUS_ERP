@@ -7,6 +7,7 @@ import {
   CloudUpload,
   FileText,
   FileUp,
+  Globe,
   Info,
   Layers,
   Loader2,
@@ -184,9 +185,14 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState('');
   const [dragging, setDragging] = useState(false);
-  const [success, setSuccess] = useState<{ label: string; versionNo: number | null } | null>(null);
+  const [success, setSuccess] = useState<{
+    label: string;
+    versionNo: number | null;
+    onWebsite: boolean;
+  } | null>(null);
   const [toast, setToast] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [showOnWebsite, setShowOnWebsite] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const yearDefaulted = useRef(false);
 
@@ -325,6 +331,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
         paperType: selectedCourse.category?.toUpperCase() === 'PRACTICAL' ? 'PRACTICAL' : 'THEORY',
         examYear: String(examYearFor(selectedYear, semesterNo)),
         language: 'EN',
+        showOnWebsite: String(showOnWebsite),
       };
       const form = new FormData();
       for (const [key, value] of Object.entries(fields)) if (value) form.append(key, value);
@@ -332,7 +339,11 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
       return paperFromResponse(await createQuestionPaper(form));
     },
     onSuccess: ({ paper, versionNo }) => {
-      setSuccess({ label: `${paper.paperCode} — ${paper.paperName}`, versionNo });
+      setSuccess({
+        label: `${paper.paperCode} — ${paper.paperName}`,
+        versionNo,
+        onWebsite: paper.showOnWebsite ?? showOnWebsite,
+      });
       setToast('Question paper uploaded successfully.');
       setDetails((prev) => ({ ...prev, courseId: '' }));
       clearFile();
@@ -401,8 +412,10 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                   <p className="text-sm">
                     {success.label}
                     {success.versionNo
-                      ? ` was saved as version ${success.versionNo} of the existing paper.`
-                      : ' was saved to the repository.'}
+                      ? ` replaced the earlier file (version ${success.versionNo}).`
+                      : ' is now published.'}{' '}
+                    Students can see it on their dashboard and in the mobile app
+                    {success.onWebsite ? ', and it is listed on the college website.' : '.'}
                   </p>
                 </div>
               </div>
@@ -669,6 +682,24 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                 <Info className="h-4 w-4 shrink-0" aria-hidden /> {fileError}
               </p>
             ) : null}
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-muted/40 px-4 py-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-primary"
+                checked={showOnWebsite}
+                onChange={(e) => setShowOnWebsite(e.target.checked)}
+              />
+              <span>
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Globe className="h-4 w-4 text-primary" aria-hidden /> Also show on the college
+                  website
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Students always see published papers on their dashboard and in the mobile app.
+                </span>
+              </span>
+            </label>
           </section>
 
           {uploadMut.isError ? (
@@ -718,7 +749,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                 'Upload PDF files only.',
                 `Maximum file size: ${maxMb} MB.`,
                 'Select the correct academic year, semester, examination, programme, department and subject.',
-                'The paper will automatically be saved in the repository.',
+                'The paper is published immediately to the student dashboard, the mobile app and (if ticked) the college website.',
               ].map((text, index) => (
                 <li key={text} className="flex gap-3">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">

@@ -72,6 +72,7 @@ export type QuestionPaper = {
   checksumSha256?: string | null;
   currentVersionNo?: number;
   status: QuestionPaperStatus;
+  showOnWebsite?: boolean;
   keywords: string[];
   uploadedById?: string | null;
   publishedById?: string | null;

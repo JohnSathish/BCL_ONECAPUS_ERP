@@ -9340,6 +9340,7 @@ model QuestionPaper {
   checksumSha256     String?   @map("checksum_sha256")
   currentVersionNo   Int       @default(1) @map("current_version_no")
   status             String    @default("DRAFT")
+  showOnWebsite      Boolean   @default(true) @map("show_on_website")
   keywords           String[]  @default([])
   searchText         String?   @map("search_text")
   uploadedById       String?   @map("uploaded_by_id") @db.Uuid

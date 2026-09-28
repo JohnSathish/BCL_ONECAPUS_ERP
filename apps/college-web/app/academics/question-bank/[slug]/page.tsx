@@ -55,7 +55,7 @@ export default async function QuestionPaperDetailPage({ params }: Props) {
     ['Subject Code', paper.subjectCode],
     ['Programme', paper.programme?.label],
     ['Department', paper.department?.label],
-    ['Major', paper.major?.label],
+    ['Paper Category', paper.category?.label],
     ['Semester', paper.semester ? `Semester ${paper.semester}` : null],
     ['Academic Year', paper.academicYear?.label],
     ['Examination Type', paper.examType?.label],

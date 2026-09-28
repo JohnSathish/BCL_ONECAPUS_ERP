@@ -1,11 +1,6 @@
 import { api } from '@/services/api';
 import type {
-  QuestionBankMaster,
-  QuestionBankMasterKind,
   QuestionBankSettings,
-  QuestionPaperListResponse,
-  QuestionPaperStatus,
-  WebsiteQuestionPaper,
   WebsiteContentType,
   WebsiteDashboard,
   WebsiteHeroSlide,
@@ -650,87 +645,3 @@ export const fetchQuestionBankSettings = () =>
 
 export const updateQuestionBankSettings = (payload: Partial<QuestionBankSettings>) =>
   api.patch<QuestionBankSettings>(`${qb}/settings`, payload).then((r) => r.data);
-
-export const fetchQuestionBankMasters = (kind?: QuestionBankMasterKind) =>
-  api
-    .get<QuestionBankMaster[]>(`${qb}/masters`, { params: kind ? { kind } : undefined })
-    .then((r) => r.data);
-
-export type QuestionBankMasterPayload = {
-  kind?: QuestionBankMasterKind;
-  label?: string;
-  code?: string;
-  parentId?: string | null;
-  sortOrder?: number;
-  isActive?: boolean;
-};
-
-export const createQuestionBankMaster = (payload: QuestionBankMasterPayload) =>
-  api.post<QuestionBankMaster>(`${qb}/masters`, payload).then((r) => r.data);
-
-export const updateQuestionBankMaster = (id: string, payload: QuestionBankMasterPayload) =>
-  api.patch<QuestionBankMaster>(`${qb}/masters/${id}`, payload).then((r) => r.data);
-
-export const deleteQuestionBankMaster = (id: string) =>
-  api.delete(`${qb}/masters/${id}`).then((r) => r.data);
-
-export type QuestionPaperListParams = {
-  q?: string;
-  status?: QuestionPaperStatus;
-  academicYearId?: string;
-  programmeId?: string;
-  departmentId?: string;
-  examTypeId?: string;
-  sort?: string;
-  page?: number;
-  limit?: number;
-};
-
-export const fetchQuestionPapers = (params: QuestionPaperListParams) => {
-  const clean = Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== ''),
-  );
-  return api.get<QuestionPaperListResponse>(`${qb}/papers`, { params: clean }).then((r) => r.data);
-};
-
-export type QuestionPaperFormFields = {
-  title: string;
-  academicYearId: string;
-  semester: string;
-  programmeId: string;
-  departmentId: string;
-  majorId: string;
-  subjectId: string;
-  subjectName: string;
-  subjectCode: string;
-  examTypeId: string;
-  examYear: string;
-  description: string;
-  publishedAt: string;
-  status: QuestionPaperStatus;
-};
-
-/** Empty strings clear optional fields server-side. */
-export const saveQuestionPaper = (
-  id: string | null,
-  fields: QuestionPaperFormFields,
-  file: File | null,
-) => {
-  const form = new FormData();
-  for (const [key, value] of Object.entries(fields)) form.append(key, value);
-  if (file) form.append('file', file);
-  const config = { headers: { 'Content-Type': 'multipart/form-data' } };
-  const request = id
-    ? api.patch<WebsiteQuestionPaper>(`${qb}/papers/${id}`, form, config)
-    : api.post<WebsiteQuestionPaper>(`${qb}/papers`, form, config);
-  return request.then((r) => r.data);
-};
-
-export const updateQuestionPaperStatus = (id: string, status: QuestionPaperStatus) =>
-  api.patch<WebsiteQuestionPaper>(`${qb}/papers/${id}/status`, { status }).then((r) => r.data);
-
-export const deleteQuestionPaper = (id: string) =>
-  api.delete(`${qb}/papers/${id}`).then((r) => r.data);
-
-export const fetchQuestionPaperPdf = (id: string) =>
-  api.get<Blob>(`${qb}/papers/${id}/file`, { responseType: 'blob' }).then((r) => r.data as Blob);

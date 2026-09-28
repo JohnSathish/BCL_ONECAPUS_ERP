@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { StorageModule } from '../../shared/storage/storage.module';
 import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { AdministrationModule } from '../administration/administration.module';
+import { QuestionBankModule } from '../question-bank/question-bank.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { WebsiteAdminController } from './website-admin.controller';
 import { WebsiteAdminService } from './website-admin.service';
@@ -24,6 +25,7 @@ import { WebsiteQuestionBankService } from './question-bank/website-question-ban
     TenantsModule,
     AcademicCalendarModule,
     AdministrationModule,
+    QuestionBankModule,
   ],
   controllers: [
     WebsiteManagementController,

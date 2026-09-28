@@ -62,6 +62,12 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
         keywords: ['syllabus', 'pdf', 'paper', 'curriculum'],
       },
       {
+        id: 'question-papers',
+        label: 'Question Papers',
+        href: '/(student)/question-papers',
+        keywords: ['question', 'paper', 'previous', 'exam', 'pyq', 'pdf'],
+      },
+      {
         id: 'short-term-courses',
         label: 'Short-Term Courses',
         href: '/(student)/short-term-courses',

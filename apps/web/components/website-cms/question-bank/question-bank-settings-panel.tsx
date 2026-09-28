@@ -10,10 +10,7 @@ import { fetchQuestionBankSettings, updateQuestionBankSettings } from '@/service
 import type { QuestionBankSettings } from '@/types/website-cms';
 import { apiErrorMessage } from '@/utils/api-error';
 
-type SettingsForm = Pick<
-  QuestionBankSettings,
-  'downloadMode' | 'maxUploadMb' | 'pageSize' | 'intro'
->;
+type SettingsForm = QuestionBankSettings;
 
 export function QuestionBankSettingsPanel({ onMessage }: { onMessage: (message: string) => void }) {
   const queryClient = useQueryClient();
@@ -25,8 +22,8 @@ export function QuestionBankSettingsPanel({ onMessage }: { onMessage: (message: 
 
   useEffect(() => {
     if (settings.data) {
-      const { downloadMode, maxUploadMb, pageSize, intro } = settings.data;
-      setForm({ downloadMode, maxUploadMb, pageSize, intro });
+      const { downloadMode, pageSize, intro } = settings.data;
+      setForm({ downloadMode, pageSize, intro });
     }
   }, [settings.data]);
 
@@ -38,8 +35,6 @@ export function QuestionBankSettingsPanel({ onMessage }: { onMessage: (message: 
     },
     onError: (error) => onMessage(apiErrorMessage(error, 'Could not save settings')),
   });
-
-  const hardMax = settings.data?.hardMaxUploadMb ?? 25;
 
   return (
     <CompactCard>
@@ -81,22 +76,6 @@ export function QuestionBankSettingsPanel({ onMessage }: { onMessage: (message: 
                 <option value="NEW_TAB">Open PDF in a new tab</option>
                 <option value="DOWNLOAD">Download the PDF file</option>
               </select>
-            </ERPField>
-            <ERPField
-              label="Maximum PDF size (MB)"
-              htmlFor="qb-max-upload"
-              helper={`Server limit is ${hardMax} MB.`}
-            >
-              <Input
-                id="qb-max-upload"
-                type="number"
-                min={1}
-                max={hardMax}
-                required
-                value={form.maxUploadMb}
-                onChange={(event) => setForm({ ...form, maxUploadMb: Number(event.target.value) })}
-                className="h-9 text-sm"
-              />
             </ERPField>
             <ERPField label="Papers per page" htmlFor="qb-page-size" helper="Between 5 and 50.">
               <Input

@@ -15,6 +15,10 @@ import { QuestionPapersService } from './services/question-papers.service';
     QuestionBankAnalyticsService,
     QuestionPaperBulkImportService,
   ],
-  exports: [QuestionPapersService],
+  exports: [
+    QuestionPapersService,
+    QuestionBankAssetsService,
+    QuestionBankAnalyticsService,
+  ],
 })
 export class QuestionBankModule {}

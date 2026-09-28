@@ -123,11 +123,11 @@ export function QuestionBankFilterForm({
           options={toOptions(filters.departments)}
         />
         <FilterSelect
-          id="majorId"
-          label="Major"
-          allLabel="All Majors"
-          value={query.majorId}
-          options={toOptions(filters.majors)}
+          id="category"
+          label="Paper Category"
+          allLabel="All Categories"
+          value={query.category}
+          options={toOptions(filters.categories)}
         />
         <FilterSelect
           id="subjectId"
@@ -147,10 +147,10 @@ export function QuestionBankFilterForm({
           options={filters.subjectCodes.map((code) => ({ value: code, label: code }))}
         />
         <FilterSelect
-          id="examTypeId"
+          id="examType"
           label="Examination Type"
           allLabel="All Types"
-          value={query.examTypeId}
+          value={query.examType}
           options={toOptions(filters.examTypes)}
         />
         <FilterSelect
@@ -287,7 +287,7 @@ export function QuestionPaperCard({
           ) : null}
           {paper.examType ? <li className="qb-chip qb-chip-type">{paper.examType.label}</li> : null}
           {paper.examYear ? <li className="qb-chip">Exam {paper.examYear}</li> : null}
-          {paper.major ? <li className="qb-chip">Major: {paper.major.label}</li> : null}
+          {paper.category ? <li className="qb-chip">{paper.category.label}</li> : null}
         </ul>
       </div>
       <div className="qb-card-date">

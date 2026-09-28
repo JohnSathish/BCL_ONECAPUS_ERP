@@ -11,7 +11,10 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Public } from '../../../common/decorators/public.decorator';
-import { extractRequestHost } from '../../../common/utils/request-host';
+import {
+  extractClientIp,
+  extractRequestHost,
+} from '../../../common/utils/request-host';
 import { TenantResolutionService } from '../../tenants/tenant-resolution.service';
 import {
   PublicQuestionPaperQueryDto,
@@ -36,7 +39,7 @@ export class WebsiteQuestionBankPublicController {
   }
 
   private assertSlug(slug: string) {
-    if (!SLUG_PATTERN.test(slug) || slug.length > 120) {
+    if (!SLUG_PATTERN.test(slug) || slug.length > 160) {
       throw new NotFoundException('Question paper not found');
     }
   }
@@ -87,8 +90,12 @@ export class WebsiteQuestionBankPublicController {
   ) {
     this.assertSlug(slug);
     const tenant = await this.resolveTenant(req, query.tenant);
-    const { buffer, fileName, downloadMode } =
-      await this.questionBank.getPublicFile(tenant.id, slug);
+    const { stream, bytes, fileName, downloadMode } =
+      await this.questionBank.getPublicFile(
+        tenant.id,
+        slug,
+        extractClientIp(req),
+      );
     const forceDownload =
       query.download === '1' || query.download === 'true'
         ? true
@@ -97,10 +104,10 @@ export class WebsiteQuestionBankPublicController {
           : downloadMode === 'DOWNLOAD';
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    return new StreamableFile(buffer, {
+    return new StreamableFile(stream, {
       type: 'application/pdf',
       disposition: `${forceDownload ? 'attachment' : 'inline'}; filename="${fileName}"`,
-      length: buffer.length,
+      ...(bytes ? { length: bytes } : {}),
     });
   }
 }

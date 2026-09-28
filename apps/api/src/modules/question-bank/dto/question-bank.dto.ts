@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -27,6 +28,12 @@ function toStringArray(value: unknown): string[] | undefined {
       .filter(Boolean);
   }
   return undefined;
+}
+
+function toOptionalBoolean({ value }: { value: unknown }) {
+  if (value === 'true' || value === '1' || value === true) return true;
+  if (value === 'false' || value === '0' || value === false) return false;
+  return value === '' || value == null ? undefined : value;
 }
 
 export const EXAMINATION_TYPES = [
@@ -247,6 +254,11 @@ export class CreateQuestionPaperDto {
   @IsArray()
   @IsString({ each: true })
   keywords?: string[];
+
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean()
+  showOnWebsite?: boolean;
 }
 
 export class UpdateQuestionPaperDto {
@@ -352,6 +364,11 @@ export class UpdateQuestionPaperDto {
   @IsArray()
   @IsString({ each: true })
   keywords?: string[];
+
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean()
+  showOnWebsite?: boolean;
 }
 
 export class QuestionPaperApprovalDto {

@@ -303,6 +303,11 @@ export default function StudentAcademicsScreen() {
             onPress={() => router.push('/(student)/syllabus' as never)}
           />
           <DownloadChip
+            label="Question Papers"
+            available
+            onPress={() => router.push('/(student)/question-papers' as never)}
+          />
+          <DownloadChip
             label="Curriculum"
             available={data?.downloads.curriculumAvailable}
             onPress={() =>

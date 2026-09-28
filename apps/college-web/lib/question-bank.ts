@@ -14,7 +14,7 @@ export type QbFilterOptions = {
   academicYears: QbOption[];
   programmes: QbOption[];
   departments: QbOption[];
-  majors: QbOption[];
+  categories: QbOption[];
   subjects: QbOption[];
   examTypes: QbOption[];
   semesters: number[];
@@ -37,7 +37,7 @@ export type QbPaper = {
   academicYear: QbOption | null;
   programme: QbOption | null;
   department: QbOption | null;
-  major: QbOption | null;
+  category: QbOption | null;
   subject: QbOption | null;
   examType: QbOption | null;
   fileBytes: number;
@@ -68,10 +68,10 @@ export type QbQuery = {
   semester?: string;
   programmeId?: string;
   departmentId?: string;
-  majorId?: string;
+  category?: string;
   subjectId?: string;
   subjectCode?: string;
-  examTypeId?: string;
+  examType?: string;
   examYear?: string;
   sort?: QbSort;
   page?: string;
@@ -83,15 +83,16 @@ export const QB_FILTER_KEYS = [
   'semester',
   'programmeId',
   'departmentId',
-  'majorId',
+  'category',
   'subjectId',
   'subjectCode',
-  'examTypeId',
+  'examType',
   'examYear',
 ] as const satisfies ReadonlyArray<keyof QbQuery>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SUBJECT_CODE = /^[A-Za-z0-9 ./_-]{1,40}$/;
+const ENUM_VALUE = /^[A-Z_]{2,32}$/;
 
 type RawParams = Record<string, string | string[] | undefined>;
 
@@ -103,16 +104,13 @@ export function parseQbQuery(params: RawParams): QbQuery {
   const query: QbQuery = {};
   const q = first(params.q).replace(/[<>]/g, '').slice(0, 120);
   if (q) query.q = q;
-  for (const key of [
-    'academicYearId',
-    'programmeId',
-    'departmentId',
-    'majorId',
-    'subjectId',
-    'examTypeId',
-  ] as const) {
+  for (const key of ['academicYearId', 'programmeId', 'departmentId', 'subjectId'] as const) {
     const value = first(params[key]);
     if (UUID.test(value)) query[key] = value.toLowerCase();
+  }
+  for (const key of ['category', 'examType'] as const) {
+    const value = first(params[key]).toUpperCase();
+    if (ENUM_VALUE.test(value)) query[key] = value;
   }
   const semester = Number.parseInt(first(params.semester), 10);
   if (semester >= 1 && semester <= 12) query.semester = String(semester);
@@ -189,7 +187,7 @@ function mapPaper(value: unknown): QbPaper | null {
     academicYear: mapOption(value.academicYear),
     programme: mapOption(value.programme),
     department: mapOption(value.department),
-    major: mapOption(value.major),
+    category: mapOption(value.category),
     subject: mapOption(value.subject),
     examType: mapOption(value.examType),
     fileBytes: file && typeof file.bytes === 'number' ? file.bytes : 0,
@@ -205,7 +203,7 @@ export async function getQuestionBankFilters(): Promise<QbFilterOptions | null> 
     academicYears: mapOptions(raw.academicYears),
     programmes: mapOptions(raw.programmes),
     departments: mapOptions(raw.departments),
-    majors: mapOptions(raw.majors),
+    categories: mapOptions(raw.categories),
     subjects: mapOptions(raw.subjects),
     examTypes: mapOptions(raw.examTypes),
     semesters: numberList(raw.semesters),

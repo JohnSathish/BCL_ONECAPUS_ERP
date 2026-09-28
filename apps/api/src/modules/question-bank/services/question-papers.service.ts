@@ -542,7 +542,7 @@ export class QuestionPapersService {
       universityName,
       preparedById: dto.preparedById ?? user.sub,
       ...fileMeta,
-      status: 'DRAFT',
+      status: 'PUBLISHED',
     });
   }
 
@@ -604,6 +604,10 @@ export class QuestionPapersService {
         keywords: input.keywords ?? [],
         searchText,
         status: input.status ?? 'DRAFT',
+        showOnWebsite: input.showOnWebsite ?? true,
+        ...(input.status === 'PUBLISHED'
+          ? { publishedById: user.sub, publishedAt: new Date() }
+          : {}),
         uploadedById: user.sub,
       },
     });
@@ -625,7 +629,12 @@ export class QuestionPapersService {
       });
     }
 
-    await this.audit(user, 'paper.created', paper.id, { after: paper });
+    await this.audit(
+      user,
+      paper.status === 'PUBLISHED' ? 'paper.published' : 'paper.created',
+      paper.id,
+      { after: paper },
+    );
     return paper;
   }
 
@@ -897,11 +906,6 @@ export class QuestionPapersService {
     const canManage = this.hasPermission(user, 'question-bank:manage');
     if (!isOwner && !canManage)
       throw new ForbiddenException('You can only edit your own papers');
-    if (!['DRAFT', 'REJECTED'].includes(paper.status) && !canManage) {
-      throw new BadRequestException(
-        'Only draft or rejected papers can be edited',
-      );
-    }
 
     if (file?.buffer?.length) {
       await this.addVersion(user, id, file, {
@@ -943,7 +947,7 @@ export class QuestionPapersService {
     if (!paper) throw new NotFoundException('Paper not found');
     const canManage = this.hasPermission(user, 'question-bank:manage');
     const isOwner = paper.uploadedById === user.sub;
-    if (!canManage && !(isOwner && paper.status === 'DRAFT')) {
+    if (!canManage && !isOwner) {
       throw new ForbiddenException('You cannot archive this paper');
     }
     const updated = await this.prisma.questionPaper.update({
