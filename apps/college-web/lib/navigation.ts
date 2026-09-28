@@ -23,6 +23,7 @@ export const navigation = [
       ['Departments', '/departments'],
       ['Programmes', '/academics/programmes'],
       ['Academic Calendar', '/academics/calendar'],
+      ['Question Bank & Previous Question Papers', '/academics/question-bank'],
       ['Library', '/facilities/library'],
     ],
   },

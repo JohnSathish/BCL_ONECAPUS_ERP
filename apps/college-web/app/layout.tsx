@@ -27,6 +27,7 @@ import './iqac.css';
 import './leadership-profiles.css';
 import './biography-feature.css';
 import './important-links.css';
+import './question-bank.css';
 import './mobile-layout-fix.css';
 
 /** Self-hosted so Docker builds do not depend on fonts.googleapis.com. */

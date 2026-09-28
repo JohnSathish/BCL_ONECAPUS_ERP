@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next';
 import { listAcademicDepartments } from '@/lib/academic-departments';
 import { fetchCms, isRecord } from '@/lib/cms-client';
 import { getCollegeContent, siteUrl } from '@/lib/content';
+import { QUESTION_BANK_PATH, listQuestionPaperSitemap, qbPaperHref } from '@/lib/question-bank';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPaths = [
@@ -90,8 +91,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [base, ...faculty];
   });
 
+  const questionPapers = await listQuestionPaperSitemap();
+  const questionBankUrls: MetadataRoute.Sitemap = [
+    {
+      url: `${siteUrl}${QUESTION_BANK_PATH}`,
+      lastModified: questionPapers[0] ? new Date(questionPapers[0].updatedAt) : new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    ...questionPapers.map((paper) => ({
+      url: `${siteUrl}${qbPaperHref(paper.slug)}`,
+      lastModified: new Date(paper.updatedAt),
+      changeFrequency: 'yearly' as const,
+      priority: 0.5,
+    })),
+  ];
+
   if (cmsEntries.length) {
-    return [...cmsEntries, ...departmentUrls];
+    return [...cmsEntries, ...departmentUrls, ...questionBankUrls];
   }
 
   return [
@@ -103,5 +120,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
     ...news,
     ...departmentUrls,
+    ...questionBankUrls,
   ];
 }

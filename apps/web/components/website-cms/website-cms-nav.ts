@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  BookOpen,
   CalendarDays,
   FileText,
   FolderOpen,
@@ -123,6 +124,13 @@ export const WEBSITE_CMS_NAV: WebsiteCmsNavItem[] = [
     label: 'Programmes',
     href: '/admin/website/programmes',
     icon: FileStack,
+    group: 'academic',
+  },
+  {
+    id: 'question-bank',
+    label: 'Question Bank',
+    href: '/admin/website/question-bank',
+    icon: BookOpen,
     group: 'academic',
   },
   {

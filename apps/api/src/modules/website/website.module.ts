@@ -14,6 +14,9 @@ import { WebsiteFyugInterestDocumentService } from './services/website-fyug-inte
 import { WebsiteAcademicPlannerService } from './website-academic-planner.service';
 import { WebsitePopupAdminController } from './website-popup-admin.controller';
 import { WebsitePopupService } from './website-popup.service';
+import { WebsiteQuestionBankAdminController } from './question-bank/website-question-bank-admin.controller';
+import { WebsiteQuestionBankPublicController } from './question-bank/website-question-bank-public.controller';
+import { WebsiteQuestionBankService } from './question-bank/website-question-bank.service';
 
 @Module({
   imports: [
@@ -27,6 +30,8 @@ import { WebsitePopupService } from './website-popup.service';
     WebsiteAdminController,
     WebsitePublicController,
     WebsitePopupAdminController,
+    WebsiteQuestionBankAdminController,
+    WebsiteQuestionBankPublicController,
   ],
   providers: [
     WebsiteService,
@@ -36,6 +41,7 @@ import { WebsitePopupService } from './website-popup.service';
     WebsiteFyugInterestDocumentService,
     WebsiteAcademicPlannerService,
     WebsitePopupService,
+    WebsiteQuestionBankService,
   ],
   exports: [
     WebsiteService,

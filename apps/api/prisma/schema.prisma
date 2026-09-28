@@ -15202,6 +15202,8 @@ model WebsiteSite {
   academicPlannerYears WebsiteAcademicPlannerYear[]
   academicPlannerDays WebsiteAcademicPlannerDay[]
   popups WebsitePopup[]
+  questionBankMasters WebsiteQuestionBankMaster[]
+  questionPapers WebsiteQuestionPaper[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -15602,6 +15604,75 @@ model WebsitePopup {
   @@index([tenantId, siteId, status, page, displayOrder])
   @@index([siteId, page, status, startDate, endDate])
   @@map("website_popups")
+  @@schema("academic")
+}
+
+/// Public website question bank lookup values (academic years, programmes, departments, majors, subjects, exam types).
+model WebsiteQuestionBankMaster {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  siteId      String   @map("site_id") @db.Uuid
+  kind        String
+  label       String
+  code        String?
+  /// SUBJECT → DEPARTMENT master id.
+  parentId    String?  @map("parent_id") @db.Uuid
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdById String?  @map("created_by_id") @db.Uuid
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, kind, label])
+  @@index([tenantId, siteId, kind, isActive, sortOrder])
+  @@map("website_question_bank_masters")
+  @@schema("academic")
+}
+
+/// Previous question papers published on the public college website (PDF kept in private storage).
+model WebsiteQuestionPaper {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  siteId         String    @map("site_id") @db.Uuid
+  title          String
+  slug           String
+  academicYearId String?   @map("academic_year_id") @db.Uuid
+  semester       Int?
+  programmeId    String?   @map("programme_id") @db.Uuid
+  departmentId   String?   @map("department_id") @db.Uuid
+  majorId        String?   @map("major_id") @db.Uuid
+  subjectId      String?   @map("subject_id") @db.Uuid
+  subjectName    String    @default("") @map("subject_name")
+  subjectCode    String    @default("") @map("subject_code")
+  examTypeId     String?   @map("exam_type_id") @db.Uuid
+  examYear       Int?      @map("exam_year")
+  description    String    @default("") @db.Text
+  status         String    @default("DRAFT")
+  publishedAt    DateTime? @map("published_at")
+  fileStorageKey String?   @map("file_storage_key")
+  fileName       String?   @map("file_name")
+  fileMimeType   String?   @map("file_mime_type")
+  fileBytes      Int?      @map("file_bytes")
+  fileSha256     String?   @map("file_sha256")
+  fileVersion    Int       @default(0) @map("file_version")
+  fileUpdatedAt  DateTime? @map("file_updated_at")
+  downloadCount  Int       @default(0) @map("download_count")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  updatedById    String?   @map("updated_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, slug])
+  @@index([tenantId, siteId, status, publishedAt])
+  @@index([siteId, status, academicYearId, semester])
+  @@index([siteId, status, programmeId, departmentId])
+  @@index([siteId, status, subjectCode])
+  @@map("website_question_papers")
   @@schema("academic")
 }
 

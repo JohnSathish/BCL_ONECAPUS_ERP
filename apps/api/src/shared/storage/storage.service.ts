@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
 export type StoragePutOptions = {
@@ -50,6 +50,23 @@ export class StorageService {
   async exists(key: string): Promise<boolean> {
     const buf = await this.get(key);
     return buf != null;
+  }
+
+  /** Best-effort delete; missing objects are not an error. */
+  async remove(key: string): Promise<void> {
+    const bucket = this.driver === 'local' ? '' : this.bucketName();
+    if (!bucket) {
+      await unlink(this.resolveLocalPath(key)).catch(() => undefined);
+      return;
+    }
+    try {
+      const { DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+      await this.s3Client().send(
+        new DeleteObjectCommand({ Bucket: bucket, Key: key }),
+      );
+    } catch {
+      // ignore — orphaned objects are harmless
+    }
   }
 
   private async putObjectStorage(

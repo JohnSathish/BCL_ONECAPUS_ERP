@@ -118,6 +118,7 @@ import { ContentEntriesEditor } from './content-entries-editor';
 import { NewsEditorView } from './news-editor-view';
 import { HomepageContentEditors } from './homepage-content-editors';
 import { LifeAtCampusEditor } from './life-at-campus-editor';
+import { QuestionBankView } from './question-bank/question-bank-view';
 import { ReorderableList } from './reorderable-list';
 import { WebsiteQuickLinksSettingsView } from './website-quick-links-settings';
 import { WEBSITE_CMS_GROUPS, WEBSITE_CMS_NAV } from './website-cms-nav';
@@ -141,6 +142,7 @@ export type WebsiteCmsSection =
   | 'testimonials'
   | 'faculty'
   | 'programmes'
+  | 'question-bank'
   | 'calendar'
   | 'year-planner'
   | 'gallery'
@@ -250,6 +252,7 @@ export function WebsiteCmsWorkspace({ section }: { section: WebsiteCmsSection })
           {section === 'seo' ? <SeoSuiteView onMessage={setMessage} /> : null}
           {section === 'calendar' ? <CalendarVisibilityView onMessage={setMessage} /> : null}
           {section === 'year-planner' ? <AcademicYearPlannerView onMessage={setMessage} /> : null}
+          {section === 'question-bank' ? <QuestionBankView onMessage={setMessage} /> : null}
           {section === 'gallery' ? <LifeAtCampusEditor onMessage={setMessage} /> : null}
           {section === 'documents' || section === 'videos' ? (
             <MediaCollectionsView kind={section} onMessage={setMessage} />
