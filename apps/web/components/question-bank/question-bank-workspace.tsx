@@ -7,7 +7,7 @@ import { Bookmark, FileText, Search, ShieldCheck, Users } from 'lucide-react';
 import { QuestionBankDashboardPanel } from './dashboard-panel';
 import { KpiCard, StatusBadge } from './qb-shared';
 import { RepositoryGrid } from './repository-grid';
-import { QuestionPaperUploadWizard } from './upload-wizard';
+import { QuestionPaperUploadForm } from './upload-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
@@ -197,7 +197,13 @@ export function QuestionBankWorkspace({ page = 'dashboard', portal = 'admin' }: 
   }
 
   if (page === 'upload') {
-    return <QuestionPaperUploadWizard canManage={Boolean(canManage)} onDone={invalidate} />;
+    return (
+      <QuestionPaperUploadForm
+        canManage={Boolean(canManage)}
+        repositoryHref={portal === 'admin' ? '/admin/academics/question-bank/papers' : undefined}
+        onDone={invalidate}
+      />
+    );
   }
 
   if (page === 'workflow') {
