@@ -34,6 +34,12 @@ export const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
   SEC: 'Skill Enhancement (SEC)',
   VAC: 'Value Added (VAC)',
   VTC: 'Vocational (VTC)',
+  INTERNSHIP: 'Internship',
+  PROJECT: 'Project',
+  RESEARCH: 'Research',
+  DISSERTATION: 'Dissertation',
+  ELECTIVE: 'Elective',
+  OPEN_ELECTIVE: 'Open Elective',
   PRACTICAL: 'Practical',
 };
 

@@ -48,6 +48,28 @@ const EXAMINATION_TYPES: Array<{ value: string; label: string }> = [
   { value: 'REVALUATION', label: 'Revaluation' },
 ];
 const EXAM_LABELS = Object.fromEntries(EXAMINATION_TYPES.map((t) => [t.value, t.label]));
+const SUBJECT_CATEGORIES: Array<{ value: string; label: string }> = [
+  { value: 'MAJOR', label: 'Major' },
+  { value: 'MINOR', label: 'Minor' },
+  { value: 'MDC', label: 'Multidisciplinary (MDC)' },
+  { value: 'AEC', label: 'Ability Enhancement (AEC)' },
+  { value: 'SEC', label: 'Skill Enhancement (SEC)' },
+  { value: 'VAC', label: 'Value Added (VAC)' },
+  { value: 'VTC', label: 'Vocational (VTC)' },
+  { value: 'INTERNSHIP', label: 'Internship' },
+  { value: 'PROJECT', label: 'Project' },
+  { value: 'RESEARCH', label: 'Research' },
+  { value: 'DISSERTATION', label: 'Dissertation' },
+  { value: 'ELECTIVE', label: 'Elective' },
+  { value: 'OPEN_ELECTIVE', label: 'Open Elective' },
+  { value: 'PRACTICAL', label: 'Practical' },
+];
+const CATEGORY_LABELS = Object.fromEntries(SUBJECT_CATEGORIES.map((c) => [c.value, c.label]));
+
+function normalizeCategory(value?: string | null) {
+  const upper = value?.trim().toUpperCase() ?? '';
+  return CATEGORY_LABELS[upper] ? upper : '';
+}
 
 type Details = {
   academicYearId: string;
@@ -55,6 +77,7 @@ type Details = {
   examinationType: string;
   programId: string;
   departmentId: string;
+  subjectCategory: string;
   courseId: string;
 };
 
@@ -64,6 +87,7 @@ const emptyDetails = (academicYearId = ''): Details => ({
   examinationType: 'UNIVERSITY_EXAM',
   programId: '',
   departmentId: '',
+  subjectCategory: '',
   courseId: '',
 });
 
@@ -121,16 +145,18 @@ function Field({
   htmlFor,
   required,
   hint,
+  className,
   children,
 }: {
   label: string;
   htmlFor: string;
   required?: boolean;
   hint?: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0 space-y-1.5">
+    <div className={`min-w-0 space-y-1.5 ${className ?? ''}`}>
       <label htmlFor={htmlFor} className="block text-sm font-medium text-foreground">
         {label}
         {required ? <span className="ml-0.5 text-destructive">*</span> : null}
@@ -239,12 +265,14 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
       details.departmentId,
       programVersionId,
       details.semesterNo,
+      details.subjectCategory,
     ],
     queryFn: () =>
       fetchCurriculumCourses({
         departmentId: details.departmentId || undefined,
         programVersionId: programVersionId || undefined,
         semesterNo: Number(details.semesterNo),
+        category: details.subjectCategory || undefined,
       }),
     enabled: queryEnabled && Boolean(details.semesterNo),
   });
@@ -309,6 +337,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
     !details.academicYearId && 'Academic Year',
     !details.semesterNo && 'Semester',
     !details.examinationType && 'Examination',
+    !details.subjectCategory && 'Subject Category',
     !details.courseId && 'Subject / Course',
     !file && 'PDF file',
   ].filter(Boolean) as string[];
@@ -327,8 +356,8 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
         courseId: selectedCourse.id,
         paperCode: selectedCourse.code,
         paperName: selectedCourse.title,
-        subjectCategory: selectedCourse.category ?? '',
-        paperType: selectedCourse.category?.toUpperCase() === 'PRACTICAL' ? 'PRACTICAL' : 'THEORY',
+        subjectCategory: details.subjectCategory,
+        paperType: details.subjectCategory === 'PRACTICAL' ? 'PRACTICAL' : 'THEORY',
         examYear: String(examYearFor(selectedYear, semesterNo)),
         language: 'EN',
         showOnWebsite: String(showOnWebsite),
@@ -530,15 +559,31 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                   loading={deptsQuery.isLoading}
                 />
               </Field>
+              <Field label="Subject Category" htmlFor="qb-category" required>
+                <select
+                  id="qb-category"
+                  className={fieldClass}
+                  value={details.subjectCategory}
+                  onChange={(e) => patch({ subjectCategory: e.target.value, courseId: '' })}
+                >
+                  <option value="">Select category</option>
+                  {SUBJECT_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
               <Field
                 label="Subject / Course"
                 htmlFor="qb-course"
                 required
+                className="sm:col-span-2 xl:col-span-3"
                 hint={
                   !details.semesterNo
                     ? 'Select a semester to see its subjects.'
                     : coursesQuery.isSuccess && !courses.length
-                      ? 'No subjects match. Try clearing the programme or department.'
+                      ? 'No subjects match. Try another category, or clear the programme or department.'
                       : undefined
                 }
               >
@@ -551,6 +596,8 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                     patch({
                       courseId,
                       departmentId: details.departmentId || course?.departmentId || '',
+                      subjectCategory:
+                        details.subjectCategory || normalizeCategory(course?.category),
                     });
                   }}
                   placeholder={
@@ -577,9 +624,12 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                     Department <strong className="text-foreground">{selectedDeptName}</strong>
                   </span>
                 ) : null}
-                {selectedCourse.category ? (
+                {details.subjectCategory ? (
                   <span>
-                    Category <strong className="text-foreground">{selectedCourse.category}</strong>
+                    Category{' '}
+                    <strong className="text-foreground">
+                      {CATEGORY_LABELS[details.subjectCategory] ?? details.subjectCategory}
+                    </strong>
                   </span>
                 ) : null}
                 <span>

@@ -12,6 +12,7 @@ import type {
 } from '@/types/question-bank';
 
 const base = '/v1/question-bank';
+const UPLOAD_CONFIG = { timeout: 120_000 };
 
 export const fetchQuestionBankDashboard = () =>
   api.get<QuestionBankDashboard>(`${base}/dashboard`).then((r) => r.data);
@@ -46,11 +47,11 @@ export const createQuestionPaper = (form: FormData) =>
   api
     .post<
       QuestionPaper | { paper: QuestionPaper; version: QuestionPaperVersion }
-    >(`${base}/papers`, form)
+    >(`${base}/papers`, form, UPLOAD_CONFIG)
     .then((r) => r.data);
 
 export const updateQuestionPaper = (id: string, form: FormData) =>
-  api.patch<QuestionPaper>(`${base}/papers/${id}`, form).then((r) => r.data);
+  api.patch<QuestionPaper>(`${base}/papers/${id}`, form, UPLOAD_CONFIG).then((r) => r.data);
 
 export const submitQuestionPaper = (id: string) =>
   api.post<QuestionPaper>(`${base}/papers/${id}/submit`).then((r) => r.data);
@@ -91,7 +92,7 @@ export const addPaperVersion = (paperId: string, form: FormData) =>
     .post<{
       paper: QuestionPaper;
       version: QuestionPaperVersion;
-    }>(`${base}/papers/${paperId}/versions`, form)
+    }>(`${base}/papers/${paperId}/versions`, form, UPLOAD_CONFIG)
     .then((r) => r.data);
 
 export const downloadPaperVersion = (paperId: string, versionNo: number) =>
@@ -127,14 +128,18 @@ export const removeQuestionBookmark = (paperId: string) =>
   api.delete(`${base}/me/bookmarks/${paperId}`).then((r) => r.data);
 
 export const previewQuestionBankBulk = (form: FormData) =>
-  api.post<BulkPreviewResponse>(`${base}/bulk/preview`, form).then((r) => r.data);
+  api.post<BulkPreviewResponse>(`${base}/bulk/preview`, form, UPLOAD_CONFIG).then((r) => r.data);
 
 export const commitQuestionBankBulk = (rows: Record<string, unknown>[], zip?: File) => {
   const form = new FormData();
   form.append('rows', JSON.stringify(rows));
   if (zip) form.append('zip', zip);
   return api
-    .post<{ imported: number; versioned?: number; paperIds: string[] }>(`${base}/bulk/commit`, form)
+    .post<{
+      imported: number;
+      versioned?: number;
+      paperIds: string[];
+    }>(`${base}/bulk/commit`, form, UPLOAD_CONFIG)
     .then((r) => r.data);
 };
 

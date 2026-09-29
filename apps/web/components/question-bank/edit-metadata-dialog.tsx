@@ -22,7 +22,22 @@ const EXAMINATION_TYPES = [
   'SUPPLEMENTARY',
   'REVALUATION',
 ];
-const SUBJECT_CATEGORIES = ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC', 'VTC', 'PRACTICAL'];
+const SUBJECT_CATEGORIES = [
+  'MAJOR',
+  'MINOR',
+  'MDC',
+  'AEC',
+  'SEC',
+  'VAC',
+  'VTC',
+  'INTERNSHIP',
+  'PROJECT',
+  'RESEARCH',
+  'DISSERTATION',
+  'ELECTIVE',
+  'OPEN_ELECTIVE',
+  'PRACTICAL',
+];
 
 type Props = {
   paper: QuestionPaper;
