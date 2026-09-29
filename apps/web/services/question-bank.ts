@@ -43,11 +43,24 @@ export const fetchQuestionPapers = (params?: Record<string, string | number | un
 export const fetchQuestionPaper = (id: string) =>
   api.get<QuestionPaper>(`${base}/papers/${id}`).then((r) => r.data);
 
-export const createQuestionPaper = (form: FormData) =>
+export type UploadProgress = { loaded: number; total: number };
+
+export const createQuestionPaper = (
+  form: FormData,
+  opts?: { onProgress?: (progress: UploadProgress) => void; signal?: AbortSignal },
+) =>
   api
-    .post<
-      QuestionPaper | { paper: QuestionPaper; version: QuestionPaperVersion }
-    >(`${base}/papers`, form, UPLOAD_CONFIG)
+    .post<QuestionPaper | { paper: QuestionPaper; version: QuestionPaperVersion }>(
+      `${base}/papers`,
+      form,
+      {
+        ...UPLOAD_CONFIG,
+        signal: opts?.signal,
+        onUploadProgress: opts?.onProgress
+          ? (event) => opts.onProgress?.({ loaded: event.loaded, total: event.total ?? 0 })
+          : undefined,
+      },
+    )
     .then((r) => r.data);
 
 export const updateQuestionPaper = (id: string, form: FormData) =>

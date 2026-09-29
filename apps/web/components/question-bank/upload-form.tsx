@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 import {
   ArrowRight,
   BookOpen,
@@ -210,6 +211,92 @@ function SectionHeading({
   );
 }
 
+type UploadProgressState = {
+  loaded: number;
+  total: number;
+  /** Bytes per second since the upload started. */
+  speed: number;
+  etaSeconds: number | null;
+};
+
+function formatEta(seconds: number) {
+  if (seconds < 1) return 'less than a second left';
+  if (seconds < 60) return `${Math.ceil(seconds)}s left`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m ${Math.ceil(seconds % 60)}s left`;
+}
+
+function UploadProgressPanel({
+  fileName,
+  progress,
+  percent,
+  onCancel,
+}: {
+  fileName: string;
+  progress: UploadProgressState;
+  percent: number;
+  onCancel: () => void;
+}) {
+  const finalising = percent >= 100;
+  return (
+    <div
+      className="space-y-3 rounded-xl bg-primary/5 p-4 ring-1 ring-primary/20"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          {finalising ? (
+            <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+          ) : (
+            <CloudUpload className="h-5 w-5 animate-pulse" aria-hidden />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium" title={fileName}>
+            {finalising ? 'Saving and publishing…' : `Uploading ${fileName}`}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {finalising
+              ? 'File received. Almost done.'
+              : [
+                  `${formatBytes(progress.loaded)} of ${formatBytes(progress.total)}`,
+                  progress.speed ? `${formatBytes(progress.speed)}/s` : null,
+                  progress.etaSeconds != null ? formatEta(progress.etaSeconds) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+          </p>
+        </div>
+        <span className="shrink-0 text-lg font-bold tabular-nums text-primary">{percent}%</span>
+      </div>
+      <div
+        className="h-2.5 w-full overflow-hidden rounded-full bg-primary/15"
+        role="progressbar"
+        aria-label="Upload progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+      >
+        <div
+          className={cn(
+            'h-full rounded-full bg-primary transition-[width] duration-200 ease-out',
+            finalising && 'animate-pulse',
+          )}
+          style={{ width: `${Math.max(percent, 3)}%` }}
+        />
+      </div>
+      {!finalising ? (
+        <div className="flex justify-end">
+          <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+            <X className="mr-1 h-4 w-4" /> Cancel upload
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -242,6 +329,8 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
   const [toast, setToast] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
   const [showOnWebsite, setShowOnWebsite] = useState(true);
+  const [progress, setProgress] = useState<UploadProgressState | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const yearDefaulted = useRef(false);
 
@@ -314,6 +403,8 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
         .slice(0, 5),
     [recentQuery.data],
   );
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
     if (!toast) return;
@@ -392,7 +483,31 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
       const form = new FormData();
       for (const [key, value] of Object.entries(fields)) if (value) form.append(key, value);
       form.append('file', file);
-      return paperFromResponse(await createQuestionPaper(form));
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const startedAt = performance.now();
+      setProgress({ loaded: 0, total: file.size, speed: 0, etaSeconds: null });
+      return paperFromResponse(
+        await createQuestionPaper(form, {
+          signal: controller.signal,
+          onProgress: ({ loaded, total }) => {
+            const size = total || file.size;
+            const elapsed = (performance.now() - startedAt) / 1000;
+            const speed = elapsed > 0.25 ? loaded / elapsed : 0;
+            setProgress({
+              loaded,
+              total: size,
+              speed,
+              etaSeconds: speed ? Math.max(0, (size - loaded) / speed) : null,
+            });
+          },
+        }),
+      );
+    },
+    onSettled: () => {
+      abortRef.current = null;
+      setProgress(null);
     },
     onSuccess: ({ paper, versionNo }) => {
       setSuccess({
@@ -408,6 +523,10 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
   });
 
   const canSubmit = missing.length === 0 && !fileError && !uploadMut.isPending;
+  const uploadCancelled = uploadMut.isError && axios.isCancel(uploadMut.error);
+  const uploadPercent = progress?.total
+    ? Math.min(100, Math.round((progress.loaded / progress.total) * 100))
+    : 0;
   const detailsDone = Boolean(
     details.academicYearId &&
     details.semesterNo &&
@@ -501,7 +620,11 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
             </div>
           ) : null}
 
-          <section className="space-y-5" aria-labelledby="qb-details-heading">
+          <fieldset
+            className="min-w-0 space-y-5"
+            aria-labelledby="qb-details-heading"
+            disabled={uploadMut.isPending}
+          >
             <SectionHeading
               id="qb-details-heading"
               step={1}
@@ -692,7 +815,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                 </div>
               </div>
             ) : null}
-          </section>
+          </fieldset>
 
           <div className="h-px bg-border/60" />
 
@@ -716,7 +839,14 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
               onChange={(e) => void pickFile(e.target.files?.[0])}
             />
 
-            {file ? (
+            {uploadMut.isPending && progress && file ? (
+              <UploadProgressPanel
+                fileName={file.name}
+                progress={progress}
+                percent={uploadPercent}
+                onCancel={() => abortRef.current?.abort()}
+              />
+            ) : file ? (
               <div className="flex items-center gap-3 rounded-xl bg-emerald-50/60 p-4 ring-1 ring-emerald-200 dark:bg-emerald-950/20 dark:ring-emerald-900">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-950/40">
                   <FileText className="h-6 w-6" aria-hidden />
@@ -811,6 +941,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                 type="checkbox"
                 className="mt-0.5 h-4 w-4 accent-primary"
                 checked={showOnWebsite}
+                disabled={uploadMut.isPending}
                 onChange={(e) => setShowOnWebsite(e.target.checked)}
               />
               <span>
@@ -825,7 +956,14 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
             </label>
           </section>
 
-          {uploadMut.isError ? (
+          {uploadCancelled ? (
+            <p
+              className="rounded-lg bg-muted/60 px-3 py-2 text-sm text-muted-foreground"
+              role="status"
+            >
+              Upload cancelled. Your details and file are still selected. Click Upload to try again.
+            </p>
+          ) : uploadMut.isError ? (
             <p
               className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
               role="alert"
@@ -847,7 +985,8 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
               <Button type="submit" size="lg" disabled={!canSubmit} className="sm:min-w-[220px]">
                 {uploadMut.isPending ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading…
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {uploadPercent >= 100 ? 'Finishing…' : `Uploading ${uploadPercent}%`}
                   </>
                 ) : (
                   <>

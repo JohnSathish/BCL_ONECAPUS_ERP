@@ -481,13 +481,16 @@ export class QuestionPapersService {
       throw new BadRequestException('PDF file is required');
     }
 
-    const settings = await this.getSettings(user.tid);
-    const course = dto.courseId
-      ? await this.prisma.course.findFirst({
-          where: { id: dto.courseId, tenantId: user.tid, deletedAt: null },
-          select: { id: true, code: true, title: true, departmentId: true },
-        })
-      : null;
+    const [settings, course, defaultUniversity] = await Promise.all([
+      this.getSettings(user.tid),
+      dto.courseId
+        ? this.prisma.course.findFirst({
+            where: { id: dto.courseId, tenantId: user.tid, deletedAt: null },
+            select: { id: true, code: true, title: true, departmentId: true },
+          })
+        : null,
+      dto.universityName ? null : this.resolveDefaultUniversity(user.tid),
+    ]);
 
     const paperCode = course?.code ?? dto.paperCode;
     const paperName = course?.title ?? dto.paperName;
@@ -502,26 +505,27 @@ export class QuestionPapersService {
       resolveExamCycleFromSemester(dto.semesterNo) ??
       undefined;
 
-    const identity = await this.findIdentityMatch(user.tid, {
-      paperCode,
-      academicYearId: dto.academicYearId,
-      examYear: dto.examYear,
-      examMonth: dto.examMonth,
-      paperType: dto.paperType,
-    });
-
-    const fileMeta = await this.assets.savePaperFile(user.tid, file, {
-      courseCode: paperCode,
-      examYear: dto.examYear,
-      examCycle,
-      semesterNo: dto.semesterNo,
-      paperCode,
-      paperType: dto.paperType,
-      maxUploadMb: settings.maxUploadMb,
-      allowedMimeTypes: settings.allowedMimeTypes as string[],
-      pdfOnly: true,
-      canonicalName: true,
-    });
+    const [identity, fileMeta] = await Promise.all([
+      this.findIdentityMatch(user.tid, {
+        paperCode,
+        academicYearId: dto.academicYearId,
+        examYear: dto.examYear,
+        examMonth: dto.examMonth,
+        paperType: dto.paperType,
+      }),
+      this.assets.savePaperFile(user.tid, file, {
+        courseCode: paperCode,
+        examYear: dto.examYear,
+        examCycle,
+        semesterNo: dto.semesterNo,
+        paperCode,
+        paperType: dto.paperType,
+        maxUploadMb: settings.maxUploadMb,
+        allowedMimeTypes: settings.allowedMimeTypes as string[],
+        pdfOnly: true,
+        canonicalName: true,
+      }),
+    ]);
 
     if (identity) {
       return this.addVersion(user, identity.id, file, {
@@ -530,8 +534,7 @@ export class QuestionPapersService {
       });
     }
 
-    const universityName =
-      dto.universityName ?? (await this.resolveDefaultUniversity(user.tid));
+    const universityName = dto.universityName ?? defaultUniversity ?? undefined;
 
     return this.createInternal(user, {
       ...dto,
@@ -609,25 +612,25 @@ export class QuestionPapersService {
           ? { publishedById: user.sub, publishedAt: new Date() }
           : {}),
         uploadedById: user.sub,
+        ...(input.filePath && input.fileName
+          ? {
+              versions: {
+                create: {
+                  tenantId: user.tid,
+                  versionNo: 1,
+                  filePath: input.filePath,
+                  fileName: input.fileName,
+                  mimeType: input.mimeType,
+                  fileSizeBytes: input.fileSizeBytes,
+                  checksumSha256: input.checksumSha256,
+                  uploadedById: user.sub,
+                  changeNote: 'Initial upload',
+                },
+              },
+            }
+          : {}),
       },
     });
-
-    if (input.filePath && input.fileName) {
-      await this.prisma.questionPaperVersion.create({
-        data: {
-          tenantId: user.tid,
-          paperId: paper.id,
-          versionNo: 1,
-          filePath: input.filePath,
-          fileName: input.fileName,
-          mimeType: input.mimeType,
-          fileSizeBytes: input.fileSizeBytes,
-          checksumSha256: input.checksumSha256,
-          uploadedById: user.sub,
-          changeNote: 'Initial upload',
-        },
-      });
-    }
 
     await this.audit(
       user,
