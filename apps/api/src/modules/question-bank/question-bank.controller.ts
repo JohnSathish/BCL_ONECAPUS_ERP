@@ -151,6 +151,12 @@ export class QuestionBankController {
     return this.papers.archive(user, id);
   }
 
+  @Delete('papers/:id/permanent')
+  @RequireAnyPermission(...QB_CONTRIBUTE)
+  deletePermanently(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.papers.deletePermanently(user, id);
+  }
+
   @Post('papers/:id/submit')
   @RequireAnyPermission(...QB_CONTRIBUTE)
   submit(@CurrentUser() user: JwtUser, @Param('id') id: string) {

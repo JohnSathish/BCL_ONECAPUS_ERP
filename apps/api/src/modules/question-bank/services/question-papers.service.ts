@@ -958,6 +958,31 @@ export class QuestionPapersService {
     return updated;
   }
 
+  async deletePermanently(user: JwtUser, id: string) {
+    const paper = await this.prisma.questionPaper.findFirst({
+      where: { id, tenantId: user.tid },
+      include: { versions: { select: { filePath: true } } },
+    });
+    if (!paper) throw new NotFoundException('Paper not found');
+    const canManage = this.hasPermission(user, 'question-bank:manage');
+    const isOwner = paper.uploadedById === user.sub;
+    if (!canManage && !isOwner) {
+      throw new ForbiddenException('You cannot delete this paper');
+    }
+
+    const { versions, ...snapshot } = paper;
+    await this.audit(user, 'paper.deleted', id, { before: snapshot });
+    await this.prisma.questionPaper.delete({ where: { id } });
+
+    const filePaths = [
+      paper.filePath,
+      paper.previewPath,
+      ...versions.map((v) => v.filePath),
+    ];
+    await this.assets.removePaperFiles(user.tid, filePaths);
+    return { ok: true, id };
+  }
+
   async download(user: JwtUser, id: string, ipAddress?: string) {
     const paper = await this.getById(user, id, this.isStudent(user));
     if (!paper.filePath) throw new NotFoundException('No file attached');
@@ -978,7 +1003,10 @@ export class QuestionPapersService {
   async preview(user: JwtUser, id: string, ipAddress?: string) {
     const paper = await this.getById(user, id, this.isStudent(user));
     if (!paper.filePath) throw new NotFoundException('No file attached');
-    if (paper.mimeType !== 'application/pdf') {
+    const isPdf =
+      paper.mimeType === 'application/pdf' ||
+      /\.pdf$/i.test(paper.fileName ?? paper.filePath);
+    if (!isPdf) {
       throw new BadRequestException('Preview is only available for PDF files');
     }
     await this.analytics.logAccess({

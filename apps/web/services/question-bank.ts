@@ -61,6 +61,9 @@ export const publishQuestionPaper = (id: string) =>
 export const archiveQuestionPaper = (id: string) =>
   api.delete<QuestionPaper>(`${base}/papers/${id}`).then((r) => r.data);
 
+export const deleteQuestionPaperPermanently = (id: string) =>
+  api.delete<{ ok: boolean; id: string }>(`${base}/papers/${id}/permanent`).then((r) => r.data);
+
 export const actOnQuestionPaperApproval = (
   id: string,
   payload: { action: 'APPROVE' | 'REJECT'; comments?: string },

@@ -1,21 +1,27 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Archive,
   Bookmark,
   BookmarkCheck,
+  CheckCircle2,
   Download,
   Eye,
   EyeOff,
   Globe,
   History,
+  Loader2,
+  MoreHorizontal,
   Pencil,
   Replace,
   Search,
   Send,
   Share2,
+  Trash2,
+  X,
+  XCircle,
 } from 'lucide-react';
 
 import { EditMetadataDialog } from './edit-metadata-dialog';
@@ -23,6 +29,14 @@ import { SharePaperDialog } from './share-dialog';
 import { StatusBadge } from './qb-shared';
 import { VersionsDrawer } from './versions-drawer';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchAcademicYears, fetchAcademicDepartments } from '@/services/organization';
@@ -32,6 +46,7 @@ import {
   addPaperVersion,
   addQuestionBookmark,
   archiveQuestionPaper,
+  deleteQuestionPaperPermanently,
   downloadQuestionPaper,
   fetchCurriculumCourses,
   fetchQuestionBankUploaders,
@@ -58,32 +73,75 @@ type Props = {
   error?: unknown;
 };
 
+type Notice = { tone: 'success' | 'error'; text: string };
+
+/** Axios blob errors carry the JSON error body as a Blob; unwrap it for a readable message. */
+async function blobErrorMessage(error: unknown, fallback: string) {
+  const data = (error as { response?: { data?: unknown } })?.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const parsed = JSON.parse(await data.text()) as { message?: string | string[] };
+      const message = Array.isArray(parsed.message) ? parsed.message[0] : parsed.message;
+      if (message) return message;
+    } catch {
+      /* fall through */
+    }
+  }
+  return apiErrorMessage(error, fallback);
+}
+
+function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 function PaperPreviewDialog({
   paperId,
   title,
+  fileName,
   onClose,
 }: {
   paperId: string;
   title: string;
+  fileName?: string | null;
   onClose: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     let objectUrl: string | null = null;
+    setUrl(null);
+    setError(null);
     previewQuestionPaperBlob(paperId)
       .then((blob) => {
         if (!active) return;
-        objectUrl = URL.createObjectURL(blob);
+        objectUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
         setUrl(objectUrl);
       })
-      .catch(() => setUrl(null));
+      .catch(async (err) => {
+        if (active) setError(await blobErrorMessage(err, 'Could not load the preview.'));
+      });
     return () => {
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [paperId]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   return (
     <div
@@ -91,19 +149,53 @@ function PaperPreviewDialog({
       onClick={onClose}
     >
       <div
-        className="flex h-[90vh] w-full max-w-4xl flex-col rounded-xl border bg-background shadow-xl"
+        className="flex h-[90vh] w-full max-w-5xl flex-col rounded-xl border bg-background shadow-xl"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Preview ${title}`}
       >
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h3 className="font-semibold">{title}</h3>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Close
-          </Button>
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+          <h3 className="truncate font-semibold">{title}</h3>
+          <div className="flex shrink-0 items-center gap-2">
+            {url ? (
+              <>
+                <Button asChild variant="outline" size="sm">
+                  <a href={url} target="_blank" rel="noopener noreferrer">
+                    Open in new tab
+                  </a>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName ?? 'question-paper.pdf';
+                    a.click();
+                  }}
+                >
+                  <Download className="mr-1 h-3.5 w-3.5" /> Download
+                </Button>
+              </>
+            ) : null}
+            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close preview">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         {url ? (
-          <iframe title="PDF preview" src={url} className="min-h-0 flex-1 w-full" />
+          <iframe title="PDF preview" src={url} className="min-h-0 w-full flex-1" />
+        ) : error ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+            <XCircle className="h-8 w-8 text-destructive" aria-hidden />
+            <p className="font-medium">Preview unavailable</p>
+            <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+          </div>
         ) : (
-          <p className="p-6 text-sm text-muted-foreground">Loading preview…</p>
+          <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading preview…
+          </div>
         )}
       </div>
     </div>
@@ -131,13 +223,33 @@ export function RepositoryGrid({
     ['question-bank:approve', 'question-bank:publish', 'question-bank:manage'].includes(p),
   );
   const isStudent = portal === 'student';
+  const canOwnerAct = (paper: QuestionPaper) =>
+    Boolean(canManage || (paper.uploadedById && paper.uploadedById === user?.id));
 
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [versionsId, setVersionsId] = useState<string | null>(null);
   const [sharePaper, setSharePaper] = useState<QuestionPaper | null>(null);
   const [editPaper, setEditPaper] = useState<QuestionPaper | null>(null);
-  const [replaceId, setReplaceId] = useState<string | null>(null);
   const [courseSearch, setCourseSearch] = useState('');
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replaceTargetRef = useRef<QuestionPaper | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(null), notice.tone === 'success' ? 5000 : 9000);
+    return () => window.clearTimeout(t);
+  }, [notice]);
+
+  useEffect(() => {
+    setSelected((prev) => {
+      const ids = new Set(papers.map((p) => p.id));
+      const next = new Set([...prev].filter((id) => ids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [papers]);
 
   const yearsQuery = useQuery({
     queryKey: ['org', 'academic-years'],
@@ -181,38 +293,92 @@ export function RepositoryGrid({
   const courseOptions = useMemo(() => {
     const rows = coursesQuery.data ?? [];
     if (filters.courseId && !rows.some((c) => c.id === filters.courseId)) {
-      const selected = papers.find((p) => p.courseId === filters.courseId);
-      if (selected?.courseId) {
-        return [
-          {
-            id: selected.courseId,
-            code: selected.paperCode,
-            title: selected.paperName,
-          },
-          ...rows,
-        ];
+      const match = papers.find((p) => p.courseId === filters.courseId);
+      if (match?.courseId) {
+        return [{ id: match.courseId, code: match.paperCode, title: match.paperName }, ...rows];
       }
     }
     return rows;
   }, [coursesQuery.data, filters.courseId, papers]);
 
-  const submitMut = useMutation({ mutationFn: submitQuestionPaper, onSuccess: onRefresh });
-  const publishMut = useMutation({ mutationFn: publishQuestionPaper, onSuccess: onRefresh });
-  const archiveMut = useMutation({ mutationFn: archiveQuestionPaper, onSuccess: onRefresh });
+  const ok = (text: string) => () => {
+    setNotice({ tone: 'success', text });
+    onRefresh();
+  };
+  const fail = (fallback: string) => (err: unknown) =>
+    setNotice({ tone: 'error', text: apiErrorMessage(err, fallback) });
+
+  const submitMut = useMutation({
+    mutationFn: submitQuestionPaper,
+    onSuccess: ok('Paper submitted for review.'),
+    onError: fail('Could not submit the paper.'),
+  });
+  const publishMut = useMutation({
+    mutationFn: publishQuestionPaper,
+    onSuccess: ok('Paper published.'),
+    onError: fail('Could not publish the paper.'),
+  });
+  const archiveMut = useMutation({
+    mutationFn: archiveQuestionPaper,
+    onSuccess: ok('Paper archived. It no longer appears for students or on the website.'),
+    onError: fail('Could not archive the paper.'),
+  });
+  const deleteMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results = await Promise.allSettled(ids.map((id) => deleteQuestionPaperPermanently(id)));
+      const failed = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+      return { deleted: ids.length - failed.length, failed };
+    },
+    onSuccess: ({ deleted, failed }) => {
+      setSelected(new Set());
+      onRefresh();
+      if (failed.length) {
+        setNotice({
+          tone: 'error',
+          text: `${deleted} deleted, ${failed.length} failed: ${apiErrorMessage(failed[0].reason, 'Delete failed')}`,
+        });
+      } else {
+        setNotice({
+          tone: 'success',
+          text: `${deleted} paper${deleted === 1 ? '' : 's'} permanently deleted.`,
+        });
+      }
+    },
+    onError: fail('Could not delete.'),
+  });
   const websiteMut = useMutation({
     mutationFn: ({ id, show }: { id: string; show: boolean }) => {
       const fd = new FormData();
       fd.append('showOnWebsite', String(show));
       return updateQuestionPaper(id, fd);
     },
-    onSuccess: onRefresh,
+    onSuccess: (_data, vars) => {
+      setNotice({
+        tone: 'success',
+        text: vars.show
+          ? 'Paper is now shown on the college website.'
+          : 'Paper hidden from the college website. Students still see it.',
+      });
+      onRefresh();
+    },
+    onError: fail('Could not update website visibility.'),
   });
-  const bookmarkMut = useMutation({ mutationFn: addQuestionBookmark, onSuccess: onRefresh });
-  const unbookmarkMut = useMutation({ mutationFn: removeQuestionBookmark, onSuccess: onRefresh });
+  const bookmarkMut = useMutation({
+    mutationFn: addQuestionBookmark,
+    onSuccess: onRefresh,
+    onError: fail('Could not save the paper.'),
+  });
+  const unbookmarkMut = useMutation({
+    mutationFn: removeQuestionBookmark,
+    onSuccess: onRefresh,
+    onError: fail('Could not remove the bookmark.'),
+  });
   const approveMut = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'APPROVE' | 'REJECT' }) =>
       actOnQuestionPaperApproval(id, { action }),
-    onSuccess: onRefresh,
+    onSuccess: (_d, vars) =>
+      ok(vars.action === 'APPROVE' ? 'Approval recorded.' : 'Paper rejected.')(),
+    onError: fail('Could not record the decision.'),
   });
   const replaceMut = useMutation({
     mutationFn: async ({ id, file }: { id: string; file: File }) => {
@@ -221,20 +387,43 @@ export function RepositoryGrid({
       fd.append('changeNote', 'Replaced via repository');
       return addPaperVersion(id, fd);
     },
-    onSuccess: () => {
-      setReplaceId(null);
-      onRefresh();
-    },
+    onSuccess: ok('New PDF uploaded as the latest version.'),
+    onError: fail('Could not replace the PDF.'),
   });
 
-  const handleDownload = async (id: string, fileName?: string | null) => {
-    const blob = await downloadQuestionPaper(id);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName ?? 'question-paper.pdf';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDownload = async (paper: QuestionPaper) => {
+    setDownloadingId(paper.id);
+    try {
+      const blob = await downloadQuestionPaper(paper.id);
+      saveBlob(
+        new Blob([blob], { type: 'application/pdf' }),
+        paper.fileName ?? `${paper.paperCode}.pdf`,
+      );
+    } catch (err) {
+      setNotice({ tone: 'error', text: await blobErrorMessage(err, 'Download failed.') });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const startReplace = (paper: QuestionPaper) => {
+    replaceTargetRef.current = paper;
+    replaceInputRef.current?.click();
+  };
+
+  const confirmDelete = (targets: QuestionPaper[]) => {
+    if (!targets.length) return;
+    const label =
+      targets.length === 1
+        ? `"${targets[0].paperCode} — ${targets[0].paperName}"`
+        : `${targets.length} selected papers`;
+    if (
+      window.confirm(
+        `Permanently delete ${label}?\n\nThe PDF files, versions, share links and download history are removed. This cannot be undone.`,
+      )
+    ) {
+      deleteMut.mutate(targets.map((p) => p.id));
+    }
   };
 
   const patch = (partial: Partial<QuestionPaperFilters>) =>
@@ -242,6 +431,11 @@ export function RepositoryGrid({
 
   const selectedPreview = papers.find((p) => p.id === previewId);
   const selectedVersions = papers.find((p) => p.id === versionsId);
+  const selectable = showActions && !isStudent && canContribute;
+  const deletablePapers = papers.filter(canOwnerAct);
+  const allSelected =
+    deletablePapers.length > 0 && deletablePapers.every((p) => selected.has(p.id));
+  const selectedPapers = papers.filter((p) => selected.has(p.id));
 
   return (
     <div className="space-y-4">
@@ -380,7 +574,56 @@ export function RepositoryGrid({
         </div>
       ) : null}
 
-      <h3 className="font-semibold">{title}</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-semibold">{title}</h3>
+        {selectable && selectedPapers.length ? (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">{selectedPapers.length} selected</span>
+            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={deleteMut.isPending}
+              onClick={() => confirmDelete(selectedPapers)}
+            >
+              {deleteMut.isPending ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1 h-3.5 w-3.5" />
+              )}
+              Delete selected
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      {notice ? (
+        <div
+          role={notice.tone === 'error' ? 'alert' : 'status'}
+          className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
+            notice.tone === 'error'
+              ? 'border-destructive/30 bg-destructive/10 text-destructive'
+              : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200'
+          }`}
+        >
+          {notice.tone === 'error' ? (
+            <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          ) : (
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          )}
+          <span className="flex-1">{notice.text}</span>
+          <button
+            type="button"
+            className="opacity-70 hover:opacity-100"
+            onClick={() => setNotice(null)}
+            aria-label="Dismiss message"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
 
       {!papers.length ? (
         <p className="text-sm text-muted-foreground">No papers found.</p>
@@ -389,6 +632,22 @@ export function RepositoryGrid({
           <table className="min-w-full text-sm">
             <thead className="bg-muted/50 text-left">
               <tr>
+                {selectable ? (
+                  <th className="w-8 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      aria-label="Select all papers"
+                      checked={allSelected}
+                      disabled={!deletablePapers.length}
+                      onChange={(e) =>
+                        setSelected(
+                          e.target.checked ? new Set(deletablePapers.map((p) => p.id)) : new Set(),
+                        )
+                      }
+                    />
+                  </th>
+                ) : null}
                 <th className="px-3 py-2">Code</th>
                 <th className="px-3 py-2">Title</th>
                 <th className="px-3 py-2">Dept / Programme</th>
@@ -398,226 +657,285 @@ export function RepositoryGrid({
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Downloads</th>
                 <th className="px-3 py-2">Uploader</th>
-                <th className="px-3 py-2">Actions</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {papers.map((paper) => (
-                <tr key={paper.id} className="border-t align-top">
-                  <td className="px-3 py-2 font-medium">{paper.paperCode}</td>
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      className="text-left hover:underline"
-                      onClick={() => setPreviewId(paper.id)}
-                    >
-                      {paper.paperName}
-                    </button>
-                    {paper.currentVersionNo && paper.currentVersionNo > 1 ? (
-                      <p className="text-xs text-muted-foreground">v{paper.currentVersionNo}</p>
+              {papers.map((paper) => {
+                const ownerAct = canOwnerAct(paper);
+                const pendingApproval = paper.approvals?.find((a) => a.status === 'PENDING');
+                const canPublishThis =
+                  canPublish &&
+                  ['APPROVED', 'PENDING_REVIEW', 'DRAFT', 'REJECTED'].includes(paper.status);
+                const busyRow =
+                  (deleteMut.isPending && deleteMut.variables?.includes(paper.id)) ||
+                  (archiveMut.isPending && archiveMut.variables === paper.id) ||
+                  (replaceMut.isPending && replaceMut.variables?.id === paper.id) ||
+                  (websiteMut.isPending && websiteMut.variables?.id === paper.id);
+                return (
+                  <tr
+                    key={paper.id}
+                    className={`border-t align-top ${selected.has(paper.id) ? 'bg-primary/5' : ''} ${busyRow ? 'opacity-60' : ''}`}
+                  >
+                    {selectable ? (
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-primary"
+                          aria-label={`Select ${paper.paperCode}`}
+                          disabled={!ownerAct}
+                          checked={selected.has(paper.id)}
+                          onChange={(e) =>
+                            setSelected((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(paper.id);
+                              else next.delete(paper.id);
+                              return next;
+                            })
+                          }
+                        />
+                      </td>
                     ) : null}
-                  </td>
-                  <td className="px-3 py-2 text-xs">
-                    <div>{paper.departmentName ?? '—'}</div>
-                    <div className="text-muted-foreground">{paper.programmeName ?? ''}</div>
-                  </td>
-                  <td className="px-3 py-2">{paper.semesterNo ?? '—'}</td>
-                  <td className="px-3 py-2">{paper.paperType}</td>
-                  <td className="px-3 py-2">{paper.examYear ?? '—'}</td>
-                  <td className="px-3 py-2">
-                    <StatusBadge status={paper.status} />
-                  </td>
-                  <td className="px-3 py-2">{paper.downloadCount ?? 0}</td>
-                  <td className="px-3 py-2 text-xs">{paper.uploadedByName ?? '—'}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex max-w-[280px] flex-wrap gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
+                    <td className="px-3 py-2 font-medium">{paper.paperCode}</td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        className="text-left hover:underline"
                         onClick={() => setPreviewId(paper.id)}
-                        title="Preview"
                       >
-                        <Eye className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownload(paper.id, paper.fileName)}
-                        title="Download"
-                      >
-                        <Download className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setVersionsId(paper.id)}
-                        title="Versions"
-                      >
-                        <History className="h-3 w-3" />
-                      </Button>
-                      {isStudent ? (
+                        {paper.paperName}
+                      </button>
+                      {paper.currentVersionNo && paper.currentVersionNo > 1 ? (
+                        <p className="text-xs text-muted-foreground">v{paper.currentVersionNo}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      <div>{paper.departmentName ?? '—'}</div>
+                      <div className="text-muted-foreground">{paper.programmeName ?? ''}</div>
+                    </td>
+                    <td className="px-3 py-2">{paper.semesterNo ?? '—'}</td>
+                    <td className="px-3 py-2">{paper.paperType}</td>
+                    <td className="px-3 py-2">{paper.examYear ?? '—'}</td>
+                    <td className="px-3 py-2">
+                      <StatusBadge status={paper.status} />
+                      {paper.status === 'PUBLISHED' && !isStudent ? (
+                        <p
+                          className={`mt-1 flex items-center gap-1 text-[11px] ${
+                            paper.showOnWebsite === false
+                              ? 'text-muted-foreground'
+                              : 'text-emerald-700 dark:text-emerald-300'
+                          }`}
+                        >
+                          {paper.showOnWebsite === false ? (
+                            <>
+                              <EyeOff className="h-3 w-3" aria-hidden /> Not on website
+                            </>
+                          ) : (
+                            <>
+                              <Globe className="h-3 w-3" aria-hidden /> On website
+                            </>
+                          )}
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2">{paper.downloadCount ?? 0}</td>
+                    <td className="px-3 py-2 text-xs">{paper.uploadedByName ?? '—'}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            paper.bookmarkId
-                              ? unbookmarkMut.mutate(paper.id)
-                              : bookmarkMut.mutate(paper.id)
-                          }
+                          variant="outline"
+                          className="h-8 gap-1 px-2"
+                          onClick={() => setPreviewId(paper.id)}
+                          title="Preview PDF"
                         >
-                          {paper.bookmarkId ? (
-                            <BookmarkCheck className="h-3 w-3" />
+                          <Eye className="h-3.5 w-3.5" /> View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0"
+                          onClick={() => void handleDownload(paper)}
+                          disabled={downloadingId === paper.id}
+                          title="Download PDF"
+                          aria-label={`Download ${paper.paperCode}`}
+                        >
+                          {downloadingId === paper.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
-                            <Bookmark className="h-3 w-3" />
+                            <Download className="h-3.5 w-3.5" />
                           )}
                         </Button>
-                      ) : null}
-                      {showActions && canContribute ? (
-                        <>
-                          {canManage || paper.uploadedById === user?.id ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              title="Edit metadata"
-                              onClick={() => setEditPaper(paper)}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                          ) : null}
+                        {isStudent ? (
                           <Button
                             size="sm"
-                            variant="outline"
-                            title="Replace (new version)"
-                            onClick={() => setReplaceId(paper.id)}
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            title={paper.bookmarkId ? 'Remove bookmark' : 'Bookmark'}
+                            onClick={() =>
+                              paper.bookmarkId
+                                ? unbookmarkMut.mutate(paper.id)
+                                : bookmarkMut.mutate(paper.id)
+                            }
                           >
-                            <Replace className="h-3 w-3" />
+                            {paper.bookmarkId ? (
+                              <BookmarkCheck className="h-3.5 w-3.5" />
+                            ) : (
+                              <Bookmark className="h-3.5 w-3.5" />
+                            )}
                           </Button>
-                          {paper.status === 'PUBLISHED' &&
-                          (canManage || paper.uploadedById === user?.id) ? (
+                        ) : null}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                             <Button
                               size="sm"
                               variant="outline"
-                              title={
-                                paper.showOnWebsite
-                                  ? 'Shown on college website — click to hide'
-                                  : 'Hidden from college website — click to show'
-                              }
-                              aria-label={
-                                paper.showOnWebsite ? 'Hide from website' : 'Show on website'
-                              }
-                              disabled={websiteMut.isPending}
-                              onClick={() =>
-                                websiteMut.mutate({ id: paper.id, show: !paper.showOnWebsite })
-                              }
+                              className="h-8 w-8 p-0"
+                              aria-label={`More actions for ${paper.paperCode}`}
+                              title="More actions"
                             >
-                              {paper.showOnWebsite ? (
-                                <Globe className="h-3 w-3 text-emerald-600" />
+                              {busyRow ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : (
-                                <EyeOff className="h-3 w-3" />
+                                <MoreHorizontal className="h-4 w-4" />
                               )}
                             </Button>
-                          ) : null}
-                          {paper.status === 'PUBLISHED' || canManage ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              title="Share"
-                              onClick={() => setSharePaper(paper)}
-                            >
-                              <Share2 className="h-3 w-3" />
-                            </Button>
-                          ) : null}
-                        </>
-                      ) : null}
-                      {showActions && canContribute && paper.status === 'DRAFT' ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => submitMut.mutate(paper.id)}
-                        >
-                          <Send className="mr-1 h-3 w-3" /> Submit
-                        </Button>
-                      ) : null}
-                      {showActions &&
-                      canPublish &&
-                      ['APPROVED', 'PENDING_REVIEW', 'DRAFT', 'REJECTED'].includes(paper.status) ? (
-                        <Button size="sm" onClick={() => publishMut.mutate(paper.id)}>
-                          Publish
-                        </Button>
-                      ) : null}
-                      {showActions &&
-                      canApprove &&
-                      paper.approvals?.some((a) => a.status === 'PENDING') ? (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              const pending = paper.approvals?.find((a) => a.status === 'PENDING');
-                              if (pending) approveMut.mutate({ id: pending.id, action: 'APPROVE' });
-                            }}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const pending = paper.approvals?.find((a) => a.status === 'PENDING');
-                              if (pending) approveMut.mutate({ id: pending.id, action: 'REJECT' });
-                            }}
-                          >
-                            Reject
-                          </Button>
-                        </>
-                      ) : null}
-                      {showActions && (canManage || paper.uploadedById === user?.id) ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          title="Archive"
-                          aria-label={`Archive ${paper.paperName}`}
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Archive "${paper.paperCode} — ${paper.paperName}"? It will disappear from the website, student dashboard and app.`,
-                              )
-                            ) {
-                              archiveMut.mutate(paper.id);
-                            }
-                          }}
-                        >
-                          <Archive className="h-3 w-3" />
-                        </Button>
-                      ) : null}
-                    </div>
-                    {replaceId === paper.id ? (
-                      <Input
-                        className="mt-2"
-                        type="file"
-                        accept="application/pdf,.pdf"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) replaceMut.mutate({ id: paper.id, file: f });
-                        }}
-                      />
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-60">
+                            <DropdownMenuLabel className="truncate">
+                              {paper.paperCode} — {paper.paperName}
+                            </DropdownMenuLabel>
+                            <DropdownMenuItem onSelect={() => setVersionsId(paper.id)}>
+                              <History className="mr-2 h-4 w-4" /> Version history
+                            </DropdownMenuItem>
+                            {showActions && canContribute ? (
+                              <>
+                                {ownerAct ? (
+                                  <DropdownMenuItem onSelect={() => setEditPaper(paper)}>
+                                    <Pencil className="mr-2 h-4 w-4" /> Edit details
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {ownerAct ? (
+                                  <DropdownMenuItem onSelect={() => startReplace(paper)}>
+                                    <Replace className="mr-2 h-4 w-4" /> Replace PDF
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {paper.status === 'PUBLISHED' && ownerAct ? (
+                                  <DropdownMenuItem
+                                    onSelect={() =>
+                                      websiteMut.mutate({
+                                        id: paper.id,
+                                        show: paper.showOnWebsite === false,
+                                      })
+                                    }
+                                  >
+                                    {paper.showOnWebsite === false ? (
+                                      <>
+                                        <Globe className="mr-2 h-4 w-4" /> Show on website
+                                      </>
+                                    ) : (
+                                      <>
+                                        <EyeOff className="mr-2 h-4 w-4" /> Hide from website
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                ) : null}
+                                {paper.status === 'PUBLISHED' || canManage ? (
+                                  <DropdownMenuItem onSelect={() => setSharePaper(paper)}>
+                                    <Share2 className="mr-2 h-4 w-4" /> Share link
+                                  </DropdownMenuItem>
+                                ) : null}
+                              </>
+                            ) : null}
+                            {showActions && canContribute && paper.status === 'DRAFT' ? (
+                              <DropdownMenuItem onSelect={() => submitMut.mutate(paper.id)}>
+                                <Send className="mr-2 h-4 w-4" /> Submit for review
+                              </DropdownMenuItem>
+                            ) : null}
+                            {showActions && canPublishThis ? (
+                              <DropdownMenuItem onSelect={() => publishMut.mutate(paper.id)}>
+                                <CheckCircle2 className="mr-2 h-4 w-4" /> Publish now
+                              </DropdownMenuItem>
+                            ) : null}
+                            {showActions && canApprove && pendingApproval ? (
+                              <>
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    approveMut.mutate({ id: pendingApproval.id, action: 'APPROVE' })
+                                  }
+                                >
+                                  <CheckCircle2 className="mr-2 h-4 w-4" /> Approve
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    approveMut.mutate({ id: pendingApproval.id, action: 'REJECT' })
+                                  }
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" /> Reject
+                                </DropdownMenuItem>
+                              </>
+                            ) : null}
+                            {showActions && ownerAct && !isStudent ? (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    if (
+                                      window.confirm(
+                                        `Archive "${paper.paperCode} — ${paper.paperName}"? It will disappear from the website, student dashboard and app, but the file is kept.`,
+                                      )
+                                    ) {
+                                      archiveMut.mutate(paper.id);
+                                    }
+                                  }}
+                                >
+                                  <Archive className="mr-2 h-4 w-4" /> Archive (hide)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                  onSelect={() => confirmDelete([paper])}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Delete permanently
+                                </DropdownMenuItem>
+                              </>
+                            ) : null}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          const target = replaceTargetRef.current;
+          e.target.value = '';
+          if (!file || !target) return;
+          if (file.type && file.type !== 'application/pdf') {
+            setNotice({ tone: 'error', text: 'Please choose a PDF file.' });
+            return;
+          }
+          replaceMut.mutate({ id: target.id, file });
+        }}
+      />
+
       {error ? <p className="text-sm text-destructive">{apiErrorMessage(error)}</p> : null}
-      {replaceMut.isError ? (
-        <p className="text-sm text-destructive">{apiErrorMessage(replaceMut.error)}</p>
-      ) : null}
 
       {previewId && selectedPreview ? (
         <PaperPreviewDialog
           paperId={previewId}
           title={`${selectedPreview.paperCode} — ${selectedPreview.paperName}`}
+          fileName={selectedPreview.fileName}
           onClose={() => setPreviewId(null)}
         />
       ) : null}
@@ -639,7 +957,10 @@ export function RepositoryGrid({
         <EditMetadataDialog
           paper={editPaper}
           onClose={() => setEditPaper(null)}
-          onSaved={onRefresh}
+          onSaved={() => {
+            setNotice({ tone: 'success', text: 'Paper details saved.' });
+            onRefresh();
+          }}
         />
       ) : null}
     </div>

@@ -4,10 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { createReadStream, existsSync } from 'fs';
-import { mkdir, writeFile } from 'fs/promises';
-import { basename, join, normalize, resolve } from 'path';
+import { mkdir, rm, rmdir, writeFile } from 'fs/promises';
+import { basename, dirname, join, normalize, resolve } from 'path';
 import { randomUUID } from 'crypto';
-import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
+import {
+  resolvePublicUploadFsPath,
+  resolveTenantUploadRoot,
+} from '../../../common/uploads/upload-paths';
 import {
   buildCanonicalPaperFileName,
   sha256Buffer,
@@ -105,7 +108,7 @@ export class QuestionBankAssetsService {
     if (!filePath?.startsWith(`/uploads/tenants/${tenantId}/question-bank/`)) {
       throw new BadRequestException('Invalid file path');
     }
-    const abs = normalize(resolve(process.cwd(), filePath.slice(1)));
+    const abs = normalize(resolve(resolvePublicUploadFsPath(filePath)));
     const expectedRoot = normalize(
       resolve(this.uploadRoot, tenantId, 'question-bank'),
     );
@@ -114,6 +117,29 @@ export class QuestionBankAssetsService {
     }
     if (!existsSync(abs)) throw new NotFoundException('File not found');
     return abs;
+  }
+
+  /** Best-effort: missing files or folders are ignored so the DB delete is never blocked. */
+  async removePaperFiles(
+    tenantId: string,
+    filePaths: Array<string | null | undefined>,
+  ) {
+    const expectedRoot = normalize(
+      resolve(this.uploadRoot, tenantId, 'question-bank'),
+    );
+    const dirs = new Set<string>();
+    for (const filePath of filePaths) {
+      if (!filePath?.startsWith(`/uploads/tenants/${tenantId}/question-bank/`))
+        continue;
+      const abs = normalize(resolve(resolvePublicUploadFsPath(filePath)));
+      if (!abs.startsWith(expectedRoot)) continue;
+      await rm(abs, { force: true }).catch(() => undefined);
+      dirs.add(dirname(abs));
+    }
+    for (const dir of dirs) {
+      if (dir === expectedRoot || !dir.startsWith(expectedRoot)) continue;
+      await rmdir(dir).catch(() => undefined);
+    }
   }
 
   openDownloadStream(tenantId: string, filePath: string, fileName?: string) {
