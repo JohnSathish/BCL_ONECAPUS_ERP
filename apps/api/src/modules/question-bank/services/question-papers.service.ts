@@ -512,6 +512,8 @@ export class QuestionPapersService {
         examYear: dto.examYear,
         examMonth: dto.examMonth,
         paperType: dto.paperType,
+        subjectCategory: dto.subjectCategory,
+        examinationType: dto.examinationType,
       }),
       this.assets.savePaperFile(user.tid, file, {
         courseCode: paperCode,
@@ -1075,6 +1077,8 @@ export class QuestionPapersService {
       examYear?: number;
       examMonth?: number;
       paperType: string;
+      subjectCategory?: string;
+      examinationType?: string;
     },
   ) {
     return this.prisma.questionPaper.findFirst({
@@ -1083,6 +1087,13 @@ export class QuestionPapersService {
         deletedAt: null,
         paperCode: { equals: input.paperCode, mode: 'insensitive' },
         paperType: input.paperType,
+        // Major and Minor (or University and Internal) papers can share a code.
+        subjectCategory: input.subjectCategory
+          ? { equals: input.subjectCategory, mode: 'insensitive' }
+          : null,
+        examinationType: input.examinationType
+          ? { equals: input.examinationType, mode: 'insensitive' }
+          : null,
         ...(input.academicYearId
           ? { academicYearId: input.academicYearId }
           : { academicYearId: null }),
