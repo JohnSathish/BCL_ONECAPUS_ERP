@@ -3,6 +3,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
+  BookOpen,
+  Check,
   CheckCircle2,
   CloudUpload,
   FileText,
@@ -92,7 +94,7 @@ const emptyDetails = (academicYearId = ''): Details => ({
 });
 
 const fieldClass =
-  'h-10 w-full rounded-lg border border-border bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40';
+  'h-10 w-full rounded-lg border border-border bg-card px-3 text-sm shadow-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/40 disabled:hover:border-border';
 
 function currentAcademicYear(years: AcademicYear[]) {
   const now = Date.now();
@@ -172,27 +174,48 @@ function SectionHeading({
   step,
   title,
   description,
+  done,
 }: {
   id: string;
   step: number;
   title: string;
   description: string;
+  done?: boolean;
 }) {
   return (
     <div className="flex items-center gap-3">
       <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+        className={cn(
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors',
+          done
+            ? 'bg-emerald-600 text-white'
+            : 'bg-primary text-primary-foreground shadow-sm shadow-primary/30',
+        )}
         aria-hidden
       >
-        {step}
+        {done ? <Check className="h-4 w-4" strokeWidth={3} /> : step}
       </span>
-      <div>
+      <div className="min-w-0 flex-1">
         <h3 id={id} className="text-base font-semibold leading-tight">
           {title}
         </h3>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
+      {done ? (
+        <span className="hidden shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 sm:inline dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900">
+          Complete
+        </span>
+      ) : null}
     </div>
+  );
+}
+
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+      <span className="h-px flex-1 bg-border/60" aria-hidden />
+    </p>
   );
 }
 
@@ -301,13 +324,17 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
   const departmentOptions: QbSelectOption[] = (deptsQuery.data ?? []).map((d) => ({
     value: d.id,
     label: d.name,
-    hint: d.code,
+    badge: d.code || undefined,
   }));
-  const courseOptions: QbSelectOption[] = courses.map((c) => ({
-    value: c.id,
-    label: `${c.code} — ${c.title}`,
-    hint: c.category ?? undefined,
-  }));
+  const courseOptions: QbSelectOption[] = courses.map((c) => {
+    const category = normalizeCategory(c.category);
+    return {
+      value: c.id,
+      label: c.title,
+      badge: c.code,
+      hint: category ? CATEGORY_LABELS[category] : (c.category ?? undefined),
+    };
+  });
 
   const patch = (partial: Partial<Details>) => {
     setSuccess(null);
@@ -381,6 +408,14 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
   });
 
   const canSubmit = missing.length === 0 && !fileError && !uploadMut.isPending;
+  const detailsDone = Boolean(
+    details.academicYearId &&
+    details.semesterNo &&
+    details.examinationType &&
+    details.subjectCategory &&
+    details.courseId,
+  );
+  const fileDone = Boolean(file) && !fileError;
 
   const startOver = () => {
     const current = currentAcademicYear(years);
@@ -472,7 +507,9 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
               step={1}
               title="Paper Details"
               description="Choose where this paper belongs."
+              done={detailsDone}
             />
+            <GroupLabel>Examination</GroupLabel>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <Field label="Academic Year" htmlFor="qb-year" required>
                 <select
@@ -521,6 +558,10 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                   ))}
                 </select>
               </Field>
+            </div>
+
+            <GroupLabel>Subject</GroupLabel>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <Field label="Programme" htmlFor="qb-programme">
                 <select
                   id="qb-programme"
@@ -556,6 +597,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                   searchPlaceholder="Search department…"
                   emptyText="No departments found"
                   clearLabel="All departments"
+                  itemNoun="department"
                   loading={deptsQuery.isLoading}
                 />
               </Field>
@@ -584,7 +626,9 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                     ? 'Select a semester to see its subjects.'
                     : coursesQuery.isSuccess && !courses.length
                       ? 'No subjects match. Try another category, or clear the programme or department.'
-                      : undefined
+                      : coursesQuery.isSuccess && !details.courseId
+                        ? `${courses.length} subject${courses.length === 1 ? '' : 's'} available for Semester ${details.semesterNo}.`
+                        : undefined
                 }
               >
                 <QbSearchableSelect
@@ -605,6 +649,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                   }
                   searchPlaceholder="Search by subject name or code…"
                   emptyText="No subjects found"
+                  itemNoun="subject"
                   disabled={!details.semesterNo}
                   loading={coursesQuery.isFetching && !courses.length}
                 />
@@ -612,32 +657,39 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
             </div>
 
             {selectedCourse ? (
-              <div className="flex flex-wrap gap-x-5 gap-y-1 rounded-lg bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
-                <span>
-                  Paper code <strong className="text-foreground">{selectedCourse.code}</strong>
+              <div className="flex items-start gap-3 rounded-xl bg-gradient-to-r from-primary/[0.07] to-transparent p-4 ring-1 ring-primary/15">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <BookOpen className="h-5 w-5" aria-hidden />
                 </span>
-                <span>
-                  Title <strong className="text-foreground">{selectedCourse.title}</strong>
-                </span>
-                {selectedDeptName ? (
-                  <span>
-                    Department <strong className="text-foreground">{selectedDeptName}</strong>
-                  </span>
-                ) : null}
-                {details.subjectCategory ? (
-                  <span>
-                    Category{' '}
-                    <strong className="text-foreground">
-                      {CATEGORY_LABELS[details.subjectCategory] ?? details.subjectCategory}
-                    </strong>
-                  </span>
-                ) : null}
-                <span>
-                  Exam year{' '}
-                  <strong className="text-foreground">
-                    {examYearFor(selectedYear, Number(details.semesterNo))}
-                  </strong>
-                </span>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-semibold leading-snug">
+                    <span className="rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">
+                      {selectedCourse.code}
+                    </span>
+                    <span className="min-w-0">{selectedCourse.title}</span>
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 text-xs">
+                    {[
+                      selectedYear?.name,
+                      `Semester ${details.semesterNo}`,
+                      EXAM_LABELS[details.examinationType],
+                      details.subjectCategory
+                        ? (CATEGORY_LABELS[details.subjectCategory] ?? details.subjectCategory)
+                        : null,
+                      selectedDeptName,
+                      `Exam year ${examYearFor(selectedYear, Number(details.semesterNo))}`,
+                    ]
+                      .filter(Boolean)
+                      .map((chip) => (
+                        <span
+                          key={chip}
+                          className="rounded-full bg-card px-2.5 py-0.5 text-muted-foreground ring-1 ring-border/70"
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                  </div>
+                </div>
               </div>
             ) : null}
           </section>
@@ -650,6 +702,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
               step={2}
               title="Upload PDF"
               description="Select the question paper file."
+              done={fileDone}
             />
 
             <input
@@ -664,7 +717,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
             />
 
             {file ? (
-              <div className="flex items-center gap-3 rounded-xl bg-primary/5 p-4 ring-1 ring-primary/20">
+              <div className="flex items-center gap-3 rounded-xl bg-emerald-50/60 p-4 ring-1 ring-emerald-200 dark:bg-emerald-950/20 dark:ring-emerald-900">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-950/40">
                   <FileText className="h-6 w-6" aria-hidden />
                 </span>
@@ -672,7 +725,8 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                   <p className="truncate text-sm font-medium" title={file.name}>
                     {file.name}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
                     {formatBytes(file.size)} · PDF ready to upload
                   </p>
                 </div>
@@ -706,21 +760,40 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                   setDragging(false);
                   void pickFile(e.dataTransfer.files?.[0]);
                 }}
+                onClick={() => fileInputRef.current?.click()}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors',
-                  dragging ? 'border-primary bg-primary/5' : 'border-primary/30 bg-primary/[0.02]',
-                  fileError && 'border-destructive/60',
+                  'group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-all',
+                  dragging
+                    ? 'scale-[1.01] border-primary bg-primary/10'
+                    : 'border-primary/30 bg-primary/[0.02] hover:border-primary/60 hover:bg-primary/[0.05]',
+                  fileError && 'border-destructive/60 bg-destructive/[0.03]',
                 )}
               >
-                <CloudUpload className="h-11 w-11 text-primary/70" aria-hidden />
-                <p className="text-base font-medium">Drag &amp; drop your PDF here</p>
+                <span
+                  className={cn(
+                    'flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary transition-transform',
+                    dragging ? 'scale-110' : 'group-hover:scale-105',
+                  )}
+                >
+                  <CloudUpload className="h-8 w-8" aria-hidden />
+                </span>
+                <p className="text-base font-semibold">
+                  {dragging ? 'Drop the PDF to attach it' : 'Drag & drop your PDF here'}
+                </p>
                 <p className="text-xs text-muted-foreground">or</p>
-                <Button type="button" onClick={() => fileInputRef.current?.click()}>
+                <Button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                >
                   <FileUp className="mr-1.5 h-4 w-4" /> Choose PDF File
                 </Button>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Only PDF files are allowed • Maximum file size: {maxMb} MB
-                </p>
+                <div className="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2.5 py-0.5">PDF only</span>
+                  <span className="rounded-full bg-muted px-2.5 py-0.5">Max {maxMb} MB</span>
+                </div>
               </div>
             )}
 
