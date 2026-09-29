@@ -48,6 +48,7 @@ model Tenant {
   tenantLicense                 TenantLicense?
   mobileAppSettings             MobileAppSettings?
   mobileAppReleases             MobileAppRelease[]
+  mobileAppUpdatePolicies       MobileAppUpdatePolicy[]
   mobileDevices                 MobileDevice[]
   mobileAppEvents               MobileAppEvent[]
   mobileAppDailyStats           MobileAppDailyStats[]
@@ -677,6 +678,33 @@ model MobileAppRelease {
 
   @@index([tenantId, appType])
   @@map("mobile_app_releases")
+  @@schema("platform")
+}
+
+/// Store-release update policy per platform (ANDROID / IOS), managed from System → App Update Management.
+model MobileAppUpdatePolicy {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  platform             String
+  latestVersion        String    @default("1.0.0") @map("latest_version")
+  minimumVersion       String    @default("1.0.0") @map("minimum_version")
+  forceUpdate          Boolean   @default(false) @map("force_update")
+  storeUrl             String?   @map("store_url")
+  releaseTitle         String?   @map("release_title")
+  releaseNotes         Json      @default("[]") @map("release_notes")
+  releaseDate          DateTime? @map("release_date") @db.Date
+  isActive             Boolean   @default(false) @map("is_active")
+  lastNotifiedAt       DateTime? @map("last_notified_at")
+  lastNotifiedVersion  String?   @map("last_notified_version")
+  lastNotifiedCount    Int?      @map("last_notified_count")
+  updatedById          String?   @map("updated_by_id") @db.Uuid
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, platform])
+  @@map("mobile_app_update_policies")
   @@schema("platform")
 }
 

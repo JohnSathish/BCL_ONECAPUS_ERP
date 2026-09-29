@@ -13,8 +13,14 @@ import { CLS_TENANT_ID } from '../../common/cls/cls.constants';
 import { ClsService } from 'nestjs-cls';
 import { MobileAppSettingsService } from './mobile-app-settings.service';
 import type { MobileAppType } from './constants/dashboard-config';
+import { detectClientPlatform } from './app-update-policy.service';
 
-const SKIP_PREFIXES = ['/v1/mobile-app/bootstrap', '/v1/auth/', '/health'];
+const SKIP_PREFIXES = [
+  '/v1/mobile-app/bootstrap',
+  '/app/version',
+  '/v1/auth/',
+  '/health',
+];
 
 @Injectable()
 export class MobileAppGateInterceptor implements NestInterceptor {
@@ -57,12 +63,23 @@ export class MobileAppGateInterceptor implements NestInterceptor {
     const appVersion =
       String(req.headers['x-app-version'] ?? '').trim() || undefined;
 
-    const gate = await this.settings.checkGate(tenantId, appType, appVersion);
+    const platform = detectClientPlatform(
+      req.headers['x-platform'] as string | undefined,
+      req.headers['user-agent'],
+    );
+
+    const gate = await this.settings.checkGate(
+      tenantId,
+      appType,
+      appVersion,
+      platform,
+    );
     if (gate.blocked) {
       throw new HttpException(
         {
           message: gate.message,
           minVersion: (gate as { minVersion?: string }).minVersion,
+          storeUrl: (gate as { playStoreUrl?: string }).playStoreUrl,
         },
         gate.statusCode ?? 503,
       );

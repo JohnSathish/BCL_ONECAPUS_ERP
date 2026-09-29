@@ -1,6 +1,7 @@
 import { getApiBase, getAppType, mobileHeadersAsync, setAppType } from '@/api/config';
 import { getAccessToken } from '@/auth/session';
 import { refreshAccessTokenString } from '@/auth/token-refresh';
+import { emitUpdateRequired } from '@/services/app-update-events';
 
 export {
   APP_VERSION,
@@ -118,6 +119,14 @@ async function doFetch<T>(path: string, options: FetchOptions): Promise<T> {
   }
 
   if (!res.ok) {
+    if (res.status === 426) {
+      const body = (data ?? {}) as { minVersion?: string; storeUrl?: string };
+      emitUpdateRequired({
+        minVersion: body.minVersion ?? null,
+        storeUrl: body.storeUrl ?? null,
+        message: parseError(data, ''),
+      });
+    }
     const err = new Error(parseError(data, res.statusText)) as Error & { status?: number };
     err.status = res.status;
     throw err;

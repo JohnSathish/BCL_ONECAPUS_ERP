@@ -34,6 +34,7 @@ import { MobileDeviceService } from './mobile-device.service';
 import { MobileHomeService } from './mobile-home.service';
 import { MobileSessionService } from './mobile-session.service';
 import type { MobileAppType } from './constants/dashboard-config';
+import { detectClientPlatform } from './app-update-policy.service';
 
 @ApiTags('mobile-app')
 @Controller({ path: 'mobile-app', version: '1' })
@@ -70,6 +71,8 @@ export class MobileAppController {
     @Headers('host') host: string,
     @Query('appType') appTypeQuery?: string,
     @Headers('x-app-type') appTypeHeader?: string,
+    @Headers('x-platform') platformHeader?: string,
+    @Headers('user-agent') userAgent?: string,
   ) {
     const slug = tenantSlug?.trim();
     let tenantId = this.cls.get<string>(CLS_TENANT_ID);
@@ -83,7 +86,11 @@ export class MobileAppController {
     }
     const raw = (appTypeQuery ?? appTypeHeader ?? 'student').toLowerCase();
     const appType: MobileAppType = raw === 'staff' ? 'STAFF' : 'STUDENT';
-    return this.settings.getBootstrapPayload(tenantId, appType);
+    return this.settings.getBootstrapPayload(
+      tenantId,
+      appType,
+      detectClientPlatform(platformHeader, userAgent),
+    );
   }
 
   @Get('config')
@@ -91,7 +98,10 @@ export class MobileAppController {
   async config(
     @CurrentUser() user: JwtUser,
     @Headers('x-app-type') appTypeHeader?: string,
+    @Headers('x-platform') platformHeader?: string,
+    @Headers('user-agent') userAgent?: string,
   ) {
+    const platform = detectClientPlatform(platformHeader, userAgent);
     const raw = (appTypeHeader ?? '').toLowerCase();
     const appType: MobileAppType =
       raw === 'staff' || user.permissions?.includes('staff:portal:self')
@@ -102,15 +112,16 @@ export class MobileAppController {
           ? 'STUDENT'
           : 'STAFF';
     if (raw === 'student')
-      return this.settings.getConfigPayload(user.tid, 'STUDENT');
+      return this.settings.getConfigPayload(user.tid, 'STUDENT', platform);
     if (raw === 'staff')
-      return this.settings.getConfigPayload(user.tid, 'STAFF');
+      return this.settings.getConfigPayload(user.tid, 'STAFF', platform);
     return this.settings.getConfigPayload(
       user.tid,
       user.permissions?.includes('staff:portal:self') &&
         !user.permissions?.includes('student:portal:self')
         ? 'STAFF'
         : 'STUDENT',
+      platform,
     );
   }
 

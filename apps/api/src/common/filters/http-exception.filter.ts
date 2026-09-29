@@ -93,6 +93,19 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
           ? (body.message as { issues: unknown[] }).issues
           : undefined;
 
+    const updateHints: Record<string, string> = {};
+    if (
+      status === 426 &&
+      body &&
+      typeof body === 'object' &&
+      !Array.isArray(body)
+    ) {
+      if (typeof body.minVersion === 'string')
+        updateHints.minVersion = body.minVersion;
+      if (typeof body.storeUrl === 'string')
+        updateHints.storeUrl = body.storeUrl;
+    }
+
     if (status >= 500) {
       this.logger.error(
         { err: exception, path: request.url, method: request.method, traceId },
@@ -125,6 +138,7 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
         ...(retryAfterSeconds != null ? { retryAfterSeconds } : {}),
         ...(fieldErrors ? { fieldErrors } : {}),
         ...(issues ? { issues } : {}),
+        ...updateHints,
       });
   }
 

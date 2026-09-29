@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { getDeviceId } from '@/auth/device';
 import { getApiBase, getTenantSlug } from '@/auth/school-config';
 import { getStoredAppType, type StoredAppType } from '@/auth/session';
@@ -53,6 +54,7 @@ export async function mobileHeadersAsync(
     'X-Client-Type': 'mobile',
     'X-App-Type': appType,
     'X-App-Version': getInstalledAppVersion(),
+    'X-Platform': Platform.OS,
     'X-Device-Id': deviceId,
     ...extra,
   };
@@ -66,6 +68,7 @@ export function mobileHeaders(extra?: Record<string, string>) {
     'X-Client-Type': 'mobile',
     'X-App-Type': appType,
     'X-App-Version': getInstalledAppVersion(),
+    'X-Platform': Platform.OS,
     ...(cachedDeviceId ? { 'X-Device-Id': cachedDeviceId } : {}),
     ...extra,
   };

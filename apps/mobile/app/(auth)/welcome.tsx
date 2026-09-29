@@ -106,7 +106,8 @@ export default function WelcomeScreen() {
       router.replace('/(auth)/maintenance');
       return;
     }
-    if (!config) return;
+    // College builds use the global AppUpdateGate (App Update Management); school SIS keeps its bootstrap check.
+    if (!config || !schoolSis) return;
     const installed = getInstalledAppVersion();
     const belowMin = isVersionBelow(installed, config.minVersion);
     const force = config.forceUpdate || belowMin;
@@ -135,7 +136,7 @@ export default function WelcomeScreen() {
         ],
       );
     }
-  }, [config, router]);
+  }, [config, router, schoolSis]);
 
   const studentStat = formatStat(stats?.students ?? 0, DEFAULT_PORTAL_STATS.students);
   const facultyStat = formatStat(stats?.faculty ?? 0, DEFAULT_PORTAL_STATS.faculty);

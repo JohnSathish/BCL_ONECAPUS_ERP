@@ -2446,6 +2446,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['tenant:manage'],
           },
           {
+            label: 'App Update Management',
+            href: '/admin/administration/app-updates',
+            permissions: ['mobile:settings:read', 'mobile:settings:manage'],
+          },
+          {
             label: 'App Version & Mobile Config',
             href: '/admin/administration/mobile-app',
             permissions: ['mobile:settings:read', 'mobile:settings:manage'],

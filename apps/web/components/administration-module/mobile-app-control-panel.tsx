@@ -313,6 +313,14 @@ export function MobileAppControlPanel() {
         </TabsContent>
 
         <TabsContent value="config" className="space-y-4">
+          <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+            Store versions, force update and the Play Store link are managed in{' '}
+            <Link href="/admin/administration/app-updates" className="font-semibold underline">
+              App Update Management
+            </Link>
+            . When a platform is active there, it overrides the min/latest version, force update and
+            Play Store fields below.
+          </p>
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>

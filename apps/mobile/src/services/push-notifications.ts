@@ -17,6 +17,7 @@ import {
   setPendingNotificationOpen,
 } from '@/services/notifications-sync';
 import { getNotificationAttachments } from '@/utils/notification-attachments';
+import { startAppUpdate } from '@/services/app-update';
 
 try {
   Notifications.setNotificationHandler({
@@ -357,6 +358,15 @@ export function navigateFromPushLink(
 
 function handleNotificationResponse(response: Notifications.NotificationResponse) {
   const content = response.notification.request.content;
+  const data = (content.data ?? {}) as Record<string, unknown>;
+  if (String(data.type ?? '').toUpperCase() === 'APP_UPDATE') {
+    void trackPushOpened('app-update');
+    void startAppUpdate({
+      required: false,
+      storeUrl: typeof data.storeUrl === 'string' ? data.storeUrl : null,
+    });
+    return;
+  }
   const link = extractLinkFromNotification(content);
   const openTargets = extractOpenTargets(content);
   void trackPushOpened(link);

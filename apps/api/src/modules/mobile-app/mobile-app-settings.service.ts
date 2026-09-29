@@ -11,6 +11,12 @@ import {
 import type { UpdateMobileAppSettingsDto } from './dto/mobile-app.dto';
 import { toPublicUploadUrl } from '../../common/uploads/public-upload-url';
 import { isVersionBelow } from './utils/version.util';
+import {
+  AppUpdatePolicyService,
+  DEFAULT_STORE_URLS,
+  effectiveMinimumVersion,
+  type AppUpdatePlatform,
+} from './app-update-policy.service';
 
 const CACHE_TTL = 900;
 
@@ -75,7 +81,41 @@ export class MobileAppSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly updatePolicies: AppUpdatePolicyService,
   ) {}
+
+  /**
+   * Installed apps that predate the in-app update gate read min/latest/store fields from
+   * bootstrap and config — mirror the active App Update Management policy into those fields.
+   */
+  private async withUpdatePolicy<T extends Record<string, unknown>>(
+    tenantId: string,
+    platform: AppUpdatePlatform | null,
+    payload: T,
+  ): Promise<T> {
+    const policy = await this.updatePolicies.getActivePolicy(
+      tenantId,
+      platform ?? 'ANDROID',
+    );
+    if (!policy) return payload;
+    const minVersion = effectiveMinimumVersion(policy);
+    const notes = Array.isArray(policy.releaseNotes)
+      ? (policy.releaseNotes as unknown[]).map((n) => String(n)).join('\n')
+      : '';
+    return {
+      ...payload,
+      minVersion,
+      latestVersion: policy.latestVersion,
+      forceUpdate: false,
+      playStoreUrl:
+        policy.storeUrl?.trim() ||
+        DEFAULT_STORE_URLS[policy.platform as AppUpdatePlatform],
+      releaseNotes: notes || payload.releaseNotes || null,
+      ...('versions' in payload
+        ? { versions: { min: minVersion, latest: policy.latestVersion } }
+        : {}),
+    };
+  }
 
   private cacheKey(tenantId: string, appType: MobileAppType) {
     return `mobile-app:config:${tenantId}:${appType}`;
@@ -192,7 +232,19 @@ export class MobileAppSettingsService {
     };
   }
 
-  async getBootstrapPayload(tenantId: string, appType: MobileAppType) {
+  async getBootstrapPayload(
+    tenantId: string,
+    appType: MobileAppType,
+    platform: AppUpdatePlatform | null = null,
+  ) {
+    const payload = await this.buildBootstrapPayload(tenantId, appType);
+    return this.withUpdatePolicy(tenantId, platform, payload);
+  }
+
+  private async buildBootstrapPayload(
+    tenantId: string,
+    appType: MobileAppType,
+  ) {
     const key = this.cacheKey(tenantId, appType);
     return this.cache.wrap(key, CACHE_TTL, async () => {
       const [
@@ -307,12 +359,16 @@ export class MobileAppSettingsService {
     });
   }
 
-  async getConfigPayload(tenantId: string, appType: MobileAppType) {
+  async getConfigPayload(
+    tenantId: string,
+    appType: MobileAppType,
+    platform: AppUpdatePlatform | null = null,
+  ) {
     const settings = await this.getSettings(tenantId);
     const isStudent = appType === 'STUDENT';
     const featureFlags = this.mergeFeatureFlags((settings as any).featureFlags);
     const versions = this.versionBlock(settings, appType);
-    return {
+    return this.withUpdatePolicy(tenantId, platform, {
       appType,
       configVersion: (settings as any).configVersion ?? 1,
       dashboardCards: this.mergeDashboardConfig(
@@ -334,13 +390,14 @@ export class MobileAppSettingsService {
         ? settings.studentMaintenanceMode
         : settings.staffMaintenanceMode,
       maintenanceMessage: settings.maintenanceMessage,
-    };
+    });
   }
 
   async checkGate(
     tenantId: string,
     appType: MobileAppType,
     appVersion?: string,
+    platform: AppUpdatePlatform | null = null,
   ) {
     const settings = await this.getSettings(tenantId);
     const isStudent = appType === 'STUDENT';
@@ -355,6 +412,27 @@ export class MobileAppSettingsService {
           settings.maintenanceMessage ??
           'The system is currently undergoing scheduled maintenance. Please try again later.',
       };
+    }
+    const policy = await this.updatePolicies.getActivePolicy(
+      tenantId,
+      platform ?? 'ANDROID',
+    );
+    if (policy) {
+      const required = effectiveMinimumVersion(policy);
+      if (appVersion && isVersionBelow(appVersion, required)) {
+        return {
+          blocked: true,
+          statusCode: 426,
+          message:
+            settings.forceUpdateMessage ??
+            'A new version of BCL OneCampus is required to continue. Please update the application to access the latest features and security improvements.',
+          minVersion: required,
+          playStoreUrl:
+            policy.storeUrl?.trim() ||
+            DEFAULT_STORE_URLS[policy.platform as AppUpdatePlatform],
+        };
+      }
+      return { blocked: false };
     }
     const minVersion = isStudent
       ? settings.studentMinVersion

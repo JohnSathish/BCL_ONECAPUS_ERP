@@ -3,6 +3,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppUpdateGate } from '@/components/app-update/app-update-gate';
 import { useAuthFailureRedirect } from '@/hooks/useAuthFailureRedirect';
 import {
   attachPushResponseListener,
@@ -57,6 +58,7 @@ export default function RootLayout() {
         <Stack.Screen name="(principal)" />
         <Stack.Screen name="(school)" />
       </Stack>
+      <AppUpdateGate />
     </SafeAreaProvider>
   );
 }
