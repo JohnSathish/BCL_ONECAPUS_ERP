@@ -44,6 +44,18 @@ export function fetchMyQuestionPapers(params: {
   return apiFetch<QuestionPaperPage>(`/v1/question-bank/me/papers?${search.toString()}`);
 }
 
+export function fetchSavedQuestionPapers() {
+  return apiFetch<QuestionPaper[]>('/v1/question-bank/me/bookmarks');
+}
+
+export function saveQuestionPaper(paperId: string) {
+  return apiFetch(`/v1/question-bank/me/bookmarks/${paperId}`, { method: 'POST' });
+}
+
+export function unsaveQuestionPaper(paperId: string) {
+  return apiFetch(`/v1/question-bank/me/bookmarks/${paperId}`, { method: 'DELETE' });
+}
+
 async function authHeaders() {
   let token = await getAccessToken();
   if (!token) {
@@ -63,6 +75,11 @@ function cachePath(paper: QuestionPaper) {
     (paper.fileName ?? `${paper.paperCode}.pdf`).replace(/[^a-zA-Z0-9._-]/g, '_') ||
     `question-paper-${paper.id}.pdf`;
   return `${PAPER_DIR}/${paper.id}-v${paper.currentVersionNo ?? 1}-${safe}`;
+}
+
+export async function isQuestionPaperOnDevice(paper: QuestionPaper) {
+  const info = await FileSystem.getInfoAsync(cachePath(paper));
+  return info.exists;
 }
 
 /** Downloads the PDF once per version; later opens reuse the cached copy. */

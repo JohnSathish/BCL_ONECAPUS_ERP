@@ -14,8 +14,8 @@ const root = path.join(__dirname, '..');
 process.chdir(root);
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const appVersion = pkg.version || '1.0.28';
-const versionCode = '48';
+const appVersion = pkg.version || '1.0.29';
+const versionCode = '49';
 
 const jdkCandidates = [
   process.env.JAVA_HOME,

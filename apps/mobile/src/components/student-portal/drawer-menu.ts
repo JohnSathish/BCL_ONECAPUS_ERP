@@ -334,4 +334,18 @@ export const QUICK_ACTIONS: QuickAction[] = [
     href: '/(student)/results',
     tone: '#0f766e',
   },
+  {
+    id: 'question-papers',
+    label: 'Question Papers',
+    icon: '📄',
+    href: '/(student)/question-papers',
+    tone: '#dc2626',
+  },
+  {
+    id: 'syllabus',
+    label: 'Syllabus',
+    icon: '📘',
+    href: '/(student)/syllabus',
+    tone: '#7c3aed',
+  },
 ];
