@@ -15,6 +15,12 @@ export type ResolveContext = {
   /** Prefer a specific calendar; otherwise resolve against active year calendar. */
   calendarId?: string | null;
   academicYearId?: string | null;
+  /**
+   * Union events from every published academic calendar in the date window.
+   * The public site uses this so a holiday filed on 2025–26 still appears
+   * while the site is showing the 2026–27 year.
+   */
+  mergePublishedCalendars?: boolean;
 };
 
 type EventRow = {
@@ -43,19 +49,13 @@ export class WorkingDayEngineService {
     const date = parseDateOnly(dateIso);
     const calendar = await this.findCalendar(tenantId, date, ctx);
     const weekendDays = this.readWeekendDays(calendar?.weekendDays);
-    const events = calendar
-      ? await this.prisma.academicCalendarEvent.findMany({
-          where: {
-            tenantId,
-            calendarId: calendar.id,
-            active: true,
-            deletedAt: null,
-            startDate: { lte: date },
-            endDate: { gte: date },
-          },
-          orderBy: [{ startDate: 'asc' }, { title: 'asc' }],
-        })
-      : [];
+    const events = await this.loadEvents(
+      tenantId,
+      calendar?.id ?? null,
+      date,
+      date,
+      ctx,
+    );
     return this.resolveWithEvents(dateIso, date, weekendDays, events, ctx);
   }
 
@@ -70,19 +70,13 @@ export class WorkingDayEngineService {
     const mid = new Date((from.getTime() + to.getTime()) / 2);
     const calendar = await this.findCalendar(tenantId, mid, ctx);
     const weekendDays = this.readWeekendDays(calendar?.weekendDays);
-    const events: EventRow[] = calendar
-      ? await this.prisma.academicCalendarEvent.findMany({
-          where: {
-            tenantId,
-            calendarId: calendar.id,
-            active: true,
-            deletedAt: null,
-            startDate: { lte: to },
-            endDate: { gte: from },
-          },
-          orderBy: [{ startDate: 'asc' }, { title: 'asc' }],
-        })
-      : [];
+    const events = await this.loadEvents(
+      tenantId,
+      calendar?.id ?? null,
+      from,
+      to,
+      ctx,
+    );
 
     const out: ResolvedDay[] = [];
     for (
@@ -170,9 +164,10 @@ export class WorkingDayEngineService {
       }
     }
 
+    const unique = this.dedupeEvents(scoped);
     const dayKind = dayKindFromEvents(
       isWeekend,
-      scoped.map((e) => ({ type: e.type, isWorkingDay: e.isWorkingDay })),
+      unique.map((e) => ({ type: e.type, isWorkingDay: e.isWorkingDay })),
       isWorkingDay,
     );
 
@@ -181,8 +176,61 @@ export class WorkingDayEngineService {
       isWorkingDay,
       dayKind,
       createsAttendanceSession,
-      events: scoped.map((e) => ({ id: e.id, type: e.type, title: e.title })),
+      events: unique.map((e) => ({ id: e.id, type: e.type, title: e.title })),
     };
+  }
+
+  private async loadEvents(
+    tenantId: string,
+    calendarId: string | null,
+    from: Date,
+    to: Date,
+    ctx: ResolveContext,
+  ): Promise<EventRow[]> {
+    if (!calendarId && !ctx.mergePublishedCalendars) return [];
+    const rows = await this.prisma.academicCalendarEvent.findMany({
+      where: ctx.mergePublishedCalendars
+        ? {
+            tenantId,
+            active: true,
+            deletedAt: null,
+            startDate: { lte: to },
+            endDate: { gte: from },
+            calendar: {
+              tenantId,
+              deletedAt: null,
+              status: 'PUBLISHED',
+            },
+          }
+        : {
+            tenantId,
+            calendarId: calendarId as string,
+            active: true,
+            deletedAt: null,
+            startDate: { lte: to },
+            endDate: { gte: from },
+          },
+      orderBy: [{ startDate: 'asc' }, { title: 'asc' }],
+    });
+    const seen = new Set<string>();
+    return rows.filter((row) => {
+      if (seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+  }
+
+  /** Same title filed on two academic years should appear once on a day. */
+  private dedupeEvents(events: EventRow[]): EventRow[] {
+    const seen = new Set<string>();
+    const out: EventRow[] = [];
+    for (const event of events) {
+      const key = `${event.type}|${event.title.trim().toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(event);
+    }
+    return out;
   }
 
   private async findCalendar(

@@ -475,6 +475,9 @@ export class WebsiteAcademicPlannerService {
     const resolved = await this.workingDays.resolveRange(tenantId, from, to, {
       calendarId: calendar.id,
       academicYearId: year.id,
+      // October events are often saved on the previous published year
+      // (2025–26) while the site grid follows the year that contains today.
+      mergePublishedCalendars: true,
     });
 
     const dayRows = resolved.map((day) => {
