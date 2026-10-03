@@ -30,7 +30,6 @@ export class QuestionBankAnalyticsService {
           paperCode: true,
           fileName: true,
           fileSizeBytes: true,
-          status: true,
           createdAt: true,
         },
       }),
