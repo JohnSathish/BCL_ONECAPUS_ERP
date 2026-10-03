@@ -110,6 +110,11 @@ export function DirectoryRowPreview({ row, expanded }: Props) {
                 : null
             }
           />
+          <InfoRow label="Programme" value={row.programme} />
+          <InfoRow label="Department" value={profile.data?.departmentName} />
+          <InfoRow label="Semester" value={row.semester ? `Semester ${row.semester}` : null} />
+          <InfoRow label="Shift" value={row.shift} />
+          <InfoRow label="NEHU Roll No" value={row.universityRollNumber} />
           <InfoRow label="Admission batch" value={row.batch} />
         </dl>
       </section>
@@ -119,8 +124,22 @@ export function DirectoryRowPreview({ row, expanded }: Props) {
           Academic metrics
         </h4>
         <dl className="space-y-1">
-          <InfoRow label="Attendance" value="—" />
-          <InfoRow label="Fee due" value="—" />
+          <InfoRow
+            label="Attendance"
+            value={
+              row.attendancePercent == null
+                ? 'Not recorded'
+                : `${Math.round(row.attendancePercent)}%`
+            }
+          />
+          <InfoRow
+            label="Fee status"
+            value={
+              (row.feeDueAmount ?? 0) > 0
+                ? `${row.feeStatus ?? 'DUE'} · ₹${(row.feeDueAmount ?? 0).toLocaleString('en-IN')}`
+                : (row.feeStatus ?? 'Paid')
+            }
+          />
           <InfoRow
             label="RFID"
             value={row.rfidNumber ? `Assigned · ${row.rfidNumber}` : 'Not assigned'}

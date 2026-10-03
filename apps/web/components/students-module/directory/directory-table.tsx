@@ -4,17 +4,7 @@ import Link from 'next/link';
 import { Fragment, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AnimatePresence, motion } from 'framer-motion';
-import {
-  ChevronDown,
-  ChevronRight,
-  CreditCard,
-  Edit,
-  Eye,
-  GraduationCap,
-  IdCard,
-  MoreHorizontal,
-  TrendingUp,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, MoreHorizontal } from 'lucide-react';
 
 import { DirectoryAttendanceBadge } from '@/components/students-module/directory/ui/directory-attendance-badge';
 import { DirectoryFeeBadge } from '@/components/students-module/directory/ui/directory-fee-badge';
@@ -32,6 +22,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  DEFAULT_DIRECTORY_COLUMNS,
+  type DirectoryColumnId,
+} from '@/components/students-module/directory/directory-columns';
 import type { StudentDirectoryRow } from '@/types/students';
 import { cn } from '@/utils/cn';
 
@@ -42,11 +36,12 @@ type Props = {
   onToggleAll: (checked: boolean) => void;
   virtualize?: boolean;
   onOpenProfile?: (row: StudentDirectoryRow) => void;
+  visibleColumns?: DirectoryColumnId[];
+  canManage?: boolean;
   className?: string;
 };
 
-export const ROW_HEIGHT = 44;
-const COL_COUNT = 16;
+export const ROW_HEIGHT = 52;
 
 function studentBase(id: string) {
   return `/admin/students/${id}`;
@@ -59,87 +54,56 @@ function PhotoCell({ row }: { row: StudentDirectoryRow }) {
 function InlineActions({
   row,
   onOpenProfile,
+  canManage,
 }: {
   row: StudentDirectoryRow;
   onOpenProfile?: (row: StudentDirectoryRow) => void;
+  canManage?: boolean;
 }) {
   const { formatStudentName } = useStudentNameFormat();
   const displayName = formatStudentName(row.displayFullName ?? row.fullName);
   const base = studentBase(row.id);
-  const quick = [
-    { label: 'View', action: () => onOpenProfile?.(row), icon: Eye, href: undefined },
-    { label: 'Edit', href: `${base}?tab=academic`, icon: Edit },
-    {
-      label: 'Academics',
-      href: `/admin/students/subject-registration?student=${row.id}`,
-      icon: GraduationCap,
-    },
-    { label: 'Promote', href: `/admin/students/promotion?studentId=${row.id}`, icon: TrendingUp },
-    { label: 'ID Card', href: `${base}?tab=id-card`, icon: IdCard },
-    { label: 'Fee Ledger', href: `${base}?tab=fees`, icon: CreditCard },
-    { label: 'Attendance', href: `${base}?tab=attendance`, icon: TrendingUp },
-  ] as const;
+  const links = [
+    { label: 'View Profile', href: base },
+    ...(canManage ? [{ label: 'Edit Student', href: `${base}?tab=academic` }] : []),
+    { label: 'Academic Details', href: `${base}?tab=academic` },
+    { label: 'Attendance', href: `${base}?tab=attendance` },
+    { label: 'Fees', href: `${base}?tab=fees` },
+    { label: 'Subjects', href: `/admin/students/subject-registration?student=${row.id}` },
+    { label: 'Documents', href: `${base}?tab=documents` },
+    { label: 'Generate ID Card', href: `${base}?tab=id-card` },
+    ...(canManage
+      ? [{ label: 'Promote', href: `/admin/students/promotion?studentId=${row.id}` }]
+      : []),
+  ];
 
   return (
-    <div className="flex items-center justify-end gap-0.5">
-      {quick.slice(0, 3).map((a) => {
-        const Icon = a.icon;
-        if ('action' in a && a.action) {
-          return (
-            <button
-              key={a.label}
-              type="button"
-              title={a.label}
-              onClick={a.action}
-              className={cn(
-                buttonVariants({ variant: 'ghost', size: 'sm' }),
-                'h-6 w-6 p-0 text-muted-foreground hover:text-primary',
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-            </button>
-          );
-        }
-        return (
-          <Link
-            key={a.label}
-            href={a.href!}
-            title={a.label}
-            className={cn(
-              buttonVariants({ variant: 'ghost', size: 'sm' }),
-              'h-6 w-6 p-0 text-muted-foreground hover:text-primary',
-            )}
-          >
-            <Icon className="h-3.5 w-3.5" />
-          </Link>
-        );
-      })}
+    <div className="flex items-center justify-end gap-1">
+      <button
+        type="button"
+        onClick={() => onOpenProfile?.(row)}
+        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'h-7 px-2 text-[11px]')}
+      >
+        <Eye className="mr-1 h-3.5 w-3.5" />
+        View
+      </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            title="More"
-            className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'h-6 w-6 p-0')}
+            title="More actions"
+            className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'h-7 w-7 p-0')}
             aria-label={`More actions for ${displayName}`}
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          {quick.map((a) =>
-            'action' in a && a.action ? (
-              <DropdownMenuItem key={a.label} onClick={a.action}>
-                {a.label}
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem key={a.label} asChild>
-                <Link href={a.href!}>{a.label}</Link>
-              </DropdownMenuItem>
-            ),
-          )}
-          <DropdownMenuItem asChild>
-            <Link href={`${base}?tab=documents`}>Documents</Link>
-          </DropdownMenuItem>
+        <DropdownMenuContent align="end" className="w-48">
+          {links.map((item) => (
+            <DropdownMenuItem key={item.label} asChild>
+              <Link href={item.href}>{item.label}</Link>
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -154,6 +118,9 @@ function DataRow({
   toggleExpanded,
   allowExpand = true,
   onOpenProfile,
+  visibleColumns,
+  canManage,
+  colSpan,
 }: {
   row: StudentDirectoryRow;
   selectedIds: Set<string>;
@@ -162,12 +129,18 @@ function DataRow({
   toggleExpanded: (id: string) => void;
   allowExpand?: boolean;
   onOpenProfile?: (row: StudentDirectoryRow) => void;
+  visibleColumns: DirectoryColumnId[];
+  canManage?: boolean;
+  colSpan: number;
 }) {
   const { formatStudentName } = useStudentNameFormat();
   const displayName = formatStudentName(row.displayFullName ?? row.fullName);
   const statusLabel = row.studentStatus ?? row.academicStatus;
   const expanded = expandedIds.has(row.id);
   const isSelected = selectedIds.has(row.id);
+  const show = (id: DirectoryColumnId) => visibleColumns.includes(id);
+  const programmeLabel = row.programme ?? '—';
+  const majorLabel = row.majorSubject ?? '—';
 
   return (
     <Fragment>
@@ -202,65 +175,99 @@ function DataRow({
             </button>
           ) : null}
         </td>
-        <td className="w-9 px-1 py-1 align-middle">
-          <PhotoCell row={row} />
-        </td>
-        <td className="whitespace-nowrap px-1.5 py-1 align-middle">
-          <p className="font-mono text-[11px] font-medium">{row.rollNumber ?? '—'}</p>
-        </td>
-        <td className="whitespace-nowrap px-1.5 py-1 align-middle">
-          <p className="font-mono text-[11px] font-medium">
-            {row.universityRollNumber?.trim() || row.admissionNumber?.trim() || '—'}
-          </p>
-        </td>
-        <td className="max-w-[160px] px-1.5 py-1 align-middle">
-          <button
-            type="button"
-            onClick={() => onOpenProfile?.(row)}
-            className="block w-full truncate text-left text-xs font-medium hover:text-primary hover:underline"
-          >
-            <StudentName
-              name={row.fullName}
-              displayFullName={row.displayFullName}
-              className="block w-full truncate text-left text-xs font-medium hover:text-primary hover:underline"
-            />
-          </button>
-        </td>
-        <td className="max-w-[140px] px-1.5 py-1 align-middle">
-          <p className="truncate text-[11px]">{row.programme ?? '—'}</p>
-        </td>
-        <td className="max-w-[100px] px-1.5 py-1 align-middle">
-          <p className="truncate text-[11px]">{row.majorSubject ?? '—'}</p>
-        </td>
-        <td className="px-1.5 py-1 align-middle">
-          <DirectorySemesterChip semester={row.semester} />
-        </td>
-        <td className="max-w-[72px] px-1.5 py-1 align-middle">
-          <span className="truncate text-[11px]">{row.shift ?? '—'}</span>
-        </td>
-        <td className="whitespace-nowrap px-1.5 py-1 align-middle">
-          <span className="text-[11px] tabular-nums">{row.mobileNumber ?? '—'}</span>
-        </td>
-        <td className="whitespace-nowrap px-1.5 py-1 align-middle">
-          <span className="font-mono text-[11px]">{row.abcId?.trim() ? row.abcId : '—'}</span>
-        </td>
-        <td className="px-1.5 py-1 align-middle">
-          <DirectoryFeeBadge row={row} />
-        </td>
-        <td className="px-1.5 py-1 align-middle">
-          <DirectoryAttendanceBadge row={row} />
-        </td>
-        <td className="px-1.5 py-1 align-middle">
-          <DirectoryStatusPill label={statusLabel} />
-        </td>
-        <td className="px-1 py-1 align-middle">
-          <InlineActions row={row} onOpenProfile={onOpenProfile} />
-        </td>
+        {show('student') ? (
+          <td className="min-w-[180px] px-1.5 py-1.5 align-middle">
+            <div className="flex items-center gap-2">
+              <PhotoCell row={row} />
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => onOpenProfile?.(row)}
+                  className="block max-w-[180px] truncate text-left text-xs font-semibold hover:text-primary hover:underline"
+                >
+                  <StudentName
+                    name={row.fullName}
+                    displayFullName={row.displayFullName}
+                    className="block truncate text-left text-xs font-semibold"
+                  />
+                </button>
+                <p className="max-w-[180px] truncate text-[11px] text-muted-foreground">
+                  {row.email ?? '—'}
+                </p>
+              </div>
+            </div>
+          </td>
+        ) : null}
+        {show('roll') ? (
+          <td className="whitespace-nowrap px-1.5 py-1 align-middle">
+            <p className="font-mono text-[11px] font-medium">{row.rollNumber ?? '—'}</p>
+          </td>
+        ) : null}
+        {show('nehu') ? (
+          <td className="whitespace-nowrap px-1.5 py-1 align-middle">
+            <p className="font-mono text-[11px] font-medium">
+              {row.universityRollNumber?.trim() || row.admissionNumber?.trim() || '—'}
+            </p>
+          </td>
+        ) : null}
+        {show('programme') ? (
+          <td className="max-w-[160px] px-1.5 py-1 align-middle">
+            <p className="truncate text-[11px] font-medium">{programmeLabel}</p>
+            {!show('major') ? (
+              <p className="truncate text-[11px] text-muted-foreground">{majorLabel}</p>
+            ) : null}
+          </td>
+        ) : null}
+        {show('major') ? (
+          <td className="max-w-[120px] px-1.5 py-1 align-middle">
+            <p className="truncate text-[11px]">{majorLabel}</p>
+          </td>
+        ) : null}
+        {show('semester') ? (
+          <td className="px-1.5 py-1 align-middle">
+            <DirectorySemesterChip semester={row.semester} />
+          </td>
+        ) : null}
+        {show('shift') ? (
+          <td className="max-w-[88px] px-1.5 py-1 align-middle">
+            <span className="truncate text-[11px]">{row.shift ?? '—'}</span>
+          </td>
+        ) : null}
+        {show('contact') ? (
+          <td className="whitespace-nowrap px-1.5 py-1 align-middle">
+            <span className="text-[11px] tabular-nums">{row.mobileNumber ?? '—'}</span>
+          </td>
+        ) : null}
+        {show('abc') ? (
+          <td className="whitespace-nowrap px-1.5 py-1 align-middle">
+            <span className="font-mono text-[11px]">{row.abcId?.trim() ? row.abcId : '—'}</span>
+          </td>
+        ) : null}
+        {show('fee') ? (
+          <td className="px-1.5 py-1 align-middle">
+            <DirectoryFeeBadge row={row} />
+          </td>
+        ) : null}
+        {show('attendance') ? (
+          <td className="px-1.5 py-1 align-middle">
+            <DirectoryAttendanceBadge row={row} />
+          </td>
+        ) : null}
+        {show('status') ? (
+          <td className="px-1.5 py-1 align-middle">
+            <DirectoryStatusPill label={statusLabel} />
+          </td>
+        ) : null}
+        {show('actions') ? (
+          <td className="sticky right-0 bg-background/95 px-1 py-1 align-middle">
+            <InlineActions row={row} onOpenProfile={onOpenProfile} canManage={canManage} />
+          </td>
+        ) : null}
       </tr>
       <AnimatePresence initial={false}>
         {allowExpand && expanded ? (
           <tr className="border-b border-border/30 bg-muted/15">
-            <td colSpan={COL_COUNT} className="px-3 py-2">
+            <td colSpan={colSpan} className="px-3 py-2">
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
@@ -285,10 +292,14 @@ export function DirectoryTable({
   onToggleAll,
   virtualize = false,
   onOpenProfile,
+  visibleColumns = DEFAULT_DIRECTORY_COLUMNS,
+  canManage,
   className,
 }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const parentRef = useRef<HTMLDivElement>(null);
+  const show = (id: DirectoryColumnId) => visibleColumns.includes(id);
+  const colSpan = 2 + visibleColumns.length;
   const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
   const someSelected = rows.some((r) => selectedIds.has(r.id)) && !allSelected;
 
@@ -341,48 +352,71 @@ export function DirectoryTable({
           />
         </th>
         <th className="w-6 px-0.5 py-1.5" aria-hidden />
-        <th className="w-9 px-1 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Photo
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Roll No
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          NEHU Roll No
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Student Name
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Programme
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Major
-        </th>
-        <th className="w-12 px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Sem
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Shift
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Mobile
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          ABC ID
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Fee
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Attendance
-        </th>
-        <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Status
-        </th>
-        <th className="w-[88px] px-1 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Actions
-        </th>
+        {show('student') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Student
+          </th>
+        ) : null}
+        {show('roll') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Roll No
+          </th>
+        ) : null}
+        {show('nehu') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            NEHU Roll No
+          </th>
+        ) : null}
+        {show('programme') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {show('major') ? 'Programme' : 'Programme / Major'}
+          </th>
+        ) : null}
+        {show('major') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Major
+          </th>
+        ) : null}
+        {show('semester') ? (
+          <th className="w-12 px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Sem
+          </th>
+        ) : null}
+        {show('shift') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Shift
+          </th>
+        ) : null}
+        {show('contact') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Contact
+          </th>
+        ) : null}
+        {show('abc') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            ABC ID
+          </th>
+        ) : null}
+        {show('fee') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Fee Status
+          </th>
+        ) : null}
+        {show('attendance') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Attendance
+          </th>
+        ) : null}
+        {show('status') ? (
+          <th className="px-1.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Status
+          </th>
+        ) : null}
+        {show('actions') ? (
+          <th className="sticky right-0 bg-background/95 px-1 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Actions
+          </th>
+        ) : null}
       </tr>
     </thead>
   );
@@ -398,7 +432,7 @@ export function DirectoryTable({
           <tbody>
             {virtualize && paddingTop > 0 ? (
               <tr>
-                <td colSpan={COL_COUNT} style={{ height: paddingTop, padding: 0, border: 0 }} />
+                <td colSpan={colSpan} style={{ height: paddingTop, padding: 0, border: 0 }} />
               </tr>
             ) : null}
             {virtualize
@@ -415,6 +449,9 @@ export function DirectoryTable({
                       toggleExpanded={toggleExpanded}
                       allowExpand={false}
                       onOpenProfile={onOpenProfile}
+                      visibleColumns={visibleColumns}
+                      canManage={canManage}
+                      colSpan={colSpan}
                     />
                   );
                 })
@@ -427,11 +464,14 @@ export function DirectoryTable({
                     onToggleRow={onToggleRow}
                     toggleExpanded={toggleExpanded}
                     onOpenProfile={onOpenProfile}
+                    visibleColumns={visibleColumns}
+                    canManage={canManage}
+                    colSpan={colSpan}
                   />
                 ))}
             {virtualize && paddingBottom > 0 ? (
               <tr>
-                <td colSpan={COL_COUNT} style={{ height: paddingBottom, padding: 0, border: 0 }} />
+                <td colSpan={colSpan} style={{ height: paddingBottom, padding: 0, border: 0 }} />
               </tr>
             ) : null}
           </tbody>
@@ -441,6 +481,6 @@ export function DirectoryTable({
   );
 }
 
-export function shouldVirtualizeDirectory(rowsCount: number, limit: number) {
-  return rowsCount > 30 || limit >= 50;
+export function shouldVirtualizeDirectory(rowsCount: number, _limit: number) {
+  return rowsCount > 200;
 }

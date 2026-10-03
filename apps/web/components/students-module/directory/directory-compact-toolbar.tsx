@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import {
   ChevronDown,
   Download,
@@ -17,6 +18,10 @@ import {
 
 import { DirectoryFilterChips } from '@/components/students-module/directory/directory-filter-chips';
 import type { DirectoryFilters } from '@/components/students-module/directory/directory-filter-bar';
+import {
+  DIRECTORY_COLUMNS,
+  type DirectoryColumnId,
+} from '@/components/students-module/directory/directory-columns';
 import { DirectorySavedViews } from '@/components/students-module/directory/directory-saved-views';
 import { DirectorySearch } from '@/components/students-module/directory/directory-search';
 import {
@@ -125,6 +130,8 @@ type Props = {
   onExportSelected?: () => void;
   exportPending?: boolean;
   hideShiftFilter?: boolean;
+  visibleColumns: DirectoryColumnId[];
+  onToggleColumn: (id: DirectoryColumnId) => void;
 };
 
 export function DirectoryCompactToolbar({
@@ -152,6 +159,8 @@ export function DirectoryCompactToolbar({
   onExportSelected,
   exportPending,
   hideShiftFilter = false,
+  visibleColumns,
+  onToggleColumn,
 }: Props) {
   const advancedFilterCount = countActiveFilters({
     ...filters,
@@ -182,6 +191,7 @@ export function DirectoryCompactToolbar({
   const subjectsHref = buildBulkHref('/admin/students/subject-registration', selectedIds, filters);
 
   const feeFilterValue = filters.uiFeeDue === 'true' ? 'true' : '';
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   return (
     <div className="sticky top-0 z-20 space-y-2">
@@ -190,12 +200,29 @@ export function DirectoryCompactToolbar({
       </div>
 
       <div className="glass-card relative z-10 rounded-xl border border-border/50 px-2.5 py-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <DirectorySavedViews
-            currentFilters={filters}
-            onApply={onApplySavedView}
-            onReset={onResetFilters}
-          />
+        <div className="mb-2 flex items-center justify-between md:hidden">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8"
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+          >
+            <Settings2 className="mr-1.5 h-3.5 w-3.5" />
+            Filters
+          </Button>
+          {totalCount != null ? (
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              {totalCount.toLocaleString()} students
+            </span>
+          ) : null}
+        </div>
+        <div
+          className={cn(
+            'flex-wrap items-center gap-1.5',
+            mobileFiltersOpen ? 'flex' : 'hidden md:flex',
+          )}
+        >
           <FilterPill
             label="Programme"
             value={filters.programVersionId}
@@ -259,8 +286,8 @@ export function DirectoryCompactToolbar({
             ) : null}
           </Button>
           {totalCount != null ? (
-            <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
-              {totalCount.toLocaleString()} records
+            <span className="ml-auto hidden text-[11px] tabular-nums text-muted-foreground md:inline">
+              {totalCount.toLocaleString()} students
             </span>
           ) : null}
         </div>
@@ -276,39 +303,38 @@ export function DirectoryCompactToolbar({
 
       <div className="glass-card relative z-10 flex flex-wrap items-center gap-1.5 rounded-xl border border-border/50 px-2.5 py-2">
         {canManage ? (
-          <>
-            <Link
-              href="/admin/students/new"
-              className={cn(
-                buttonVariants({ size: 'sm' }),
-                'h-7 rounded-lg bg-gradient-to-r from-primary to-primary/80 px-2.5 text-[11px] shadow-sm',
-              )}
-            >
-              <Plus className="mr-1 h-3 w-3" />
-              Add Student
-            </Link>
-            {canImport ? (
-              <Link
-                href="/admin/students/import"
-                className={cn(
-                  buttonVariants({ variant: 'outline', size: 'sm' }),
-                  'h-7 rounded-lg border-border/60 px-2.5 text-[11px]',
-                )}
-              >
-                <Import className="mr-1 h-3 w-3" />
-                Import
-              </Link>
-            ) : null}
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 rounded-lg border-border/60 px-2.5 text-[11px]"
-              onClick={onQuickAdd}
-            >
-              Quick Add
-            </Button>
-          </>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" size="sm" className="h-8 rounded-lg px-3 text-xs">
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                Add Student
+                <ChevronDown className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuItem asChild>
+                <Link href="/admin/students/new">Add Manually</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onQuickAdd}>Quick Add</DropdownMenuItem>
+              {canImport ? (
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/students/import">Import Students</Link>
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+        {canImport ? (
+          <Link
+            href="/admin/students/import"
+            className={cn(
+              buttonVariants({ variant: 'outline', size: 'sm' }),
+              'h-8 rounded-lg border-border/60 px-2.5 text-xs',
+            )}
+          >
+            <Import className="mr-1 h-3.5 w-3.5" />
+            Import
+          </Link>
         ) : null}
 
         {canExport ? (
@@ -316,7 +342,7 @@ export function DirectoryCompactToolbar({
             type="button"
             size="sm"
             variant="outline"
-            className="h-7 rounded-lg border-border/60 px-2.5 text-[11px]"
+            className="h-8 rounded-lg border-border/60 px-2.5 text-xs"
             disabled={exportPending}
             onClick={onExport}
           >
@@ -331,7 +357,7 @@ export function DirectoryCompactToolbar({
               type="button"
               size="sm"
               variant="outline"
-              className="h-7 rounded-lg border-border/60 px-2.5 text-[11px]"
+              className="h-8 rounded-lg border-border/60 px-2.5 text-xs"
             >
               Bulk Actions
               <ChevronDown className="ml-1 h-3 w-3" />
@@ -405,6 +431,45 @@ export function DirectoryCompactToolbar({
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <DirectorySavedViews
+            currentFilters={filters}
+            departmentOptions={departmentOptions}
+            onApply={onApplySavedView}
+            onReset={onResetFilters}
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 rounded-lg border-border/60 px-2.5 text-xs"
+              >
+                Columns
+                <ChevronDown className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {DIRECTORY_COLUMNS.map((column) => (
+                <DropdownMenuItem
+                  key={column.id}
+                  disabled={'locked' in column && column.locked}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    if (!('locked' in column && column.locked)) onToggleColumn(column.id);
+                  }}
+                >
+                  <span className="mr-2 inline-flex h-3.5 w-3.5 items-center justify-center rounded border text-[10px]">
+                    {visibleColumns.includes(column.id) ? '✓' : ''}
+                  </span>
+                  {column.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   );

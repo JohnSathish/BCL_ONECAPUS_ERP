@@ -2,10 +2,17 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Settings2 } from 'lucide-react';
+import { ChevronRight, RefreshCw, Settings2 } from 'lucide-react';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { DirectoryAdvancedFiltersDrawer } from '@/components/students-module/directory/directory-advanced-filters-drawer';
+import {
+  DEFAULT_DIRECTORY_COLUMNS,
+  DIRECTORY_COLUMNS,
+  readStoredColumns,
+  writeStoredColumns,
+  type DirectoryColumnId,
+} from '@/components/students-module/directory/directory-columns';
 import { DirectoryCompactToolbar } from '@/components/students-module/directory/directory-compact-toolbar';
 import { DirectoryFloatingBulkBar } from '@/components/students-module/directory/directory-floating-bulk-bar';
 import { DirectoryKpiStrip } from '@/components/students-module/directory/directory-kpi-strip';
@@ -25,13 +32,18 @@ import {
 import type { DirectoryFilters } from '@/components/students-module/directory/directory-filter-bar';
 import { Button } from '@/components/ui/button';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
+import { useInstitutionBranding } from '@/hooks/use-institution-branding';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useShiftScope } from '@/hooks/use-shift-scope';
 import { useRequireAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useStudentPermissions } from '@/hooks/use-student-permissions';
 import { toShiftOptions } from '@/lib/shift-options';
 import { fetchAcademicStreams } from '@/services/academic-engine';
-import { fetchAdmissionBatches, listAcademicSessions } from '@/services/academic-lifecycle';
+import {
+  fetchAdmissionBatches,
+  fetchCycleDashboard,
+  listAcademicSessions,
+} from '@/services/academic-lifecycle';
 import {
   fetchAcademicDepartments,
   fetchCampuses,
@@ -86,7 +98,23 @@ const emptyFilters: DirectoryFilters = {
   uiAbcStatus: '',
 };
 
+const PAGE_SIZE_KEY = 'directory-page-size';
 const DEFAULT_LIMIT = 25;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+
+function readStoredPageSize() {
+  if (typeof window === 'undefined') return DEFAULT_LIMIT;
+  const raw = Number(localStorage.getItem(PAGE_SIZE_KEY));
+  return PAGE_SIZE_OPTIONS.includes(raw) ? raw : DEFAULT_LIMIT;
+}
+
+function formatSynced(updatedAt: number) {
+  if (!updatedAt) return 'Not synced yet';
+  const minutes = Math.max(0, Math.round((Date.now() - updatedAt) / 60000));
+  if (minutes < 1) return 'Last synced: just now';
+  if (minutes === 1) return 'Last synced: 1 min ago';
+  return `Last synced: ${minutes} min ago`;
+}
 
 function filtersToParams(filters: DirectoryFilters, page: number, limit: number) {
   const opt = (v: string) => v || undefined;
@@ -155,12 +183,31 @@ export function StudentDirectoryPage() {
   const debouncedSearch = useDebouncedValue(searchInput, 300);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
+  const [visibleColumns, setVisibleColumns] =
+    useState<DirectoryColumnId[]>(DEFAULT_DIRECTORY_COLUMNS);
+  const { branding } = useInstitutionBranding();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [admittedProfile, setAdmittedProfile] = useState<StudentProfile | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [profileRow, setProfileRow] = useState<StudentDirectoryRow | null>(null);
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setLimit(readStoredPageSize());
+    setVisibleColumns(readStoredColumns());
+  }, []);
+
+  const toggleColumn = (id: DirectoryColumnId) => {
+    setVisibleColumns((current) => {
+      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+      const stored = DIRECTORY_COLUMNS.map((column) => column.id).filter(
+        (item) => next.includes(item) || item === 'student' || item === 'actions',
+      );
+      writeStoredColumns(stored);
+      return stored;
+    });
+  };
 
   useEffect(() => {
     setFilters((f) => (f.search === debouncedSearch ? f : { ...f, search: debouncedSearch }));
@@ -182,6 +229,13 @@ export function StudentDirectoryPage() {
     enabled: authReady,
   });
   const institutionId = institutions.data?.[0]?.id ?? '';
+
+  const cycle = useQuery({
+    queryKey: ['academic-lifecycle', 'dashboard', institutionId, 'student-records'],
+    queryFn: () => fetchCycleDashboard(institutionId),
+    enabled: authReady && Boolean(institutionId),
+    staleTime: 60_000,
+  });
 
   const campuses = useQuery({
     queryKey: ['org', 'campuses', institutionId],
@@ -383,8 +437,12 @@ export function StudentDirectoryPage() {
   };
 
   const handleApplySavedView = (viewFilters: DirectoryFilters) => {
+    const shiftId =
+      shiftScope.hideShiftSelectors && shiftScope.activeShiftId
+        ? shiftScope.activeShiftId
+        : viewFilters.shiftId;
     setSearchInput(viewFilters.search ?? '');
-    setFilters(viewFilters);
+    setFilters({ ...viewFilters, shiftId });
     setPage(1);
     setSelectedIds(new Set());
   };
@@ -417,14 +475,57 @@ export function StudentDirectoryPage() {
   const openProfile = (row: StudentDirectoryRow) => setProfileRow(row);
 
   return (
-    <DashboardShell role="admin" title="Student Records Management">
-      <DirectoryShell className="flex h-[calc(100dvh-6.5rem)] flex-col gap-2 pb-2">
-        <div className="shrink-0">
-          <h1 className="text-lg font-bold tracking-tight">Student Records Management</h1>
-          <p className="text-[11px] text-muted-foreground">
-            Manage, search, track and update student records · {meta.total.toLocaleString()}{' '}
-            students
-          </p>
+    <DashboardShell role="admin" title="Student Records" pageHeader={false}>
+      <DirectoryShell className="flex h-[calc(100dvh-6.5rem)] flex-col gap-3 pb-2">
+        <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {institutions.data?.[0]?.name ?? branding?.displayName ?? 'College'}
+              </span>
+              {cycle.data?.primarySession?.name ? (
+                <>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <span>{cycle.data.primarySession.name}</span>
+                </>
+              ) : null}
+              {cycle.data?.currentCycle ? (
+                <>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <span>
+                    {cycle.data.currentCycle === 'EVEN' ? 'Even Semester' : 'Odd Semester'}
+                  </span>
+                </>
+              ) : null}
+              {cycle.data?.primarySession?.status === 'ACTIVE' ? (
+                <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                  Active
+                </span>
+              ) : null}
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">Student Records</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage, search, and track student records • {meta.total.toLocaleString()} students
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{formatSynced(students.dataUpdatedAt)}</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={students.isFetching}
+              onClick={() => {
+                void students.refetch();
+                void summary.refetch();
+              }}
+            >
+              <RefreshCw
+                className={`mr-1.5 h-3.5 w-3.5 ${students.isFetching ? 'animate-spin' : ''}`}
+              />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         <div className="shrink-0">
@@ -474,6 +575,8 @@ export function StudentDirectoryPage() {
             }
             exportPending={exportMut.isPending}
             hideShiftFilter={shiftScope.hideShiftSelectors}
+            visibleColumns={visibleColumns}
+            onToggleColumn={toggleColumn}
           />
         </div>
 
@@ -515,11 +618,13 @@ export function StudentDirectoryPage() {
               className="flex min-h-[240px] flex-col items-center justify-center gap-2 px-6 text-center"
               role="status"
             >
-              <p className="text-sm font-medium text-foreground">No students match these filters</p>
+              <p className="text-sm font-medium text-foreground">No students found</p>
               <p className="max-w-md text-sm text-muted-foreground">
-                Try clearing search or advanced filters, or add a student if this programme has no
-                records yet.
+                Try changing your search criteria or clearing some filters.
               </p>
+              <Button type="button" size="sm" variant="outline" onClick={handleResetFilters}>
+                Clear Filters
+              </Button>
             </div>
           ) : (
             <>
@@ -530,6 +635,8 @@ export function StudentDirectoryPage() {
                 onToggleAll={toggleAll}
                 virtualize={useVirtual}
                 onOpenProfile={openProfile}
+                visibleColumns={visibleColumns}
+                canManage={perms.canManage}
                 className="min-h-0 flex-1"
               />
               <DirectoryMobileList
@@ -546,6 +653,7 @@ export function StudentDirectoryPage() {
                 }}
                 onLimitChange={(l) => {
                   setLimit(l);
+                  localStorage.setItem(PAGE_SIZE_KEY, String(l));
                   setPage(1);
                   setSelectedIds(new Set());
                 }}

@@ -33,20 +33,31 @@ const DOT_STYLES: Record<Tone, string> = {
 export function DirectoryAttendanceBadge({ row }: { row: StudentDirectoryRow }) {
   const { label, tone } = resolveAttendance(row);
 
+  const width =
+    row.attendancePercent == null ? 0 : Math.max(0, Math.min(100, row.attendancePercent));
+
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums',
-        TONE_STYLES[tone],
-      )}
-      title={
-        row.attendancePercent != null
-          ? `Attendance ${Math.round(row.attendancePercent)}%`
-          : 'Attendance not recorded'
-      }
-    >
-      <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT_STYLES[tone])} />
-      {label}
+    <span className="inline-flex min-w-[72px] flex-col gap-1">
+      <span
+        className={cn(
+          'inline-flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums',
+          TONE_STYLES[tone],
+        )}
+        title={
+          row.attendancePercent != null
+            ? `Attendance ${Math.round(row.attendancePercent)}%`
+            : 'Attendance not recorded'
+        }
+      >
+        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT_STYLES[tone])} />
+        {label}
+      </span>
+      <span className="h-1 overflow-hidden rounded-full bg-muted">
+        <span
+          className={cn('block h-full rounded-full', DOT_STYLES[tone])}
+          style={{ width: `${width}%` }}
+        />
+      </span>
     </span>
   );
 }

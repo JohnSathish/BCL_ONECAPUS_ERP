@@ -4,6 +4,35 @@ import { useEffect, useState } from 'react';
 import { Bookmark, ChevronDown, Plus, Trash2 } from 'lucide-react';
 
 import type { DirectoryFilters } from '@/components/students-module/directory/directory-filter-bar';
+
+function blankFilters(): DirectoryFilters {
+  return {
+    search: '',
+    programVersionId: '',
+    shiftId: '',
+    batchId: '',
+    semester: '',
+    streamId: '',
+    admissionStatus: '',
+    academicStatus: '',
+    departmentId: '',
+    sessionId: '',
+    categoryLookupId: '',
+    religionLookupId: '',
+    differentlyAbled: '',
+    studentStatus: '',
+    admissionType: '',
+    uiSubjectPending: '',
+    uiFeeDue: '',
+    uiHostel: '',
+    uiRfidAssigned: '',
+    uiAttendanceShortage: '',
+    uiRecentlyAdded: '',
+    uiNoPhoto: '',
+    uiNoMobile: '',
+    uiAbcStatus: '',
+  };
+}
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -29,12 +58,12 @@ const PRESET_VIEWS: SavedView[] = [
   },
   {
     id: 'preset-fee',
-    name: 'Fee Defaulters',
+    name: 'Fee Pending',
     filters: { uiFeeDue: 'true' },
   },
   {
     id: 'preset-attendance',
-    name: 'Attendance Below 75%',
+    name: 'Attendance Risk',
     filters: { uiAttendanceShortage: 'true' },
   },
   {
@@ -61,6 +90,31 @@ const PRESET_VIEWS: SavedView[] = [
     id: 'preset-sem2',
     name: 'Semester 2',
     filters: { semester: '2' },
+  },
+  {
+    id: 'preset-sem3',
+    name: 'Semester 3',
+    filters: { semester: '3' },
+  },
+  {
+    id: 'preset-sem5',
+    name: 'Semester 5',
+    filters: { semester: '5' },
+  },
+  {
+    id: 'preset-geography',
+    name: 'Geography Students',
+    filters: { departmentId: '__geography__' },
+  },
+  {
+    id: 'preset-pending',
+    name: 'Pending Enrollment',
+    filters: { studentStatus: 'PENDING' },
+  },
+  {
+    id: 'preset-recent',
+    name: 'Recently Added',
+    filters: { uiRecentlyAdded: 'true' },
   },
   {
     id: 'preset-subjects',
@@ -91,11 +145,17 @@ function saveCustomViews(views: SavedView[]) {
 
 type Props = {
   currentFilters: DirectoryFilters;
+  departmentOptions?: { id: string; label: string }[];
   onApply: (filters: DirectoryFilters) => void;
   onReset: () => void;
 };
 
-export function DirectorySavedViews({ currentFilters, onApply, onReset }: Props) {
+export function DirectorySavedViews({
+  currentFilters,
+  departmentOptions = [],
+  onApply,
+  onReset,
+}: Props) {
   const [customViews, setCustomViews] = useState<SavedView[]>([]);
 
   useEffect(() => {
@@ -122,7 +182,11 @@ export function DirectorySavedViews({ currentFilters, onApply, onReset }: Props)
   };
 
   const applyView = (view: SavedView) => {
-    onApply({ ...currentFilters, ...view.filters, search: currentFilters.search });
+    const next = { ...blankFilters(), ...view.filters, search: '' };
+    if (next.departmentId === '__geography__') {
+      next.departmentId = departmentOptions.find((d) => /geography/i.test(d.label))?.id ?? '';
+    }
+    onApply(next);
   };
 
   return (

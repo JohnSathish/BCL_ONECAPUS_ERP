@@ -13,9 +13,9 @@ export function DirectorySkeleton({ className }: { className?: string }) {
 
 export function DirectoryKpiSkeleton() {
   return (
-    <div className="flex gap-0 overflow-hidden rounded-xl border border-border/50">
-      {Array.from({ length: 7 }).map((_, i) => (
-        <DirectorySkeleton key={i} className="h-14 min-w-[120px] flex-1" />
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <DirectorySkeleton key={i} className="h-[92px] rounded-xl border border-border/40" />
       ))}
     </div>
   );
@@ -32,9 +32,27 @@ export function DirectoryTableSkeleton({
     <div
       className={cn('glass-card flex min-h-0 flex-1 flex-col space-y-1 rounded-xl p-2', className)}
     >
-      <DirectorySkeleton className="h-7 w-full" />
+      <div className="flex items-center gap-3 px-2 py-2">
+        <DirectorySkeleton className="h-3 w-3" />
+        <DirectorySkeleton className="h-8 w-8 rounded-full" />
+        <DirectorySkeleton className="h-8 w-36" />
+        <DirectorySkeleton className="h-4 w-16" />
+        <DirectorySkeleton className="h-4 w-20" />
+        <DirectorySkeleton className="hidden h-4 w-28 sm:block" />
+        <DirectorySkeleton className="ml-auto h-6 w-16" />
+      </div>
       {Array.from({ length: rows }).map((_, i) => (
-        <DirectorySkeleton key={i} className="h-9 w-full" />
+        <div key={i} className="flex items-center gap-3 border-t border-border/30 px-2 py-2">
+          <DirectorySkeleton className="h-3 w-3" />
+          <DirectorySkeleton className="h-8 w-8 rounded-full" />
+          <div className="space-y-1">
+            <DirectorySkeleton className="h-3 w-32" />
+            <DirectorySkeleton className="h-2.5 w-40" />
+          </div>
+          <DirectorySkeleton className="h-3 w-16" />
+          <DirectorySkeleton className="hidden h-3 w-24 md:block" />
+          <DirectorySkeleton className="ml-auto h-5 w-14 rounded-full" />
+        </div>
       ))}
     </div>
   );
