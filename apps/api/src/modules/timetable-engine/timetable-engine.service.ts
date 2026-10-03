@@ -30,6 +30,83 @@ import {
   parseDateOnly,
   toDateOnlyIso,
 } from '../academic-calendar/academic-calendar.types';
+import {
+  getZonedDateKey,
+  getZonedWeekday,
+} from '../../common/utils/time-greeting';
+
+const TIMETABLE_TOKEN_STOP = new Set([
+  'department',
+  'dept',
+  'of',
+  'the',
+  'and',
+  'major',
+  'minor',
+  'honours',
+  'hons',
+  'honors',
+  'morning',
+  'evening',
+  'shift',
+  'semester',
+  'sem',
+  'day',
+  'odd',
+  'even',
+  'programme',
+  'program',
+  'ba',
+  'bsc',
+  'bcom',
+  'bba',
+]);
+
+function timetableSubjectTokens(...parts: Array<string | null | undefined>) {
+  const tokens = new Set<string>();
+  for (const part of parts) {
+    const raw = String(part ?? '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+    if (!raw) continue;
+    if (
+      raw.length >= 3 &&
+      raw.length <= 6 &&
+      !raw.includes(' ') &&
+      !TIMETABLE_TOKEN_STOP.has(raw)
+    ) {
+      tokens.add(raw);
+    }
+    if (raw.length >= 4 && !TIMETABLE_TOKEN_STOP.has(raw)) tokens.add(raw);
+    for (const word of raw.split(' ')) {
+      if (word.length >= 4 && !TIMETABLE_TOKEN_STOP.has(word)) tokens.add(word);
+    }
+  }
+  return [...tokens];
+}
+
+function timetableTokenHits(haystack: string, token: string) {
+  if (!token || token.length < 3) return false;
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i').test(haystack);
+}
+
+/** Monday–Saturday dates for the institution calendar (IST). */
+function institutionWeekDates(now = new Date()) {
+  const todayKey = getZonedDateKey(now);
+  const todayDow = getZonedWeekday(now);
+  const [year, month, day] = todayKey.split('-').map(Number);
+  const mondayOffset = todayDow === 0 ? -6 : 1 - todayDow;
+  const mondayUtc = Date.UTC(year, month - 1, day + mondayOffset);
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(mondayUtc + index * 86_400_000);
+    return {
+      date: date.toISOString().slice(0, 10),
+      dayOfWeek: date.getUTCDay(),
+    };
+  });
+}
 
 type PlanFilters = {
   shiftId?: string;
@@ -1391,11 +1468,12 @@ export class TimetableEngineService {
       where: { tenantId: user.tid, userId: user.sub, deletedAt: null },
       select: { id: true, primaryShiftId: true },
     });
-    if (!student) return { entries: [] };
+    if (!student) return { entries: [], closedDays: [] };
 
-    // v4: personalize category-only AEC/MDC/SEC/VTC/VAC slots with enrolled paper titles.
-    const dateKey = new Date().toISOString().slice(0, 10);
-    const cacheKey = `timetable:student:v4:${student.id}:week:${dateKey}`;
+    // v6: the week view is the major-department routine. A Garo minor must
+    // not replace it, and the latest published plan must not either.
+    const dateKey = getZonedDateKey();
+    const cacheKey = `timetable:student:v6:${student.id}:week:${dateKey}`;
     return this.cache.wrap(cacheKey, 60, () =>
       this.computeStudentWeek(user, student, filters),
     );
@@ -1411,6 +1489,10 @@ export class TimetableEngineService {
       select: {
         id: true,
         primaryShiftId: true,
+        programVersionId: true,
+        departmentId: true,
+        campusId: true,
+        department: { select: { id: true, name: true, code: true } },
         academicStanding: {
           select: { currentSemesterSequence: true },
         },
@@ -1440,12 +1522,6 @@ export class TimetableEngineService {
       },
     });
 
-    const plan = await this.latestPublishedPlan(user.tid, {
-      shiftId: filters?.shiftId ?? fullStudent?.primaryShiftId ?? undefined,
-      streamId: filters?.streamId,
-    });
-    if (!plan) return { entries: [] };
-
     const registrations = fullStudent?.semesterRegistrations ?? [];
     const activeRegistration =
       registrations.find((reg) => (reg.lines?.length ?? 0) > 0) ??
@@ -1454,6 +1530,80 @@ export class TimetableEngineService {
     const standingSemester =
       fullStudent?.academicStanding?.currentSemesterSequence ?? null;
     const registrationSemester = activeRegistration?.semesterSequence ?? null;
+
+    const courseIds = [
+      ...new Set(
+        lines
+          .map((line) => line.offering?.courseId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const offeringIds = [
+      ...new Set(lines.map((line) => line.offeringId).filter(Boolean)),
+    ] as string[];
+    const sectionIds = [
+      ...new Set(lines.map((line) => line.offeringSectionId).filter(Boolean)),
+    ] as string[];
+
+    let groupIds: string[] = [];
+    if (courseIds.length) {
+      const papers = await (
+        this.prisma as any
+      ).teachingSubjectGroupPaper.findMany({
+        where: { tenantId: user.tid, courseId: { in: courseIds } },
+        select: { teachingSubjectGroupId: true },
+      });
+      groupIds = [
+        ...new Set(
+          papers
+            .map(
+              (p: { teachingSubjectGroupId: string }) =>
+                p.teachingSubjectGroupId,
+            )
+            .filter(Boolean),
+        ),
+      ] as string[];
+    }
+
+    const identity = await this.studentTimetableIdentity(user.tid, {
+      studentId: fullStudent?.id ?? student.id,
+      programVersionId: fullStudent?.programVersionId ?? null,
+      departmentId: fullStudent?.departmentId ?? null,
+      departmentName: fullStudent?.department?.name ?? null,
+      departmentCode: fullStudent?.department?.code ?? null,
+      courseIds,
+    });
+
+    const plan = await this.pickStudentPublishedPlan(user.tid, {
+      shiftId: filters?.shiftId ?? fullStudent?.primaryShiftId ?? undefined,
+      streamId: filters?.streamId,
+      programVersionId: fullStudent?.programVersionId ?? null,
+      departmentIds: identity.departmentIds,
+      subjectIds: identity.subjectIds,
+      subjectTokens: identity.subjectTokens,
+      courseIds,
+      offeringIds,
+      groupIds,
+      sectionIds,
+    });
+    const closedDays = await this.closedDaysForCurrentWeek(
+      user.tid,
+      plan,
+      fullStudent?.campusId ?? null,
+      fullStudent?.departmentId ?? null,
+    );
+    if (!plan) {
+      return {
+        entries: [],
+        closedDays,
+        meta: {
+          matchedBy: 'none',
+          reason:
+            "No published timetable matches this student's department or enrolled subjects.",
+          subjectTokens: identity.subjectTokens,
+        },
+      };
+    }
 
     // Load the full published class routine for this plan, with display relations.
     const planEntries = await this.prisma.timetablePlanEntry.findMany({
@@ -1464,7 +1614,14 @@ export class TimetableEngineService {
       },
       include: {
         teachingSubjectGroup: {
-          select: { id: true, code: true, title: true, fyugpCategory: true },
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            fyugpCategory: true,
+            academicSubjectId: true,
+            departmentId: true,
+          },
         },
       },
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
@@ -1474,9 +1631,12 @@ export class TimetableEngineService {
       return {
         plan,
         entries: [],
+        closedDays,
         meta: {
-          matchedBy: 'none',
+          matchedBy: plan.matchedBy,
           reason: 'Published plan has no timetable entries.',
+          planId: plan.id,
+          planName: plan.name,
         },
       };
     }
@@ -1516,37 +1676,6 @@ export class TimetableEngineService {
       }
       targetSemester =
         [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-    }
-
-    const courseIds = [
-      ...new Set(
-        lines
-          .map((line) => line.offering?.courseId)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    ];
-    const offeringIds = [
-      ...new Set(lines.map((line) => line.offeringId).filter(Boolean)),
-    ] as string[];
-
-    let groupIds: string[] = [];
-    if (courseIds.length) {
-      const papers = await (
-        this.prisma as any
-      ).teachingSubjectGroupPaper.findMany({
-        where: { tenantId: user.tid, courseId: { in: courseIds } },
-        select: { teachingSubjectGroupId: true },
-      });
-      groupIds = [
-        ...new Set(
-          papers
-            .map(
-              (p: { teachingSubjectGroupId: string }) =>
-                p.teachingSubjectGroupId,
-            )
-            .filter(Boolean),
-        ),
-      ] as string[];
     }
 
     const courseById = new Map<string, { code: string; title: string }>();
@@ -1654,14 +1783,61 @@ export class TimetableEngineService {
       );
     };
 
-    const entries = planEntries.filter((entry) => {
+    const semesterEntries = planEntries.filter((entry) => {
       if (targetSemester == null) return true;
       if (entry.semesterSequence == null) return true;
       return entry.semesterSequence === targetSemester;
     });
 
+    const courseIdSet = new Set(courseIds);
+    const offeringIdSet = new Set(offeringIds);
+    const groupIdSet = new Set(groupIds);
+    const sectionIdSet = new Set(sectionIds);
+    const subjectIdSet = new Set(identity.subjectIds);
+    const departmentIdSet = new Set(identity.departmentIds);
+    const entryIsMine = (entry: (typeof planEntries)[number]) => {
+      if (entry.courseId && courseIdSet.has(entry.courseId)) return true;
+      if (entry.courseOfferingId && offeringIdSet.has(entry.courseOfferingId))
+        return true;
+      if (
+        entry.teachingSubjectGroupId &&
+        groupIdSet.has(entry.teachingSubjectGroupId)
+      )
+        return true;
+      if (entry.offeringSectionId && sectionIdSet.has(entry.offeringSectionId))
+        return true;
+      const group = entry.teachingSubjectGroup;
+      if (group?.academicSubjectId && subjectIdSet.has(group.academicSubjectId))
+        return true;
+      if (group?.departmentId && departmentIdSet.has(group.departmentId)) {
+        const category = String(
+          entry.fyugpCategory ?? group.fyugpCategory ?? '',
+        ).toUpperCase();
+        if (category === 'MAJOR' || category === 'MINOR' || category === '')
+          return true;
+      }
+      const blob = `${group?.code ?? ''} ${group?.title ?? ''} ${entry.sectionCode ?? ''}`;
+      return identity.subjectTokens.some((token) =>
+        timetableTokenHits(blob, token),
+      );
+    };
+
+    let entries = semesterEntries.filter(
+      (entry) => isCategoryOnlyEntry(entry) || entryIsMine(entry),
+    );
+    const ownedClasses = entries.filter((entry) => !isCategoryOnlyEntry(entry));
+    if (
+      ownedClasses.length === 0 &&
+      (plan.matchedBy === 'department' ||
+        plan.matchedBy === 'subject_name' ||
+        plan.matchedBy === 'programme')
+    ) {
+      entries = semesterEntries;
+    }
+
     return {
       plan,
+      closedDays,
       entries: entries.map((entry) => {
         const meta = {
           ...((entry.metadata ?? {}) as Record<string, unknown>),
@@ -1745,7 +1921,9 @@ export class TimetableEngineService {
         };
       }),
       meta: {
-        matchedBy: 'published_plan_semester',
+        matchedBy: plan.matchedBy,
+        planId: plan.id,
+        planName: plan.name,
         targetSemester,
         registrationSemester,
         standingSemester,
@@ -2306,6 +2484,221 @@ export class TimetableEngineService {
           status: 'scheduled',
         })),
     });
+  }
+
+  private async studentTimetableIdentity(
+    tenantId: string,
+    student: {
+      studentId: string;
+      programVersionId: string | null;
+      departmentId: string | null;
+      departmentName: string | null;
+      departmentCode: string | null;
+      courseIds: string[];
+    },
+  ) {
+    const [courses, track] = await Promise.all([
+      student.courseIds.length
+        ? this.prisma.course.findMany({
+            where: { tenantId, id: { in: student.courseIds } },
+            select: { id: true, departmentId: true, code: true, title: true },
+          })
+        : Promise.resolve(
+            [] as Array<{
+              id: string;
+              departmentId: string | null;
+              code: string;
+              title: string;
+            }>,
+          ),
+      this.prisma.studentMajorMinorTrack.findUnique({
+        where: { studentId: student.studentId },
+        include: {
+          majorSubject: {
+            select: {
+              id: true,
+              name: true,
+              departmentId: true,
+              department: { select: { name: true, code: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    // Home department is the major only. Geography majors are allowed Garo
+    // as a minor; that minor must not select the Garo class routine.
+    const homeDepartmentId =
+      track?.majorSubject?.departmentId ?? student.departmentId ?? null;
+    const departmentIds = new Set<string>();
+    if (homeDepartmentId) departmentIds.add(homeDepartmentId);
+
+    const subjectIds = [track?.majorSubject?.id].filter((id): id is string =>
+      Boolean(id),
+    );
+
+    const usingStudentDepartment =
+      !track?.majorSubject?.departmentId ||
+      track.majorSubject.departmentId === student.departmentId;
+    const subjectTokens = timetableSubjectTokens(
+      track?.majorSubject?.name,
+      track?.majorSubject?.department?.name,
+      track?.majorSubject?.department?.code,
+      usingStudentDepartment ? student.departmentName : null,
+      usingStudentDepartment ? student.departmentCode : null,
+      ...courses
+        .filter(
+          (course) =>
+            homeDepartmentId && course.departmentId === homeDepartmentId,
+        )
+        .flatMap((course) => [course.title, course.code]),
+    );
+
+    return { departmentIds: [...departmentIds], subjectIds, subjectTokens };
+  }
+
+  private async pickStudentPublishedPlan(
+    tenantId: string,
+    input: {
+      shiftId?: string;
+      streamId?: string;
+      programVersionId: string | null;
+      departmentIds: string[];
+      subjectIds: string[];
+      subjectTokens: string[];
+      courseIds: string[];
+      offeringIds: string[];
+      groupIds: string[];
+      sectionIds: string[];
+    },
+  ) {
+    const whereBase = {
+      tenantId,
+      status: 'PUBLISHED' as const,
+      deletedAt: null,
+      ...(input.streamId
+        ? {
+            metadata: {
+              path: ['streamId'],
+              equals: input.streamId,
+            } as object,
+          }
+        : {}),
+    };
+    const sameShift = await this.prisma.timetablePlan.findMany({
+      where: {
+        ...whereBase,
+        ...(input.shiftId ? { shiftId: input.shiftId } : {}),
+      },
+      orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+      take: 40,
+    });
+    let candidates = sameShift;
+    if (candidates.length <= 1) {
+      const broader = await this.prisma.timetablePlan.findMany({
+        where: whereBase,
+        orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+        take: 40,
+      });
+      const seen = new Set(candidates.map((plan) => plan.id));
+      candidates = [
+        ...candidates,
+        ...broader.filter((plan) => !seen.has(plan.id)),
+      ];
+    }
+
+    type Scored = (typeof candidates)[number] & {
+      score: number;
+      matchedBy: 'enrollment' | 'department' | 'subject_name' | 'programme';
+    };
+    const scored: Scored[] = [];
+    for (const plan of candidates) {
+      const meta = (plan.metadata ?? {}) as {
+        streamName?: string | null;
+        streamCode?: string | null;
+      };
+      const haystack = `${plan.name} ${meta.streamName ?? ''} ${meta.streamCode ?? ''}`;
+      const nameHit = input.subjectTokens.some((token) =>
+        timetableTokenHits(haystack, token),
+      );
+      const departmentHit = Boolean(
+        plan.departmentId && input.departmentIds.includes(plan.departmentId),
+      );
+      const programmeHit = Boolean(
+        input.programVersionId &&
+        plan.programVersionId === input.programVersionId,
+      );
+      // Latest published plan, the BA programme, and a Garo minor paper are
+      // not the student's class routine. Only the major department is.
+      if (!nameHit && !departmentHit) continue;
+      const matchedBy = departmentHit ? 'department' : 'subject_name';
+      const sameShift = input.shiftId && plan.shiftId === input.shiftId;
+      const score =
+        (departmentHit ? 1000 : 0) +
+        (nameHit ? 600 : 0) +
+        (programmeHit ? 40 : 0) +
+        (sameShift ? 30 : 0);
+      scored.push({ ...plan, score, matchedBy });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored[0] ?? null;
+  }
+
+  private async closedDaysForCurrentWeek(
+    tenantId: string,
+    plan: { id: string; academicYearId: string | null } | null,
+    campusId: string | null,
+    departmentId: string | null,
+  ) {
+    const week = institutionWeekDates();
+    if (!week.length) return [];
+    try {
+      const resolved = await this.workingDays.resolveRange(
+        tenantId,
+        week[0]!.date,
+        week[week.length - 1]!.date,
+        {
+          academicYearId: plan?.academicYearId,
+          campusId,
+          departmentId,
+        },
+      );
+      const byDate = new Map(resolved.map((day) => [day.date, day]));
+      const closed: Array<{
+        date: string;
+        dayOfWeek: number;
+        dayKind: string;
+        title: string;
+      }> = [];
+      for (const day of week) {
+        const calendarDay = byDate.get(day.date);
+        if (!calendarDay || calendarDay.isWorkingDay) continue;
+        if (plan) {
+          const forceRun = await this.hasDayAction(
+            tenantId,
+            plan.id,
+            parseDateOnly(day.date),
+            ['CALENDAR_FORCE_RUN', 'HOLIDAY_CLASS'],
+          );
+          if (forceRun) continue;
+        }
+        const holidayEvent = calendarDay.events.find((event) =>
+          /HOLIDAY|CLOSURE|BREAK|WEEKEND/i.test(event.type),
+        );
+        closed.push({
+          date: day.date,
+          dayOfWeek: day.dayOfWeek,
+          dayKind: calendarDay.dayKind,
+          title:
+            holidayEvent?.title?.trim() ||
+            calendarDay.events[0]?.title?.trim() ||
+            (calendarDay.dayKind === 'WEEKEND' ? 'Weekend' : 'Holiday'),
+        });
+      }
+      return closed;
+    } catch {
+      return [];
+    }
   }
 
   private async latestPublishedPlan(

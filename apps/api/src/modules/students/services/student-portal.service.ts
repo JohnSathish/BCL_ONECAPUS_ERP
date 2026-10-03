@@ -16,6 +16,23 @@ import { StudentsService } from '../students.service';
 import { StudentPortalCalendarService } from './student-portal-calendar.service';
 import { getZonedWeekday } from '../../../common/utils/time-greeting';
 
+type WeekClosure = {
+  date: string;
+  dayOfWeek: number;
+  dayKind: string;
+  title: string;
+};
+
+function closureForDay(
+  weekTimetable: { closedDays?: WeekClosure[] } | null | undefined,
+  dayOfWeek: number,
+) {
+  return (
+    weekTimetable?.closedDays?.find((day) => day.dayOfWeek === dayOfWeek) ??
+    null
+  );
+}
+
 const SNAPSHOT_CATEGORY_LABELS: Record<string, string> = {
   MAJOR: 'Major',
   MINOR: 'Minor',
@@ -396,7 +413,8 @@ export class StudentPortalService {
   async getDashboardWidgetTimetable(user: JwtUser) {
     const student = await this.resolveStudent(user);
     const weekTimetable = await this.timetable.studentWeek(user);
-    const today = new Date().getDay();
+    const today = getZonedWeekday();
+    if (closureForDay(weekTimetable, today)) return [];
     const entries = weekTimetable?.entries ?? [];
     const offeringIds = [
       ...new Set(
@@ -985,9 +1003,16 @@ export class StudentPortalService {
       this.academicEngine
         .getMyCreditSummary(user.tid, user.sub)
         .catch(() => null),
-      this.timetable
-        .studentWeek(user)
-        .catch(() => ({ entries: [] as Record<string, unknown>[] })),
+      this.timetable.studentWeek(user).catch(
+        () =>
+          ({
+            entries: [] as Record<string, unknown>[],
+            closedDays: [] as WeekClosure[],
+          }) as {
+            entries: Record<string, unknown>[];
+            closedDays: WeekClosure[];
+          },
+      ),
       this.lms.studentDashboard(user).catch(() => null),
       this.examinations.studentResults(user).catch(() => null),
       this.prisma.academicYear.findFirst({
@@ -1278,28 +1303,40 @@ export class StudentPortalService {
     };
 
     const today = getZonedWeekday();
-    const todayClasses = (weekTimetable.entries ?? [])
-      .filter((e) => e.dayOfWeek === today)
-      .sort(
-        (a, b) =>
-          (parseTimeToMinutes(String(a.startTime ?? '')) ?? 0) -
-          (parseTimeToMinutes(String(b.startTime ?? '')) ?? 0),
-      )
-      .map((entry) => mapTimetableSlot(entry as Record<string, unknown>));
+    const todayClosure = closureForDay(weekTimetable, today);
+    const todayClasses = todayClosure
+      ? []
+      : (weekTimetable.entries ?? [])
+          .filter((e) => e.dayOfWeek === today)
+          .sort(
+            (a, b) =>
+              (parseTimeToMinutes(String(a.startTime ?? '')) ?? 0) -
+              (parseTimeToMinutes(String(b.startTime ?? '')) ?? 0),
+          )
+          .map((entry) => mapTimetableSlot(entry as Record<string, unknown>));
 
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const weeklyTimetable = dayNames.map((day, dayOfWeek) => ({
-      day,
-      dayOfWeek,
-      slots: (weekTimetable.entries ?? [])
-        .filter((e) => e.dayOfWeek === dayOfWeek)
-        .sort(
-          (a, b) =>
-            (parseTimeToMinutes(String(a.startTime ?? '')) ?? 0) -
-            (parseTimeToMinutes(String(b.startTime ?? '')) ?? 0),
-        )
-        .map((entry) => mapTimetableSlot(entry as Record<string, unknown>)),
-    }));
+    const weeklyTimetable = dayNames.map((day, dayOfWeek) => {
+      const closure = closureForDay(weekTimetable, dayOfWeek);
+      return {
+        day,
+        dayOfWeek,
+        holidayTitle: closure?.title ?? null,
+        dayKind: closure?.dayKind ?? null,
+        slots: closure
+          ? []
+          : (weekTimetable.entries ?? [])
+              .filter((e) => e.dayOfWeek === dayOfWeek)
+              .sort(
+                (a, b) =>
+                  (parseTimeToMinutes(String(a.startTime ?? '')) ?? 0) -
+                  (parseTimeToMinutes(String(b.startTime ?? '')) ?? 0),
+              )
+              .map((entry) =>
+                mapTimetableSlot(entry as Record<string, unknown>),
+              ),
+      };
+    });
 
     const attendanceBySubject = (attendance?.subjects ?? []).map(
       (row: {
@@ -1407,6 +1444,9 @@ export class StudentPortalService {
       subjects,
       attendanceBySubject,
       todayClasses,
+      todayClosure: todayClosure
+        ? { title: todayClosure.title, dayKind: todayClosure.dayKind }
+        : null,
       weeklyTimetable,
       semesterProgress,
       journey,
