@@ -26,14 +26,12 @@ import {
   UserPlus,
   Users,
   Wallet,
-  Clock,
   BookMarked,
   Award,
   UserCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { DashboardAiAssistant } from '@/components/dashboard/dashboard-ai-assistant';
 import { ShiftOperationsSection } from '@/components/dashboard/shift-operations-cards';
 import { fetchOperationsCenter } from '@/services/dashboard-analytics';
@@ -45,12 +43,10 @@ import type { OperationsActionItem, OperationsCenter } from '@/types/dashboard-a
 import {
   ArrowLink,
   CircularProgress,
-  DeptProgressBar,
   FeeBarChart,
   KpiCard,
   OpsSkeleton,
   PriorityBadge,
-  QuickActionCard,
   SaaSCard,
   SectionTitle,
   StatusDot,
@@ -267,7 +263,7 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
   const shiftScope = useShiftScope();
   const effectiveShiftId = useEffectiveShiftId(undefined);
   const permissions = useAuthStore((s) => s.session?.user?.permissions);
-  const [clock, setClock] = useState('');
+  const [clock, setClock] = useState({ date: '', time: '' });
 
   const opsQ = useQuery({
     queryKey: ['dashboard', 'operations', effectiveShiftId, workspace?.kind],
@@ -283,26 +279,21 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
 
   useEffect(() => {
     const tick = () => {
-      setClock(
-        new Date().toLocaleString('en-IN', {
-          weekday: 'short',
+      const now = new Date();
+      setClock({
+        date: now.toLocaleDateString('en-IN', {
+          weekday: 'long',
           day: 'numeric',
           month: 'short',
           year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
         }),
-      );
+        time: now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      });
     };
     tick();
     const id = setInterval(tick, 30_000);
     return () => clearInterval(id);
   }, []);
-
-  const collectionTrend = useMemo(
-    () => sparkTrend(ops?.finance.collectionSparkline ?? []),
-    [ops?.finance.collectionSparkline],
-  );
 
   const notifications = useMemo(() => {
     if (!ops) return [];
@@ -380,51 +371,71 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
     [permissions],
   );
 
+  const healthItems = SYSTEM_HEALTH_GROUPS.flatMap((group) => group.items);
+  const healthWarning = healthItems.some((item) => item.status !== 'healthy');
+  const academicDepartments = ops?.departments.length ?? 0;
+
   return (
-    <div className="min-h-full space-y-6 rounded-2xl bg-[#F8FAFC] pb-6 dark:bg-background">
+    <div className="min-h-full space-y-3 rounded-2xl bg-[#F8FAFC] pb-4 dark:bg-background">
       {/* Section 1 — Header */}
       <motion.header
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-border/60 dark:bg-card"
+        className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-extrabold tracking-tight text-[#0F172A] dark:text-foreground">
-              {dayGreeting}, {displayName} 👋
+              {dayGreeting}, {displayName}
             </h1>
-            <p className="mt-1 text-sm font-semibold text-[#2563EB]">{institutionName}</p>
-            {shiftScope.hideShiftSelectors && shiftScope.activeShiftName ? (
-              <p className="mt-1 text-xs font-medium text-[#64748B]">
-                Workspace:{' '}
-                <span className="text-[#0F172A] dark:text-foreground">
-                  {shiftScope.activeShiftName}
-                </span>
-              </p>
-            ) : null}
-            {ops ? (
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[#475569]">
-                <span>
-                  Academic Year:{' '}
-                  <strong className="text-[#0F172A]">{ops.institution.academicYear}</strong>
-                </span>
-                <span>
-                  {(ops.institution.activeSemesters?.length ?? 0) > 1 ? 'Semesters' : 'Semester'}:{' '}
-                  <strong className="text-[#0F172A]">{ops.institution.semester}</strong>
-                </span>
-                {ops.institution.cycle ? (
-                  <span>
-                    Cycle: <strong className="text-[#0F172A]">{ops.institution.cycle}</strong>
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#64748B]">
-              <span className="inline-flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                {clock}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-lg px-2"
+              onClick={() => void opsQ.refetch()}
+              disabled={opsQ.isFetching}
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', opsQ.isFetching && 'animate-spin')} />
+            </Button>
+          </div>
+          <p className="mt-1 text-sm text-[#475569]">
+            <span className="font-semibold text-[#2563EB]">{institutionName}</span>
+            <span className="mx-1.5 text-[#CBD5E1]">|</span>
+            Your Campus, Our Mission
+          </p>
+          {shiftScope.hideShiftSelectors && shiftScope.activeShiftName ? (
+            <p className="mt-1 text-xs font-medium text-[#64748B]">
+              Workspace: {shiftScope.activeShiftName}
+            </p>
+          ) : null}
+          {ops ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#475569]">
+              <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                Academic Year: <strong>{ops.institution.academicYear}</strong>
               </span>
-              {ops?.updatedAt ? (
+              <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                Semester: <strong>{ops.institution.semester}</strong>
+              </span>
+              {ops.institution.cycle ? (
+                <span className="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                  Cycle: <strong>{ops.institution.cycle}</strong>
+                </span>
+              ) : null}
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold',
+                  healthWarning ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700',
+                )}
+              >
+                <span
+                  className={cn(
+                    'h-1.5 w-1.5 rounded-full',
+                    healthWarning ? 'bg-amber-500' : 'bg-emerald-500',
+                  )}
+                />
+                {healthWarning ? 'Some systems need attention' : 'All systems operational'}
+              </span>
+              {ops.updatedAt ? (
                 <span>
                   Last sync:{' '}
                   {new Date(ops.updatedAt).toLocaleTimeString('en-IN', {
@@ -434,32 +445,11 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
                 </span>
               ) : null}
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative hidden w-64 lg:block">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-              <Input
-                readOnly
-                placeholder="Search students, staff, fees, reports..."
-                className="h-9 rounded-xl border-slate-200 bg-slate-50 pl-9 text-sm"
-                onFocus={() => {
-                  document.dispatchEvent(
-                    new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
-                  );
-                }}
-              />
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl"
-              onClick={() => void opsQ.refetch()}
-              disabled={opsQ.isFetching}
-            >
-              <RefreshCw className={cn('mr-2 h-4 w-4', opsQ.isFetching && 'animate-spin')} />
-              Refresh
-            </Button>
-          </div>
+          ) : null}
+        </div>
+        <div className="rounded-xl border border-slate-200/80 bg-white px-4 py-2 text-right shadow-sm">
+          <p className="text-xs text-[#64748B]">{clock.date}</p>
+          <p className="text-lg font-bold tabular-nums text-[#0F172A]">{clock.time}</p>
         </div>
       </motion.header>
 
@@ -470,181 +460,210 @@ export function OperationsCommandCenter({ userName }: { userName?: string }) {
           variants={staggerContainer}
           initial="hidden"
           animate="show"
-          className="space-y-6"
+          className="space-y-3"
         >
-          <ShiftOperationsSection />
-
-          {/* KPI strip */}
-          <div className="grid items-stretch gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid items-stretch gap-2 sm:grid-cols-2 xl:grid-cols-6">
             <KpiCard
-              label="Students"
+              label="Total Students"
               value={ops.institution.studentCount.toLocaleString('en-IN')}
-              subValue={`${ops.admissions?.approved ?? 0} new admissions`}
               hint="Active enrollment"
               icon={Users}
-              tone="purple"
+              tone="blue"
               href="/admin/students"
             />
             <KpiCard
-              label="Faculty / Staff"
+              label="Total Staff"
               value={ops.institution.staffCount.toLocaleString('en-IN')}
-              subValue="On record"
-              hint="Teaching & non-teaching"
+              hint="Teaching and non-teaching"
               icon={UserCheck}
-              tone="blue"
-              href="/admin/hr"
-            />
-            <KpiCard
-              label="Today's Attendance"
-              value={ops.academic.dataSource === 'live' ? pct(ops.pulse.attendanceTodayPct) : '—'}
-              subValue={
-                ops.academic.dataSource === 'live'
-                  ? `${ops.academic.studentsPresent.toLocaleString('en-IN')} present`
-                  : 'Awaiting session data'
-              }
-              hint={`${ops.academic.classesCompleted}/${ops.academic.classesScheduled} classes marked`}
-              icon={BookOpen}
-              tone="blue"
-              href="/admin/academics/attendance"
-            />
-            <KpiCard
-              label="Today's Collection"
-              value={money(ops.finance.todayCollection)}
-              subValue={`${money(ops.finance.monthCollection)} this month`}
-              hint={`${pct(ops.finance.collectionRate)} collection rate`}
-              icon={IndianRupee}
               tone="green"
-              href="/admin/fees/collections"
-              trend={collectionTrend}
-            />
-            <KpiCard
-              label="Pending Fees"
-              value={money(ops.pulse.pendingDues)}
-              subValue={`${ops.finance.defaulters} defaulters`}
-              hint={`${ops.finance.monthlyTuitionPending} monthly pending`}
-              icon={AlertTriangle}
-              tone="red"
-              href="/admin/fees/defaulters"
+              href="/admin/staff"
             />
             <KpiCard
               label="Admissions"
-              value={String(ops.admissions?.pendingReview ?? ops.admissions?.submitted ?? 0)}
-              subValue="Pending reviews"
-              hint={`${ops.admissions?.received ?? 0} applications received`}
+              value={String(ops.admissions?.received ?? 0)}
+              hint={`${ops.admissions?.pendingReview ?? 0} pending`}
               icon={GraduationCap}
               tone="orange"
               href="/admin/admissions"
             />
+            <KpiCard
+              label="Outstanding Fees"
+              value={money(ops.pulse.pendingDues)}
+              hint={`${ops.finance.defaulters.toLocaleString('en-IN')} defaulters`}
+              icon={IndianRupee}
+              tone="red"
+              href="/admin/fees/defaulters"
+            />
+            <KpiCard
+              label="Faculty Attendance"
+              value={pct(ops.academic.facultyAttendancePct)}
+              hint={
+                ops.academic.dataSource === 'live'
+                  ? `${ops.academic.facultyPresent} present`
+                  : 'Latest recorded figure'
+              }
+              icon={UserCheck}
+              tone="purple"
+              href="/admin/staff"
+            />
+            <KpiCard
+              label="Departments"
+              value={String(academicDepartments)}
+              hint="Departments with students"
+              icon={Library}
+              tone="blue"
+              href="/admin/organization"
+            />
           </div>
 
-          {/* Hero — OneCampus AI Assistant */}
-          <DashboardAiAssistant variant="hero" />
-
-          {/* Operational widgets */}
-          <div className="grid gap-4 lg:grid-cols-3">
-            <SystemHealthPanel />
-            <SmartShortcutsPanel groups={shortcutGroups} />
-            <NotificationsPanel items={notifications} actions={ops.actions} />
+          <div className="grid gap-3 xl:grid-cols-5">
+            <div className="xl:col-span-3">
+              <ShiftOperationsSection campus />
+            </div>
+            <div className="space-y-2 xl:col-span-2">
+              <DashboardAiAssistant compact />
+              {ops.aiInsights[0] ? (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {ops.aiInsights[0]}
+                </p>
+              ) : null}
+            </div>
           </div>
 
-          {/* Analytics */}
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-3 xl:grid-cols-4">
             <AdmissionsOverview ops={ops} />
             <FeeOverview ops={ops} />
             <AttendanceOverview ops={ops} />
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <SaaSCard>
+            <SaaSCard className="p-4">
               <SectionTitle
                 title="Department Strength"
-                subtitle="Students and attendance by department"
-                action={<ArrowLink href="/admin/analytics" label="Full analytics" />}
+                action={<ArrowLink href="/admin/analytics" label="View all" />}
               />
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
                 {ops.departments.length ? (
-                  ops.departments.map((d) => (
-                    <DeptProgressBar
-                      key={d.name}
-                      name={d.name}
-                      value={d.attendancePct}
-                      metric={`${d.students} students`}
-                    />
-                  ))
+                  [...ops.departments]
+                    .sort((a, b) => b.students - a.students)
+                    .slice(0, 8)
+                    .map((department, _index, ranked) => {
+                      const maxStudents = ranked[0]?.students || 1;
+                      return (
+                        <div
+                          key={department.name}
+                          className="grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-2 text-xs"
+                        >
+                          <span className="truncate">{department.name}</span>
+                          <span className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                            <span
+                              className="block h-full rounded-full bg-sky-500"
+                              style={{
+                                width: `${Math.max(8, (department.students / maxStudents) * 100)}%`,
+                              }}
+                            />
+                          </span>
+                          <span className="text-right tabular-nums">
+                            {department.students.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      );
+                    })
                 ) : (
                   <p className="text-sm text-[#64748B]">No department data available.</p>
                 )}
               </div>
             </SaaSCard>
-
-            <SaaSCard id="action-center">
-              <SectionTitle
-                title="Pending Approvals"
-                subtitle="Tasks requiring attention"
-                action={
-                  ops.actions.length ? (
-                    <span className="rounded-full bg-[#2563EB]/10 px-3 py-1 text-xs font-bold text-[#2563EB]">
-                      {ops.actions.length} pending
-                    </span>
-                  ) : null
-                }
-              />
-              <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-                {ops.actions.length ? (
-                  ops.actions.map((action) => <ActionRow key={action.id} action={action} />)
-                ) : (
-                  <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-800">
-                    All clear — no urgent actions today.
-                  </p>
-                )}
-              </div>
-            </SaaSCard>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <SaaSCard>
+          <div className="grid gap-3 xl:grid-cols-4">
+            <SaaSCard className="p-4">
               <SectionTitle
-                title="Upcoming Events"
-                action={<ArrowLink href="/admin/academics/examinations" label="Calendar" />}
+                title="Live Campus Activity"
+                action={<span className="text-[10px] font-bold text-emerald-600">Live</span>}
               />
-              <div className="space-y-2">
-                {ops.upcomingEvents.length ? (
-                  ops.upcomingEvents.map((ev, i) => (
+              <div className="max-h-64 space-y-2 overflow-y-auto">
+                {ops.announcements.length ? (
+                  ops.announcements.slice(0, 6).map((item, index) => (
                     <Link
-                      key={`${ev.label}-${i}`}
-                      href={ev.href ?? '#'}
-                      className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 transition-all hover:border-[#2563EB]/30 hover:shadow-sm"
+                      key={`${item.title}-${index}`}
+                      href={item.href ?? '/admin'}
+                      className="block rounded-lg px-1 py-1.5 hover:bg-slate-50"
                     >
-                      <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-[#2563EB]/10 text-[#2563EB]">
-                        <span className="text-[10px] font-bold uppercase">
-                          {ev.date.split(' ').pop()}
-                        </span>
-                        <span className="text-sm font-extrabold leading-none">
-                          {ev.date.split(' ')[0]}
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold text-[#0F172A]">{ev.label}</p>
-                        <p className="text-xs text-[#64748B]">Institutional calendar event</p>
-                      </div>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-[#64748B]" />
+                      <p className="text-xs font-medium text-[#0F172A]">{item.title}</p>
+                      <p className="text-[10px] text-[#64748B]">{item.date}</p>
                     </Link>
                   ))
                 ) : (
-                  <p className="text-sm text-[#64748B]">No upcoming events scheduled.</p>
+                  <p className="text-xs text-[#64748B]">No recent campus activity.</p>
                 )}
               </div>
             </SaaSCard>
-
-            <SaaSCard>
-              <SectionTitle title="Quick Actions" subtitle="One-click operations" />
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {QUICK_ACTIONS.map((action) => (
-                  <QuickActionCard key={action.href} {...action} />
-                ))}
+            <SaaSCard id="action-center" className="p-4">
+              <SectionTitle
+                title="Pending Approvals"
+                action={
+                  <span className="rounded-full bg-[#2563EB]/10 px-2 py-0.5 text-[10px] font-bold text-[#2563EB]">
+                    {ops.actions.length} pending
+                  </span>
+                }
+              />
+              <div className="max-h-64 space-y-2 overflow-y-auto">
+                {ops.actions.length ? (
+                  ops.actions
+                    .slice(0, 6)
+                    .map((action) => <ActionRow key={action.id} action={action} />)
+                ) : (
+                  <p className="text-xs font-medium text-emerald-700">All clear today.</p>
+                )}
               </div>
             </SaaSCard>
+            <SaaSCard className="p-4">
+              <SectionTitle
+                title="Upcoming Events"
+                action={
+                  <ArrowLink href="/admin/academics/academic-calendar" label="View calendar" />
+                }
+              />
+              <div className="max-h-64 space-y-2 overflow-y-auto">
+                {ops.upcomingEvents.length ? (
+                  ops.upcomingEvents.slice(0, 6).map((event, index) => (
+                    <Link
+                      key={`${event.label}-${index}`}
+                      href={event.href ?? '/admin/academics/academic-calendar'}
+                      className="flex items-center gap-2 rounded-lg px-1 py-1.5 hover:bg-slate-50"
+                    >
+                      <span className="w-12 shrink-0 text-[11px] font-bold text-[#2563EB]">
+                        {event.date}
+                      </span>
+                      <span className="min-w-0 truncate text-xs font-medium">{event.label}</span>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="text-xs text-[#64748B]">No upcoming events.</p>
+                )}
+              </div>
+            </SaaSCard>
+            <SaaSCard className="p-4">
+              <SectionTitle
+                title="System Health"
+                action={<ArrowLink href="/admin/administration" label="View details" />}
+              />
+              <ul className="space-y-1.5">
+                {healthItems.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between text-xs">
+                    <span>{item.label}</span>
+                    <StatusDot status={item.status} />
+                  </li>
+                ))}
+              </ul>
+            </SaaSCard>
           </div>
+
+          {shortcutGroups.length || notifications.length ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              <SmartShortcutsPanel groups={shortcutGroups} />
+              <NotificationsPanel items={notifications} actions={ops.actions} />
+            </div>
+          ) : null}
         </motion.div>
       ) : null}
     </div>

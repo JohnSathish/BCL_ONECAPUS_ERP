@@ -103,14 +103,32 @@ function ShiftOperationsCard({
               <h3 className="text-base font-bold text-[#0F172A] dark:text-foreground">
                 {row.name}
               </h3>
-              <span
-                className={cn(
-                  'rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
-                  accent.badgeClass,
-                )}
-              >
-                {row.code}
-              </span>
+              {(() => {
+                const phase = shiftPhase(row.startTime, row.endTime);
+                if (!phase) return null;
+                return (
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white',
+                      phase === 'Ongoing' && 'bg-emerald-500',
+                      phase === 'Upcoming' && 'bg-amber-500',
+                      phase === 'Closed' && 'bg-slate-400',
+                    )}
+                  >
+                    {phase}
+                  </span>
+                );
+              })()}
+              {!shiftPhase(row.startTime, row.endTime) ? (
+                <span
+                  className={cn(
+                    'rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                    accent.badgeClass,
+                  )}
+                >
+                  {row.code}
+                </span>
+              ) : null}
             </div>
             <p className="mt-0.5 text-xs text-[#64748B]">
               {row.startTime} – {row.endTime}
@@ -125,7 +143,7 @@ function ShiftOperationsCard({
               className="h-8 rounded-lg text-xs"
               onClick={() => onOpenWorkspace?.(workspaceKind!)}
             >
-              Open workspace
+              Open {row.name.replace(/ shift$/i, '')} workspace
               <ArrowRight className="ml-1 h-3.5 w-3.5" />
             </Button>
           ) : null}
@@ -173,7 +191,28 @@ function ShiftOperationsCard({
   );
 }
 
-export function ShiftOperationsSection() {
+function shiftPhase(start: string, end: string) {
+  const toMinutes = (value: string) => {
+    const match = value.trim().match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+    if (!match) return null;
+    let hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const meridiem = match[3]?.toLowerCase();
+    if (meridiem === 'pm' && hours < 12) hours += 12;
+    if (meridiem === 'am' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  };
+  const startMin = toMinutes(start);
+  const endMin = toMinutes(end);
+  if (startMin == null || endMin == null) return null;
+  const now = new Date();
+  const current = now.getHours() * 60 + now.getMinutes();
+  if (current >= startMin && current <= endMin) return 'Ongoing';
+  if (current < startMin) return 'Upcoming';
+  return 'Closed';
+}
+
+export function ShiftOperationsSection({ campus = false }: { campus?: boolean }) {
   const workspace = useOptionalWorkspaceContext();
   const shiftScope = useShiftScope();
   const { can, isAdmin } = usePermissions();
@@ -249,13 +288,31 @@ export function ShiftOperationsSection() {
 
   if (!morningDayRows.length) return null;
 
+  const todayLabel = new Date().toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
   return (
-    <SaaSCard>
+    <SaaSCard className={campus ? 'p-4' : undefined}>
       <SectionTitle
-        title="Shift Operations"
-        subtitle="Morning and Day delivery workspaces — compare load and jump into a shift admin view"
+        title={campus ? "Today's Campus Operations" : 'Shift Operations'}
+        subtitle={
+          campus
+            ? todayLabel
+            : 'Morning and Day delivery workspaces — compare load and jump into a shift admin view'
+        }
         action={
-          workspace?.showWorkspaceSwitcher ? (
+          campus ? (
+            <Link
+              href="/admin/academics/timetable"
+              className="text-xs font-semibold text-[#2563EB]"
+            >
+              View full operation
+            </Link>
+          ) : workspace?.showWorkspaceSwitcher ? (
             <span className="text-xs text-[#64748B]">
               Use the workspace switcher above to manage a shift
             </span>
