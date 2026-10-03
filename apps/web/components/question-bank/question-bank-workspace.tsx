@@ -190,6 +190,7 @@ export function QuestionBankWorkspace({ page = 'dashboard', portal = 'admin' }: 
     return (
       <QuestionBankDashboardPanel
         data={dashboardQuery.data}
+        isLoading={dashboardQuery.isLoading}
         isError={dashboardQuery.isError}
         error={dashboardQuery.error}
       />

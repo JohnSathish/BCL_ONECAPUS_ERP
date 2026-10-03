@@ -28,7 +28,9 @@ export class QuestionBankAnalyticsService {
           academicYearId: true,
           paperName: true,
           paperCode: true,
+          fileName: true,
           fileSizeBytes: true,
+          status: true,
           createdAt: true,
         },
       }),
@@ -102,6 +104,36 @@ export class QuestionBankAnalyticsService {
       .map(([label, value]) => ({ label, value }))
       .sort((a, b) => b.value - a.value);
 
+    const storageByDepartment = new Map<string, number>();
+    for (const paper of papers) {
+      const label = paper.departmentId
+        ? (deptNameMap.get(paper.departmentId) ?? 'Unknown')
+        : 'Unassigned';
+      storageByDepartment.set(
+        label,
+        (storageByDepartment.get(label) ?? 0) + (paper.fileSizeBytes ?? 0),
+      );
+    }
+    const topStorage =
+      Array.from(storageByDepartment.entries())
+        .map(([label, bytes]) => ({ label, bytes }))
+        .sort((a, b) => b.bytes - a.bytes)[0] ?? null;
+
+    const recentUploads = [...papers]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 5)
+      .map((paper) => ({
+        id: paper.id,
+        paperCode: paper.paperCode,
+        paperName: paper.paperName,
+        fileName: paper.fileName,
+        departmentName: paper.departmentId
+          ? (deptNameMap.get(paper.departmentId) ?? null)
+          : null,
+        status: paper.status,
+        createdAt: paper.createdAt.toISOString(),
+      }));
+
     const topPaperIds = topDownloads.map((t) => t.paperId);
     const topPaperRows = topPaperIds.length
       ? papers.filter((p) => topPaperIds.includes(p.id))
@@ -132,6 +164,7 @@ export class QuestionBankAnalyticsService {
         downloadsThisMonth,
         pendingApprovals,
         storageUsedBytes,
+        topStorage,
         topPaper,
         missingSubjects: Math.max(0, subjects.size > 0 ? 0 : 1),
       },
@@ -142,6 +175,7 @@ export class QuestionBankAnalyticsService {
       ),
       papersByDepartment,
       mostDownloaded,
+      recentUploads,
     };
   }
 

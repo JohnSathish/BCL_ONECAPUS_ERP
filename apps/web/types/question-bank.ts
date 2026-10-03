@@ -123,6 +123,7 @@ export type QuestionBankDashboard = {
     downloadsThisMonth: number;
     pendingApprovals: number;
     storageUsedBytes?: number;
+    topStorage?: { label: string; bytes: number } | null;
     topPaper: { id: string; paperName: string; paperCode: string; downloads: number } | null;
     missingSubjects: number;
   };
@@ -134,6 +135,15 @@ export type QuestionBankDashboard = {
     paperName: string;
     paperCode: string;
     downloads: number;
+  }[];
+  recentUploads?: {
+    id: string;
+    paperCode: string;
+    paperName: string;
+    fileName?: string | null;
+    departmentName?: string | null;
+    status: string;
+    createdAt: string;
   }[];
 };
 
