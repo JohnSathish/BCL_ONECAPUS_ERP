@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { ChevronRight, RefreshCw } from 'lucide-react';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { DirectoryPagination } from '@/components/students-module/directory/directory-pagination';
@@ -11,8 +12,16 @@ import {
   DirectoryKpiSkeleton,
   DirectoryTableSkeleton,
 } from '@/components/students-module/directory/ui/directory-skeleton';
+import {
+  DEFAULT_STAFF_COLUMNS,
+  STAFF_COLUMNS,
+  readStoredStaffColumns,
+  writeStoredStaffColumns,
+  type StaffColumnId,
+} from '@/components/staff-module/directory/staff-columns';
 import { StaffCompactToolbar } from '@/components/staff-module/directory/staff-compact-toolbar';
 import { StaffDirectoryTable } from '@/components/staff-module/directory/staff-directory-table';
+import { StaffInsights } from '@/components/staff-module/directory/staff-insights';
 import { StaffKpiStrip } from '@/components/staff-module/directory/staff-kpi-strip';
 import {
   applyClientSideStaffFilters,
@@ -21,15 +30,19 @@ import {
   type StaffDirectoryFilters,
 } from '@/components/staff-module/directory/staff-filter-utils';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
+import { Button } from '@/components/ui/button';
+import { useInstitutionBranding } from '@/hooks/use-institution-branding';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useRequireAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useStaffPermissions } from '@/hooks/use-staff-permissions';
 import { toShiftOptions } from '@/lib/shift-options';
+import { fetchCycleDashboard } from '@/services/academic-lifecycle';
 import { fetchDepartments, fetchCampuses, fetchInstitutions } from '@/services/organization';
 import {
   downloadStaffImportTemplate,
   exportStaffCsv,
   fetchAcademicRoles,
+  fetchAllStaff,
   fetchDesignations,
   fetchEnhancedStaffSummary,
   fetchStaff,
@@ -37,7 +50,23 @@ import {
 import { fetchShifts } from '@/services/shifts';
 import { apiErrorMessage } from '@/utils/api-error';
 
+const PAGE_SIZE_KEY = 'staff-directory-page-size';
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 const DEFAULT_LIMIT = 50;
+
+function readStoredPageSize() {
+  if (typeof window === 'undefined') return DEFAULT_LIMIT;
+  const raw = Number(localStorage.getItem(PAGE_SIZE_KEY));
+  return PAGE_SIZE_OPTIONS.includes(raw) ? raw : DEFAULT_LIMIT;
+}
+
+function formatSynced(updatedAt: number) {
+  if (!updatedAt) return 'Not synced yet';
+  const minutes = Math.max(0, Math.round((Date.now() - updatedAt) / 60000));
+  if (minutes < 1) return 'Last synced: just now';
+  if (minutes === 1) return 'Last synced: 1 min ago';
+  return `Last synced: ${minutes} min ago`;
+}
 
 export function StaffDirectoryPage() {
   const session = useRequireAuth();
@@ -48,8 +77,26 @@ export function StaffDirectoryPage() {
   const debouncedSearch = useDebouncedValue(searchInput, 300);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(DEFAULT_LIMIT);
+  const [visibleColumns, setVisibleColumns] = useState<StaffColumnId[]>(DEFAULT_STAFF_COLUMNS);
+  const { branding } = useInstitutionBranding();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setLimit(readStoredPageSize());
+    setVisibleColumns(readStoredStaffColumns());
+  }, []);
+
+  const toggleColumn = (id: StaffColumnId) => {
+    setVisibleColumns((current) => {
+      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+      const ordered = STAFF_COLUMNS.map((column) => column.id).filter(
+        (item) => next.includes(item) || item === 'staff' || item === 'actions',
+      );
+      writeStoredStaffColumns(ordered);
+      return ordered;
+    });
+  };
 
   useEffect(() => {
     setFilters((f) => (f.search === debouncedSearch ? f : { ...f, search: debouncedSearch }));
@@ -75,6 +122,24 @@ export function StaffDirectoryPage() {
     queryKey: ['staff', 'summary', 'enhanced'],
     queryFn: fetchEnhancedStaffSummary,
     enabled: authReady && perms.canRead,
+  });
+
+  const cycle = useQuery({
+    queryKey: ['academic-lifecycle', 'dashboard', institutionId, 'staff-directory'],
+    queryFn: () => fetchCycleDashboard(institutionId),
+    enabled: authReady && Boolean(institutionId),
+    staleTime: 60_000,
+  });
+
+  const insights = useQuery({
+    queryKey: ['staff', 'directory-insights'],
+    queryFn: () => fetchAllStaff(),
+    enabled:
+      authReady &&
+      perms.canRead &&
+      (summary.data?.total ?? 0) > 0 &&
+      (summary.data?.total ?? 0) <= 1500,
+    staleTime: 5 * 60_000,
   });
 
   const listParams = useMemo(
@@ -212,22 +277,68 @@ export function StaffDirectoryPage() {
 
   const meta = staffList.data?.meta ?? { page: 1, limit, total: 0, totalPages: 0 };
   const hasUiOnlyFilter = Boolean(
-    filters.uiPortalPending || filters.uiNoSubjects || filters.uiOnLeave,
+    filters.uiPortalPending ||
+    filters.uiNoSubjects ||
+    filters.uiOnLeave ||
+    filters.uiNoRfid ||
+    filters.uiNoDepartment,
   );
+  const collegeTotal = summary.data?.total ?? meta.total;
 
   return (
-    <DashboardShell role="admin" title="Staff Directory">
-      <DirectoryShell className="space-y-2 pb-12">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h1 className="text-lg font-bold tracking-tight">Staff Directory</h1>
-            <p className="text-[11px] text-muted-foreground">
-              Compact admin workspace · {meta.total.toLocaleString()} staff
+    <DashboardShell role="admin" title="Staff Management" pageHeader={false}>
+      <DirectoryShell className="space-y-3 pb-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {institutions.data?.[0]?.name ?? branding?.displayName ?? 'College'}
+              </span>
+              {cycle.data?.primarySession?.name ? (
+                <>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <span>{cycle.data.primarySession.name}</span>
+                </>
+              ) : null}
+              {cycle.data?.currentCycle ? (
+                <>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <span>
+                    {cycle.data.currentCycle === 'EVEN' ? 'Even Semester' : 'Odd Semester'}
+                  </span>
+                </>
+              ) : null}
+              {cycle.data?.primarySession?.status === 'ACTIVE' ? (
+                <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                  Active
+                </span>
+              ) : null}
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">Staff Management</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage teaching, non-teaching, administrative and visiting staff •{' '}
+              {collegeTotal.toLocaleString('en-IN')} staff members
             </p>
           </div>
-          <Link href="/admin/staff/new" className="text-[11px] text-primary hover:underline">
-            Add staff
-          </Link>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{formatSynced(staffList.dataUpdatedAt || summary.dataUpdatedAt)}</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={staffList.isFetching}
+              onClick={() => {
+                void staffList.refetch();
+                void summary.refetch();
+                void insights.refetch();
+              }}
+            >
+              <RefreshCw
+                className={`mr-1.5 h-3.5 w-3.5 ${staffList.isFetching ? 'animate-spin' : ''}`}
+              />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {summary.isLoading ? (
@@ -239,6 +350,14 @@ export function StaffDirectoryPage() {
             onFilterChange={handleFilterChange}
           />
         )}
+
+        <StaffInsights
+          summary={summary.data}
+          rows={insights.data?.data ?? []}
+          loading={insights.isFetching && !insights.data}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+        />
 
         <StaffCompactToolbar
           filters={filters}
@@ -272,6 +391,8 @@ export function StaffDirectoryPage() {
             selectedIds.size > 0 ? () => exportMut.mutate([...selectedIds]) : undefined
           }
           exportPending={exportMut.isPending}
+          visibleColumns={visibleColumns}
+          onToggleColumn={toggleColumn}
         />
 
         {message ? <p className="glass-card rounded-lg px-2.5 py-1.5 text-xs">{message}</p> : null}
@@ -298,6 +419,8 @@ export function StaffDirectoryPage() {
               selectedIds={selectedIds}
               onToggleRow={toggleRow}
               onToggleAll={toggleAll}
+              visibleColumns={visibleColumns}
+              canManage={perms.canManage}
             />
             <div className="md:hidden space-y-2">
               {displayRows.map((row) => (
@@ -321,6 +444,7 @@ export function StaffDirectoryPage() {
               }}
               onLimitChange={(l) => {
                 setLimit(l);
+                localStorage.setItem(PAGE_SIZE_KEY, String(l));
                 setPage(1);
                 setSelectedIds(new Set());
               }}

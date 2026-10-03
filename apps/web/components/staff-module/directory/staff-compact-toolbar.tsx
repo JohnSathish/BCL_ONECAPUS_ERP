@@ -1,17 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  ChevronDown,
-  Download,
-  Eye,
-  FileSpreadsheet,
-  MoreHorizontal,
-  Plus,
-  User,
-} from 'lucide-react';
+import { ChevronDown, Download, FileSpreadsheet, Plus } from 'lucide-react';
 
 import { DirectorySearch } from '@/components/students-module/directory/directory-search';
+import {
+  STAFF_COLUMNS,
+  type StaffColumnId,
+} from '@/components/staff-module/directory/staff-columns';
+import { StaffSavedViews } from '@/components/staff-module/directory/staff-saved-views';
 import {
   countActiveStaffFilters,
   type StaffDirectoryFilters,
@@ -93,6 +90,8 @@ type Props = {
   onExport: () => void;
   onExportSelected?: () => void;
   exportPending?: boolean;
+  visibleColumns: StaffColumnId[];
+  onToggleColumn: (id: StaffColumnId) => void;
 };
 
 export function StaffCompactToolbar({
@@ -116,6 +115,8 @@ export function StaffCompactToolbar({
   onExport,
   onExportSelected,
   exportPending,
+  visibleColumns,
+  onToggleColumn,
 }: Props) {
   const activeCount = countActiveStaffFilters(filters);
   const staffTypeData = useSupportDataOptions('staff-types');
@@ -130,162 +131,282 @@ export function StaffCompactToolbar({
       : STAFF_STATUSES.map((s) => ({ id: s, label: staffTypeLabel(s) }));
 
   return (
-    <div className="glass-card space-y-2 rounded-xl border border-border/50 p-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <DirectorySearch
-          value={search}
-          onChange={onSearchChange}
-          loading={searchLoading}
-          className="min-w-[180px] flex-1"
-        />
-        <FilterPill
-          label="Type"
-          value={filters.staffType}
-          options={staffTypeOptions}
-          onChange={(staffType) => onFilterChange({ staffType })}
-        />
-        <FilterPill
-          label="Department"
-          value={filters.departmentId}
-          options={departmentOptions}
-          onChange={(departmentId) => onFilterChange({ departmentId })}
-        />
-        <FilterPill
-          label="Designation"
-          value={filters.designationId}
-          options={designationOptions}
-          onChange={(designationId) => onFilterChange({ designationId })}
-        />
-        {academicRoleOptions.length > 0 ? (
-          <FilterPill
-            label="Role"
-            value={filters.additionalRoleCode}
-            options={academicRoleOptions}
-            onChange={(additionalRoleCode) => onFilterChange({ additionalRoleCode })}
+    <div className="space-y-2">
+      <div className="rounded-xl border border-border/60 bg-background p-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <DirectorySearch
+            value={search}
+            onChange={onSearchChange}
+            loading={searchLoading}
+            placeholder="Search staff by name, staff code, email, mobile, department..."
+            recentKey="staff-directory-recent-searches"
+            className="min-w-[220px] flex-1"
           />
-        ) : null}
-        <FilterPill
-          label="Shift"
-          value={filters.teachingShiftCategory}
-          options={TEACHING_SHIFT_FILTER_OPTIONS.filter((o) => o.id).map((o) => ({
-            id: o.id,
-            label: o.label,
-          }))}
-          onChange={(teachingShiftCategory) => onFilterChange({ teachingShiftCategory })}
-        />
-        <FilterPill
-          label="Status"
-          value={filters.status}
-          options={statusOptions}
-          onChange={(status) => onFilterChange({ status })}
-        />
-        <FilterPill
-          label="HoD"
-          value={filters.uiHodOnly}
-          options={[{ id: 'true', label: 'HoD only' }]}
-          onChange={(uiHodOnly) => onFilterChange({ uiHodOnly })}
-        />
-        <FilterPill
-          label="Teaching"
-          value={filters.uiActiveTeaching}
-          options={[{ id: 'true', label: 'Active teaching' }]}
-          onChange={(uiActiveTeaching) => onFilterChange({ uiActiveTeaching })}
-        />
-        <FilterPill
-          label="Research"
-          value={filters.uiHasPublications}
-          options={[{ id: 'true', label: 'Has publications' }]}
-          onChange={(uiHasPublications) => onFilterChange({ uiHasPublications })}
-        />
-        {activeCount > 0 ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-7 text-[11px]"
-            onClick={onResetFilters}
-          >
-            Clear ({activeCount})
-          </Button>
-        ) : null}
-        <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          {canExport ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-[11px]"
-                  disabled={exportPending}
-                >
-                  <Download className="mr-1 h-3.5 w-3.5" />
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem className="text-xs" onClick={onExport}>
-                  Export all (filtered)
-                </DropdownMenuItem>
-                {onExportSelected && selectedIds.size > 0 ? (
-                  <DropdownMenuItem className="text-xs" onClick={onExportSelected}>
-                    Export selected ({selectedIds.size})
-                  </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {activeCount > 0 ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-10"
+              onClick={onResetFilters}
+            >
+              Clear Filters
+            </Button>
           ) : null}
-          {canImport ? (
-            <>
-              <Link
-                href="/admin/staff/import"
-                className={cn(
-                  buttonVariants({ size: 'sm', variant: 'outline' }),
-                  'h-7 text-[11px]',
-                )}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <FilterPill
+            label="Type"
+            value={filters.staffType}
+            options={staffTypeOptions}
+            onChange={(staffType) => onFilterChange({ staffType })}
+          />
+          <FilterPill
+            label="Department"
+            value={filters.departmentId}
+            options={departmentOptions}
+            onChange={(departmentId) => onFilterChange({ departmentId })}
+          />
+          <FilterPill
+            label="Designation"
+            value={filters.designationId}
+            options={designationOptions}
+            onChange={(designationId) => onFilterChange({ designationId })}
+          />
+          {academicRoleOptions.length > 0 ? (
+            <FilterPill
+              label="Role"
+              value={filters.additionalRoleCode}
+              options={academicRoleOptions}
+              onChange={(additionalRoleCode) => onFilterChange({ additionalRoleCode })}
+            />
+          ) : null}
+          <FilterPill
+            label="Shift"
+            value={filters.teachingShiftCategory}
+            options={TEACHING_SHIFT_FILTER_OPTIONS.filter((o) => o.id).map((o) => ({
+              id: o.id,
+              label: o.label,
+            }))}
+            onChange={(teachingShiftCategory) => onFilterChange({ teachingShiftCategory })}
+          />
+          <FilterPill
+            label="Status"
+            value={filters.status}
+            options={statusOptions}
+            onChange={(status) => onFilterChange({ status })}
+          />
+          <FilterPill
+            label="Leave"
+            value={filters.uiOnLeave}
+            options={[{ id: 'true', label: 'On leave' }]}
+            onChange={(uiOnLeave) =>
+              onFilterChange({
+                uiOnLeave,
+                status:
+                  uiOnLeave === 'true'
+                    ? 'ON_LEAVE'
+                    : filters.status === 'ON_LEAVE'
+                      ? ''
+                      : filters.status,
+              })
+            }
+          />
+          <FilterPill
+            label="Teaching"
+            value={filters.uiActiveTeaching}
+            options={[{ id: 'true', label: 'Active teaching' }]}
+            onChange={(uiActiveTeaching) => onFilterChange({ uiActiveTeaching })}
+          />
+          <FilterPill
+            label="Research"
+            value={filters.uiHasPublications}
+            options={[{ id: 'true', label: 'Has publications' }]}
+            onChange={(uiHasPublications) => onFilterChange({ uiHasPublications })}
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 rounded-full px-2.5 text-[11px]"
               >
-                <FileSpreadsheet className="mr-1 h-3.5 w-3.5" />
-                Import Staff
-              </Link>
-              {onDownloadTemplate ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-[11px]"
-                  onClick={onDownloadTemplate}
-                >
-                  <Download className="mr-1 h-3.5 w-3.5" />
-                  Download Template
-                </Button>
-              ) : null}
-            </>
-          ) : null}
-          {canBulkUpdate ? (
-            <Link
-              href="/admin/staff/bulk-update"
-              className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'h-7 text-[11px]')}
-            >
-              <FileSpreadsheet className="mr-1 h-3.5 w-3.5" />
-              Bulk Update
-            </Link>
-          ) : null}
-          {canManage ? (
-            <Link
-              href="/admin/staff/new"
-              className={cn(buttonVariants({ size: 'sm' }), 'h-7 text-[11px]')}
-            >
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              Add Staff
-            </Link>
+                More Filters
+                <ChevronDown className="ml-0.5 h-3 w-3 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-52">
+              <DropdownMenuItem
+                className="text-xs"
+                onClick={() =>
+                  onFilterChange({ uiHodOnly: filters.uiHodOnly === 'true' ? '' : 'true' })
+                }
+              >
+                {filters.uiHodOnly === 'true' ? '✓ ' : ''}HoD only
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-xs"
+                onClick={() =>
+                  onFilterChange({
+                    uiPortalPending: filters.uiPortalPending === 'true' ? '' : 'true',
+                  })
+                }
+              >
+                {filters.uiPortalPending === 'true' ? '✓ ' : ''}Portal pending
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-xs"
+                onClick={() =>
+                  onFilterChange({ uiNoSubjects: filters.uiNoSubjects === 'true' ? '' : 'true' })
+                }
+              >
+                {filters.uiNoSubjects === 'true' ? '✓ ' : ''}No subjects
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-xs"
+                onClick={() =>
+                  onFilterChange({ uiNoRfid: filters.uiNoRfid === 'true' ? '' : 'true' })
+                }
+              >
+                {filters.uiNoRfid === 'true' ? '✓ ' : ''}RFID not assigned
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-xs"
+                onClick={() =>
+                  onFilterChange({
+                    uiNoDepartment: filters.uiNoDepartment === 'true' ? '' : 'true',
+                  })
+                }
+              >
+                {filters.uiNoDepartment === 'true' ? '✓ ' : ''}No department
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {totalCount != null ? (
+            <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+              {totalCount.toLocaleString('en-IN')} staff members
+            </span>
           ) : null}
         </div>
       </div>
-      {totalCount != null ? (
-        <p className="text-[10px] text-muted-foreground">
-          {totalCount.toLocaleString()} staff members
-        </p>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/60 bg-background px-2.5 py-2 shadow-sm">
+        {canManage ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" size="sm" className="h-8 rounded-lg px-3 text-xs">
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                Add Staff
+                <ChevronDown className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem asChild>
+                <Link href="/admin/staff/new">Add Manually</Link>
+              </DropdownMenuItem>
+              {canImport ? (
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/staff/import">Import Staff</Link>
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+        {canImport ? (
+          <Link
+            href="/admin/staff/import"
+            className={cn(
+              buttonVariants({ size: 'sm', variant: 'outline' }),
+              'h-8 rounded-lg text-xs',
+            )}
+          >
+            <FileSpreadsheet className="mr-1 h-3.5 w-3.5" />
+            Import
+          </Link>
+        ) : null}
+        {canExport ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 rounded-lg text-xs"
+            disabled={exportPending}
+            onClick={onExport}
+          >
+            <Download className="mr-1 h-3.5 w-3.5" />
+            Export
+          </Button>
+        ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" size="sm" variant="outline" className="h-8 rounded-lg text-xs">
+              Bulk Actions
+              <ChevronDown className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            {canBulkUpdate ? (
+              <DropdownMenuItem asChild>
+                <Link href="/admin/staff/bulk-update">Bulk Update</Link>
+              </DropdownMenuItem>
+            ) : null}
+            {canExport ? (
+              <DropdownMenuItem className="text-xs" onClick={onExport} disabled={exportPending}>
+                Export filtered list
+              </DropdownMenuItem>
+            ) : null}
+            {onExportSelected ? (
+              <DropdownMenuItem
+                className="text-xs"
+                disabled={exportPending || selectedIds.size === 0}
+                onClick={onExportSelected}
+              >
+                Export selected ({selectedIds.size})
+              </DropdownMenuItem>
+            ) : null}
+            {onDownloadTemplate ? (
+              <DropdownMenuItem className="text-xs" onClick={onDownloadTemplate}>
+                Download import template
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <div className="ml-auto flex items-center gap-1.5">
+          <StaffSavedViews
+            currentFilters={filters}
+            onApply={(next) => {
+              onSearchChange('');
+              onFilterChange(next);
+            }}
+            onReset={onResetFilters}
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" size="sm" variant="outline" className="h-8 rounded-lg text-xs">
+                Columns
+                <ChevronDown className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {STAFF_COLUMNS.map((column) => (
+                <DropdownMenuItem
+                  key={column.id}
+                  disabled={column.locked}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    if (!column.locked) onToggleColumn(column.id);
+                  }}
+                >
+                  <span className="mr-2 inline-flex h-3.5 w-3.5 items-center justify-center rounded border text-[10px]">
+                    {visibleColumns.includes(column.id) ? '✓' : ''}
+                  </span>
+                  {column.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
     </div>
   );
 }

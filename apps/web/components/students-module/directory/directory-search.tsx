@@ -15,27 +15,37 @@ type Props = {
   onChange: (value: string) => void;
   onSearch?: () => void;
   loading?: boolean;
+  placeholder?: string;
+  recentKey?: string;
   className?: string;
 };
 
-function loadRecent(): string[] {
+function loadRecent(key: string): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(RECENT_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as string[]) : [];
   } catch {
     return [];
   }
 }
 
-function saveRecent(term: string) {
+function saveRecent(key: string, term: string) {
   if (!term.trim() || typeof window === 'undefined') return;
   const trimmed = term.trim();
-  const next = [trimmed, ...loadRecent().filter((s) => s !== trimmed)].slice(0, MAX_RECENT);
-  localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  const next = [trimmed, ...loadRecent(key).filter((s) => s !== trimmed)].slice(0, MAX_RECENT);
+  localStorage.setItem(key, JSON.stringify(next));
 }
 
-export function DirectorySearch({ value, onChange, onSearch, loading, className }: Props) {
+export function DirectorySearch({
+  value,
+  onChange,
+  onSearch,
+  loading,
+  placeholder = 'Search by Name, Roll No, NEHU Roll No, Mobile, Aadhaar, ABC ID, Email...',
+  recentKey = RECENT_KEY,
+  className,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [focused, setFocused] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
@@ -60,17 +70,13 @@ export function DirectorySearch({ value, onChange, onSearch, loading, className 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (value.trim()) saveRecent(value);
+    if (value.trim()) saveRecent(recentKey, value);
     onSearch?.();
     inputRef.current?.blur();
   };
 
   return (
     <form onSubmit={handleSubmit} className={cn('min-w-0 flex-1', className)}>
-      <label className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
-        <Search className="h-3.5 w-3.5 text-primary" />
-        Search Students
-      </label>
       <div className="relative flex gap-2">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -81,10 +87,11 @@ export function DirectorySearch({ value, onChange, onSearch, loading, className 
             onChange={(e) => onChange(e.target.value)}
             onFocus={() => {
               setFocused(true);
-              setRecent(loadRecent());
+              setRecent(loadRecent(recentKey));
             }}
             onBlur={() => window.setTimeout(() => setFocused(false), 150)}
-            placeholder="Name, Roll No, NEHU Roll No, Mobile, Aadhaar, RFID, Email…"
+            aria-label="Search students"
+            placeholder={placeholder}
             className={cn(
               'h-10 w-full rounded-lg border border-border/60 bg-background/80 pl-9 pr-16 text-sm',
               'placeholder:text-muted-foreground/70 focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20',
@@ -103,7 +110,7 @@ export function DirectorySearch({ value, onChange, onSearch, loading, className 
               </button>
             ) : null}
             <kbd className="hidden rounded border border-border/80 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
-              ⌘K
+              Ctrl K
             </kbd>
           </div>
           {showRecent ? (

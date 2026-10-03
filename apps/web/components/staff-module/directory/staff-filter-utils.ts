@@ -28,6 +28,10 @@ export type StaffDirectoryFilters = {
   uiActiveTeaching: string;
 
   uiHasPublications: string;
+
+  uiNoRfid: string;
+
+  uiNoDepartment: string;
 };
 
 export const emptyStaffFilters = (): StaffDirectoryFilters => ({
@@ -58,6 +62,10 @@ export const emptyStaffFilters = (): StaffDirectoryFilters => ({
   uiActiveTeaching: '',
 
   uiHasPublications: '',
+
+  uiNoRfid: '',
+
+  uiNoDepartment: '',
 });
 
 export function staffFiltersToParams(
@@ -127,6 +135,10 @@ export function countActiveStaffFilters(filters: StaffDirectoryFilters): number 
 
   if (filters.uiHasPublications) n++;
 
+  if (filters.uiNoRfid) n++;
+
+  if (filters.uiNoDepartment) n++;
+
   return n;
 }
 
@@ -147,6 +159,14 @@ export function applyClientSideStaffFilters(
 
   if (filters.uiOnLeave === 'true') {
     result = result.filter((r) => r.status === 'ON_LEAVE');
+  }
+
+  if (filters.uiNoRfid === 'true') {
+    result = result.filter((r) => !r.rfidNo?.trim());
+  }
+
+  if (filters.uiNoDepartment === 'true') {
+    result = result.filter((r) => !r.department?.trim());
   }
 
   return result;
