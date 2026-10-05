@@ -365,6 +365,7 @@ export class OfferingsService {
       sectionCode: string;
       courseOffering: {
         category: string | null;
+        titleOverride?: string | null;
         course: { code: string; title: string };
       };
       eligibleStreams?: Array<{
