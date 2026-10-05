@@ -15,6 +15,7 @@ import type {
   QuestionPaperQueryDto,
   UpdateQuestionPaperDto,
 } from '../dto/question-bank.dto';
+import { offeringPaperTitle } from '../../academic-engine/domain/offering-paper-title';
 import { resolveExamCycleFromSemester } from '../utils/question-paper-file.util';
 import { QuestionBankAssetsService } from './question-bank-assets.service';
 import { QuestionBankAnalyticsService } from './question-bank-analytics.service';
@@ -45,10 +46,10 @@ export class QuestionPapersService {
   }
 
   private isStudent(user: JwtUser) {
-    return (
-      user.roles?.includes('student') &&
-      !this.hasPermission(user, 'question-bank:read')
-    );
+    const student =
+      user.roles?.includes('student') ||
+      this.hasPermission(user, 'student:portal:self');
+    return Boolean(student) && !this.hasPermission(user, 'question-bank:read');
   }
 
   buildSearchText(input: {
@@ -143,15 +144,27 @@ export class QuestionPapersService {
         course: {
           deletedAt: null,
           ...(query.departmentId ? { departmentId: query.departmentId } : {}),
-          ...(query.q
-            ? {
-                OR: [
-                  { code: { contains: query.q, mode: 'insensitive' } },
-                  { title: { contains: query.q, mode: 'insensitive' } },
-                ],
-              }
-            : {}),
         },
+        ...(query.q
+          ? {
+              OR: [
+                {
+                  course: {
+                    OR: [
+                      { code: { contains: query.q, mode: 'insensitive' } },
+                      { title: { contains: query.q, mode: 'insensitive' } },
+                    ],
+                  },
+                },
+                {
+                  titleOverride: {
+                    contains: query.q,
+                    mode: 'insensitive',
+                  },
+                },
+              ],
+            }
+          : {}),
       },
       include: {
         course: {
@@ -181,11 +194,17 @@ export class QuestionPapersService {
       }
     >();
     for (const row of offerings) {
-      if (!row.course || byCourse.has(row.course.id)) continue;
+      if (!row.course) continue;
+      const title = offeringPaperTitle(row.course, row);
+      const existing = byCourse.get(row.course.id);
+      if (existing) {
+        if (row.titleOverride?.trim()) existing.title = title;
+        continue;
+      }
       byCourse.set(row.course.id, {
         id: row.course.id,
         code: row.course.code,
-        title: row.course.title,
+        title,
         credits: row.course.credits,
         departmentId: row.course.departmentId,
         category: row.category,
@@ -228,6 +247,35 @@ export class QuestionPapersService {
     return [...byCourse.values()];
   }
 
+  private async resolveMappedPaperTitle(
+    tenantId: string,
+    course: { id: string; title: string } | null,
+    dto: { semesterNo?: number; subjectCategory?: string },
+  ) {
+    if (!course) return undefined;
+    const offering = await this.prisma.courseOffering.findFirst({
+      where: {
+        tenantId,
+        courseId: course.id,
+        deletedAt: null,
+        titleOverride: { not: null },
+        ...(dto.semesterNo ? { semesterSequence: dto.semesterNo } : {}),
+        ...(dto.subjectCategory
+          ? {
+              category: {
+                equals: dto.subjectCategory,
+                mode: 'insensitive',
+              },
+            }
+          : {}),
+      },
+      select: { titleOverride: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const title = offeringPaperTitle(course, offering);
+    return title || undefined;
+  }
+
   async list(user: JwtUser, query: QuestionPaperQueryDto, studentView = false) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -261,22 +309,9 @@ export class QuestionPapersService {
     if (studentView || this.isStudent(user)) {
       where.status = 'PUBLISHED';
       const scope = await this.resolveStudentScope(user);
-      if (scope.courseIds.length) {
-        where.OR = [
-          { courseId: { in: scope.courseIds } },
-          ...(scope.departmentId && scope.semesterNo
-            ? [
-                {
-                  courseId: null,
-                  departmentId: scope.departmentId,
-                  semesterNo: scope.semesterNo,
-                },
-              ]
-            : []),
-        ];
-      } else if (scope.departmentId) {
-        where.departmentId = scope.departmentId;
-      }
+      const or = this.studentPaperMatch(scope);
+      if (or.length) where.OR = or;
+      else where.id = { in: [] };
     } else if (
       !query.status &&
       !this.hasPermission(user, 'question-bank:manage')
@@ -493,7 +528,12 @@ export class QuestionPapersService {
     ]);
 
     const paperCode = course?.code ?? dto.paperCode;
-    const paperName = course?.title ?? dto.paperName;
+    const mappedTitle = await this.resolveMappedPaperTitle(
+      user.tid,
+      course,
+      dto,
+    );
+    const paperName = mappedTitle ?? dto.paperName;
     if (!paperCode || !paperName) {
       throw new BadRequestException(
         'Course selection or paper code/title is required',
@@ -1117,23 +1157,40 @@ export class QuestionPapersService {
   }
 
   private async resolveStudentScope(user: JwtUser) {
+    const empty = {
+      courseIds: [] as string[],
+      courseCodes: [] as string[],
+      departmentIds: [] as string[],
+      programVersionId: undefined as string | undefined,
+    };
     const student = await this.prisma.student.findFirst({
       where: { tenantId: user.tid, userId: user.sub, deletedAt: null },
-      select: { id: true, departmentId: true },
+      select: { id: true, departmentId: true, programVersionId: true },
     });
-    if (!student)
-      return {
-        courseIds: [] as string[],
-        departmentId: undefined,
-        semesterNo: undefined,
-      };
+    if (!student) return empty;
 
-    const registrations = await this.prisma.semesterRegistration.findMany({
-      where: { tenantId: user.tid, studentId: student.id },
-      include: {
-        lines: { include: { offering: { select: { courseId: true } } } },
-      },
-    });
+    const [registrations, track] = await Promise.all([
+      this.prisma.semesterRegistration.findMany({
+        where: {
+          tenantId: user.tid,
+          studentId: student.id,
+          archivedAt: null,
+        },
+        include: {
+          lines: {
+            where: { status: { notIn: ['dropped', 'cancelled', 'rejected'] } },
+            include: { offering: { select: { courseId: true } } },
+          },
+        },
+      }),
+      this.prisma.studentMajorMinorTrack.findUnique({
+        where: { studentId: student.id },
+        include: {
+          majorSubject: { select: { departmentId: true } },
+          minorSubject: { select: { departmentId: true } },
+        },
+      }),
+    ]);
 
     const courseIds = [
       ...new Set(
@@ -1144,40 +1201,89 @@ export class QuestionPapersService {
         ),
       ),
     ];
+    const courses = courseIds.length
+      ? await this.prisma.course.findMany({
+          where: { tenantId: user.tid, id: { in: courseIds } },
+          select: { id: true, code: true, departmentId: true },
+        })
+      : [];
 
-    const standing = await this.prisma.studentAcademicStanding.findUnique({
-      where: { studentId: student.id },
-      select: { currentSemesterSequence: true },
-    });
+    const departmentIds = new Set<string>();
+    if (student.departmentId) departmentIds.add(student.departmentId);
+    for (const course of courses) {
+      if (course.departmentId) departmentIds.add(course.departmentId);
+    }
+    if (track?.majorSubject?.departmentId)
+      departmentIds.add(track.majorSubject.departmentId);
+    if (track?.minorSubject?.departmentId)
+      departmentIds.add(track.minorSubject.departmentId);
 
     return {
       courseIds,
-      departmentId: student.departmentId ?? undefined,
-      semesterNo: standing?.currentSemesterSequence ?? undefined,
+      courseCodes: [
+        ...new Set(
+          courses
+            .map((course) => course.code?.trim())
+            .filter((code): code is string => Boolean(code)),
+        ),
+      ],
+      departmentIds: [...departmentIds],
+      programVersionId: student.programVersionId ?? undefined,
     };
+  }
+
+  private studentPaperMatch(scope: {
+    courseIds: string[];
+    courseCodes: string[];
+    departmentIds: string[];
+    programVersionId?: string;
+  }) {
+    const or: Record<string, unknown>[] = [];
+    if (scope.courseIds.length) or.push({ courseId: { in: scope.courseIds } });
+    for (const code of scope.courseCodes) {
+      or.push({ paperCode: { equals: code, mode: 'insensitive' } });
+    }
+    if (scope.departmentIds.length) {
+      or.push({ departmentId: { in: scope.departmentIds } });
+    }
+    if (scope.programVersionId) {
+      or.push({ programVersionId: scope.programVersionId });
+    }
+    return or;
   }
 
   private studentCanAccessPaper(
     paper: {
       courseId: string | null;
       departmentId: string | null;
-      semesterNo: number | null;
+      paperCode?: string | null;
+      programVersionId?: string | null;
     },
-    scope: { courseIds: string[]; departmentId?: string; semesterNo?: number },
+    scope: {
+      courseIds: string[];
+      courseCodes: string[];
+      departmentIds: string[];
+      programVersionId?: string;
+    },
   ) {
     if (paper.courseId && scope.courseIds.includes(paper.courseId)) return true;
+    const code = paper.paperCode?.trim().toLowerCase();
     if (
-      !paper.courseId &&
-      paper.departmentId &&
-      scope.departmentId &&
-      paper.departmentId === scope.departmentId &&
-      paper.semesterNo &&
-      scope.semesterNo &&
-      paper.semesterNo === scope.semesterNo
+      code &&
+      scope.courseCodes.some((courseCode) => courseCode.toLowerCase() === code)
     ) {
       return true;
     }
-    return scope.courseIds.length === 0 && !scope.departmentId;
+    if (paper.departmentId && scope.departmentIds.includes(paper.departmentId))
+      return true;
+    if (
+      paper.programVersionId &&
+      scope.programVersionId &&
+      paper.programVersionId === scope.programVersionId
+    ) {
+      return true;
+    }
+    return false;
   }
 
   private audit(
