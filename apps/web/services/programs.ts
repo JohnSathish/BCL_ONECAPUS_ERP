@@ -357,6 +357,7 @@ export async function createOffering(payload: {
   majorPaperIndex?: number;
   capacity?: number;
   waitlistCapacity?: number;
+  titleOverride?: string | null;
 }) {
   const { data } = await api.post('/v1/programs-courses/offerings', payload);
   return data as CourseOffering;
@@ -373,6 +374,7 @@ export async function updateOffering(
     isElective: boolean;
     semesterId: string | null;
     majorPaperIndex: number;
+    titleOverride: string | null;
   }>,
 ) {
   const { data } = await api.patch(`/v1/programs-courses/offerings/${id}`, payload);

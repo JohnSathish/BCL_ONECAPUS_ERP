@@ -55,6 +55,7 @@ export type CompletionOfferingSnapshot = {
   category: string | null;
   courseId: string;
   mappingSource?: string | null;
+  titleOverride?: string | null;
   course: { id: string; code: string; title: string; credits: number };
   sections: CompletionSectionSnapshot[];
 };

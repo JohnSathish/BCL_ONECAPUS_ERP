@@ -7,6 +7,7 @@ import { SearchableSectionSelect } from '@/components/students-module/add-studen
 import { slotCategory } from '@/components/students-module/add-student/utils/subject-basket';
 import type { CatalogSectionRow, IneligibleCatalogSection } from '@/types/academic-engine';
 import { cn } from '@/utils/cn';
+import { offeringPaperTitle } from '@/utils/offering-paper-title';
 
 type Props = {
   slotKey: string;
@@ -89,7 +90,7 @@ export function SubjectCategoryCard({
       {locked && selected ? (
         <div className="text-[11px]">
           <p className="truncate font-medium">
-            {selected.courseOffering.course.title}
+            {offeringPaperTitle(selected.courseOffering.course, selected.courseOffering)}
             <span className="text-muted-foreground"> ({selected.courseOffering.course.code})</span>
           </p>
           <p className="text-[10px] text-muted-foreground">
@@ -130,7 +131,10 @@ export function SubjectCategoryCard({
                     >
                       <div className="flex items-start justify-between gap-1">
                         <span className="font-medium">
-                          {row.section.courseOffering.course.title}
+                          {offeringPaperTitle(
+                            row.section.courseOffering.course,
+                            row.section.courseOffering,
+                          )}
                           <span className="text-muted-foreground">
                             {' '}
                             ({row.section.courseOffering.course.code})

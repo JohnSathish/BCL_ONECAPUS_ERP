@@ -91,6 +91,7 @@ const courseListOfferingInclude = {
   select: {
     category: true,
     semesterSequence: true,
+    titleOverride: true,
     programVersion: {
       select: {
         version: true,
@@ -106,6 +107,7 @@ export type CourseMappingSummary = {
   version: number;
   category: string | null;
   semesterSequence: number | null;
+  titleOverride: string | null;
 };
 
 const MAPPING_SUMMARY_CAP = 8;
@@ -189,6 +191,12 @@ export class AcademicCatalogService {
       vtcTrackGroupCode: resolved.vtcTrackGroupCode,
       vtcTrackStage: resolved.vtcTrackStage,
     };
+  }
+
+  private normalizeTitleOverride(value: string | null | undefined) {
+    if (value == null) return null;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : null;
   }
 
   private normalizeCurriculumCategory(category: string) {
@@ -731,6 +739,7 @@ export class AcademicCatalogService {
           version: o.programVersion!.version,
           category: o.category,
           semesterSequence: o.semesterSequence,
+          titleOverride: o.titleOverride,
         }));
       return {
         ...course,
@@ -1319,6 +1328,7 @@ export class AcademicCatalogService {
         majorPaperIndex: dto.majorPaperIndex,
         capacity: dto.capacity,
         waitlistCapacity: dto.waitlistCapacity,
+        titleOverride: this.normalizeTitleOverride(dto.titleOverride),
       },
       include: offeringIncludeWithSections,
     });
@@ -1385,6 +1395,9 @@ export class AcademicCatalogService {
           : {}),
         ...(data.majorPaperIndex !== undefined
           ? { majorPaperIndex: data.majorPaperIndex }
+          : {}),
+        ...(data.titleOverride !== undefined
+          ? { titleOverride: this.normalizeTitleOverride(data.titleOverride) }
           : {}),
       },
       include: offeringIncludeWithSections,

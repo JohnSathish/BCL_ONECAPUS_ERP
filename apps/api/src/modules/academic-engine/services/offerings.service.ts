@@ -17,6 +17,7 @@ import {
 } from '../../programs-courses/academic-catalog.service';
 import type { CreateOfferingSectionDto } from '../dto/academic-engine.dto';
 import { CurriculumResolutionService } from './curriculum-resolution.service';
+import { offeringPaperTitle } from '../domain/offering-paper-title';
 import { CourseEligibilityService } from './course-eligibility.service';
 import type { EligibilityPreviewInput } from './course-eligibility.service';
 import { LmsWorkspaceService } from '../../lms/services/lms-workspace.service';
@@ -373,7 +374,10 @@ export class OfferingsService {
     }) =>
       formatStreamIneligibleMessage({
         courseCode: section.courseOffering.course.code,
-        courseTitle: section.courseOffering.course.title,
+        courseTitle: offeringPaperTitle(
+          section.courseOffering.course,
+          section.courseOffering,
+        ),
         category: section.courseOffering.category ?? 'ELECTIVE',
         sectionCode: section.sectionCode,
         studentStreamLabel,

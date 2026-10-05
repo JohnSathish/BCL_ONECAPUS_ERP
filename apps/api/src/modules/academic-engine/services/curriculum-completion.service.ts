@@ -495,6 +495,7 @@ export class CurriculumCompletionService {
       category: string | null;
       courseId: string;
       mappingSource?: string | null;
+      titleOverride?: string | null;
       course: {
         id: string;
         code: string;
@@ -509,6 +510,7 @@ export class CurriculumCompletionService {
       category: offering.category,
       courseId: offering.courseId,
       mappingSource: offering.mappingSource,
+      titleOverride: offering.titleOverride,
       course: {
         ...offering.course,
         credits: Number(offering.course.credits),

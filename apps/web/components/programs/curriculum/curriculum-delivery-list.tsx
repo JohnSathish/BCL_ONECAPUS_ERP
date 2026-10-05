@@ -5,6 +5,7 @@ import type { OfferingSection } from '@/types/programs';
 import type { CurriculumOfferingRow } from '@/types/curriculum-filters';
 import { formatCurriculumMetaLine, isSharedPoolOffering } from '@/utils/curriculum-offering-meta';
 import { formatEligibleStreamsLabel } from '@/utils/section-stream-label';
+import { offeringPaperTitle } from '@/utils/offering-paper-title';
 
 type Props = {
   rows: CurriculumOfferingRow[];
@@ -66,7 +67,7 @@ export function CurriculumDeliveryList({
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">
-                      {o.course.code} — {o.course.title}
+                      {o.course.code} — {offeringPaperTitle(o.course, o)}
                     </p>
                     {o.semesterSequence != null && o.semesterSequence >= 1 ? (
                       <span className="rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">

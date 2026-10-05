@@ -1,4 +1,5 @@
 import type { CatalogSectionRow } from '@/types/academic-engine';
+import { offeringPaperTitle } from '@/utils/offering-paper-title';
 import { slotCategory } from '@/utils/semester-rules';
 
 export type AssignedSubjectRow = {
@@ -28,7 +29,7 @@ export function formatAssignmentMode(mode: 'auto' | 'manual'): string {
 
 export function formatCourseLine(section: CatalogSectionRow): string {
   const course = section.courseOffering.course;
-  return `${course.code} — ${course.title}`;
+  return `${course.code} — ${offeringPaperTitle(course, section.courseOffering)}`;
 }
 
 export function formatAssignmentMeta(section: CatalogSectionRow, mode: 'auto' | 'manual'): string {

@@ -3,6 +3,7 @@ import {
   computeMappingStatus,
 } from '../../programs-courses/domain/curriculum-offering-list.helpers';
 import type { CategoryMeta } from './fyugp-templates';
+import { offeringPaperTitle } from './offering-paper-title';
 import {
   CATEGORY_DISPLAY_ORDER,
   type CompletionCellInput,
@@ -236,7 +237,7 @@ export function buildMissingItemsFromCell(params: {
               category: cell.category,
               issueType: issue,
               courseCode: offering.course.code,
-              courseTitle: offering.course.title,
+              courseTitle: offeringPaperTitle(offering.course, offering),
               offeringId: offering.id,
               sectionId: section.id,
               message: `Section ${section.sectionCode} has no faculty assigned`,
@@ -271,7 +272,7 @@ export function buildMissingItemsFromCell(params: {
             category: cell.category,
             issueType: issue,
             courseCode: offering.course.code,
-            courseTitle: offering.course.title,
+            courseTitle: offeringPaperTitle(offering.course, offering),
             offeringId: offering.id,
             message: `${offering.course.code} mapping is ${mappingStatus.toLowerCase().replace('_', ' ')}`,
             quickAction: 'CREATE_SECTION',

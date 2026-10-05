@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import type { CatalogSectionRow, IneligibleCatalogSection } from '@/types/academic-engine';
+import { offeringPaperTitle } from '@/utils/offering-paper-title';
 
 type ElectiveSlotPickerProps = {
   slotKey: string;
@@ -110,7 +111,10 @@ export function ElectiveSlotPicker({
                 <li key={row.section.id}>
                   <span className="font-medium">
                     {row.section.courseOffering.course.code} —{' '}
-                    {row.section.courseOffering.course.title}
+                    {offeringPaperTitle(
+                      row.section.courseOffering.course,
+                      row.section.courseOffering,
+                    )}
                   </span>
                   <span className="block text-destructive/90">{row.reasons[0]}</span>
                 </li>

@@ -21,6 +21,7 @@ import {
   upsertSemesterStructureRules,
 } from './services/structure-rules.helper';
 import { slugifySubject, type NepCategory } from './domain/nep-categories';
+import { offeringPaperTitle } from './domain/offering-paper-title';
 import { resolveAecSubjectSlug } from './domain/aec-eligibility';
 import type { Class12Subject } from './domain/registration-context';
 import { blockingValidationIssues, runValidators } from './domain/validators';
@@ -1690,7 +1691,10 @@ export class AcademicEngineService {
         programVersionId: s.courseOffering.programVersionId ?? null,
         courseId: s.courseOffering.courseId,
         courseCode: s.courseOffering.course.code,
-        courseTitle: s.courseOffering.course.title,
+        courseTitle: offeringPaperTitle(
+          s.courseOffering.course,
+          s.courseOffering,
+        ),
         category: (s.courseOffering.category ?? 'ELECTIVE') as NepCategory,
         subjectSlug:
           s.courseOffering.category === 'AEC'

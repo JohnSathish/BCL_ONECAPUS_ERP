@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { assignMajorPaperSlots } from '../domain/major-paper-assignment';
+import { offeringPaperTitle } from '../domain/offering-paper-title';
 import {
   normalizeCourseEligibilityRules,
   isRulesEmpty,
@@ -879,6 +880,7 @@ export class ShiftCurriculumService {
     minorOfferings: Array<{
       id: string;
       courseId: string;
+      titleOverride?: string | null;
       course: {
         code: string;
         title: string;
@@ -904,7 +906,7 @@ export class ShiftCurriculumService {
           offering.course.code,
         paper: {
           code: offering.course.code,
-          title: offering.course.title,
+          title: offeringPaperTitle(offering.course, offering),
           offeringId: offering.id,
         },
       }))

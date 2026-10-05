@@ -463,6 +463,7 @@ export class ProgramVersionLifecycleService {
             capacity: o.capacity,
             waitlistCapacity: o.waitlistCapacity,
             isElective: o.isElective,
+            titleOverride: o.titleOverride,
             registrationOpensAt: o.registrationOpensAt,
             registrationClosesAt: o.registrationClosesAt,
             prerequisiteOfferingIds: o.prerequisiteOfferingIds ?? undefined,

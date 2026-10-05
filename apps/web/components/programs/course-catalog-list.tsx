@@ -5,6 +5,16 @@ import { Button } from '@/components/ui/button';
 import type { Course } from '@/types/programs';
 import { formatCourseCatalogMeta } from '@/utils/course-delivery-meta';
 
+function minorPaperNames(course: Course): string[] {
+  const names = new Set<string>();
+  const master = course.title.trim();
+  for (const mapping of course.mappingSummary ?? []) {
+    const name = mapping.titleOverride?.trim();
+    if (name && name !== master) names.add(name);
+  }
+  return [...names];
+}
+
 function formatMappingChip(m: NonNullable<Course['mappingSummary']>[number]) {
   const parts = [m.programCode];
   if (m.semesterSequence != null) parts.push(`Sem ${m.semesterSequence}`);
@@ -60,66 +70,74 @@ export function CourseCatalogList({
 
   return (
     <div className="space-y-2">
-      {courses.map((c) => (
-        <article
-          key={c.id}
-          className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/50 p-3 sm:flex-row sm:items-start sm:justify-between"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="font-medium">
-              <HighlightMatch text={c.code} query={searchQuery} />
-              {' — '}
-              <HighlightMatch text={c.title} query={searchQuery} />
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {formatCourseCatalogMeta(c)} · {c.courseType}
-              {c.department ? (
-                <>
-                  {' · '}
-                  <HighlightMatch text={c.department.name} query={searchQuery} />
-                </>
-              ) : null}
-            </p>
-            {c.mappingSummary && c.mappingSummary.length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {c.mappingSummary.map((m, i) => (
-                  <span
-                    key={`${m.programCode}-${m.category}-${m.semesterSequence}-${i}`}
-                    className="inline-flex rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
-                  >
-                    {formatMappingChip(m)}
-                  </span>
-                ))}
-                {c.mappingSummaryTruncated ? (
-                  <span className="inline-flex px-1 text-[10px] text-muted-foreground">
-                    +{(c.mappingSummaryTotal ?? 0) - (c.mappingSummary?.length ?? 0)} more
-                  </span>
-                ) : null}
-              </div>
-            ) : (
-              <p className="mt-1.5 text-[10px] italic text-muted-foreground">
-                No curriculum mapping yet
+      {courses.map((c) => {
+        const minorNames = minorPaperNames(c);
+        return (
+          <article
+            key={c.id}
+            className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/50 p-3 sm:flex-row sm:items-start sm:justify-between"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">
+                <HighlightMatch text={c.code} query={searchQuery} />
+                {' — '}
+                <HighlightMatch text={c.title} query={searchQuery} />
               </p>
-            )}
-          </div>
-          {canManage ? (
-            <div className="flex shrink-0 gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => onEdit(c)}>
-                Edit
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isRemovePending}
-                onClick={() => onRemove(c)}
-              >
-                Remove
-              </Button>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {formatCourseCatalogMeta(c)} · {c.courseType}
+                {c.department ? (
+                  <>
+                    {' · '}
+                    <HighlightMatch text={c.department.name} query={searchQuery} />
+                  </>
+                ) : null}
+              </p>
+              {minorNames.length > 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Minor paper name: {minorNames.join('; ')}
+                </p>
+              ) : null}
+              {c.mappingSummary && c.mappingSummary.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {c.mappingSummary.map((m, i) => (
+                    <span
+                      key={`${m.programCode}-${m.category}-${m.semesterSequence}-${i}`}
+                      className="inline-flex rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                    >
+                      {formatMappingChip(m)}
+                    </span>
+                  ))}
+                  {c.mappingSummaryTruncated ? (
+                    <span className="inline-flex px-1 text-[10px] text-muted-foreground">
+                      +{(c.mappingSummaryTotal ?? 0) - (c.mappingSummary?.length ?? 0)} more
+                    </span>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="mt-1.5 text-[10px] italic text-muted-foreground">
+                  No curriculum mapping yet
+                </p>
+              )}
             </div>
-          ) : null}
-        </article>
-      ))}
+            {canManage ? (
+              <div className="flex shrink-0 gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => onEdit(c)}>
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isRemovePending}
+                  onClick={() => onRemove(c)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
 
       {hasNextPage ? (
         <div className="pt-2 text-center">

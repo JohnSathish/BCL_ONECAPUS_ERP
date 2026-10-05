@@ -2229,6 +2229,8 @@ model CourseOffering {
   capacity                Int       @default(40)
   waitlistCapacity        Int       @default(10) @map("waitlist_capacity")
   isElective              Boolean   @default(false) @map("is_elective")
+  /// Paper name for this mapping when it differs from the course master title.
+  titleOverride           String?   @map("title_override")
   registrationOpensAt     DateTime? @map("registration_opens_at")
   registrationClosesAt    DateTime? @map("registration_closes_at")
   prerequisiteOfferingIds Json?     @map("prerequisite_offering_ids")

@@ -35,6 +35,7 @@ import { electiveSlotBadge, filterVtcSectionsForTrack } from '@/utils/vtc-track-
 import { majorPaperOptionsForSlot } from '@/components/students-module/add-student/utils/subject-basket';
 import { Class12EligibilityWarningBanner } from '@/components/students-module/subject-registration/class12-eligibility-warning-banner';
 import { ALWAYS_AUTO_ASSIGNED_CATEGORIES } from '@/constants/nep-curriculum-categories';
+import { offeringPaperTitle } from '@/utils/offering-paper-title';
 
 type MeRegistrationData = Awaited<ReturnType<typeof fetchMyRegistration>> & {
   softGate?: {
@@ -529,7 +530,8 @@ function StudentRegistrationContent() {
                     <CompactCardBody className="space-y-1 text-sm">
                       {compulsoryLines.map((l) => (
                         <p key={l.id} className="text-muted-foreground">
-                          {l.category}: {l.offering.course.code} — {l.offering.course.title}
+                          {l.category}: {l.offering.course.code} —{' '}
+                          {offeringPaperTitle(l.offering.course, l.offering)}
                         </p>
                       ))}
                       {compulsoryLines.length === 0 ? (
@@ -650,7 +652,11 @@ function StudentRegistrationContent() {
                                   {options.map((s) => (
                                     <option key={s.id} value={s.id}>
                                       {s.courseOffering.course.code} —{' '}
-                                      {s.courseOffering.course.title} ({seatLabel(s)})
+                                      {offeringPaperTitle(
+                                        s.courseOffering.course,
+                                        s.courseOffering,
+                                      )}{' '}
+                                      ({seatLabel(s)})
                                       {s.mappingSource === 'SHARED_POOL' ? ' · pool' : ''}
                                     </option>
                                   ))}
@@ -676,7 +682,8 @@ function StudentRegistrationContent() {
                             <option value="">Select {cat} section…</option>
                             {sectionsForCategory(cat).map((s) => (
                               <option key={s.id} value={s.id}>
-                                {s.courseOffering.course.code} — {s.courseOffering.course.title} (
+                                {s.courseOffering.course.code} —{' '}
+                                {offeringPaperTitle(s.courseOffering.course, s.courseOffering)} (
                                 {seatLabel(s)}){s.mappingSource === 'SHARED_POOL' ? ' · pool' : ''}
                               </option>
                             ))}
@@ -688,7 +695,11 @@ function StudentRegistrationContent() {
                                 title={row.reasons[0]}
                               >
                                 {row.section.courseOffering.course.code} —{' '}
-                                {row.section.courseOffering.course.title} — {row.reasons[0]}
+                                {offeringPaperTitle(
+                                  row.section.courseOffering.course,
+                                  row.section.courseOffering,
+                                )}{' '}
+                                — {row.reasons[0]}
                               </option>
                             ))}
                           </select>
@@ -742,7 +753,8 @@ function StudentRegistrationContent() {
                       </p>
                       {compulsoryLines.map((l) => (
                         <p key={l.id}>
-                          {l.category}: {l.offering.course.code} — {l.offering.course.title}
+                          {l.category}: {l.offering.course.code} —{' '}
+                          {offeringPaperTitle(l.offering.course, l.offering)}
                         </p>
                       ))}
                       <p className="pt-2 text-xs font-medium uppercase text-muted-foreground">
@@ -759,7 +771,7 @@ function StudentRegistrationContent() {
                                 <p key={`MAJOR-${i + 1}`}>
                                   MAJOR paper {i + 1}:{' '}
                                   {section
-                                    ? `${section.courseOffering.course.code} — ${section.courseOffering.course.title}`
+                                    ? `${section.courseOffering.course.code} — ${offeringPaperTitle(section.courseOffering.course, section.courseOffering)}`
                                     : '—'}
                                 </p>
                               );
@@ -772,7 +784,7 @@ function StudentRegistrationContent() {
                           <p key={cat}>
                             {cat}:{' '}
                             {section
-                              ? `${section.courseOffering.course.code} — ${section.courseOffering.course.title} (${seatLabel(section)})`
+                              ? `${section.courseOffering.course.code} — ${offeringPaperTitle(section.courseOffering.course, section.courseOffering)} (${seatLabel(section)})`
                               : '—'}
                           </p>
                         );

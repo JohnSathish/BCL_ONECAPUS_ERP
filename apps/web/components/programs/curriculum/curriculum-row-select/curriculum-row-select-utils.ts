@@ -1,6 +1,7 @@
 import { NEP_CURRICULUM_CATEGORIES } from '@/constants/nep-curriculum-categories';
 import type { CurriculumFilters, CurriculumOfferingQuery } from '@/types/curriculum-filters';
 import type { CurriculumOfferingRow } from '@/types/curriculum-filters';
+import { offeringPaperTitle } from '@/utils/offering-paper-title';
 
 export type RowSelectContext = {
   programVersionId?: string;
@@ -198,7 +199,7 @@ export function groupCurriculumRowsBySemesterAndCategory(
 }
 
 export function formatRowPrimaryLabel(row: CurriculumOfferingRow): string {
-  return `${row.course.code} — ${row.course.title}`;
+  return `${row.course.code} — ${offeringPaperTitle(row.course, row)}`;
 }
 
 export function formatRowSecondaryLabel(row: CurriculumOfferingRow): string {

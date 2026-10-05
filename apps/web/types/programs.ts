@@ -93,6 +93,7 @@ export type CourseMappingSummary = {
   version: number;
   category: string | null;
   semesterSequence: number | null;
+  titleOverride?: string | null;
 };
 
 export type CourseListParams = {
@@ -170,6 +171,7 @@ export type CourseOffering = {
   courseId: string;
   semesterId?: string | null;
   isElective: boolean;
+  titleOverride?: string | null;
   category?: string | null;
   semesterSequence?: number | null;
   displayOrder?: number | null;

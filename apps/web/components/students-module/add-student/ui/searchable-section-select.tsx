@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { glassSelectClass } from '@/components/students-module/add-student/ui/glass-field';
 import type { CatalogSectionRow, IneligibleCatalogSection } from '@/types/academic-engine';
 import { cn } from '@/utils/cn';
+import { offeringPaperTitle } from '@/utils/offering-paper-title';
 
 export type IneligibleSectionOption = IneligibleCatalogSection;
 
@@ -22,7 +23,7 @@ type Props = {
 
 function formatSectionLabel(s: CatalogSectionRow) {
   const code = s.courseOffering.course.code;
-  const title = s.courseOffering.course.title;
+  const title = offeringPaperTitle(s.courseOffering.course, s.courseOffering);
   const seats = `${s.seatLedger?.confirmedCount ?? 0}/${s.capacity}`;
   return `${code} — ${title} · ${s.sectionCode} (${seats})`;
 }
@@ -49,7 +50,7 @@ export function SearchableSectionSelect({
     const q = query.toLowerCase();
     return sections.filter((s) => {
       const code = s.courseOffering.course.code.toLowerCase();
-      const title = s.courseOffering.course.title.toLowerCase();
+      const title = offeringPaperTitle(s.courseOffering.course, s.courseOffering).toLowerCase();
       const section = s.sectionCode.toLowerCase();
       return code.includes(q) || title.includes(q) || section.includes(q);
     });
@@ -61,7 +62,7 @@ export function SearchableSectionSelect({
     return ineligibleSections.filter((row) => {
       const s = row.section;
       const code = s.courseOffering.course.code.toLowerCase();
-      const title = s.courseOffering.course.title.toLowerCase();
+      const title = offeringPaperTitle(s.courseOffering.course, s.courseOffering).toLowerCase();
       const section = s.sectionCode.toLowerCase();
       return code.includes(q) || title.includes(q) || section.includes(q);
     });

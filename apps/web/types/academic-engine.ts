@@ -141,6 +141,7 @@ export type CatalogSectionRow = {
   poolName?: string;
   courseOffering: {
     id: string;
+    titleOverride?: string | null;
     category: string | null;
     semesterSequence: number | null;
     majorPaperIndex?: number | null;

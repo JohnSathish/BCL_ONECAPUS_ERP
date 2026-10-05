@@ -192,6 +192,7 @@ const offeringSchema = z.object({
   category: z.enum(NEP_CATEGORIES),
   semesterSequence: z.number().int().min(1).max(8).optional(),
   isElective: z.boolean().optional(),
+  titleOverride: z.string().max(300).optional().or(z.literal('')),
 });
 
 type OfferingFormValues = z.infer<typeof offeringSchema>;
@@ -549,6 +550,7 @@ export default function AdminProgramsPage() {
       category: 'MAJOR',
       semesterSequence: undefined,
       isElective: false,
+      titleOverride: '',
     },
   });
 
@@ -911,6 +913,7 @@ export default function AdminProgramsPage() {
         category: v.category,
         semesterSequence: v.semesterSequence,
         isElective: v.isElective,
+        titleOverride: v.titleOverride?.trim() || null,
       }),
     onSuccess: () => {
       offeringForm.reset({
@@ -920,6 +923,7 @@ export default function AdminProgramsPage() {
         category: 'MAJOR',
         semesterSequence: undefined,
         isElective: false,
+        titleOverride: '',
       });
       clearOfferingDraft();
       setEditingOffering(null);
@@ -934,6 +938,7 @@ export default function AdminProgramsPage() {
         semesterSequence: v.semesterSequence,
         semesterId: v.semesterId ? v.semesterId : null,
         isElective: v.isElective,
+        titleOverride: v.titleOverride?.trim() || null,
       }),
     onSuccess: () => {
       setEditingOffering(null);
@@ -944,6 +949,7 @@ export default function AdminProgramsPage() {
         category: 'MAJOR',
         semesterSequence: undefined,
         isElective: false,
+        titleOverride: '',
       });
       clearOfferingDraft();
       invalidate();
@@ -967,6 +973,7 @@ export default function AdminProgramsPage() {
       category: defaultNepCategory(o),
       semesterSequence: o.semesterSequence ?? undefined,
       isElective: o.isElective ?? false,
+      titleOverride: o.titleOverride ?? '',
     });
   };
 
@@ -979,6 +986,7 @@ export default function AdminProgramsPage() {
       category: 'MAJOR',
       semesterSequence: undefined,
       isElective: false,
+      titleOverride: '',
     });
   };
 
@@ -1840,6 +1848,17 @@ export default function AdminProgramsPage() {
                           </option>
                         ))}
                       </select>
+                    </Field>
+                    <Field label="Paper name on this mapping">
+                      <Input
+                        placeholder="Leave blank to use the course master title"
+                        {...offeringForm.register('titleOverride')}
+                        disabled={!canManage}
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Use this when the same paper code has a different name as a minor, for
+                        example Geography and Environment on GEO-302.
+                      </p>
                     </Field>
                     <Field label="Semester sequence (1–8)">
                       <Input

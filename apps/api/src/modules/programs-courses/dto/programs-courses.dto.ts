@@ -8,6 +8,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
   IsUUID,
   Max,
   Min,
@@ -472,6 +473,11 @@ export class CreateCourseOfferingDto {
   @IsOptional()
   @IsNumber()
   waitlistCapacity?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  titleOverride?: string | null;
 }
 
 export class UpdateCourseOfferingDto {
@@ -508,4 +514,9 @@ export class UpdateCourseOfferingDto {
   @IsOptional()
   @IsNumber()
   majorPaperIndex?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  titleOverride?: string | null;
 }

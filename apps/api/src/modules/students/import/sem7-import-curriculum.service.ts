@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { assignMajorPaperSlots } from '../../academic-engine/domain/major-paper-assignment';
 import { slugifySubject } from '../../academic-engine/domain/nep-categories';
+import { offeringPaperTitle } from '../../academic-engine/domain/offering-paper-title';
 import { CurriculumResolutionService } from '../../academic-engine/services/curriculum-resolution.service';
 import { MajorMinorEligibilityService } from '../../academic-engine/services/major-minor-eligibility.service';
 import { PrismaService } from '../../../database/prisma.service';
@@ -47,6 +48,7 @@ type CurriculumOffering = {
   semesterSequence: number | null;
   majorPaperIndex: number | null;
   courseId: string;
+  titleOverride?: string | null;
   course: {
     id: string;
     code: string;
@@ -168,6 +170,7 @@ export class Sem7ImportCurriculumService {
         semesterSequence: offering.semesterSequence,
         majorPaperIndex: offering.majorPaperIndex,
         courseId: offering.courseId,
+        titleOverride: offering.titleOverride,
         course: offering.course,
         categoryPoolId: offering.categoryPoolId,
       })),
@@ -177,6 +180,7 @@ export class Sem7ImportCurriculumService {
         semesterSequence: offering.semesterSequence,
         majorPaperIndex: offering.majorPaperIndex,
         courseId: offering.courseId,
+        titleOverride: offering.titleOverride,
         course: offering.course,
         categoryPoolId: offering.categoryPoolId,
       })),
@@ -426,7 +430,7 @@ export class Sem7ImportCurriculumService {
 
   private toPaperOption(offering: CurriculumOffering): Sem7PaperOption {
     return {
-      title: offering.course.title,
+      title: offeringPaperTitle(offering.course, offering),
       code: offering.course.code,
       courseId: offering.courseId,
       offeringId: offering.id,

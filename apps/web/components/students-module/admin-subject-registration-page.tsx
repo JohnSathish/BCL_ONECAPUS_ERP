@@ -27,6 +27,7 @@ import { HonoursTrackSelector } from '@/components/students-module/subject-regis
 import { ValidationIssuesPanel } from '@/components/students-module/subject-registration/validation-issues-panel';
 import { Class12EligibilityWarningBanner } from '@/components/students-module/subject-registration/class12-eligibility-warning-banner';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { offeringPaperTitle } from '@/utils/offering-paper-title';
 import { toShiftOptions } from '@/lib/shift-options';
 import {
   fetchCatalog,
@@ -356,7 +357,7 @@ export function AdminSubjectRegistrationPage() {
   const handleIneligiblePick = (slotKey: string, sectionId: string, reasons: string[]) => {
     const section = sectionById.get(sectionId);
     const courseLabel = section
-      ? `${section.courseOffering.course.code} — ${section.courseOffering.course.title}`
+      ? `${section.courseOffering.course.code} — ${offeringPaperTitle(section.courseOffering.course, section.courseOffering)}`
       : undefined;
     setPendingOverride({ slotKey, sectionId, reasons, courseLabel });
   };

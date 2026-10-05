@@ -11,6 +11,7 @@ import { StudentDirectoryEnrichmentService } from './student-directory-enrichmen
 import { StudentDisplaySettingsService } from '../../administration/services/student-display-settings.service';
 import type { UpdateStudentProfileDto } from '../dto/students.dto';
 import { resolveStudentContactEmail } from '../student-credentials.util';
+import { offeringPaperTitle } from '../../academic-engine/domain/offering-paper-title';
 
 const profileInclude = {
   masterProfile: true,
@@ -125,7 +126,7 @@ export class StudentProfileService {
             registrationStatus: reg.status,
             sectionCode: l.offeringSection?.sectionCode ?? null,
             courseCode: course.code,
-            courseTitle: course.title,
+            courseTitle: offeringPaperTitle(course, l.offering),
             category: String(
               l.category || l.offering?.category || '',
             ).toUpperCase(),
@@ -251,7 +252,10 @@ export class StudentProfileService {
       semesterSequence: number;
       lines: {
         category: string;
-        offering: { course: { code: string; title: string } };
+        offering: {
+          course: { code: string; title: string };
+          titleOverride?: string | null;
+        };
       }[];
     }[],
     currentSem?: number,
@@ -273,7 +277,7 @@ export class StudentProfileService {
       if (groups[cat]) {
         groups[cat].push({
           code: line.offering.course.code,
-          title: line.offering.course.title,
+          title: offeringPaperTitle(line.offering.course, line.offering),
         });
       }
     }
@@ -730,7 +734,7 @@ export class StudentProfileService {
             course: {
               id: line.offering.courseId,
               code: course.code,
-              title: course.title,
+              title: offeringPaperTitle(course, line.offering),
               credits: Number(line.credits ?? course.credits ?? 0),
             },
             section: line.offeringSection

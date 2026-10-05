@@ -1,4 +1,5 @@
 import type { CatalogSectionRow } from '@/types/academic-engine';
+import { offeringPaperTitle } from '@/utils/offering-paper-title';
 
 export function formatCatalogLabel(code: string, title: string) {
   return `${code} — ${title}`;
@@ -16,7 +17,10 @@ export function catalogOptionsForCategory(sections: CatalogSectionRow[], categor
     seen.add(code);
     options.push({
       value: code,
-      label: formatCatalogLabel(code, row.courseOffering.course.title),
+      label: formatCatalogLabel(
+        code,
+        offeringPaperTitle(row.courseOffering.course, row.courseOffering),
+      ),
       subjectSlug: row.courseOffering.course.subjectSlug,
     });
   }

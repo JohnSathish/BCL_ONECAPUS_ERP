@@ -17,6 +17,7 @@ import {
 import { DEFAULT_FYUGP_SEMESTER_RULES } from '../src/modules/academic-engine/domain/fyugp-templates';
 import { upsertSemesterStructureRules } from '../src/modules/academic-engine/services/structure-rules.helper';
 import { syncProgramPromotionMappings } from '../src/modules/academic-lifecycle/utils/sync-promotion-mappings';
+import { resolveMappingTitleOverride } from './offering-title-override';
 
 export type SeedScienceFyugpCatalogContext = {
   prisma: PrismaClient;
@@ -433,6 +434,11 @@ async function upsertDirectOffering(
       category: courseDef.category,
     },
   });
+  const titleOverride = await resolveMappingTitleOverride(
+    prisma,
+    courseId,
+    courseDef.title,
+  );
 
   const offering =
     existingOff ??
@@ -448,8 +454,20 @@ async function upsertDirectOffering(
         majorPaperIndex: courseDef.majorPaperIndex,
         capacity: 80,
         waitlistCapacity: 20,
+        titleOverride,
       },
     }));
+
+  if (
+    existingOff &&
+    titleOverride &&
+    (existingOff.titleOverride ?? null) !== titleOverride
+  ) {
+    await prisma.courseOffering.update({
+      where: { id: existingOff.id },
+      data: { titleOverride },
+    });
+  }
 
   for (const shiftId of shiftIds) {
     let section = await prisma.offeringSection.findFirst({

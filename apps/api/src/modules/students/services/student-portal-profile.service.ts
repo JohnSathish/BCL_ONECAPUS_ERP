@@ -15,6 +15,7 @@ import { StudentAssetsService } from './student-assets.service';
 import { StudentAbcService } from './student-abc.service';
 import { StudentPortalService } from './student-portal.service';
 import { StudentProfileService } from './student-profile.service';
+import { offeringPaperTitle } from '../../academic-engine/domain/offering-paper-title';
 import { StudentProfileChangeRequestService } from './student-profile-change-request.service';
 import {
   STUDENT_MARKSHEET_IMAGE_MIMES,
@@ -110,7 +111,10 @@ export class StudentPortalProfileService {
         category: String(l.category ?? '').toUpperCase(),
         label:
           SNAPSHOT_LABELS[String(l.category ?? '').toUpperCase()] ?? l.category,
-        title: l.offering?.course?.title ?? l.offering?.course?.code ?? '—',
+        title:
+          offeringPaperTitle(l.offering?.course, l.offering) ||
+          l.offering?.course?.code ||
+          '—',
       }));
 
     const demands = ledger?.demands ?? [];
