@@ -114,12 +114,13 @@ function activeVersionId(program?: Program) {
   return (versions.find((v) => v.status === 'PUBLISHED') ?? versions[0])?.id ?? '';
 }
 
-/** Odd-semester exams sit in the first calendar year of the session, even ones in the second. */
-function examYearFor(year: AcademicYear | undefined, semesterNo: number) {
+/** The repository year is the first calendar year of the selected session (2026–27 → 2026). */
+function examYearFor(year: AcademicYear | undefined) {
+  const named = year?.name?.match(/\d{4}/);
+  if (named) return Number(named[0]);
   const start = year ? new Date(year.startDate).getFullYear() : NaN;
-  const end = year ? new Date(year.endDate).getFullYear() : NaN;
-  if (Number.isNaN(start) || Number.isNaN(end)) return new Date().getFullYear();
-  return semesterNo % 2 === 1 ? start : end;
+  if (!Number.isNaN(start)) return start;
+  return new Date().getFullYear();
 }
 
 async function validatePdf(file: File, maxMb: number): Promise<string | null> {
@@ -463,7 +464,6 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
   const uploadMut = useMutation({
     mutationFn: async () => {
       if (!file || !selectedCourse) throw new Error('Select a subject and a PDF file.');
-      const semesterNo = Number(details.semesterNo);
       const departmentId = details.departmentId || selectedCourse.departmentId || '';
       const fields: Record<string, string> = {
         academicYearId: details.academicYearId,
@@ -476,7 +476,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
         paperName: selectedCourse.title,
         subjectCategory: details.subjectCategory,
         paperType: details.subjectCategory === 'PRACTICAL' ? 'PRACTICAL' : 'THEORY',
-        examYear: String(examYearFor(selectedYear, semesterNo)),
+        examYear: String(examYearFor(selectedYear)),
         language: 'EN',
         showOnWebsite: String(showOnWebsite),
       };
@@ -800,7 +800,7 @@ export function QuestionPaperUploadForm({ canManage, repositoryHref, onDone }: P
                         ? (CATEGORY_LABELS[details.subjectCategory] ?? details.subjectCategory)
                         : null,
                       selectedDeptName,
-                      `Exam year ${examYearFor(selectedYear, Number(details.semesterNo))}`,
+                      `Exam year ${examYearFor(selectedYear)}`,
                     ]
                       .filter(Boolean)
                       .map((chip) => (
