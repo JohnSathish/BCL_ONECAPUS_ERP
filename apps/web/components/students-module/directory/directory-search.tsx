@@ -31,7 +31,7 @@ function loadRecent(key: string): string[] {
 }
 
 function saveRecent(key: string, term: string) {
-  if (!term.trim() || typeof window === 'undefined') return;
+  if (!term?.trim() || typeof window === 'undefined') return;
   const trimmed = term.trim();
   const next = [trimmed, ...loadRecent(key).filter((s) => s !== trimmed)].slice(0, MAX_RECENT);
   localStorage.setItem(key, JSON.stringify(next));
@@ -52,8 +52,8 @@ export function DirectorySearch({
   const debounced = useDebouncedValue(value, 300);
 
   useEffect(() => {
-    if (debounced.trim()) saveRecent(debounced);
-  }, [debounced]);
+    if (debounced.trim()) saveRecent(recentKey, debounced);
+  }, [debounced, recentKey]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
