@@ -65,18 +65,30 @@ export const VTC_MONTHLY_MODIFIER = {
 };
 
 /**
- * Lab lines on the Science plan. Charged once when the student has at least
- * one practical subject. 2024 B.Sc. Sem V–VI due list:
- * ₹1,000 without a practical (tuition 100 + college 900),
- * ₹1,800 with a practical (+ lab 450 + expendables 350),
- * ₹1,100 / ₹1,900 when VTC (+₹100) is also taken.
- * The lab package is not multiplied per subject and is not added again
- * on top of these plan lines. Year-3 admission/session fee stays ₹9,500.
+ * Lab lines on the Science plan. Charged once, never per subject, and never
+ * a second time on top of these lines. 2024 B.Sc. Sem V–VI due list:
+ * ₹1,000 without a lab, ₹1,800 with a lab, +₹100 when the student has VTC.
+ * Year-3 admission/session fee stays ₹9,500.
+ *
+ * Botany, Chemistry, and Zoology on that list are always ₹1,800 (or ₹1,900
+ * with VTC). Mathematics and Physics are ₹1,000 unless a real practical paper
+ * is registered. Internship is not a lab paper.
  */
 export const SCIENCE_PRACTICAL_LAB_LINE_CODES = [
   'LAB_FEE',
   'LAB_EXPENDABLES',
 ] as const;
+
+const SCIENCE_NON_LAB_DELIVERY = new Set([
+  'INTERNSHIP',
+  'PROJECT',
+  'FIELD_WORK',
+  'DISSERTATION',
+  'SEMINAR',
+  'VIVA',
+  'APPRENTICESHIP',
+  'COMMUNITY_ENGAGEMENT',
+]);
 
 export function applySciencePracticalLabLines<T extends { code: string }>(
   lines: T[],
@@ -85,4 +97,41 @@ export function applySciencePracticalLabLines<T extends { code: string }>(
   if (practicalSubjectCount > 0) return lines;
   const lab = new Set<string>(SCIENCE_PRACTICAL_LAB_LINE_CODES);
   return lines.filter((line) => !lab.has(line.code));
+}
+
+/** Botany, Chemistry, and Zoology pay the lab package even in a theory-only semester. */
+export function scienceHonoursIncludesLab(input: {
+  programCode?: string | null;
+  majorSlug?: string | null;
+}): boolean {
+  const code = (input.programCode ?? '').toUpperCase();
+  const tokens = (input.majorSlug ?? '')
+    .toLowerCase()
+    .split(/[-_\s/]+/)
+    .filter(Boolean);
+  if (code.startsWith('BSC-BOT') || tokens.includes('botany')) return true;
+  if (
+    code.startsWith('BSC-CHE') ||
+    code.startsWith('BSC-CHM') ||
+    tokens.includes('chemistry')
+  ) {
+    return true;
+  }
+  if (code.startsWith('BSC-ZOO') || tokens.includes('zoology')) return true;
+  return false;
+}
+
+/** A registered paper that should add the ₹800 lab package. Internship does not. */
+export function isBillableScienceLabCourse(
+  course?: {
+    hasPractical?: boolean | null;
+    deliveryType?: string | null;
+    practicalCredits?: unknown;
+  } | null,
+): boolean {
+  if (!course) return false;
+  const delivery = String(course.deliveryType ?? '').toUpperCase();
+  if (SCIENCE_NON_LAB_DELIVERY.has(delivery)) return false;
+  if (course.hasPractical) return true;
+  return Number(course.practicalCredits ?? 0) > 0;
 }

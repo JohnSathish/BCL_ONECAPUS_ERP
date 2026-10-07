@@ -224,8 +224,9 @@ export function MonthlyFeePlansPanel() {
             </CardTitle>
             <CardDescription>
               Update tuition and college fee amounts here each academic year — no code change
-              needed. For Science, Lab Fee and Lab Expendables are charged only when the student has
-              a practical subject. VTC adds ₹100/month when the student has a VTC subject.
+              needed. Botany, Chemistry, and Zoology include the lab package. Mathematics and
+              Physics include it only when a practical paper is registered. Internship does not add
+              lab fee. VTC adds ₹100/month when the student has a VTC subject.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">

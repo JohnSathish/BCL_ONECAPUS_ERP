@@ -3,7 +3,9 @@ import type { JwtUser } from '../../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../../database/prisma.service';
 import {
   applySciencePracticalLabLines,
+  isBillableScienceLabCourse,
   MONTHLY_DEMAND_TYPE,
+  scienceHonoursIncludesLab,
   VTC_MONTHLY_MODIFIER,
 } from '../constants/monthly-fee.constants';
 import { FeeCalendarSyncService } from '../fee-calendar-sync.service';
@@ -383,7 +385,7 @@ export class MonthlyFeeEngineService {
       plan.code === 'SCIENCE'
         ? applySciencePracticalLabLines(
             planLines,
-            await this.countSciencePracticals(tenantId, student.id),
+            (await this.scienceLabApplies(tenantId, student)) ? 1 : 0,
           )
         : planLines;
 
@@ -783,6 +785,23 @@ export class MonthlyFeeEngineService {
     return { updated };
   }
 
+  /**
+   * Lab package applies for Botany, Chemistry, and Zoology honours, and for
+   * Mathematics or Physics only when a real practical paper is registered.
+   * Internship never adds the lab fee.
+   */
+  private async scienceLabApplies(tenantId: string, student: StudentCtx) {
+    if (
+      scienceHonoursIncludesLab({
+        programCode: student.programVersion?.program?.code,
+        majorSlug: student.programChoices?.[0]?.subjectSlug,
+      })
+    ) {
+      return true;
+    }
+    return (await this.countSciencePracticals(tenantId, student.id)) > 0;
+  }
+
   private async countSciencePracticals(tenantId: string, studentId: string) {
     const standing = await this.db().studentAcademicStanding.findUnique({
       where: { studentId },
@@ -802,8 +821,20 @@ export class MonthlyFeeEngineService {
     });
     if (!reg?.lines) return 0;
     return reg.lines.filter(
-      (l: { offering?: { course?: { hasPractical?: boolean } } }) =>
-        l.offering?.course?.hasPractical,
+      (l: {
+        status?: string;
+        offering?: {
+          course?: {
+            hasPractical?: boolean;
+            deliveryType?: string | null;
+            practicalCredits?: unknown;
+          };
+        };
+      }) => {
+        const status = String(l.status ?? '').toLowerCase();
+        if (status === 'cancelled' || status === 'dropped') return false;
+        return isBillableScienceLabCourse(l.offering?.course);
+      },
     ).length;
   }
 
