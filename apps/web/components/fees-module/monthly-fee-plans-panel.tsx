@@ -38,6 +38,23 @@ function currentBillingPeriodLabel() {
   return now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 }
 
+const SCIENCE_LAB_LINE_CODES = new Set(['LAB_FEE', 'LAB_EXPENDABLES']);
+
+function scienceMonthlySplit(
+  lines: Array<{ id?: string; code: string; amount: number }>,
+  lineAmounts: Record<string, string> = {},
+) {
+  let base = 0;
+  let lab = 0;
+  for (const line of lines) {
+    const key = line.id ?? line.code;
+    const amount = Number(lineAmounts[key] ?? line.amount ?? 0);
+    if (SCIENCE_LAB_LINE_CODES.has(line.code)) lab += amount;
+    else base += amount;
+  }
+  return { base, lab, withPractical: base + lab };
+}
+
 export function MonthlyFeePlansPanel() {
   const qc = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -112,14 +129,20 @@ export function MonthlyFeePlansPanel() {
   const plans = plansQ.data ?? [];
   const selected = plans.find((p) => p.id === selectedId) ?? plans[0] ?? null;
 
+  const scienceEditorSplit = useMemo(
+    () => scienceMonthlySplit(selected?.lines ?? [], lineAmounts),
+    [selected, lineAmounts],
+  );
+
   const computedTotal = useMemo(() => {
     if (!selected?.lines) return 0;
+    if (selected.code === 'SCIENCE') return scienceEditorSplit.withPractical;
     return selected.lines.reduce((sum, line) => {
       const key = line.id ?? line.code;
       const val = lineAmounts[key] ?? String(line.amount);
       return sum + Number(val || 0);
     }, 0);
-  }, [selected, lineAmounts]);
+  }, [selected, lineAmounts, scienceEditorSplit.withPractical]);
 
   const saveMut = useMutation({
     mutationFn: () => {
@@ -201,8 +224,8 @@ export function MonthlyFeePlansPanel() {
             </CardTitle>
             <CardDescription>
               Update tuition and college fee amounts here each academic year — no code change
-              needed. VTC (+₹100/month) and science practical rules apply automatically when demands
-              are generated.
+              needed. For Science, Lab Fee and Lab Expendables are charged only when the student has
+              a practical subject. VTC adds ₹100/month when the student has a VTC subject.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -293,6 +316,12 @@ export function MonthlyFeePlansPanel() {
           <div className="space-y-2">
             {plans.map((plan) => {
               const total = (plan.lines ?? []).reduce((s, l) => s + Number(l.amount), 0);
+              const scienceSplit =
+                plan.code === 'SCIENCE' ? scienceMonthlySplit(plan.lines ?? []) : null;
+              const rateLabel =
+                scienceSplit && scienceSplit.lab > 0
+                  ? `${formatInr(scienceSplit.base)} without practical · ${formatInr(scienceSplit.withPractical)} with practical`
+                  : `${formatInr(total)}/month`;
               return (
                 <button
                   key={plan.id}
@@ -310,7 +339,7 @@ export function MonthlyFeePlansPanel() {
                   <p className="text-xs text-muted-foreground">
                     {plan.code} · {plan.majorSlug ?? 'any major'}
                   </p>
-                  <p className="mt-1 text-sm font-medium">{formatInr(total)}/month</p>
+                  <p className="mt-1 text-sm font-medium">{rateLabel}</p>
                 </button>
               );
             })}
@@ -321,7 +350,9 @@ export function MonthlyFeePlansPanel() {
               <h3 className="text-lg font-semibold">{selected.name}</h3>
               <p className="text-sm text-muted-foreground">
                 Edit line amounts below, then click Save. New demands generated after this date will
-                use the updated rates. Already-issued monthly demands are not changed automatically.
+                use the updated rates. Science demands that added a second lab charge, or charged
+                lab without a practical subject, are corrected the next time that student's fee
+                account is opened.
               </p>
               <div className="mt-4 overflow-x-auto rounded-xl border">
                 <table className="w-full text-sm">
@@ -350,8 +381,20 @@ export function MonthlyFeePlansPanel() {
                         </tr>
                       );
                     })}
+                    {selected.code === 'SCIENCE' && scienceEditorSplit.lab > 0 ? (
+                      <tr className="border-t">
+                        <td className="px-3 py-2">Without practical subject</td>
+                        <td className="px-3 py-2 text-right">
+                          {formatInr(scienceEditorSplit.base)}
+                        </td>
+                      </tr>
+                    ) : null}
                     <tr className="border-t font-semibold">
-                      <td className="px-3 py-2">Total per month</td>
+                      <td className="px-3 py-2">
+                        {selected.code === 'SCIENCE' && scienceEditorSplit.lab > 0
+                          ? 'With practical subject'
+                          : 'Total per month'}
+                      </td>
                       <td className="px-3 py-2 text-right">{formatInr(computedTotal)}</td>
                     </tr>
                   </tbody>

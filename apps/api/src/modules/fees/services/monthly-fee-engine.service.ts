@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import {
+  applySciencePracticalLabLines,
   MONTHLY_DEMAND_TYPE,
   VTC_MONTHLY_MODIFIER,
 } from '../constants/monthly-fee.constants';
@@ -365,20 +366,26 @@ export class MonthlyFeeEngineService {
     student: StudentCtx,
     plan: { id: string; code?: string; lines?: Array<Record<string, unknown>> },
   ) {
-    const lines = [
-      ...(plan.lines ?? []).map(
-        (l: { code?: string; name?: string; amount?: unknown }) => ({
-          code: String(l.code),
-          name: String(l.name),
-          category: 'MONTHLY',
-          unitAmount: Number(l.amount),
-          amount: Number(l.amount),
-          quantity: 1,
-          sourceType: 'MONTHLY_PLAN',
-          sourceRefId: plan.id,
-        }),
-      ),
-    ];
+    const planLines = (plan.lines ?? []).map(
+      (l: { code?: string; name?: string; amount?: unknown }) => ({
+        code: String(l.code),
+        name: String(l.name),
+        category: 'MONTHLY',
+        unitAmount: Number(l.amount),
+        amount: Number(l.amount),
+        quantity: 1,
+        sourceType: 'MONTHLY_PLAN',
+        sourceRefId: plan.id,
+      }),
+    );
+
+    const lines =
+      plan.code === 'SCIENCE'
+        ? applySciencePracticalLabLines(
+            planLines,
+            await this.countSciencePracticals(tenantId, student.id),
+          )
+        : planLines;
 
     const stream = this.resolveStudentStream(student);
     if (stream === 'geography' && !lines.some((l) => l.code === 'LAB_FEE')) {
@@ -389,24 +396,6 @@ export class MonthlyFeeEngineService {
         unitAmount: 200,
         amount: 200,
         quantity: 1,
-        sourceType: 'MODIFIER',
-        sourceRefId: plan.id,
-      });
-    }
-
-    const sciencePracticalCount = await this.countSciencePracticals(
-      tenantId,
-      student.id,
-    );
-    if (sciencePracticalCount > 0 && plan.code === 'SCIENCE') {
-      const labPerSubject = 450 + 350;
-      lines.push({
-        code: 'SCIENCE_LAB_PER_SUBJECT',
-        name: `Science Lab (${sciencePracticalCount} practical subject(s))`,
-        category: 'MONTHLY',
-        unitAmount: labPerSubject,
-        amount: labPerSubject * sciencePracticalCount,
-        quantity: sciencePracticalCount,
         sourceType: 'MODIFIER',
         sourceRefId: plan.id,
       });
@@ -544,7 +533,10 @@ export class MonthlyFeeEngineService {
 
   /**
    * Rebuild open monthly demands when plan matching was wrong
-   * (e.g. Political Science matched SCIENCE via substring "science").
+   * (e.g. Political Science matched SCIENCE via substring "science"),
+   * or when science lab lines no longer match the practical-subject rule.
+   * Later months have their carried-forward outstanding adjusted after an
+   * earlier month is corrected.
    */
   async reconcileOpenMonthlyDemands(tenantId: string, studentId: string) {
     const student = await this.loadStudent(tenantId, studentId);
@@ -552,6 +544,13 @@ export class MonthlyFeeEngineService {
 
     const plan = await this.resolvePlan(tenantId, student);
     if (!plan) return { updated: 0 };
+
+    const correctLines = await this.buildCurrentMonthLines(
+      tenantId,
+      student,
+      plan,
+    );
+    const monthlyTotal = correctLines.reduce((s, l) => s + l.amount, 0);
 
     const demands = await this.db().studentFeeDemand.findMany({
       where: {
@@ -561,59 +560,118 @@ export class MonthlyFeeEngineService {
         status: { in: ['PUBLISHED', 'LOCKED', 'PARTIALLY_PAID'] },
       },
       include: { lines: true },
+      orderBy: { billingPeriod: 'asc' },
     });
 
+    let carried = 0;
+    let upstreamChanged = false;
     let updated = 0;
+
     for (const demand of demands) {
       const metadata = (demand.metadata ?? {}) as {
         planCode?: string;
         arrearsCarriedForward?: number;
       };
-      if (metadata.planCode === plan.code) continue;
-
       const existingLines = (demand.lines ?? []) as Array<{
         id: string;
         code?: string;
         amount?: unknown;
       }>;
       const arrearsLine = existingLines.find((l) => l.code === 'ARREARS');
-      const arrearsAmount = arrearsLine ? Number(arrearsLine.amount) : 0;
-
-      const correctLines = await this.buildCurrentMonthLines(
-        tenantId,
-        student,
-        plan,
+      const storedArrears = arrearsLine ? Number(arrearsLine.amount) : 0;
+      const storedBalance = Number(demand.balanceAmount ?? 0);
+      const hasDuplicateScienceLab = existingLines.some(
+        (line) => line.code === 'SCIENCE_LAB_PER_SUBJECT',
       );
-      const monthlyTotal = correctLines.reduce((s, l) => s + l.amount, 0);
-      const newTotal = monthlyTotal + arrearsAmount;
-      const oldTotal = Number(demand.totalAmount);
-      const delta = newTotal - oldTotal;
-      if (delta === 0 && metadata.planCode === plan.code) continue;
+      const correctHasLab = correctLines.some(
+        (line) => line.code === 'LAB_FEE' || line.code === 'LAB_EXPENDABLES',
+      );
+      const storedHasLab = existingLines.some(
+        (line) => line.code === 'LAB_FEE' || line.code === 'LAB_EXPENDABLES',
+      );
+      // Rebuild wrong plan matches, the extra per-subject lab line, and science
+      // lab lines that do not match whether the student has a practical subject.
+      // Leave other already-issued amounts alone when an admin later edits the plan.
+      const componentsChanged =
+        metadata.planCode !== plan.code ||
+        hasDuplicateScienceLab ||
+        (plan.code === 'SCIENCE' && correctHasLab !== storedHasLab);
 
+      if (!componentsChanged && !upstreamChanged) {
+        carried += storedBalance;
+        continue;
+      }
+
+      const arrears = carried;
+      const newTotal = monthlyTotal + arrears;
+      const oldTotal = Number(demand.totalAmount);
       const paid = Number(demand.paidAmount ?? 0);
       const newBalance = Math.max(0, newTotal - paid);
 
-      await this.db().studentFeeDemandLine.deleteMany({
-        where: {
-          demandId: demand.id,
-          code: { not: 'ARREARS' },
-        },
-      });
+      if (
+        !componentsChanged &&
+        storedArrears === arrears &&
+        oldTotal === newTotal
+      ) {
+        carried += storedBalance;
+        continue;
+      }
 
-      for (const line of correctLines) {
-        await this.db().studentFeeDemandLine.create({
-          data: {
-            tenantId,
+      if (componentsChanged) {
+        await this.db().studentFeeDemandLine.deleteMany({
+          where: {
             demandId: demand.id,
-            code: line.code,
-            name: line.name,
-            category: line.category,
-            quantity: line.quantity,
-            unitAmount: line.unitAmount,
-            amount: line.amount,
-            sourceType: line.sourceType,
-            sourceRefId: line.sourceRefId,
+            code: { not: 'ARREARS' },
           },
+        });
+
+        for (const line of correctLines) {
+          await this.db().studentFeeDemandLine.create({
+            data: {
+              tenantId,
+              demandId: demand.id,
+              code: line.code,
+              name: line.name,
+              category: line.category,
+              quantity: line.quantity,
+              unitAmount: line.unitAmount,
+              amount: line.amount,
+              sourceType: line.sourceType,
+              sourceRefId: line.sourceRefId,
+            },
+          });
+        }
+      }
+
+      if (arrears > 0) {
+        if (arrearsLine) {
+          await this.db().studentFeeDemandLine.update({
+            where: { id: arrearsLine.id },
+            data: {
+              unitAmount: arrears,
+              amount: arrears,
+              quantity: 1,
+            },
+          });
+        } else {
+          await this.db().studentFeeDemandLine.create({
+            data: {
+              tenantId,
+              demandId: demand.id,
+              code: 'ARREARS',
+              name: 'Outstanding from previous months',
+              category: 'ARREARS',
+              quantity: 1,
+              unitAmount: arrears,
+              amount: arrears,
+              sourceType: 'ARREARS',
+              sourceRefId: plan.id,
+            },
+          });
+        }
+      } else if (arrearsLine) {
+        await this.db().studentFeeDemandLine.delete({
+          where: { id: arrearsLine.id },
         });
       }
 
@@ -626,12 +684,13 @@ export class MonthlyFeeEngineService {
           metadata: {
             ...metadata,
             planCode: plan.code,
-            arrearsCarriedForward: arrearsAmount,
+            arrearsCarriedForward: arrears,
             reconciledFromPlan: metadata.planCode ?? null,
           },
         },
       });
 
+      const delta = newTotal - oldTotal;
       if (delta !== 0) {
         await this.ledger.post({
           tenantId,
@@ -642,9 +701,12 @@ export class MonthlyFeeEngineService {
           creditAmount: delta < 0 ? Math.abs(delta) : 0,
           referenceType: 'DEMAND',
           referenceId: demand.id,
-          description: `Monthly plan correction (${metadata.planCode ?? '?'} → ${plan.code}) — ${demand.billingPeriod}`,
+          description: `Monthly fee correction — ${demand.billingPeriod}`,
         });
       }
+
+      carried += newBalance;
+      upstreamChanged = true;
       updated += 1;
     }
 

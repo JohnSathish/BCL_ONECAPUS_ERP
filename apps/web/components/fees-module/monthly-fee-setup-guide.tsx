@@ -36,7 +36,7 @@ export function MonthlyFeeSetupGuide({ compact = false }: { compact?: boolean })
       id: 'plans',
       title: 'Configure monthly fee plans',
       description:
-        'Set tuition and college fee amounts per programme. VTC and science rules apply automatically when demands are generated.',
+        'Set tuition and college fee amounts per programme. Science lab lines apply only when the student has a practical subject. VTC adds ₹100 when a VTC subject is taken.',
       done: hasPlans,
       href: '/admin/fees/monthly-plans',
       action: 'Open monthly plans',
