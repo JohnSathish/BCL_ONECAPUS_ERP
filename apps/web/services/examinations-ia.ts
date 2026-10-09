@@ -267,14 +267,14 @@ export async function generateIaTimetable(payload: {
   startDate: string;
   durationMinutes?: number;
   defaultStartTime?: string;
-  mode?: 'SIMPLE' | 'FYUGP_FIRST_IA';
+  mode?: 'SIMPLE' | 'FYUGP_FIRST_IA' | 'FYUGP_SECOND_IA';
   routinePattern?: 'MORNING' | 'DAY';
 }) {
   const { data } = await api.post('/v1/examinations/ia/exams/generate-timetable', payload);
   return data as {
     updated: number;
     warnings?: string[];
-    mode?: 'SIMPLE' | 'FYUGP_FIRST_IA';
+    mode?: 'SIMPLE' | 'FYUGP_FIRST_IA' | 'FYUGP_SECOND_IA';
   };
 }
 

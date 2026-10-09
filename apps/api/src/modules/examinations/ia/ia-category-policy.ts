@@ -144,3 +144,52 @@ export function categoryPolicyFromMetadata(
   }
   return resolveCategoryPolicy(semesterNos, map);
 }
+
+export function iaPaperCategory(metadata: unknown): string {
+  if (!metadata || typeof metadata !== 'object') return '';
+  return (
+    normalizeIaSubjectCategory(
+      (metadata as { category?: string | null }).category,
+    ) ?? ''
+  );
+}
+
+/**
+ * Same offering can be a major paper and a minor paper on different days.
+ * Use the student's registration category when both sittings exist.
+ */
+export function pickIaPaperForRegistration<
+  T extends {
+    id: string;
+    metadata?: unknown;
+    offeringId?: string | null;
+    courseId?: string | null;
+  },
+>(
+  papers: T[],
+  line: {
+    offeringId: string;
+    category?: string | null;
+    courseId?: string | null;
+  },
+): T | undefined {
+  const lineCat = normalizeIaSubjectCategory(line.category) ?? '';
+  const forOffering = papers.filter(
+    (paper) => paper.offeringId && paper.offeringId === line.offeringId,
+  );
+  const pool = forOffering.length
+    ? forOffering
+    : papers.filter(
+        (paper) => paper.courseId && paper.courseId === line.courseId,
+      );
+  if (!pool.length) return undefined;
+  const exact = lineCat
+    ? pool.find((paper) => iaPaperCategory(paper.metadata) === lineCat)
+    : undefined;
+  if (exact) return exact;
+  const categories = new Set(
+    pool.map((paper) => iaPaperCategory(paper.metadata)).filter(Boolean),
+  );
+  if (categories.size > 1) return undefined;
+  return pool[0];
+}

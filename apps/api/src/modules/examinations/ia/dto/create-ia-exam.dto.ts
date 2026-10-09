@@ -116,10 +116,10 @@ export class GenerateIaTimetableDto {
   @IsString()
   defaultStartTime?: string;
 
-  /** SIMPLE = legacy 3-papers/day packer; FYUGP_FIRST_IA = printed First IA day plan. */
+  /** SIMPLE = legacy packer; FYUGP_FIRST_IA / FYUGP_SECOND_IA = printed routines. */
   @IsOptional()
-  @IsIn(['SIMPLE', 'FYUGP_FIRST_IA'])
-  mode?: 'SIMPLE' | 'FYUGP_FIRST_IA';
+  @IsIn(['SIMPLE', 'FYUGP_FIRST_IA', 'FYUGP_SECOND_IA'])
+  mode?: 'SIMPLE' | 'FYUGP_FIRST_IA' | 'FYUGP_SECOND_IA';
 
   /** Override Morning/Day times; otherwise inferred from session shift name. */
   @IsOptional()

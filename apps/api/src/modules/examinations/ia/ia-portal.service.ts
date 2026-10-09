@@ -3,6 +3,7 @@ import type { JwtUser } from '../../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../../database/prisma.service';
 import { IA_EXAM_TYPES } from './ia.constants';
 import { IaAdmitCardService } from './ia-admit-card.service';
+import { pickIaPaperForRegistration } from './ia-category-policy';
 import { IaDefaulterService } from './ia-defaulter.service';
 import { IaSettingsService } from './ia-settings.service';
 import { SHEET_STATUSES } from './ia.constants';
@@ -106,6 +107,7 @@ export class IaPortalService {
 
     type PaperRow = {
       id: string;
+      sessionId?: string | null;
       paperCode: string;
       paperName: string;
       examDate: Date;
@@ -113,6 +115,7 @@ export class IaPortalService {
       endTime: Date;
       courseId?: string | null;
       offeringId?: string | null;
+      metadata?: unknown;
     };
 
     const allPapers: PaperRow[] = sessionIds.length
@@ -123,30 +126,31 @@ export class IaPortalService {
             sessionId: { in: sessionIds },
           },
           orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }],
-          take: 500,
+          take: 2000,
         })
       : [];
 
-    const paperByOffering = new Map(
-      allPapers
-        .filter((p) => p.offeringId)
-        .map((p) => [p.offeringId as string, p]),
-    );
-    const paperByCourse = new Map(
-      allPapers.filter((p) => p.courseId).map((p) => [p.courseId as string, p]),
-    );
+    const papersBySession = new Map<string, PaperRow[]>();
+    for (const paper of allPapers) {
+      const key = paper.sessionId ?? '';
+      const list = papersBySession.get(key) ?? [];
+      list.push(paper);
+      papersBySession.set(key, list);
+    }
 
     const matched: PaperRow[] = [];
     const seenIds = new Set<string>();
     for (const line of effectiveLines) {
-      const paper =
-        paperByOffering.get(line.offeringId) ??
-        (line.offering?.courseId
-          ? paperByCourse.get(line.offering.courseId)
-          : undefined);
-      if (paper && !seenIds.has(paper.id)) {
-        seenIds.add(paper.id);
-        matched.push(paper);
+      for (const sessionPapers of papersBySession.values()) {
+        const paper = pickIaPaperForRegistration(sessionPapers, {
+          offeringId: line.offeringId,
+          category: line.category,
+          courseId: line.offering?.courseId,
+        });
+        if (paper && !seenIds.has(paper.id)) {
+          seenIds.add(paper.id);
+          matched.push(paper);
+        }
       }
     }
 

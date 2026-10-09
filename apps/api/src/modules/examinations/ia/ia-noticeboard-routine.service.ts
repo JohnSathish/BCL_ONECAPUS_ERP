@@ -13,6 +13,10 @@ import {
   resolveNoticeboardPattern,
 } from './ia-noticeboard-grid';
 import {
+  buildFyugpSecondIaDayNotice,
+  FYUGP_SECOND_IA_INSTRUCTIONS,
+} from './fyugp-second-ia-routine';
+import {
   DBC_TURA_NOTICE_CONTACTS,
   renderIaNoticeboardRoutineHtml,
   type IaNoticeboardRoutineInput,
@@ -143,25 +147,36 @@ export class IaNoticeboardRoutineService {
       shiftName = shift?.name ?? null;
     }
 
-    const pattern = options?.routinePattern
-      ? options.routinePattern
-      : resolveNoticeboardPattern(
-          shiftName,
-          typeof meta.routinePattern === 'string' ? meta.routinePattern : null,
-        );
+    const isSecondIa =
+      session.examType === 'IA_TEST_2' ||
+      meta.timetableMode === 'FYUGP_SECOND_IA';
+    const pattern = isSecondIa
+      ? 'DAY'
+      : options?.routinePattern
+        ? options.routinePattern
+        : resolveNoticeboardPattern(
+            shiftName,
+            typeof meta.routinePattern === 'string'
+              ? meta.routinePattern
+              : null,
+          );
 
     // Always print the official FYUGP category plan (not raw paper schedule dates/times).
     const startIso =
       (options?.startDate && /^\d{4}-\d{2}-\d{2}$/.test(options.startDate)
         ? options.startDate
-        : null) ?? this.toIsoDate(session.startDate as Date | string | null);
+        : null) ??
+      this.toIsoDate(session.startDate as Date | string | null) ??
+      (isSecondIa ? '2026-10-12' : null);
     if (!startIso) {
       throw new BadRequestException(
         'Set Start date on IA Timetable (e.g. 2026-08-24) before printing the noticeboard routine.',
       );
     }
 
-    const rows = buildNoticeboardRowsFromPlan(startIso, pattern);
+    const rows = isSecondIa
+      ? buildFyugpSecondIaDayNotice(startIso)
+      : buildNoticeboardRowsFromPlan(startIso, pattern);
     if (!rows.length) {
       throw new BadRequestException(
         'No timetable rows available for this examination.',
@@ -172,7 +187,9 @@ export class IaNoticeboardRoutineService {
       typeof meta.academicYearName === 'string' ? meta.academicYearName : null;
     const year = this.yearFromSessionName(session.name, academicYearName);
     const shiftLabel = pattern === 'MORNING' ? 'MORNING SHIFT' : 'DAY SHIFT';
-    const examTitle = `FYUGP ROUTINE FOR ODD SEMESTER FIRST INTERNAL ASSESSMENT ${year}`;
+    const examTitle = isSecondIa
+      ? `FYUGP ROUTINE FOR ODD SEMESTER 2ND INTERNAL ASSESSMENT ${year}`
+      : `FYUGP ROUTINE FOR ODD SEMESTER FIRST INTERNAL ASSESSMENT ${year}`;
 
     const [sy, sm, sd] = startIso.split('-').map(Number);
     const startForAdmit = new Date(sy, sm - 1, sd);
@@ -188,7 +205,9 @@ export class IaNoticeboardRoutineService {
       shiftLabel,
       academicYearLabel: academicYearName,
       rows,
-      instructions: this.defaultInstructions(pattern, admitFrom),
+      instructions: isSecondIa
+        ? [...FYUGP_SECOND_IA_INSTRUCTIONS]
+        : this.defaultInstructions(pattern, admitFrom),
       leftSignatory: {
         title: 'Coordinator,',
         subtitle: 'Examination cell',
@@ -200,7 +219,9 @@ export class IaNoticeboardRoutineService {
     };
 
     const html = renderIaNoticeboardRoutineHtml(input);
-    const filename = `FYUGP-First-IA-${year}-${pattern}-Noticeboard.pdf`;
+    const filename = isSecondIa
+      ? `FYUGP-2nd-IA-${year}-DAY-Noticeboard.pdf`
+      : `FYUGP-First-IA-${year}-${pattern}-Noticeboard.pdf`;
     return { html, filename, input };
   }
 

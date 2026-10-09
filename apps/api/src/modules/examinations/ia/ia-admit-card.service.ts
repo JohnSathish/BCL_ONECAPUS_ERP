@@ -15,6 +15,10 @@ import { IaAdmitPdfService } from './ia-admit-pdf.service';
 import { IaAuditService } from './ia-audit.service';
 import { IaDefaulterService } from './ia-defaulter.service';
 import { IaExamProvisioningService } from './ia-exam-provisioning.service';
+import {
+  iaPaperCategory,
+  pickIaPaperForRegistration,
+} from './ia-category-policy';
 import { IaSettingsService } from './ia-settings.service';
 import {
   renderIaAdmitCardHtml,
@@ -165,25 +169,14 @@ export class IaAdmitCardService {
       include: { offering: { select: { courseId: true } } },
     });
 
-    const paperByOffering = new Map(
-      sessionPapers
-        .filter((p) => p.offeringId)
-        .map((p) => [p.offeringId as string, p]),
-    );
-    const paperByCourse = new Map(
-      sessionPapers
-        .filter((p) => p.courseId)
-        .map((p) => [p.courseId as string, p]),
-    );
-
     const matched: PaperRow[] = [];
     const seen = new Set<string>();
     for (const line of lines) {
-      const paper =
-        paperByOffering.get(line.offeringId) ??
-        (line.offering.courseId
-          ? paperByCourse.get(line.offering.courseId)
-          : undefined);
+      const paper = pickIaPaperForRegistration(sessionPapers, {
+        offeringId: line.offeringId,
+        category: line.category,
+        courseId: line.offering.courseId,
+      });
       if (paper && !seen.has(paper.id)) {
         seen.add(paper.id);
         matched.push(paper);
@@ -214,10 +207,31 @@ export class IaAdmitCardService {
     } as const;
 
     if (paper.offeringId) {
+      const paperCat = iaPaperCategory(paper.metadata);
+      const sessionId = (paper as PaperRow & { sessionId?: string }).sessionId;
+      let splitByCategory = false;
+      if (paperCat && sessionId) {
+        const siblings = await this.db().examPaperSchedule.findMany({
+          where: {
+            tenantId,
+            sessionId,
+            offeringId: paper.offeringId,
+            deletedAt: null,
+          },
+          select: { metadata: true },
+        });
+        const categories = new Set(
+          siblings
+            .map((row: { metadata?: unknown }) => iaPaperCategory(row.metadata))
+            .filter(Boolean),
+        );
+        splitByCategory = categories.size > 1;
+      }
       const lines = await this.prisma.semesterRegistrationLine.findMany({
         where: {
           tenantId,
           offeringId: paper.offeringId,
+          ...(splitByCategory ? { category: paperCat } : {}),
           status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
           ...(paper.semesterNo != null
             ? { registration: { semesterSequence: paper.semesterNo } }

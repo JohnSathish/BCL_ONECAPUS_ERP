@@ -19,6 +19,7 @@ import {
   inferFyugpRoutinePattern,
   type FyugpRoutinePattern,
 } from './fyugp-first-ia-routine';
+import { assignFyugpSecondIaTimetable } from './fyugp-second-ia-routine';
 import {
   categoryPolicyFromMetadata,
   categoryPolicyToMetadata,
@@ -812,7 +813,7 @@ export class IaExamProvisioningService {
     let warnings: string[] = [];
     let endDate = new Date(dto.startDate);
 
-    if (mode === 'FYUGP_FIRST_IA') {
+    if (mode === 'FYUGP_FIRST_IA' || mode === 'FYUGP_SECOND_IA') {
       const meta = (session.metadata ?? {}) as Record<string, unknown>;
       let shiftName =
         typeof meta.shiftName === 'string' ? meta.shiftName : null;
@@ -828,36 +829,38 @@ export class IaExamProvisioningService {
         shiftName = shift?.name ?? null;
       }
       const pattern: FyugpRoutinePattern =
-        dto.routinePattern ?? inferFyugpRoutinePattern(shiftName);
+        mode === 'FYUGP_SECOND_IA'
+          ? 'DAY'
+          : (dto.routinePattern ?? inferFyugpRoutinePattern(shiftName));
 
+      const mappedPapers = papers.map(
+        (p: {
+          id: string;
+          paperCode: string;
+          semesterNo: number | null;
+          metadata?: { category?: string; programmeCode?: string };
+        }) => {
+          const meta =
+            p.metadata && typeof p.metadata === 'object'
+              ? (p.metadata as Record<string, unknown>)
+              : {};
+          return {
+            id: p.id,
+            paperCode: p.paperCode,
+            semesterNo: p.semesterNo,
+            category: meta.category != null ? String(meta.category) : null,
+            programmeCode:
+              meta.programmeCode != null ? String(meta.programmeCode) : null,
+          };
+        },
+      );
       const {
         assignments,
         warnings: assignWarnings,
         maxDayOffset,
-      } = assignFyugpFirstIaTimetable(
-        papers.map(
-          (p: {
-            id: string;
-            paperCode: string;
-            semesterNo: number | null;
-            metadata?: { category?: string; programmeCode?: string };
-          }) => {
-            const meta =
-              p.metadata && typeof p.metadata === 'object'
-                ? (p.metadata as Record<string, unknown>)
-                : {};
-            return {
-              id: p.id,
-              paperCode: p.paperCode,
-              semesterNo: p.semesterNo,
-              category: meta.category != null ? String(meta.category) : null,
-              programmeCode:
-                meta.programmeCode != null ? String(meta.programmeCode) : null,
-            };
-          },
-        ),
-        pattern,
-      );
+      } = mode === 'FYUGP_SECOND_IA'
+        ? assignFyugpSecondIaTimetable(mappedPapers, pattern)
+        : assignFyugpFirstIaTimetable(mappedPapers, pattern);
       warnings = assignWarnings;
 
       for (const a of assignments) {

@@ -313,7 +313,9 @@ export function IaTimetableWorkspace() {
   const [sessionId, setSessionId] = useState('');
   const [startDate, setStartDate] = useState('2026-08-24');
   const [durationMinutes, setDurationMinutes] = useState(120);
-  const [mode, setMode] = useState<'SIMPLE' | 'FYUGP_FIRST_IA'>('FYUGP_FIRST_IA');
+  const [mode, setMode] = useState<'SIMPLE' | 'FYUGP_FIRST_IA' | 'FYUGP_SECOND_IA'>(
+    'FYUGP_FIRST_IA',
+  );
   const [routinePattern, setRoutinePattern] = useState<'MORNING' | 'DAY' | 'AUTO'>('AUTO');
   const [message, setMessage] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -441,10 +443,15 @@ export function IaTimetableWorkspace() {
             <p className="text-xs text-muted-foreground">Mode</p>
             <select
               value={mode}
-              onChange={(e) => setMode(e.target.value as 'SIMPLE' | 'FYUGP_FIRST_IA')}
+              onChange={(e) =>
+                setMode(e.target.value as 'SIMPLE' | 'FYUGP_FIRST_IA' | 'FYUGP_SECOND_IA')
+              }
               className="h-9 min-w-[240px] rounded-xl border border-border bg-background px-3 text-sm"
             >
               <option value="FYUGP_FIRST_IA">FYUGP First Internal Assessment routine</option>
+              <option value="FYUGP_SECOND_IA">
+                FYUGP 2nd Internal Assessment (Day Shift, 12–16 Oct)
+              </option>
               <option value="SIMPLE">Simple auto-pack (legacy)</option>
             </select>
           </div>
@@ -493,7 +500,11 @@ export function IaTimetableWorkspace() {
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            {mode === 'FYUGP_FIRST_IA' ? 'Apply FYUGP First IA Timetable' : 'Generate Timetable'}
+            {mode === 'FYUGP_FIRST_IA'
+              ? 'Apply FYUGP First IA Timetable'
+              : mode === 'FYUGP_SECOND_IA'
+                ? 'Apply FYUGP 2nd IA Timetable'
+                : 'Generate Timetable'}
           </Button>
           <Button
             size="sm"
