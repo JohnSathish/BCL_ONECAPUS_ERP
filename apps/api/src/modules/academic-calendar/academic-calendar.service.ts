@@ -904,6 +904,13 @@ export class AcademicCalendarService {
         where: { id: existing.id },
         data: {
           ...data,
+          // A timetable sync must not wipe a time the office already corrected.
+          startTime:
+            input.startTime !== undefined
+              ? input.startTime
+              : existing.startTime,
+          endTime:
+            input.endTime !== undefined ? input.endTime : existing.endTime,
           deletedAt: null,
         },
       });

@@ -46,7 +46,7 @@ export function CalendarEventChip({ event, compact, onClick, onContextMenu }: Pr
         {event.icon ? <span className="mr-0.5">{event.icon}</span> : null}
         {event.title}
       </p>
-      {!compact && time ? (
+      {time && (!compact || !event.isAllDay) ? (
         <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] opacity-80">
           <Clock className="h-2.5 w-2.5 shrink-0" />
           {time}

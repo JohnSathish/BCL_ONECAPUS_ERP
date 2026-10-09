@@ -35,7 +35,7 @@ export function AcademicCalendarEventDetailsDialog({
 }: Props) {
   if (!event) return null;
   const color = colorForType(event.type, event.color);
-  const readOnly = Boolean(event.readOnly || event.sourceModule);
+  const sourceLocked = Boolean(event.sourceModule);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,7 +76,7 @@ export function AcademicCalendarEventDetailsDialog({
             {event.sourceModule ? (
               <>
                 <dt className="text-muted-foreground">Source</dt>
-                <dd>Managed by {event.sourceModule}</dd>
+                <dd>Linked to {event.sourceModule}. Edit can still change the time and wording.</dd>
               </>
             ) : null}
             <dt className="text-muted-foreground">Created</dt>
@@ -105,7 +105,7 @@ export function AcademicCalendarEventDetailsDialog({
             </div>
           ) : null}
 
-          {canEdit && !readOnly ? (
+          {canEdit ? (
             <div>
               <LabelFile onUpload={onUpload} />
             </div>
@@ -122,13 +122,15 @@ export function AcademicCalendarEventDetailsDialog({
           >
             Print
           </Button>
-          {canEdit && !readOnly ? (
+          {canEdit ? (
+            <Button type="button" onClick={onEdit}>
+              Edit
+            </Button>
+          ) : null}
+          {canEdit && !sourceLocked ? (
             <>
               <Button type="button" variant="secondary" onClick={onDuplicate}>
                 Duplicate
-              </Button>
-              <Button type="button" onClick={onEdit}>
-                Edit
               </Button>
               <Button type="button" variant="destructive" onClick={onDelete}>
                 Delete

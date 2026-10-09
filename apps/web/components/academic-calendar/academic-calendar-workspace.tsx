@@ -264,10 +264,9 @@ export function AcademicCalendarWorkspace() {
       }
       if ((e.key === 'e' || e.key === 'E') && selectedEvent && detailsOpen) {
         e.preventDefault();
-        if (!selectedEvent.readOnly) {
-          setEditing(selectedEvent);
-          setFormOpen(true);
-        }
+        setEditing(selectedEvent);
+        setDetailsOpen(false);
+        setFormOpen(true);
       }
       if (e.key === 'Delete' && selectedEvent && detailsOpen && !selectedEvent.readOnly) {
         e.preventDefault();
@@ -299,6 +298,15 @@ export function AcademicCalendarWorkspace() {
   const openEvent = (ev: AcademicCalendarEvent) => {
     setSelectedEvent(ev);
     setDetailsOpen(true);
+  };
+
+  const beginEdit = (ev: AcademicCalendarEvent) => {
+    if (!canEdit) return;
+    setSelectedEvent(ev);
+    setEditing(ev);
+    setDetailsOpen(false);
+    setCtxMenu(null);
+    setFormOpen(true);
   };
 
   const selectedYear = years.data?.find((y) => y.id === academicYearId);
@@ -792,6 +800,15 @@ export function AcademicCalendarWorkspace() {
           ) : null}
           {ctxMenu.event ? (
             <>
+              {canEdit ? (
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left font-semibold hover:bg-slate-50"
+                  onClick={() => beginEdit(ctxMenu.event!)}
+                >
+                  Edit
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="block w-full px-3 py-2 text-left hover:bg-slate-50"
@@ -839,8 +856,7 @@ export function AcademicCalendarWorkspace() {
         canEdit={canEdit}
         onEdit={() => {
           if (!selectedEvent) return;
-          setEditing(selectedEvent);
-          setFormOpen(true);
+          beginEdit(selectedEvent);
         }}
         onDelete={() => {
           if (!selectedEvent) return;

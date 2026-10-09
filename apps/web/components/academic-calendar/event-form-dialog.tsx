@@ -102,8 +102,8 @@ export function AcademicCalendarEventFormDialog({
         startDate: editing.startDate,
         endDate: editing.endDate,
         isAllDay: editing.isAllDay ?? true,
-        startTime: editing.startTime ?? '09:00',
-        endTime: editing.endTime ?? '10:00',
+        startTime: editing.startTime ?? defaultStartTime(editing.type, editing.title),
+        endTime: editing.endTime ?? defaultEndTime(editing.type, editing.title),
         color: editing.color ?? '',
         icon: editing.icon ?? '',
         visibilityStudents: flags.students ?? true,
@@ -323,6 +323,14 @@ export function AcademicCalendarEventFormDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function defaultStartTime(type: string, title = '') {
+  return /EXAM|INTERNAL|VIVA|TEST/i.test(`${type} ${title}`) ? '13:00' : '09:00';
+}
+
+function defaultEndTime(type: string, title = '') {
+  return /EXAM|INTERNAL|VIVA|TEST/i.test(`${type} ${title}`) ? '14:15' : '10:00';
 }
 
 export function formValuesToPayload(values: EventFormValues) {

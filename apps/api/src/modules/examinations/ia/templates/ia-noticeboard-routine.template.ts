@@ -245,7 +245,12 @@ export function renderIaNoticeboardRoutineHtml(
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.2px;
-      background: #fff;
+      background: #163a6b;
+      color: #fff;
+    }
+    table.routine thead tr:nth-child(2) th {
+      background: #e7f0fa;
+      color: #163a6b;
     }
     .sl, .date, .day, .paper, .when, .clock { font-weight: 700; }
     .date { font-size: 13px; }

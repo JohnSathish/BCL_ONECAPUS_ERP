@@ -88,7 +88,7 @@ export function canPublishCalendar(user: JwtUser): boolean {
 
 /**
  * Enforce scoped write access by role / event type / department / ownership.
- * Source-linked events are read-only in the calendar UI (caller should check separately).
+ * Source-linked events can be edited. Delete and duplicate stay blocked so a sync can recreate them.
  */
 export function assertCanWriteEvent(
   user: JwtUser,
@@ -113,9 +113,9 @@ export function assertCanWriteEvent(
     throw new ForbiddenException('Missing academic-calendar write permission');
   }
 
-  if (event.sourceModule) {
+  if (event.sourceModule && action !== 'update') {
     throw new ForbiddenException(
-      `This event is managed by ${event.sourceModule} and cannot be edited in the calendar`,
+      `This event is managed by ${event.sourceModule} and cannot be removed from the calendar`,
     );
   }
 
