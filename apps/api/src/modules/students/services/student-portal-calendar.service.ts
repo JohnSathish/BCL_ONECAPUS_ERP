@@ -99,24 +99,29 @@ export class StudentPortalCalendarService {
         }),
       ]);
 
-    const courseIds = [
-      ...new Set(lines.map((l) => l.offering?.courseId).filter(Boolean)),
-    ] as string[];
-    const offeringIds = [...new Set(lines.map((l) => l.offeringId))];
+    const offeringIds = [
+      ...new Set(lines.map((l) => l.offeringId).filter(Boolean)),
+    ];
+    const liveSessionIds = (
+      await (this.prisma as any).examSession.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          status: { in: ['ACTIVE', 'SCHEDULED', 'OPEN'] },
+        },
+        select: { id: true },
+      })
+    ).map((session: { id: string }) => session.id);
 
     const [exams, assignments] = await Promise.all([
-      courseIds.length || offeringIds.length
+      offeringIds.length && liveSessionIds.length
         ? (this.prisma as any).examPaperSchedule.findMany({
             where: {
               tenantId,
               deletedAt: null,
               examDate: { gte: from, lte: to },
-              OR: [
-                ...(courseIds.length ? [{ courseId: { in: courseIds } }] : []),
-                ...(offeringIds.length
-                  ? [{ offeringId: { in: offeringIds } }]
-                  : []),
-              ],
+              sessionId: { in: liveSessionIds },
+              offeringId: { in: offeringIds },
             },
             select: {
               id: true,
@@ -164,10 +169,15 @@ export class StudentPortalCalendarService {
       });
     }
 
+    const seenExam = new Set<string>();
     for (const exam of exams) {
+      const date = this.dateOnly(exam.examDate);
+      const key = `${date}|${String(exam.paperCode ?? '').toUpperCase()}`;
+      if (seenExam.has(key)) continue;
+      seenExam.add(key);
       events.push({
         id: `exam-${exam.id}`,
-        date: this.dateOnly(exam.examDate),
+        date,
         type: 'exam',
         title: exam.paperName ?? exam.paperCode,
         subtitle: exam.paperCode,
