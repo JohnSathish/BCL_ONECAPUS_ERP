@@ -37,6 +37,22 @@ function formatDayName(d: Date) {
   return d.toLocaleDateString('en-IN', { weekday: 'long' }).toUpperCase();
 }
 
+/** Clock stored on a TIME column. Keep the digits; do not shift them into IST. */
+export function formatExamWallClock(
+  value: Date | string | null | undefined,
+): string | null {
+  if (value == null || value === '') return null;
+  if (typeof value === 'string') {
+    const iso = value.match(/T(\d{2}):(\d{2})/);
+    if (iso) return `${iso[1]}:${iso[2]}`;
+    const plain = value.match(/^(\d{1,2}):(\d{2})/);
+    if (plain) return `${plain[1].padStart(2, '0')}:${plain[2]}`;
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
+
 function formatClock(value: Date | string | null | undefined): string | null {
   if (value == null) return null;
   if (typeof value === 'string') {

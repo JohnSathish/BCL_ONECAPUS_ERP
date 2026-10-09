@@ -15,6 +15,7 @@ import { IaAdmitPdfService } from './ia-admit-pdf.service';
 import { IaAuditService } from './ia-audit.service';
 import { IaDefaulterService } from './ia-defaulter.service';
 import { IaExamProvisioningService } from './ia-exam-provisioning.service';
+import { formatExamWallClock } from './ia-noticeboard-grid';
 import {
   iaPaperCategory,
   pickIaPaperForRegistration,
@@ -675,8 +676,8 @@ export class IaAdmitCardService {
         paperType: this.paperTypeFromMetadata(p.metadata),
         maxMarks: this.maxMarksFromMetadata(p.metadata),
         examDate: p.examDate.toISOString(),
-        startTime: String(p.startTime),
-        endTime: String(p.endTime),
+        startTime: formatExamWallClock(p.startTime),
+        endTime: formatExamWallClock(p.endTime),
       })),
       admitCardNumber,
       verifyCode,

@@ -155,15 +155,17 @@ export function formatExamDate(value?: string | null) {
 
 export function formatExamTime(value?: string | null) {
   if (!value) return '—';
-  const text = String(value);
-  if (/^\d{2}:\d{2}/.test(text)) return text.slice(0, 5);
-  const date = new Date(text);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const text = String(value).trim();
+  // TIME columns arrive as 13:00 or 1970-01-01T13:00:00.000Z. Those digits are
+  // the exam clock. Converting them to the phone timezone turns 1:00 PM into 6:30 PM.
+  const iso = text.match(/T(\d{2}):(\d{2})/);
+  const plain = iso ? null : text.match(/^(\d{1,2}):(\d{2})/);
+  const hour = iso ? Number(iso[1]) : plain ? Number(plain[1]) : null;
+  const minute = iso ? iso[2] : plain ? plain[2] : null;
+  if (hour == null || minute == null) return '—';
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minute} ${period}`;
 }
 
 export function formatExamTimeRange(start?: string | null, end?: string | null) {

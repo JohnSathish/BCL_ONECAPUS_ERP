@@ -4,6 +4,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { IA_EXAM_TYPES } from './ia.constants';
 import { IaAdmitCardService } from './ia-admit-card.service';
 import { pickIaPaperForRegistration } from './ia-category-policy';
+import { formatExamWallClock } from './ia-noticeboard-grid';
 import { IaDefaulterService } from './ia-defaulter.service';
 import { IaSettingsService } from './ia-settings.service';
 import { SHEET_STATUSES } from './ia.constants';
@@ -175,8 +176,8 @@ export class IaPortalService {
         paperCode: p.paperCode,
         paperName: p.paperName,
         examDate: p.examDate,
-        startTime: p.startTime,
-        endTime: p.endTime,
+        startTime: formatExamWallClock(p.startTime),
+        endTime: formatExamWallClock(p.endTime),
       }));
 
     return {
