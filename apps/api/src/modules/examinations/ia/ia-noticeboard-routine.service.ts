@@ -149,7 +149,8 @@ export class IaNoticeboardRoutineService {
 
     const isSecondIa =
       session.examType === 'IA_TEST_2' ||
-      meta.timetableMode === 'FYUGP_SECOND_IA';
+      meta.timetableMode === 'FYUGP_SECOND_IA' ||
+      /2nd internal|second internal/i.test(String(session.name ?? ''));
     const pattern = isSecondIa
       ? 'DAY'
       : options?.routinePattern
@@ -161,13 +162,18 @@ export class IaNoticeboardRoutineService {
               : null,
           );
 
-    // Always print the official FYUGP category plan (not raw paper schedule dates/times).
-    const startIso =
-      (options?.startDate && /^\d{4}-\d{2}-\d{2}$/.test(options.startDate)
+    // The timetable screen keeps 24 Aug as its default start date. That date
+    // belongs to the first internal. A 2nd internal notice must use this exam's
+    // own start (12 Oct 2026), not the date typed for another exam.
+    const requestedStart =
+      options?.startDate && /^\d{4}-\d{2}-\d{2}$/.test(options.startDate)
         ? options.startDate
-        : null) ??
-      this.toIsoDate(session.startDate as Date | string | null) ??
-      (isSecondIa ? '2026-10-12' : null);
+        : null;
+    const startIso = isSecondIa
+      ? (this.toIsoDate(session.startDate as Date | string | null) ??
+        '2026-10-12')
+      : (requestedStart ??
+        this.toIsoDate(session.startDate as Date | string | null));
     if (!startIso) {
       throw new BadRequestException(
         'Set Start date on IA Timetable (e.g. 2026-08-24) before printing the noticeboard routine.',

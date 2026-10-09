@@ -100,6 +100,7 @@ export class IaPortalService {
           tenantId: user.tid,
           deletedAt: null,
           examType: { in: [...IA_EXAM_TYPES] },
+          status: { in: ['ACTIVE', 'SCHEDULED', 'OPEN'] },
         },
         select: { id: true },
       })

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -306,10 +306,14 @@ export function IaSessionsWorkspace() {
   );
 }
 
+function isSecondIaExam(exam?: { name?: string; examType?: string } | null) {
+  if (!exam) return false;
+  return exam.examType === 'IA_TEST_2' || /2nd internal|second internal/i.test(exam.name ?? '');
+}
+
 export function IaTimetableWorkspace() {
   const qc = useQueryClient();
   const exams = useQuery({ queryKey: ['ia', 'exams'], queryFn: fetchIaExams });
-  const papers = useQuery({ queryKey: ['ia', 'papers'], queryFn: () => fetchIaPapers() });
   const [sessionId, setSessionId] = useState('');
   const [startDate, setStartDate] = useState('2026-08-24');
   const [durationMinutes, setDurationMinutes] = useState(120);
@@ -322,7 +326,24 @@ export function IaTimetableWorkspace() {
 
   const activeSession = sessionId || exams.data?.[0]?.id || '';
   const selectedExam = (exams.data ?? []).find((s) => s.id === activeSession);
-  const sessionPapers = (papers.data ?? []).filter((p) => p.sessionId === activeSession);
+  const secondIa = isSecondIaExam(selectedExam);
+  const papers = useQuery({
+    queryKey: ['ia', 'papers', activeSession],
+    queryFn: () => fetchIaPapers(activeSession ? { sessionId: activeSession } : undefined),
+    enabled: Boolean(activeSession),
+  });
+  const sessionPapers = papers.data ?? [];
+
+  useEffect(() => {
+    if (!selectedExam) return;
+    if (isSecondIaExam(selectedExam)) {
+      setMode('FYUGP_SECOND_IA');
+      setStartDate(selectedExam.startDate?.slice(0, 10) || '2026-10-12');
+      return;
+    }
+    setMode((current) => (current === 'FYUGP_SECOND_IA' ? 'FYUGP_FIRST_IA' : current));
+    if (selectedExam.startDate) setStartDate(selectedExam.startDate.slice(0, 10));
+  }, [selectedExam?.id, selectedExam?.examType, selectedExam?.name, selectedExam?.startDate]);
 
   const inferredPattern = useMemo(() => {
     const name = (
@@ -365,15 +386,24 @@ export function IaTimetableWorkspace() {
 
   const downloadPdf = useMutation({
     mutationFn: () =>
-      downloadIaNoticeboardRoutinePdf(activeSession, {
-        routinePattern: resolvedPattern,
-        startDate,
-      }),
-    onSuccess: (blob) => {
+      downloadIaNoticeboardRoutinePdf(
+        activeSession,
+        secondIa
+          ? undefined
+          : {
+              routinePattern: resolvedPattern,
+              startDate,
+            },
+      ),
+    onSuccess: ({ blob, filename }) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `FYUGP-First-IA-${resolvedPattern}-Noticeboard.pdf`;
+      a.download =
+        filename ||
+        (secondIa
+          ? 'FYUGP-2nd-IA-Noticeboard.pdf'
+          : `FYUGP-First-IA-${resolvedPattern}-Noticeboard.pdf`);
       a.click();
       URL.revokeObjectURL(url);
       setMessage('Noticeboard routine PDF downloaded.');
@@ -389,10 +419,15 @@ export function IaTimetableWorkspace() {
 
   const printHtml = useMutation({
     mutationFn: () =>
-      fetchIaNoticeboardRoutineHtml(activeSession, {
-        routinePattern: resolvedPattern,
-        startDate,
-      }),
+      fetchIaNoticeboardRoutineHtml(
+        activeSession,
+        secondIa
+          ? undefined
+          : {
+              routinePattern: resolvedPattern,
+              startDate,
+            },
+      ),
     onSuccess: (html) => {
       const w = window.open('', '_blank');
       if (!w) {
@@ -418,8 +453,8 @@ export function IaTimetableWorkspace() {
     <div className="space-y-4">
       <Card title="Auto Scheduling Wizard">
         <p className="mb-3 text-xs text-muted-foreground">
-          Prefer <strong>FYUGP First Internal Assessment routine</strong> for Morning/Day printed IA
-          grids (MAJOR → VAC by day). Use Simple auto-pack only for ad-hoc packing by paper code.
+          The noticeboard PDF follows the exam you select. A 2nd internal exam prints the 12–16
+          October Day Shift grid. The first internal exam keeps the August routine.
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1">
@@ -477,7 +512,7 @@ export function IaTimetableWorkspace() {
                 <option value="DAY">Day (9:45–10:40 + Fri VAC afternoon)</option>
               </select>
             </div>
-          ) : (
+          ) : mode === 'SIMPLE' ? (
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Duration (minutes)</p>
               <input
@@ -489,7 +524,7 @@ export function IaTimetableWorkspace() {
                 className="h-9 w-24 rounded-xl border border-border bg-background px-3 text-sm"
               />
             </div>
-          )}
+          ) : null}
           <Button
             size="sm"
             onClick={() => generate.mutate()}
@@ -538,6 +573,11 @@ export function IaTimetableWorkspace() {
             Day 0 from start date = Monday MAJOR / MAJOR 1. Morning VAC falls on Saturday; Day Shift
             Sem 1 VAC is Friday afternoon (1:45–2:10). After applying, download the noticeboard PDF
             for the notice board (Morning and Day exams separately).
+          </p>
+        ) : mode === 'FYUGP_SECOND_IA' ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Day Shift, 12–16 October. Afternoon papers are 1:00–2:15. Tuesday Semester 1 AEC is
+            9:45–11:00. Semester 1 minor is Thursday; Semester 1 major is Friday.
           </p>
         ) : null}
         {message ? <p className="mt-3 text-xs text-muted-foreground">{message}</p> : null}

@@ -3,7 +3,7 @@ import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { AcademicCalendarService } from '../academic-calendar/academic-calendar.service';
 import { toDateOnlyIso } from '../academic-calendar/academic-calendar.types';
-import { isIaExamType } from './ia/ia.constants';
+import { IA_EXAM_TYPES, isIaExamType } from './ia/ia.constants';
 
 const SOURCE_MODULE = 'examinations';
 
@@ -30,12 +30,47 @@ export class ExamCalendarSyncService {
    * Best-effort sync of an ExamSession onto the Academic Calendar.
    * Never throws to the caller — exam writes must not fail on calendar errors.
    */
+  /**
+   * An internal assessment whose last day is already past is no longer the
+   * live exam. Only the exam that is still ahead stays on the calendar.
+   */
+  async expireFinishedIaSessions(
+    tenantId: string,
+    updatedById?: string,
+  ): Promise<number> {
+    const startOfToday = new Date();
+    startOfToday.setUTCHours(0, 0, 0, 0);
+    const finished = await (this.prisma as any).examSession.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        examType: { in: [...IA_EXAM_TYPES] },
+        status: { in: ['ACTIVE', 'SCHEDULED', 'OPEN', 'DRAFT'] },
+        endDate: { lt: startOfToday },
+      },
+      select: { id: true },
+    });
+    if (!finished.length) return 0;
+    await (this.prisma as any).examSession.updateMany({
+      where: { id: { in: finished.map((row: { id: string }) => row.id) } },
+      data: { status: 'EXPIRED' },
+    });
+    for (const row of finished) {
+      await this.removeSession(
+        { tid: tenantId, sub: updatedById ?? '' } as JwtUser,
+        row.id,
+      );
+    }
+    return finished.length;
+  }
+
   async syncSession(user: JwtUser, sessionId: string): Promise<void> {
     try {
+      await this.expireFinishedIaSessions(user.tid, user.sub);
       const session = await (this.prisma as any).examSession.findFirst({
         where: { id: sessionId, tenantId: user.tid },
       });
-      if (!session || session.deletedAt) {
+      if (!session || session.deletedAt || session.status === 'EXPIRED') {
         await this.calendars.removeFromSource(
           user.tid,
           SOURCE_MODULE,
@@ -61,19 +96,21 @@ export class ExamCalendarSyncService {
         orderBy: { examDate: 'asc' },
       });
 
-      let start: Date | null = session.startDate ?? null;
-      let end: Date | null = session.endDate ?? null;
+      // Use the paper dates only. Stretching back to an older session start
+      // painted every day from that date (for example 1 October) as an exam.
+      let start: Date | null = null;
+      let end: Date | null = null;
       if (papers.length) {
         const dates = papers
           .map((p: { examDate: Date }) => p.examDate)
           .filter(Boolean) as Date[];
         if (dates.length) {
-          const min = dates.reduce((a, b) => (a < b ? a : b));
-          const max = dates.reduce((a, b) => (a > b ? a : b));
-          start = start && start < min ? start : min;
-          end = end && end > max ? end : max;
+          start = dates.reduce((a, b) => (a < b ? a : b));
+          end = dates.reduce((a, b) => (a > b ? a : b));
         }
       }
+      if (!start) start = session.startDate ?? null;
+      if (!end) end = session.endDate ?? null;
 
       if (!start && !end) {
         this.logger.debug(

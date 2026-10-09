@@ -1,5 +1,6 @@
 /**
- * Colorful DBC-blue noticeboard routine HTML (FYUGP First IA Morning / Day).
+ * College noticeboard routine. Same sheet as the printed FYUGP notice,
+ * with blue rules so the 2nd internal is distinct on the notice board.
  */
 
 export type NoticeboardInstitution = {
@@ -65,6 +66,21 @@ function isEmptyCell(value: string) {
   return !v || v === '—' || v === '--------';
 }
 
+function titleLines(title: string): string[] {
+  const match = title.match(
+    /^(.*)\s+((?:FIRST|\d+(?:ST|ND|RD|TH))\s+INTERNAL ASSESSMENT\s+\d{4})$/i,
+  );
+  if (!match) return [title];
+  return [match[1].trim(), match[2].trim()];
+}
+
+function timingHtml(label: string) {
+  const match = label.match(/^(MORNING|AFTERNOON)\s+(.+)$/i);
+  if (!match) return esc(label);
+  const clock = match[2].replace(/\s*-\s*/, ' - ');
+  return `<div class="when">${esc(match[1].toUpperCase())}</div><div class="clock">${esc(clock)}</div>`;
+}
+
 export function renderIaNoticeboardRoutineHtml(
   input: IaNoticeboardRoutineInput,
 ): string {
@@ -83,8 +99,9 @@ export function renderIaNoticeboardRoutineHtml(
     ? `<img class="logo" src="${esc(input.institution.logoUrl)}" alt="Logo" />`
     : `<div class="logo-fallback" aria-hidden="true">DBC</div>`;
 
-  const isMorning = /morning/i.test(input.shiftLabel);
-  const shiftTone = isMorning ? 'shift-morning' : 'shift-day';
+  const titles = titleLines(input.examTitle)
+    .map((line) => `<div>${esc(line)}</div>`)
+    .join('');
 
   const rowsHtml = input.rows
     .map((r, idx) => {
@@ -92,7 +109,7 @@ export function renderIaNoticeboardRoutineHtml(
       const semCell = (raw: string) =>
         isEmptyCell(raw)
           ? `<td class="c empty">--------</td>`
-          : `<td class="c paper"><span class="chip">${cell(raw)}</span></td>`;
+          : `<td class="c paper">${cell(raw)}</td>`;
       return `
     <tr class="${stripe}">
       <td class="c sl">${r.slNo}</td>
@@ -100,7 +117,7 @@ export function renderIaNoticeboardRoutineHtml(
         <div class="date">${esc(r.dateLabel)}</div>
         <div class="day">${esc(r.dayLabel)}</div>
       </td>
-      <td class="c timing"><span class="time-pill">${esc(r.timingLabel)}</span></td>
+      <td class="c timing">${timingHtml(r.timingLabel)}</td>
       ${semCell(r.sem1)}
       ${semCell(r.sem3)}
       ${semCell(r.sem5)}
@@ -130,316 +147,214 @@ export function renderIaNoticeboardRoutineHtml(
   <meta charset="utf-8" />
   <title>${esc(input.examTitle)}</title>
   <style>
-    @page { size: A4; margin: 10mm; }
-    :root {
-      --navy: #0b3d6e;
-      --navy-deep: #062846;
-      --gold: #c9a227;
-      --gold-soft: #f7efd2;
-      --sky: #e8f1fa;
-      --ink: #142033;
-      --muted: #4a5a70;
-      --line: #9bb4ce;
-      --white: #ffffff;
-      --stripe: #f4f8fc;
-    }
+    @page { size: A4; margin: 8mm; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      color: var(--ink);
-      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: #1a1a1a;
+      font-family: "Times New Roman", Times, serif;
       font-size: 12px;
-      line-height: 1.35;
-      background: var(--white);
+      line-height: 1.3;
+      background: #fff;
     }
-    .sheet {
-      width: 100%;
-      border: 2px solid var(--navy);
-      border-radius: 6px;
-      overflow: hidden;
-    }
-    .topbar {
-      height: 6px;
-      background: linear-gradient(90deg, var(--navy-deep), var(--navy) 45%, var(--gold));
-    }
+    .sheet { width: 100%; }
     .header {
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 12px 14px 10px;
-      background:
-        linear-gradient(180deg, #ffffff 0%, var(--sky) 100%);
-      border-bottom: 3px solid var(--gold);
+      gap: 12px;
+      padding: 0 4px 8px;
     }
     .logo, .logo-fallback {
       width: 78px;
       height: 78px;
       object-fit: contain;
       flex: 0 0 auto;
-      border-radius: 50%;
-      background: var(--white);
-      border: 2px solid var(--gold);
-      box-shadow: 0 1px 3px rgba(11, 61, 110, 0.18);
     }
     .logo-fallback {
       display: flex;
       align-items: center;
       justify-content: center;
+      border: 2px solid #1d4f91;
+      border-radius: 50%;
       font-weight: 800;
-      color: var(--navy);
-      letter-spacing: 0.5px;
-      font-size: 16px;
+      color: #1d4f91;
+      font-family: "Segoe UI", Arial, sans-serif;
     }
     .head-text { flex: 1; text-align: center; }
     .college {
-      font-size: 20px;
-      font-weight: 800;
-      color: var(--navy-deep);
-      letter-spacing: 0.3px;
-      text-transform: none;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
     }
-    .addr {
-      margin-top: 3px;
-      font-size: 11px;
-      color: var(--muted);
-      font-weight: 600;
+    .addr, .contacts, .affil {
+      margin-top: 2px;
+      font-size: 12px;
     }
-    .contacts {
-      margin-top: 6px;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 6px 10px;
+    .affil { font-style: italic; }
+    .rules { margin: 0 0 10px; }
+    .rules .thick, .rules .thin {
+      border: 0;
+      border-top: 3px solid #1d4f91;
+      margin: 0;
     }
-    .contact-pill {
-      display: inline-block;
-      padding: 3px 9px;
-      border-radius: 999px;
-      background: var(--white);
-      border: 1px solid var(--line);
-      color: var(--navy);
-      font-size: 10.5px;
-      font-weight: 650;
-    }
-    .affil {
-      margin-top: 7px;
-      font-size: 11px;
-      font-style: italic;
-      color: var(--navy);
-      font-weight: 600;
-    }
-    .title-block {
-      padding: 12px 14px 8px;
-      text-align: center;
-      background: var(--white);
-    }
+    .rules .thin { border-top-width: 1px; margin-top: 3px; }
     .title {
-      display: inline-block;
-      font-size: 13.5px;
+      text-align: center;
+      color: #1d4f91;
+      font-size: 18px;
       font-weight: 800;
-      text-transform: uppercase;
       letter-spacing: 0.4px;
-      color: var(--navy-deep);
-      border-bottom: 2px solid var(--gold);
-      padding-bottom: 3px;
+      text-transform: uppercase;
+      line-height: 1.25;
+    }
+    .shift-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 8px 28px 12px;
+    }
+    .shift-row .line {
+      flex: 1;
+      border-top: 2px solid #1d4f91;
     }
     .shift {
-      margin-top: 8px;
-      display: inline-block;
-      padding: 4px 16px;
+      border: 2px solid #1d4f91;
+      color: #1d4f91;
       border-radius: 999px;
-      font-size: 12px;
+      padding: 3px 16px 4px;
       font-weight: 800;
       letter-spacing: 0.8px;
+      font-size: 13px;
       text-transform: uppercase;
-      color: var(--white);
+      background: #fff;
     }
-    .shift-morning { background: linear-gradient(90deg, #0b3d6e, #1a6bb5); }
-    .shift-day { background: linear-gradient(90deg, #8a5a00, #c9a227); color: #1a1400; }
-    .table-wrap { padding: 0 10px 10px; }
     table.routine {
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      border: 1.5px solid var(--navy);
+      color: #1d4f91;
     }
     table.routine th, table.routine td {
-      border: 1px solid var(--line);
-      padding: 7px 4px;
+      border: 1.5px solid #1d4f91;
+      padding: 6px 4px;
       vertical-align: middle;
+      text-align: center;
     }
     table.routine thead th {
-      background: linear-gradient(180deg, #134a7c, var(--navy));
-      color: var(--white);
-      font-size: 10.5px;
-      font-weight: 700;
+      font-size: 11px;
+      font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.2px;
+      background: #fff;
     }
-    table.routine thead th.group-head {
-      background: linear-gradient(180deg, #c9a227, #a8871a);
-      color: #1a1400;
-      font-size: 11px;
-    }
-    .c { text-align: center; }
-    .sl {
-      font-weight: 800;
-      color: var(--navy);
-      background: var(--gold-soft);
-    }
-    .row-even { background: var(--white); }
-    .row-odd { background: var(--stripe); }
-    .date { font-weight: 800; color: var(--navy-deep); font-size: 12px; }
-    .day {
-      margin-top: 2px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.4px;
-      color: #b45309;
-    }
-    .time-pill {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 6px;
-      background: #def0ff;
-      border: 1px solid #8cbcde;
-      color: var(--navy-deep);
-      font-size: 10.5px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .chip {
-      display: inline-block;
-      min-width: 62px;
-      padding: 3px 8px;
-      border-radius: 6px;
-      background: linear-gradient(180deg, #ffffff, #e7f0fa);
-      border: 1px solid #9dbad4;
-      color: var(--navy-deep);
-      font-weight: 800;
-      font-size: 11px;
-      letter-spacing: 0.3px;
-    }
-    .empty {
-      color: #94a3b8;
-      font-weight: 600;
-      letter-spacing: 1px;
-    }
+    .sl, .date, .day, .paper, .when, .clock { font-weight: 700; }
+    .date { font-size: 13px; }
+    .day { margin-top: 2px; font-size: 12px; letter-spacing: 0.3px; }
+    .when { font-size: 12px; letter-spacing: 0.4px; }
+    .clock { margin-top: 2px; font-size: 12px; }
+    .paper { font-size: 13px; font-weight: 800; }
+    .empty { letter-spacing: 1px; font-weight: 700; }
     .instr-wrap {
-      margin: 4px 12px 8px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      background: linear-gradient(180deg, #fffdf5, var(--gold-soft));
-      border: 1px solid #e2c766;
+      margin-top: 14px;
+      border: 2px solid #1d4f91;
+      border-radius: 12px;
+      overflow: hidden;
     }
-    .instr-wrap h3 {
-      margin: 0 0 8px;
-      font-size: 12.5px;
-      color: var(--navy-deep);
+    .instr-head {
+      background: #1d4f91;
+      color: #fff;
+      text-align: center;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      padding: 6px 8px;
       text-transform: uppercase;
-      letter-spacing: 0.4px;
+      font-size: 13px;
     }
     ol.instr {
       margin: 0;
-      padding: 0;
+      padding: 8px 12px 10px;
       list-style: none;
     }
     ol.instr li {
       display: flex;
       align-items: flex-start;
       gap: 8px;
-      margin: 5px 0;
+      margin: 6px 0;
     }
     .badge {
       flex: 0 0 auto;
       width: 18px;
       height: 18px;
       border-radius: 50%;
-      background: var(--navy);
-      color: var(--white);
-      font-size: 10px;
+      background: #1d4f91;
+      color: #fff;
+      font-size: 11px;
       font-weight: 800;
       display: flex;
       align-items: center;
       justify-content: center;
       margin-top: 1px;
+      font-family: "Segoe UI", Arial, sans-serif;
     }
-    .txt { font-size: 12px; color: var(--ink); font-weight: 550; }
+    .txt { font-size: 13px; }
     .signs {
       display: flex;
       justify-content: space-between;
       gap: 24px;
-      padding: 28px 18px 16px;
+      padding: 36px 8px 4px;
     }
-    .sign { width: 42%; }
-    .sign.right { text-align: right; }
+    .sign { width: 42%; text-align: center; }
     .sign .space {
-      height: 42px;
-      border-bottom: 1.5px dashed var(--line);
+      height: 28px;
+      border-bottom: 1.5px dotted #1d4f91;
       margin-bottom: 6px;
     }
-    .sign .name {
-      font-weight: 800;
-      color: var(--navy-deep);
-      font-size: 12.5px;
-    }
-    .sign .role {
-      font-size: 11px;
-      color: var(--muted);
-      font-weight: 650;
-    }
-    .footer-bar {
-      height: 5px;
-      background: linear-gradient(90deg, var(--gold), var(--navy));
-    }
+    .sign .name { font-weight: 700; font-size: 13px; }
+    .sign .role { font-size: 12px; }
   </style>
 </head>
 <body>
   <div class="sheet">
-    <div class="topbar"></div>
     <header class="header">
       ${logo}
       <div class="head-text">
         <div class="college">${college}</div>
         <div class="addr">${address}</div>
-        <div class="contacts">
-          <span class="contact-pill">Ph. ${esc(phone)}</span>
-          <span class="contact-pill">Mob. ${esc(mobile)}</span>
-          <span class="contact-pill">Email: ${esc(email)}</span>
-          <span class="contact-pill">Website: ${esc(website)}</span>
-        </div>
+        <div class="contacts">Ph. ${esc(phone)} &nbsp;|&nbsp; Mob. ${esc(mobile)}</div>
+        <div class="contacts">Email: ${esc(email)} &nbsp;|&nbsp; Website: ${esc(website)}</div>
         <div class="affil">${esc(accreditation)}</div>
       </div>
     </header>
+    <div class="rules"><hr class="thick" /><hr class="thin" /></div>
 
-    <div class="title-block">
-      <div class="title">${esc(input.examTitle)}</div>
-      <div><span class="shift ${shiftTone}">${esc(input.shiftLabel)}</span></div>
+    <div class="title">${titles}</div>
+    <div class="shift-row">
+      <span class="line"></span>
+      <span class="shift">${esc(input.shiftLabel)}</span>
+      <span class="line"></span>
     </div>
 
-    <div class="table-wrap">
-      <table class="routine">
-        <thead>
-          <tr>
-            <th rowspan="2" style="width:7%">SL NO.</th>
-            <th rowspan="2" style="width:17%">DATE &amp; DAY</th>
-            <th rowspan="2" style="width:18%">TIMING</th>
-            <th colspan="3" class="group-head">Examinations for the courses to be held</th>
-          </tr>
-          <tr>
-            <th style="width:19.3%">1st Semester</th>
-            <th style="width:19.3%">3rd Semester</th>
-            <th style="width:19.3%">5th Semester</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rowsHtml}
-        </tbody>
-      </table>
-    </div>
+    <table class="routine">
+      <thead>
+        <tr>
+          <th rowspan="2" style="width:8%">Sl. No.</th>
+          <th rowspan="2" style="width:18%">Date &amp; Day of Examinations</th>
+          <th rowspan="2" style="width:16%">Timing</th>
+          <th colspan="3">Examinations for the courses to be held</th>
+        </tr>
+        <tr>
+          <th style="width:19.3%">1st Semester</th>
+          <th style="width:19.3%">3rd Semester</th>
+          <th style="width:19.3%">5th Semester</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
 
     <div class="instr-wrap">
-      <h3>Instructions for the test</h3>
+      <div class="instr-head">Instructions for the test</div>
       <ol class="instr">
         ${instructionsHtml}
       </ol>
@@ -451,13 +366,12 @@ export function renderIaNoticeboardRoutineHtml(
         <div class="name">${esc(left.title)}</div>
         ${left.subtitle ? `<div class="role">${esc(left.subtitle)}</div>` : ''}
       </div>
-      <div class="sign right">
+      <div class="sign">
         <div class="space"></div>
         <div class="name">${esc(right.title)}</div>
         ${right.subtitle ? `<div class="role">${esc(right.subtitle)}</div>` : ''}
       </div>
     </div>
-    <div class="footer-bar"></div>
   </div>
 </body>
 </html>`;

@@ -282,14 +282,19 @@ export async function downloadIaNoticeboardRoutinePdf(
   sessionId: string,
   options?: { routinePattern?: 'MORNING' | 'DAY'; startDate?: string },
 ) {
-  const { data } = await api.get(`/v1/examinations/ia/exams/${sessionId}/noticeboard-routine.pdf`, {
+  const response = await api.get(`/v1/examinations/ia/exams/${sessionId}/noticeboard-routine.pdf`, {
     params: {
       ...(options?.routinePattern ? { routinePattern: options.routinePattern } : {}),
       ...(options?.startDate ? { startDate: options.startDate } : {}),
     },
     responseType: 'blob',
   });
-  return data as Blob;
+  const header = String(response.headers?.['content-disposition'] ?? '');
+  const named = header.match(/filename="([^"]+)"/);
+  return {
+    blob: response.data as Blob,
+    filename: named?.[1] ?? 'IA-Noticeboard.pdf',
+  };
 }
 
 export async function fetchIaNoticeboardRoutineHtml(

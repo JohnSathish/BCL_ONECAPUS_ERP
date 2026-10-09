@@ -808,10 +808,19 @@ export class IaExamProvisioningService {
       throw new BadRequestException('No subjects scheduled for this exam');
     }
 
-    const mode = dto.mode ?? 'SIMPLE';
+    const sessionIsSecond =
+      session.examType === 'IA_TEST_2' ||
+      /2nd internal|second internal/i.test(String(session.name ?? ''));
+    // The timetable screen defaults to the August first-internal routine.
+    // Applying that onto the October exam moves every paper to the wrong week.
+    const mode = sessionIsSecond ? 'FYUGP_SECOND_IA' : (dto.mode ?? 'SIMPLE');
+    const startDate =
+      sessionIsSecond && (!dto.startDate || dto.startDate < '2026-10-01')
+        ? '2026-10-12'
+        : dto.startDate;
     let updated = 0;
     let warnings: string[] = [];
-    let endDate = new Date(dto.startDate);
+    let endDate = new Date(startDate);
 
     if (mode === 'FYUGP_FIRST_IA' || mode === 'FYUGP_SECOND_IA') {
       const meta = (session.metadata ?? {}) as Record<string, unknown>;
@@ -864,7 +873,7 @@ export class IaExamProvisioningService {
       warnings = assignWarnings;
 
       for (const a of assignments) {
-        const [y, m, d] = dto.startDate.split('-').map(Number);
+        const [y, m, d] = startDate.split('-').map(Number);
         const examDate = new Date(y, m - 1, d + a.dayOffset);
         await (this.prisma as any).examPaperSchedule.update({
           where: { id: a.paperId },
@@ -877,7 +886,7 @@ export class IaExamProvisioningService {
         updated += 1;
       }
 
-      const [ey, em, ed] = dto.startDate.split('-').map(Number);
+      const [ey, em, ed] = startDate.split('-').map(Number);
       endDate = new Date(ey, em - 1, ed + maxDayOffset);
 
       await (this.prisma as any).examSession.update({
@@ -900,7 +909,7 @@ export class IaExamProvisioningService {
       const maxPerDay = 3;
 
       for (const paper of papers) {
-        const examDate = new Date(dto.startDate);
+        const examDate = new Date(startDate);
         examDate.setDate(examDate.getDate() + dayOffset);
         const slotStart = this.addMinutes(
           startTime,
@@ -923,7 +932,7 @@ export class IaExamProvisioningService {
         }
         updated += 1;
       }
-      endDate = new Date(dto.startDate);
+      endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + dayOffset);
     }
 
@@ -936,7 +945,7 @@ export class IaExamProvisioningService {
       {
         papers: papers.length,
         updated,
-        startDate: dto.startDate,
+        startDate,
         mode,
         warnings,
       },
