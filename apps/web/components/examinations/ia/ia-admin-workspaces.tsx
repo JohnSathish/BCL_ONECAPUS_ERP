@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -313,8 +314,13 @@ function isSecondIaExam(exam?: { name?: string; examType?: string } | null) {
 
 export function IaTimetableWorkspace() {
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
   const exams = useQuery({ queryKey: ['ia', 'exams'], queryFn: fetchIaExams });
   const [sessionId, setSessionId] = useState('');
+  useEffect(() => {
+    const exam = searchParams.get('exam');
+    if (exam) setSessionId(exam);
+  }, [searchParams]);
   const [startDate, setStartDate] = useState('2026-08-24');
   const [durationMinutes, setDurationMinutes] = useState(120);
   const [mode, setMode] = useState<'SIMPLE' | 'FYUGP_FIRST_IA' | 'FYUGP_SECOND_IA'>(

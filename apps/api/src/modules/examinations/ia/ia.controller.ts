@@ -31,6 +31,7 @@ import {
   CreateIaExamDto,
   GenerateIaTimetableDto,
   PreviewIaExamDto,
+  UpdateIaExamDto,
 } from './dto/create-ia-exam.dto';
 import { IaAdmitCardService } from './ia-admit-card.service';
 import { IaConsolidationService } from './ia-consolidation.service';
@@ -155,6 +156,16 @@ export class IaController {
   @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:create')
   createExam(@CurrentUser() user: JwtUser, @Body() dto: CreateIaExamDto) {
     return this.exams.createExam(user, dto);
+  }
+
+  @Patch('exams/:sessionId')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:create')
+  updateExam(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Body() dto: UpdateIaExamDto,
+  ) {
+    return this.exams.updateExam(user, sessionId, dto);
   }
 
   @Post('exams/generate-timetable')

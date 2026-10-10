@@ -23,7 +23,13 @@ const NAV_ITEMS = [
   { href: `${BASE}/settings`, label: 'Settings' },
 ];
 
-export function IaExaminationShell({ children }: { children: React.ReactNode }) {
+export function IaExaminationShell({
+  children,
+  banner = true,
+}: {
+  children: React.ReactNode;
+  banner?: boolean;
+}) {
   const pathname = usePathname();
   const settings = useQuery({ queryKey: ['ia', 'settings'], queryFn: fetchIaSettings });
 
@@ -35,23 +41,25 @@ export function IaExaminationShell({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="space-y-5">
-      <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-background p-5 shadow-xl shadow-primary/5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-              NEHU Internal Assessment
-            </p>
-            <h2 className="mt-1 flex items-center gap-2 text-xl font-bold sm:text-2xl">
-              <ClipboardList className="h-6 w-6 text-primary" />
-              Examination Module
-            </h2>
-            <p className="max-w-3xl text-sm text-muted-foreground">
-              Internal Assessment &amp; Continuous Evaluation for Don Bosco College Tura.
-              End-semester university exams remain with NEHU.
-            </p>
+      {banner ? (
+        <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-background p-5 shadow-xl shadow-primary/5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                NEHU Internal Assessment
+              </p>
+              <h2 className="mt-1 flex items-center gap-2 text-xl font-bold sm:text-2xl">
+                <ClipboardList className="h-6 w-6 text-primary" />
+                Examination Module
+              </h2>
+              <p className="max-w-3xl text-sm text-muted-foreground">
+                Internal Assessment &amp; Continuous Evaluation for Don Bosco College Tura.
+                End-semester university exams remain with NEHU.
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <div className="rounded-2xl border border-border/60 bg-card p-2">
         <nav className="flex gap-1 overflow-x-auto">

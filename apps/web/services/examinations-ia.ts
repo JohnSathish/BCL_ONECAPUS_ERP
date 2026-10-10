@@ -32,9 +32,12 @@ export type IaSession = {
   id: string;
   name: string;
   examType: string;
+  academicYearId?: string | null;
+  shiftId?: string | null;
   semesterNo?: number | null;
   startDate?: string | null;
   endDate?: string | null;
+  instructions?: string | null;
   status: string;
 };
 
@@ -155,7 +158,20 @@ export type IaExamSummary = IaSession & {
     shiftName?: string | null;
     departmentCount: number;
     maxMarks?: number;
+    academicYearName?: string | null;
   };
+};
+
+export type UpdateIaExamPayload = {
+  name?: string;
+  examType?: string;
+  academicYearId?: string;
+  shiftId?: string | null;
+  maxMarks?: number;
+  remarks?: string;
+  status?: string;
+  startDate?: string | null;
+  endDate?: string | null;
 };
 
 export type CreateIaExamPayload = {
@@ -242,6 +258,11 @@ export async function previewIaExam(payload: CreateIaExamPayload) {
 
 export async function fetchIaExams() {
   const { data } = await api.get<IaExamSummary[]>('/v1/examinations/ia/exams');
+  return data;
+}
+
+export async function updateIaExam(sessionId: string, payload: UpdateIaExamPayload) {
+  const { data } = await api.patch(`/v1/examinations/ia/exams/${sessionId}`, payload);
   return data;
 }
 

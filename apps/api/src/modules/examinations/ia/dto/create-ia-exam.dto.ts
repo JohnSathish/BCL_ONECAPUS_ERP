@@ -11,6 +11,7 @@ import {
   IsUUID,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IA_EXAM_TYPES } from '../ia.constants';
@@ -97,6 +98,63 @@ export class CreateIaExamDto {
 }
 
 export class PreviewIaExamDto extends CreateIaExamDto {}
+
+export const IA_EXAM_STATUSES = [
+  'DRAFT',
+  'SCHEDULED',
+  'ACTIVE',
+  'IN_PROGRESS',
+  'OPEN',
+  'COMPLETED',
+  'EXPIRED',
+  'CANCELLED',
+] as const;
+
+/** Safe edits for an exam that already has subjects and students. */
+export class UpdateIaExamDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsIn([...IA_EXAM_TYPES])
+  examType?: string;
+
+  @IsOptional()
+  @IsUUID()
+  academicYearId?: string;
+
+  /** Null or empty clears the shift (all shifts). */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== '')
+  @IsUUID()
+  shiftId?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  maxMarks?: number;
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+
+  @IsOptional()
+  @IsIn([...IA_EXAM_STATUSES])
+  status?: string;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== '')
+  @IsDateString()
+  startDate?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== '')
+  @IsDateString()
+  endDate?: string | null;
+}
 
 export class GenerateIaTimetableDto {
   @IsUUID()

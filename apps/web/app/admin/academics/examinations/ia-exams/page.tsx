@@ -10,7 +10,7 @@ export default function IaExamsPage() {
   if (!session) return null;
   return (
     <DashboardShell role="admin" pageHeader={false} title="IA Exams">
-      <IaExaminationShell>
+      <IaExaminationShell banner={false}>
         <IaExamsWorkspace />
       </IaExaminationShell>
     </DashboardShell>

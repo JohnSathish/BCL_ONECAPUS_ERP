@@ -13,6 +13,7 @@ import type {
   CreateIaExamDto,
   GenerateIaTimetableDto,
   PreviewIaExamDto,
+  UpdateIaExamDto,
 } from './dto/create-ia-exam.dto';
 import {
   assignFyugpFirstIaTimetable,
@@ -784,10 +785,156 @@ export class IaExamProvisioningService {
           shiftName: meta.shiftName ?? null,
           departmentCount: meta.departmentCount ?? 0,
           maxMarks: meta.maxMarks,
+          academicYearName:
+            typeof (meta as { academicYearName?: string }).academicYearName ===
+            'string'
+              ? (meta as { academicYearName?: string }).academicYearName
+              : null,
         },
       });
     }
     return enriched;
+  }
+
+  async updateExam(user: JwtUser, sessionId: string, dto: UpdateIaExamDto) {
+    await this.licenseEnforcement.assertWriteAllowed(
+      user.tid,
+      'examination.write',
+    );
+    const session = await (this.prisma as any).examSession.findFirst({
+      where: { id: sessionId, tenantId: user.tid, deletedAt: null },
+    });
+    if (!session || !isIaExamType(session.examType)) {
+      throw new NotFoundException('IA exam not found');
+    }
+    if (dto.examType && !isIaExamType(dto.examType)) {
+      throw new BadRequestException('Invalid IA exam type');
+    }
+
+    const meta = {
+      ...((session.metadata ?? {}) as Record<string, unknown>),
+    };
+    let shiftId = session.shiftId as string | null;
+    let shiftName = typeof meta.shiftName === 'string' ? meta.shiftName : null;
+    if (dto.shiftId !== undefined) {
+      if (!dto.shiftId) {
+        shiftId = null;
+        shiftName = null;
+      } else {
+        const shift = await this.prisma.shift.findFirst({
+          where: { id: dto.shiftId, tenantId: user.tid, deletedAt: null },
+          select: { id: true, name: true },
+        });
+        if (!shift) throw new NotFoundException('Shift not found');
+        shiftId = shift.id;
+        shiftName = shift.name;
+      }
+    }
+
+    let academicYearId = session.academicYearId as string | null;
+    if (dto.academicYearId) {
+      const year = await this.resolveAcademicYear(user.tid, dto.academicYearId);
+      academicYearId = year.id;
+      meta.academicYearName = year.name;
+    }
+
+    const name = dto.name?.trim() || session.name;
+    const maxMarks =
+      dto.maxMarks != null ? Number(dto.maxMarks) : Number(meta.maxMarks ?? 0);
+    if (dto.maxMarks != null) meta.maxMarks = dto.maxMarks;
+    meta.shiftId = shiftId;
+    meta.shiftName = shiftName;
+
+    const updated = await (this.prisma as any).examSession.update({
+      where: { id: session.id },
+      data: {
+        name,
+        examType: dto.examType ?? session.examType,
+        academicYearId,
+        shiftId,
+        instructions:
+          dto.remarks !== undefined
+            ? dto.remarks.trim() || null
+            : session.instructions,
+        status: dto.status ?? session.status,
+        ...(dto.startDate !== undefined
+          ? { startDate: dto.startDate ? new Date(dto.startDate) : null }
+          : {}),
+        ...(dto.endDate !== undefined
+          ? { endDate: dto.endDate ? new Date(dto.endDate) : null }
+          : {}),
+        metadata: meta,
+      },
+    });
+
+    if (
+      dto.maxMarks != null ||
+      (dto.name && dto.name.trim() !== session.name)
+    ) {
+      const papers = await (this.prisma as any).examPaperSchedule.findMany({
+        where: { tenantId: user.tid, sessionId: session.id, deletedAt: null },
+        select: { id: true, metadata: true },
+      });
+      const schemeIds = papers
+        .map((p: { metadata?: { schemeId?: string } }) => p.metadata?.schemeId)
+        .filter(Boolean) as string[];
+      if (schemeIds.length) {
+        const componentCodes = [session.examType, dto.examType].filter(
+          (code): code is string => Boolean(code),
+        );
+        if (dto.maxMarks != null) {
+          await (this.prisma as any).iaAssessmentScheme.updateMany({
+            where: { id: { in: schemeIds }, tenantId: user.tid },
+            data: {
+              totalMaxMarks: dto.maxMarks,
+              passMark: Math.ceil(dto.maxMarks * 0.4),
+            },
+          });
+          await (this.prisma as any).iaAssessmentComponent.updateMany({
+            where: {
+              tenantId: user.tid,
+              schemeId: { in: schemeIds },
+              code: { in: componentCodes },
+            },
+            data: {
+              maxMarks: dto.maxMarks,
+              ...(dto.name ? { label: name } : {}),
+            },
+          });
+        } else if (dto.name) {
+          await (this.prisma as any).iaAssessmentComponent.updateMany({
+            where: {
+              tenantId: user.tid,
+              schemeId: { in: schemeIds },
+              code: { in: componentCodes },
+            },
+            data: { label: name },
+          });
+        }
+      }
+      if (dto.maxMarks != null) {
+        for (const paper of papers) {
+          const paperMeta =
+            paper.metadata && typeof paper.metadata === 'object'
+              ? paper.metadata
+              : {};
+          await (this.prisma as any).examPaperSchedule.update({
+            where: { id: paper.id },
+            data: { metadata: { ...paperMeta, maxMarks: dto.maxMarks } },
+          });
+        }
+      }
+    }
+
+    await this.audit.log(user, 'IA_EXAM', session.id, 'UPDATE', session, {
+      name,
+      examType: dto.examType ?? session.examType,
+      maxMarks: dto.maxMarks ?? maxMarks,
+      shiftId,
+      status: dto.status ?? session.status,
+    });
+    void this.examCalendar.syncSession(user, session.id);
+    return updated;
   }
 
   async generateTimetable(user: JwtUser, dto: GenerateIaTimetableDto) {
