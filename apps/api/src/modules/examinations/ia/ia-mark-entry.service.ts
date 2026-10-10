@@ -12,6 +12,24 @@ import { IaSessionService } from './ia-session.service';
 import { IaWorkflowService } from './ia-workflow.service';
 import type { SaveIaMarksDto } from './dto/ia.dto';
 
+const rosterStudentSelect = {
+  id: true,
+  rollNumber: true,
+  enrollmentNumber: true,
+  primaryShift: { select: { id: true, name: true } },
+  masterProfile: { select: { fullName: true } },
+  user: { select: { displayName: true } },
+} as const;
+
+function rosterStudentName(student: {
+  masterProfile?: { fullName?: string | null } | null;
+  user?: { displayName?: string | null } | null;
+}) {
+  const fromProfile = student.masterProfile?.fullName?.trim();
+  const fromAccount = student.user?.displayName?.trim();
+  return fromProfile || fromAccount || null;
+}
+
 @Injectable()
 export class IaMarkEntryService {
   constructor(
@@ -220,15 +238,7 @@ export class IaMarkEntryService {
             registration: {
               include: {
                 shift: { select: { id: true, name: true } },
-                student: {
-                  select: {
-                    id: true,
-                    rollNumber: true,
-                    enrollmentNumber: true,
-                    primaryShift: { select: { id: true, name: true } },
-                    user: { select: { displayName: true } },
-                  },
-                },
+                student: { select: rosterStudentSelect },
               },
             },
           },
@@ -279,7 +289,7 @@ export class IaMarkEntryService {
         id: row.student.id,
         rollNumber: row.student.rollNumber,
         enrollmentNumber: row.student.enrollmentNumber,
-        fullName: row.student.user?.displayName ?? null,
+        fullName: rosterStudentName(row.student),
         shiftId: row.shift?.id ?? null,
         shiftName: row.shift?.name ?? null,
         marks: scheme.components.map(
@@ -541,15 +551,7 @@ export class IaMarkEntryService {
       registration: {
         include: {
           shift: { select: { id: true, name: true } },
-          student: {
-            select: {
-              id: true,
-              rollNumber: true,
-              enrollmentNumber: true,
-              primaryShift: { select: { id: true, name: true } },
-              user: { select: { displayName: true } },
-            },
-          },
+          student: { select: rosterStudentSelect },
         },
       },
     };
