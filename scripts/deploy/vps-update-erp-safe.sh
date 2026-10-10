@@ -97,10 +97,10 @@ echo "Deploying commit: $(git log -1 --oneline)"
 echo "Validating nginx config…"
 "${COMPOSE[@]}" run --rm --no-deps nginx nginx -t
 
-echo "Rebuilding web + api + worker…"
+echo "Rebuilding api, then worker, then web…"
 build_ok=0
 for attempt in 1 2 3; do
-  if "${COMPOSE[@]}" build web api worker; then
+  if "${COMPOSE[@]}" build api && "${COMPOSE[@]}" build worker && "${COMPOSE[@]}" build web; then
     build_ok=1
     break
   fi
