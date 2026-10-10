@@ -19,8 +19,8 @@ COPY --from=deps /app/package-lock.json ./package-lock.json
 COPY apps/api ./apps/api
 WORKDIR /app/apps/api
 ENV DATABASE_URL=postgresql://nep:nep_dev_password@postgres:5432/nep_erp
-# SWC transpile. tsc still exhausts a 2 GB heap on this VPS.
-ENV NODE_OPTIONS=--max-old-space-size=1536
+# Per-file transpile. A whole-program tsc exceeds the VPS heap.
+ENV NODE_OPTIONS=--max-old-space-size=2048
 RUN rm -f prisma.config.ts && ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma
 RUN npm run build:docker
 

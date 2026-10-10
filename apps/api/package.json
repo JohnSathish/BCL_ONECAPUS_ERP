@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "build:docker": "swc src -d dist --strip-leading-paths && node scripts/copy-nest-assets.mjs",
+    "build:docker": "node scripts/docker-transpile.mjs && node scripts/copy-nest-assets.mjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "predev": "node ../../scripts/wait-for-tcp.mjs 127.0.0.1 15432 90000 postgres",
     "dev": "node --max-old-space-size=8192 ./node_modules/@nestjs/cli/bin/nest.js start --watch",
@@ -135,8 +135,6 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
-    "@swc/cli": "^0.7.8",
-    "@swc/core": "^1.13.5",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
