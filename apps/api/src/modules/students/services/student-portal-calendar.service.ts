@@ -32,72 +32,83 @@ export class StudentPortalCalendarService {
     const from = new Date(y, m, 1);
     const to = new Date(y, m + span, 0, 23, 59, 59, 999);
 
-    const [holidays, demands, lines, workspaceIds, deptActivities] =
-      await Promise.all([
-        this.prisma.staffPublicHoliday.findMany({
-          where: {
-            tenantId,
-            active: true,
-            holidayDate: { gte: from, lte: to },
-          },
-          select: {
-            id: true,
-            name: true,
-            holidayDate: true,
-            holidayType: true,
-          },
-        }),
-        this.prisma.studentFeeDemand.findMany({
-          where: {
-            tenantId,
-            studentId,
-            dueDate: { gte: from, lte: to },
-            balanceAmount: { gt: 0 },
-          },
-          select: {
-            id: true,
-            demandNo: true,
-            dueDate: true,
-            balanceAmount: true,
-            billingPeriod: true,
-          },
-        }),
-        this.prisma.semesterRegistrationLine.findMany({
-          where: {
-            tenantId,
-            status: { in: [...ENROLLED_LINE_STATUSES] },
-            registration: { studentId },
-          },
-          select: {
-            offeringId: true,
-            offering: { select: { courseId: true } },
-          },
-        }),
-        this.studentWorkspaceIds(tenantId, studentId),
-        (this.prisma as any).departmentActivity.findMany({
-          where: {
-            tenantId,
-            deletedAt: null,
-            status: { in: ['OPEN', 'APPROVED', 'CLOSED', 'COMPLETED'] },
-            eventDate: { gte: from, lte: to },
-            OR: [
-              { status: 'OPEN' },
-              {
-                registrations: {
-                  some: { studentId, status: 'REGISTERED' },
-                },
+    const [
+      holidays,
+      demands,
+      lines,
+      studentShift,
+      workspaceIds,
+      deptActivities,
+    ] = await Promise.all([
+      this.prisma.staffPublicHoliday.findMany({
+        where: {
+          tenantId,
+          active: true,
+          holidayDate: { gte: from, lte: to },
+        },
+        select: {
+          id: true,
+          name: true,
+          holidayDate: true,
+          holidayType: true,
+        },
+      }),
+      this.prisma.studentFeeDemand.findMany({
+        where: {
+          tenantId,
+          studentId,
+          dueDate: { gte: from, lte: to },
+          balanceAmount: { gt: 0 },
+        },
+        select: {
+          id: true,
+          demandNo: true,
+          dueDate: true,
+          balanceAmount: true,
+          billingPeriod: true,
+        },
+      }),
+      this.prisma.semesterRegistrationLine.findMany({
+        where: {
+          tenantId,
+          status: { in: [...ENROLLED_LINE_STATUSES] },
+          registration: { studentId },
+        },
+        select: {
+          offeringId: true,
+          offering: { select: { courseId: true } },
+          registration: { select: { shiftId: true } },
+        },
+      }),
+      this.prisma.student.findFirst({
+        where: { id: studentId, tenantId, deletedAt: null },
+        select: { primaryShiftId: true },
+      }),
+      this.studentWorkspaceIds(tenantId, studentId),
+      (this.prisma as any).departmentActivity.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          status: { in: ['OPEN', 'APPROVED', 'CLOSED', 'COMPLETED'] },
+          eventDate: { gte: from, lte: to },
+          OR: [
+            { status: 'OPEN' },
+            {
+              registrations: {
+                some: { studentId, status: 'REGISTERED' },
               },
-            ],
-          },
-          select: {
-            id: true,
-            title: true,
-            eventDate: true,
-            status: true,
-            department: { select: { name: true } },
-          },
-        }),
-      ]);
+            },
+          ],
+        },
+        select: {
+          id: true,
+          title: true,
+          eventDate: true,
+          status: true,
+          department: { select: { name: true } },
+        },
+      }),
+    ]);
 
     const offeringIds = [
       ...new Set(lines.map((l) => l.offeringId).filter(Boolean)),
@@ -125,6 +136,8 @@ export class StudentPortalCalendarService {
             },
             select: {
               id: true,
+              sessionId: true,
+              offeringId: true,
               paperCode: true,
               paperName: true,
               examDate: true,
@@ -169,8 +182,43 @@ export class StudentPortalCalendarService {
       });
     }
 
+    const shiftByOffering = new Map<string, string | null>();
+    for (const line of lines) {
+      shiftByOffering.set(
+        line.offeringId,
+        line.registration?.shiftId || studentShift?.primaryShiftId || null,
+      );
+    }
+    const examSessionIds = [
+      ...new Set(
+        exams
+          .map((exam: { sessionId?: string | null }) => exam.sessionId)
+          .filter(Boolean),
+      ),
+    ] as string[];
+    const examSessions = examSessionIds.length
+      ? await (this.prisma as any).examSession.findMany({
+          where: { id: { in: examSessionIds } },
+          select: { id: true, shiftId: true },
+        })
+      : [];
+    const sessionShiftById = new Map<string, string | null>(
+      examSessions.map((row: { id: string; shiftId: string | null }) => [
+        row.id,
+        row.shiftId,
+      ]),
+    );
     const seenExam = new Set<string>();
     for (const exam of exams) {
+      const sessionShift = exam.sessionId
+        ? (sessionShiftById.get(exam.sessionId) ?? null)
+        : null;
+      const studentShiftId = exam.offeringId
+        ? (shiftByOffering.get(exam.offeringId) ?? null)
+        : null;
+      if (sessionShift && studentShiftId && sessionShift !== studentShiftId) {
+        continue;
+      }
       const date = this.dateOnly(exam.examDate);
       const key = `${date}|${String(exam.paperCode ?? '').toUpperCase()}`;
       if (seenExam.has(key)) continue;

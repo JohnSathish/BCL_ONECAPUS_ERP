@@ -194,6 +194,7 @@ export class IaAdmitCardService {
   private async studentsForPaper(tenantId: string, paper: PaperRow) {
     const studentSelect = {
       id: true,
+      primaryShiftId: true,
       rollNumber: true,
       enrollmentNumber: true,
       admissionNumber: true,
@@ -206,10 +207,10 @@ export class IaAdmitCardService {
       },
       department: { select: { name: true, code: true } },
     } as const;
+    const sessionId = (paper as PaperRow & { sessionId?: string }).sessionId;
 
     if (paper.offeringId) {
       const paperCat = iaPaperCategory(paper.metadata);
-      const sessionId = (paper as PaperRow & { sessionId?: string }).sessionId;
       let splitByCategory = false;
       if (paperCat && sessionId) {
         const siblings = await this.db().examPaperSchedule.findMany({
@@ -246,14 +247,7 @@ export class IaAdmitCardService {
           },
         },
       });
-      return Array.from(
-        new Map(
-          lines.map((line) => [
-            line.registration.student.id,
-            line.registration.student,
-          ]),
-        ).values(),
-      );
+      return this.studentsOnSessionShift(sessionId, tenantId, lines);
     }
 
     if (!paper.courseId) return [];
@@ -276,9 +270,40 @@ export class IaAdmitCardService {
       },
       take: 2000,
     });
+    return this.studentsOnSessionShift(sessionId, tenantId, lines);
+  }
+
+  private async studentsOnSessionShift<
+    T extends { id: string; primaryShiftId: string | null },
+  >(
+    sessionId: string | undefined,
+    tenantId: string,
+    lines: Array<{
+      registration: {
+        shiftId: string | null;
+        student: T;
+      };
+    }>,
+  ) {
+    const sessionShiftId = sessionId
+      ? ((
+          await this.db().examSession.findFirst({
+            where: { id: sessionId, tenantId },
+            select: { shiftId: true },
+          })
+        )?.shiftId ?? null)
+      : null;
+    const eligible = sessionShiftId
+      ? lines.filter((line) => {
+          const studentShift =
+            line.registration.shiftId ||
+            line.registration.student.primaryShiftId;
+          return !studentShift || studentShift === sessionShiftId;
+        })
+      : lines;
     return Array.from(
       new Map(
-        lines.map((line) => [
+        eligible.map((line) => [
           line.registration.student.id,
           line.registration.student,
         ]),

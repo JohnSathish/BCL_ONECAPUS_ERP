@@ -18,6 +18,18 @@ export class IaPortalService {
     private readonly admitCards: IaAdmitCardService,
   ) {}
 
+  /** A shift-specific exam is only for students on that shift. */
+  private shiftMatches(
+    sessionShiftId: string | null | undefined,
+    lineShiftId: string | null | undefined,
+    primaryShiftId: string | null | undefined,
+  ) {
+    if (!sessionShiftId) return true;
+    const studentShift = lineShiftId || primaryShiftId || null;
+    if (!studentShift) return true;
+    return sessionShiftId === studentShift;
+  }
+
   private async studentForUser(user: JwtUser) {
     const student = await this.prisma.student.findFirst({
       where: { tenantId: user.tid, userId: user.sub, deletedAt: null },
@@ -56,7 +68,10 @@ export class IaPortalService {
             : {}),
         },
       },
-      include: { offering: { select: { id: true, courseId: true } } },
+      include: {
+        offering: { select: { id: true, courseId: true } },
+        registration: { select: { shiftId: true } },
+      },
     });
 
     // If current-semester filter yields nothing, fall back to all of this student's lines.
@@ -71,7 +86,10 @@ export class IaPortalService {
               },
               registration: { studentId: student.id },
             },
-            include: { offering: { select: { id: true, courseId: true } } },
+            include: {
+              offering: { select: { id: true, courseId: true } },
+              registration: { select: { shiftId: true } },
+            },
           });
 
     const offeringIds = new Set(
@@ -95,17 +113,16 @@ export class IaPortalService {
       };
     }
 
-    const sessionIds = (
-      await (this.prisma as any).examSession.findMany({
-        where: {
-          tenantId: user.tid,
-          deletedAt: null,
-          examType: { in: [...IA_EXAM_TYPES] },
-          status: { in: ['ACTIVE', 'SCHEDULED', 'OPEN'] },
-        },
-        select: { id: true },
-      })
-    ).map((s: { id: string }) => s.id);
+    const sessions = (await (this.prisma as any).examSession.findMany({
+      where: {
+        tenantId: user.tid,
+        deletedAt: null,
+        examType: { in: [...IA_EXAM_TYPES] },
+        status: { in: ['ACTIVE', 'SCHEDULED', 'OPEN'] },
+      },
+      select: { id: true, shiftId: true },
+    })) as Array<{ id: string; shiftId: string | null }>;
+    const sessionIds = sessions.map((s) => s.id);
 
     type PaperRow = {
       id: string;
@@ -143,7 +160,17 @@ export class IaPortalService {
     const matched: PaperRow[] = [];
     const seenIds = new Set<string>();
     for (const line of effectiveLines) {
-      for (const sessionPapers of papersBySession.values()) {
+      for (const session of sessions) {
+        if (
+          !this.shiftMatches(
+            session.shiftId,
+            line.registration?.shiftId,
+            student.primaryShiftId,
+          )
+        ) {
+          continue;
+        }
+        const sessionPapers = papersBySession.get(session.id) ?? [];
         const paper = pickIaPaperForRegistration(sessionPapers, {
           offeringId: line.offeringId,
           category: line.category,

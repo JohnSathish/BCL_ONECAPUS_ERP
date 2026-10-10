@@ -12,9 +12,12 @@ import {
   buildNoticeboardRowsFromPlan,
   resolveNoticeboardPattern,
 } from './ia-noticeboard-grid';
+import { inferFyugpRoutinePattern } from './fyugp-first-ia-routine';
 import {
   buildFyugpSecondIaDayNotice,
+  buildFyugpSecondIaMorningNotice,
   FYUGP_SECOND_IA_INSTRUCTIONS,
+  FYUGP_SECOND_IA_MORNING_INSTRUCTIONS,
 } from './fyugp-second-ia-routine';
 import {
   DBC_TURA_NOTICE_CONTACTS,
@@ -151,16 +154,15 @@ export class IaNoticeboardRoutineService {
       session.examType === 'IA_TEST_2' ||
       meta.timetableMode === 'FYUGP_SECOND_IA' ||
       /2nd internal|second internal/i.test(String(session.name ?? ''));
+    const storedPattern =
+      meta.routinePattern === 'MORNING' || meta.routinePattern === 'DAY'
+        ? meta.routinePattern
+        : null;
     const pattern = isSecondIa
-      ? 'DAY'
+      ? (storedPattern ?? inferFyugpRoutinePattern(shiftName))
       : options?.routinePattern
         ? options.routinePattern
-        : resolveNoticeboardPattern(
-            shiftName,
-            typeof meta.routinePattern === 'string'
-              ? meta.routinePattern
-              : null,
-          );
+        : resolveNoticeboardPattern(shiftName, storedPattern);
 
     // The timetable screen keeps 24 Aug as its default start date. That date
     // belongs to the first internal. A 2nd internal notice must use this exam's
@@ -181,7 +183,9 @@ export class IaNoticeboardRoutineService {
     }
 
     const rows = isSecondIa
-      ? buildFyugpSecondIaDayNotice(startIso)
+      ? pattern === 'MORNING'
+        ? buildFyugpSecondIaMorningNotice(startIso)
+        : buildFyugpSecondIaDayNotice(startIso)
       : buildNoticeboardRowsFromPlan(startIso, pattern);
     if (!rows.length) {
       throw new BadRequestException(
@@ -212,7 +216,9 @@ export class IaNoticeboardRoutineService {
       academicYearLabel: academicYearName,
       rows,
       instructions: isSecondIa
-        ? [...FYUGP_SECOND_IA_INSTRUCTIONS]
+        ? pattern === 'MORNING'
+          ? [...FYUGP_SECOND_IA_MORNING_INSTRUCTIONS]
+          : [...FYUGP_SECOND_IA_INSTRUCTIONS]
         : this.defaultInstructions(pattern, admitFrom),
       leftSignatory: {
         title: 'Coordinator,',
@@ -226,7 +232,7 @@ export class IaNoticeboardRoutineService {
 
     const html = renderIaNoticeboardRoutineHtml(input);
     const filename = isSecondIa
-      ? `FYUGP-2nd-IA-${year}-DAY-Noticeboard.pdf`
+      ? `FYUGP-2nd-IA-${year}-${pattern}-Noticeboard.pdf`
       : `FYUGP-First-IA-${year}-${pattern}-Noticeboard.pdf`;
     return { html, filename, input };
   }

@@ -1,7 +1,8 @@
 /**
- * FYUGP Odd Semester 2nd Internal Assessment — Day Shift printed routine.
- * Start date is Monday 12 October 2026 on the official notice.
- * Afternoon sittings are 1:00–2:15. Tuesday Sem 1 AEC is 9:45–11:00.
+ * FYUGP Odd Semester 2nd Internal Assessment.
+ * Start date is Monday 12 October 2026.
+ * Day Shift: 1:00–2:15, Tuesday Sem 1 AEC 9:45–11:00.
+ * Morning Shift: 8:15–9:30, Tuesday Sem 1 AEC 6:45–8:00.
  * Total marks 15. Duration 1 hour 15 minutes.
  */
 
@@ -84,6 +85,18 @@ const DAY_SLOTS: Record<number, Slot[]> = {
   ],
 };
 
+/** Same papers as the Day Shift. Clocks follow the Morning Shift notice. */
+const MORNING_SLOTS: Record<number, Slot[]> = Object.fromEntries(
+  Object.entries(DAY_SLOTS).map(([semester, slots]) => [
+    Number(semester),
+    slots.map((slot) =>
+      slot.startTime === '09:45'
+        ? { ...slot, startTime: '06:45', endTime: '08:00' }
+        : { ...slot, startTime: '08:15', endTime: '09:30' },
+    ),
+  ]),
+);
+
 const NOTICE_LABEL: Record<string, string> = {
   '1|MDC': 'MDC',
   '1|AEC': 'AEC',
@@ -120,11 +133,7 @@ export function assignFyugpSecondIaTimetable(
 } {
   const assignments: FyugpAssignment[] = [];
   const warnings: string[] = [];
-  if (pattern === 'MORNING') {
-    warnings.push(
-      'The printed 2nd Internal Assessment routine is the Day Shift. Morning times are not on that notice.',
-    );
-  }
+  const slotsBySemester = pattern === 'MORNING' ? MORNING_SLOTS : DAY_SLOTS;
 
   const bySem = new Map<number, FyugpPaperLike[]>();
   for (const paper of papers) {
@@ -142,7 +151,7 @@ export function assignFyugpSecondIaTimetable(
   let maxDayOffset = 0;
 
   for (const [semesterNo, semPapers] of bySem) {
-    const slots = DAY_SLOTS[semesterNo];
+    const slots = slotsBySemester[semesterNo];
     if (!slots) {
       for (const paper of semPapers) {
         warnings.push(
@@ -291,10 +300,82 @@ export function buildFyugpSecondIaDayNotice(
   return lines.map((row, index) => ({ slNo: index + 1, ...row }));
 }
 
+/** Printed Morning Shift grid. Tuesday Sem 1 AEC is the 6:45 sitting. */
+export function buildFyugpSecondIaMorningNotice(
+  startDateIso: string,
+): SecondIaNoticeRow[] {
+  const [y, m, d] = startDateIso.split('-').map(Number);
+  if (!y || !m || !d) return [];
+  const day = (offset: number) => new Date(y, m - 1, d + offset);
+  const dateOf = (offset: number) => formatDate(day(offset));
+  const nameOf = (offset: number) =>
+    day(offset).toLocaleDateString('en-IN', { weekday: 'long' }).toUpperCase();
+
+  const sitting = 'MORNING 8:15-9:30';
+  const blank = '--------';
+  const lines: Array<Omit<SecondIaNoticeRow, 'slNo'>> = [
+    {
+      dateLabel: dateOf(0),
+      dayLabel: nameOf(0),
+      timingLabel: sitting,
+      sem1: 'MDC',
+      sem3: 'AEC',
+      sem5: 'MINOR 302',
+    },
+    {
+      dateLabel: dateOf(1),
+      dayLabel: nameOf(1),
+      timingLabel: 'MORNING 6:45-8:00',
+      sem1: 'AEC',
+      sem3: blank,
+      sem5: blank,
+    },
+    {
+      dateLabel: dateOf(1),
+      dayLabel: nameOf(1),
+      timingLabel: sitting,
+      sem1: 'SEC',
+      sem3: 'MDC',
+      sem5: blank,
+    },
+    {
+      dateLabel: dateOf(2),
+      dayLabel: nameOf(2),
+      timingLabel: sitting,
+      sem1: 'VAC',
+      sem3: 'SEC',
+      sem5: 'MAJOR 300',
+    },
+    {
+      dateLabel: dateOf(3),
+      dayLabel: nameOf(3),
+      timingLabel: sitting,
+      sem1: 'MINOR 100',
+      sem3: 'MAJOR 200',
+      sem5: 'MAJOR 301',
+    },
+    {
+      dateLabel: dateOf(4),
+      dayLabel: nameOf(4),
+      timingLabel: sitting,
+      sem1: 'MAJOR 100',
+      sem3: 'MAJOR 201',
+      sem5: 'MAJOR 302',
+    },
+  ];
+  return lines.map((row, index) => ({ slNo: index + 1, ...row }));
+}
+
 export const FYUGP_SECOND_IA_MARKS = 15;
 export const FYUGP_SECOND_IA_INSTRUCTIONS = [
   'The Admit Card will be issued from 8th October 2026. Kindly, bring your fee book.',
   'Syllabus for the test: Classes taken after the 1st Internal Assessment to till date.',
   'Total marks-15 and the Duration of Exam: 1 hour 15 minutes.',
   'NEHU Question pattern to be followed.',
+];
+
+export const FYUGP_SECOND_IA_MORNING_INSTRUCTIONS = [
+  'Arrival: 6:30 AM.',
+  'Admit Card will be issued on 9th October 2026. Kindly, bring your fee book.',
+  'Topics to Study: Classes taken till date.',
 ];

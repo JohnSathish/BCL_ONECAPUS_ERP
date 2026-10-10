@@ -1,6 +1,7 @@
 import {
   assignFyugpSecondIaTimetable,
   buildFyugpSecondIaDayNotice,
+  buildFyugpSecondIaMorningNotice,
 } from './fyugp-second-ia-routine';
 
 describe('buildFyugpSecondIaDayNotice', () => {
@@ -50,6 +51,35 @@ describe('buildFyugpSecondIaDayNotice', () => {
       sem5: 'MAJOR 302',
     });
   });
+
+  it('matches the Morning Shift notice for 12–16 October 2026', () => {
+    const rows = buildFyugpSecondIaMorningNotice('2026-10-12');
+    expect(rows).toHaveLength(6);
+    expect(rows[0]).toMatchObject({
+      timingLabel: 'MORNING 8:15-9:30',
+      sem1: 'MDC',
+      sem3: 'AEC',
+      sem5: 'MINOR 302',
+    });
+    expect(rows[1]).toMatchObject({
+      dateLabel: '13-10-2026',
+      timingLabel: 'MORNING 6:45-8:00',
+      sem1: 'AEC',
+      sem3: '--------',
+      sem5: '--------',
+    });
+    expect(rows[2]).toMatchObject({
+      timingLabel: 'MORNING 8:15-9:30',
+      sem1: 'SEC',
+      sem3: 'MDC',
+      sem5: '--------',
+    });
+    expect(rows[5]).toMatchObject({
+      sem1: 'MAJOR 100',
+      sem3: 'MAJOR 201',
+      sem5: 'MAJOR 302',
+    });
+  });
 });
 
 describe('assignFyugpSecondIaTimetable', () => {
@@ -89,6 +119,32 @@ describe('assignFyugpSecondIaTimetable', () => {
     expect(assignments.find((a) => a.paperId === 'sec1')).toMatchObject({
       dayOffset: 1,
       startTime: '13:00',
+    });
+  });
+
+  it('uses the morning clocks for the same papers', () => {
+    const { assignments } = assignFyugpSecondIaTimetable(
+      [
+        { id: 'aec1', paperCode: 'AEC-120', semesterNo: 1, category: 'AEC' },
+        { id: 'sec1', paperCode: 'SEC-131', semesterNo: 1, category: 'SEC' },
+        { id: 'mdc3', paperCode: 'MDC-111', semesterNo: 3, category: 'MDC' },
+      ],
+      'MORNING',
+    );
+    expect(assignments.find((a) => a.paperId === 'aec1')).toMatchObject({
+      dayOffset: 1,
+      startTime: '06:45',
+      endTime: '08:00',
+    });
+    expect(assignments.find((a) => a.paperId === 'sec1')).toMatchObject({
+      dayOffset: 1,
+      startTime: '08:15',
+      endTime: '09:30',
+    });
+    expect(assignments.find((a) => a.paperId === 'mdc3')).toMatchObject({
+      dayOffset: 1,
+      startTime: '08:15',
+      endTime: '09:30',
     });
   });
 

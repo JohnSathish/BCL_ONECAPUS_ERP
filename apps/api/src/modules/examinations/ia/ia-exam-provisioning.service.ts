@@ -984,9 +984,13 @@ export class IaExamProvisioningService {
         });
         shiftName = shift?.name ?? null;
       }
+      const storedPattern =
+        meta.routinePattern === 'MORNING' || meta.routinePattern === 'DAY'
+          ? meta.routinePattern
+          : null;
       const pattern: FyugpRoutinePattern =
         mode === 'FYUGP_SECOND_IA'
-          ? 'DAY'
+          ? (storedPattern ?? inferFyugpRoutinePattern(shiftName))
           : (dto.routinePattern ?? inferFyugpRoutinePattern(shiftName));
 
       const mappedPapers = papers.map(
