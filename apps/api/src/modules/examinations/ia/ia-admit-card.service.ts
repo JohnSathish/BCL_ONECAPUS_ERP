@@ -18,7 +18,7 @@ import { IaExamProvisioningService } from './ia-exam-provisioning.service';
 import { formatExamWallClock } from './ia-noticeboard-grid';
 import {
   iaPaperCategory,
-  pickIaPaperForRegistration,
+  normalizeIaSubjectCategory,
 } from './ia-category-policy';
 import { IaSettingsService } from './ia-settings.service';
 import {
@@ -155,30 +155,100 @@ export class IaAdmitCardService {
     return 20;
   }
 
+  private sessionSemesterNos(
+    session: { semesterNo?: number | null; metadata?: unknown },
+    papers: PaperRow[],
+  ) {
+    const semesterNos = new Set<number>();
+    const meta = (session.metadata ?? {}) as { semesterNos?: unknown };
+    if (Array.isArray(meta.semesterNos)) {
+      for (const value of meta.semesterNos) {
+        const semesterNo = Number(value);
+        if (Number.isFinite(semesterNo) && semesterNo > 0) {
+          semesterNos.add(semesterNo);
+        }
+      }
+    }
+    for (const paper of papers) {
+      if (paper.semesterNo != null) semesterNos.add(paper.semesterNo);
+    }
+    if (!semesterNos.size && session.semesterNo != null) {
+      semesterNos.add(session.semesterNo);
+    }
+    return [...semesterNos];
+  }
+
+  /**
+   * A day/morning exam often covers several semesters, but the session row
+   * keeps only the first one. Match each registered subject to the paper for
+   * that subject and semester, not to session.semesterNo.
+   */
   private async papersForStudentFromRegistrations(
     tenantId: string,
     studentId: string,
-    semesterNo: number,
+    session: {
+      semesterNo?: number | null;
+      shiftId?: string | null;
+      metadata?: unknown;
+    },
     sessionPapers: PaperRow[],
+    studentShiftId?: string | null,
   ) {
+    const semesterNos = this.sessionSemesterNos(session, sessionPapers);
     const lines = await this.prisma.semesterRegistrationLine.findMany({
       where: {
         tenantId,
         status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
-        registration: { studentId, semesterSequence: semesterNo },
+        registration: {
+          studentId,
+          ...(semesterNos.length
+            ? { semesterSequence: { in: semesterNos } }
+            : {}),
+        },
       },
-      include: { offering: { select: { courseId: true } } },
+      include: {
+        offering: { select: { courseId: true } },
+        registration: { select: { shiftId: true, semesterSequence: true } },
+      },
     });
+
+    const sessionShiftId = session.shiftId ?? null;
+    const eligible = sessionShiftId
+      ? lines.filter((line) => {
+          const shift = line.registration.shiftId || studentShiftId;
+          return !shift || shift === sessionShiftId;
+        })
+      : lines;
 
     const matched: PaperRow[] = [];
     const seen = new Set<string>();
-    for (const line of lines) {
-      const paper = pickIaPaperForRegistration(sessionPapers, {
-        offeringId: line.offeringId,
-        category: line.category,
-        courseId: line.offering.courseId,
+    for (const line of eligible) {
+      const scoped = sessionPapers.filter((paper) => {
+        if (
+          paper.semesterNo != null &&
+          paper.semesterNo !== line.registration.semesterSequence
+        ) {
+          return false;
+        }
+        if (paper.offeringId) return paper.offeringId === line.offeringId;
+        return Boolean(
+          paper.courseId && paper.courseId === line.offering.courseId,
+        );
       });
-      if (paper && !seen.has(paper.id)) {
+      const lineCategory = normalizeIaSubjectCategory(line.category) ?? '';
+      const categories = new Set(
+        scoped.map((paper) => iaPaperCategory(paper.metadata)).filter(Boolean),
+      );
+      const chosen =
+        lineCategory && categories.size > 1
+          ? scoped.filter(
+              (paper) => iaPaperCategory(paper.metadata) === lineCategory,
+            )
+          : categories.size > 1
+            ? []
+            : scoped;
+      for (const paper of chosen) {
+        if (seen.has(paper.id)) continue;
         seen.add(paper.id);
         matched.push(paper);
       }
@@ -681,24 +751,13 @@ export class IaAdmitCardService {
       orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }],
     });
 
-    let studentPapers: PaperRow[];
-    if (session.semesterNo != null) {
-      studentPapers = await this.papersForStudentFromRegistrations(
-        tenantId,
-        studentId,
-        session.semesterNo,
-        papers,
-      );
-    } else {
-      const studentPaperIds = new Set<string>();
-      for (const paper of papers) {
-        const roster = await this.studentsForPaper(tenantId, paper);
-        if (roster.some((s) => s.id === studentId)) {
-          studentPaperIds.add(paper.id);
-        }
-      }
-      studentPapers = papers.filter((p) => studentPaperIds.has(p.id));
-    }
+    const studentPapers = await this.papersForStudentFromRegistrations(
+      tenantId,
+      studentId,
+      session,
+      papers,
+      student.primaryShiftId,
+    );
 
     const father = student.guardians.find((g) =>
       /father/i.test(g.guardianType),
@@ -737,12 +796,32 @@ export class IaAdmitCardService {
   ): Promise<IaAdmitCardTemplateInput> {
     const { session, student, studentPapers } = ctx;
     const verifyUrl = `${this.verifyBaseUrl()}/verify/ia-admit/${verifyToken}`;
+    const sittingSemesters = [
+      ...new Set(
+        studentPapers
+          .map((paper) => paper.semesterNo)
+          .filter((semesterNo): semesterNo is number => semesterNo != null),
+      ),
+    ].sort((a, b) => a - b);
+    const progressSemester =
+      student.semesterProgress?.[0]?.semesterSequence ?? null;
+    const semesterLabel = sittingSemesters.length
+      ? sittingSemesters.join(', ')
+      : progressSemester != null
+        ? String(progressSemester)
+        : session.semesterNo != null
+          ? String(session.semesterNo)
+          : null;
     return {
       institution,
       session: {
         name: session.name,
         examType: session.examType,
-        semesterNo: session.semesterNo,
+        semesterNo:
+          sittingSemesters.length === 1
+            ? sittingSemesters[0]
+            : session.semesterNo,
+        semesterLabel,
         academicYear,
         instructions: session.instructions,
         shiftName: await this.shiftName(session.shiftId),
@@ -756,9 +835,10 @@ export class IaAdmitCardService {
         programme: student.programVersion?.program?.name,
         department: student.department?.name,
         semesterNo:
-          session.semesterNo ??
-          student.semesterProgress?.[0]?.semesterSequence ??
-          null,
+          sittingSemesters.length === 1
+            ? sittingSemesters[0]
+            : (progressSemester ?? session.semesterNo ?? null),
+        semesterLabel,
         gender: student.masterProfile?.gender,
         dateOfBirth: student.masterProfile?.dateOfBirth?.toISOString() ?? null,
         fatherName: ctx.fatherName,

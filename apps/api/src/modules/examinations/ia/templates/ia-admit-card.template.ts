@@ -11,6 +11,7 @@ export type IaAdmitCardTemplateInput = {
     name: string;
     examType?: string;
     semesterNo?: number | null;
+    semesterLabel?: string | null;
     academicYear?: string | null;
     instructions?: string | null;
     shiftName?: string | null;
@@ -24,6 +25,7 @@ export type IaAdmitCardTemplateInput = {
     programme?: string | null;
     department?: string | null;
     semesterNo?: number | null;
+    semesterLabel?: string | null;
     gender?: string | null;
     dateOfBirth?: string | null;
     fatherName?: string | null;
@@ -321,6 +323,10 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
   const instructions = card.session.instructions
     ? card.session.instructions.split(/\n+/).filter(Boolean)
     : DEFAULT_INSTRUCTIONS;
+  const semesterText =
+    card.student.semesterLabel ||
+    card.session.semesterLabel ||
+    (card.student.semesterNo != null ? String(card.student.semesterNo) : '');
 
   return `
   <div class="page">
@@ -341,7 +347,7 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
         <div>
           <strong>${esc(card.session.name)}</strong>
           <div>Academic Session: ${esc(card.session.academicYear ?? '—')}</div>
-          ${card.session.semesterNo ? `<div>Semester ${card.session.semesterNo}</div>` : ''}
+          ${semesterText ? `<div>Semester ${esc(semesterText)}</div>` : ''}
         </div>
         <div class="verify-block">
           <div class="card-no">${esc(card.admitCardNumber)}</div>
@@ -360,7 +366,7 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
           <div class="field"><label>Mother's Name</label><span>${esc(card.student.motherName)}</span></div>
           <div class="field"><label>Programme</label><span>${esc(card.student.programme)}</span></div>
           <div class="field"><label>Department</label><span>${esc(card.student.department)}</span></div>
-          <div class="field"><label>Semester</label><span>${card.student.semesterNo ?? '—'}</span></div>
+          <div class="field"><label>Semester</label><span>${semesterText ? esc(semesterText) : '—'}</span></div>
           <div class="field"><label>Gender</label><span>${esc(card.student.gender)}</span></div>
           <div class="field"><label>Date of Birth</label><span>${fmtDate(card.student.dateOfBirth)}</span></div>
         </div>
