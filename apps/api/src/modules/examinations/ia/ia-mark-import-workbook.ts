@@ -21,6 +21,7 @@ export type IaMarkImportWorkbookInput = {
   academicYear: string;
   programme: string;
   examName: string;
+  paperCode?: string | null;
   shiftName: string;
   subject: string;
   components: IaMarkImportComponent[];
@@ -54,8 +55,16 @@ export async function buildIaMarkImportWorkbook(
   const workbook = new ExcelJS.Workbook();
   workbook.creator = input.collegeName;
   workbook.created = new Date();
-  const sheet = workbook.addWorksheet('IA Marks', {
-    views: [{ showGridLines: false, state: 'frozen', ySplit: 11 }],
+  const sheet = workbook.addWorksheet(workbookSheetName(input.paperCode), {
+    properties: { tabColor: { argb: NAVY } },
+    views: [
+      {
+        showGridLines: false,
+        state: 'frozen',
+        ySplit: 11,
+        activeCell: 'E12',
+      },
+    ],
     pageSetup: {
       orientation: 'landscape',
       fitToPage: true,
@@ -65,12 +74,12 @@ export async function buildIaMarkImportWorkbook(
     },
   });
 
-  sheet.getColumn(1).width = 18;
-  sheet.getColumn(2).width = 18;
-  sheet.getColumn(3).width = 32;
+  sheet.getColumn(1).width = 7;
+  sheet.getColumn(2).width = 16;
+  sheet.getColumn(3).width = 36;
   sheet.getColumn(4).width = 16;
   for (let index = 0; index < components.length; index++) {
-    sheet.getColumn(5 + index).width = 34;
+    sheet.getColumn(5 + index).width = 18;
   }
   sheet.getColumn(lastCol).width = 24;
 
@@ -129,6 +138,27 @@ export async function buildIaMarkImportWorkbook(
 
   await embedLogo(workbook, sheet, input.logoUrl);
 
+  sheet.mergeCells(4, 1, 4, lastCol);
+  sheet.getRow(4).height = 22;
+  const summary = sheet.getCell(4, 1);
+  summary.value = [
+    input.academicYear,
+    input.programme,
+    input.examName,
+    input.shiftName,
+    input.subject,
+  ]
+    .filter((part) => part && part !== '—')
+    .join('    ·    ');
+  summary.font = {
+    name: 'Calibri',
+    size: 11,
+    bold: true,
+    color: { argb: NAVY },
+  };
+  summary.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  summary.fill = solid('FFF4F8FC');
+
   const meta: Array<[string, string]> = [
     ['Academic Year', input.academicYear || '—'],
     ['Programme', input.programme || '—'],
@@ -139,19 +169,21 @@ export async function buildIaMarkImportWorkbook(
   meta.forEach(([label, value], index) => {
     const row = 5 + index;
     sheet.getRow(row).height = 18;
-    const labelCell = sheet.getCell(row, 1);
-    labelCell.value = label;
-    labelCell.font = { name: 'Calibri', size: 10, color: { argb: MUTED } };
-    labelCell.alignment = { vertical: 'middle' };
-    const valueCell = sheet.getCell(row, 2);
-    valueCell.value = `:  ${value}`;
-    valueCell.font = {
-      name: 'Calibri',
-      size: 11,
-      bold: true,
-      color: { argb: INK },
+    sheet.mergeCells(row, 1, row, 2);
+    const cell = sheet.getCell(row, 1);
+    cell.value = {
+      richText: [
+        {
+          text: `${label}  `,
+          font: { name: 'Calibri', size: 10, color: { argb: MUTED } },
+        },
+        {
+          text: value,
+          font: { name: 'Calibri', size: 11, bold: true, color: { argb: INK } },
+        },
+      ],
     };
-    valueCell.alignment = { vertical: 'middle' };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
   });
 
   const maxShown = components.map((component) => Number(component.maxMarks));
@@ -221,7 +253,7 @@ export async function buildIaMarkImportWorkbook(
     ...components.map((component) => marksHeader(input, component)),
     'Remarks',
   ];
-  sheet.getRow(headerRow).height = 34;
+  sheet.getRow(headerRow).height = 36;
   headers.forEach((header, index) => {
     const cell = sheet.getCell(headerRow, index + 1);
     cell.value = header;
@@ -408,11 +440,16 @@ function marksHeader(
   input: IaMarkImportWorkbookInput,
   component: IaMarkImportComponent,
 ) {
-  const title =
-    input.components.length === 1
-      ? input.examName || component.label
-      : component.label;
-  return `${title}\n(Marks out of ${component.maxMarks})`;
+  const title = input.components.length === 1 ? 'Marks' : component.label;
+  return `${title}\n(out of ${component.maxMarks})`;
+}
+
+function workbookSheetName(paperCode?: string | null) {
+  const cleaned = String(paperCode || 'IA Marks')
+    .replace(/[\\/?*[\]:]/g, ' ')
+    .trim()
+    .slice(0, 31);
+  return cleaned || 'IA Marks';
 }
 
 function solid(argb: string): ExcelJS.Fill {

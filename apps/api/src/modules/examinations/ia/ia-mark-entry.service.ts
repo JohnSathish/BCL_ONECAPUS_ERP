@@ -684,6 +684,7 @@ export class IaMarkEntryService {
       academicYear: context.academicYearName || '—',
       programme,
       examName: context.sessionName || 'Internal assessment',
+      paperCode: paper.paperCode || null,
       shiftName:
         shifts.length === 1 ? shifts[0] : context.shiftName || 'All shifts',
       subject:
