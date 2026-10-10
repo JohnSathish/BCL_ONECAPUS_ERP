@@ -2,7 +2,7 @@
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { IaExaminationShell } from '@/components/examinations/ia/ia-examination-shell';
-import { IaPlaceholderWorkspace } from '@/components/examinations/ia/ia-admin-workspaces';
+import { IaAnalyticsWorkspace } from '@/components/examinations/ia/ia-analytics-workspace';
 import { useRequireAuth } from '@/hooks/use-auth';
 
 export default function IaAnalyticsPage() {
@@ -11,10 +11,7 @@ export default function IaAnalyticsPage() {
   return (
     <DashboardShell role="admin" pageHeader={false} title="IA Analytics">
       <IaExaminationShell>
-        <IaPlaceholderWorkspace
-          title="Student Performance Analytics"
-          description="Phase 2: trend charts, subject-wise failure rates, and AI-assisted insights."
-        />
+        <IaAnalyticsWorkspace />
       </IaExaminationShell>
     </DashboardShell>
   );

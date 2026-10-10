@@ -47,6 +47,7 @@ export type IaAdmitCardData = {
     semesterNo?: number | null;
     academicYear?: string | null;
     instructions?: string | null;
+    shiftName?: string | null;
   };
   student?: {
     fullName?: string | null;

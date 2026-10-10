@@ -9,7 +9,13 @@ import { LicenseEnforcementService } from '../../licensing/services/license-enfo
 import { ExamCalendarSyncService } from '../exam-calendar-sync.service';
 import { IA_EXAM_TYPES, isIaExamType } from './ia.constants';
 import { IaAuditService } from './ia-audit.service';
-import type { IaPaperDto, IaQueryDto, IaSessionDto } from './dto/ia.dto';
+import type {
+  IaPaperDto,
+  IaQueryDto,
+  IaSessionDto,
+  RescheduleIaPapersDto,
+  UpdateIaPaperScheduleDto,
+} from './dto/ia.dto';
 
 @Injectable()
 export class IaSessionService {
@@ -23,6 +29,22 @@ export class IaSessionService {
   private timeDate(value: string) {
     const d = new Date(`1970-01-01T${value}`);
     return d;
+  }
+
+  /** Store a wall clock as UTC so the office sees the same hours it typed. */
+  private wallClock(value: string) {
+    const match = value.match(/^(\d{2}):(\d{2})$/);
+    const hours = Number(match?.[1] ?? 0);
+    const minutes = Number(match?.[2] ?? 0);
+    return new Date(Date.UTC(1970, 0, 1, hours, minutes, 0));
+  }
+
+  private assertClockOrder(startTime: string, endTime: string) {
+    if (startTime >= endTime) {
+      throw new BadRequestException(
+        'The end time must be later than the start time.',
+      );
+    }
   }
 
   listSessions(tenantId: string, query: IaQueryDto) {
@@ -154,6 +176,84 @@ export class IaSessionService {
     await this.audit.log(user, 'IA_PAPER', row.id, 'CREATE', null, row);
     void this.examCalendar.syncSession(user, dto.sessionId);
     return row;
+  }
+
+  async updatePaperSchedule(
+    user: JwtUser,
+    paperId: string,
+    dto: UpdateIaPaperScheduleDto,
+  ) {
+    await this.licenseEnforcement.assertWriteAllowed(
+      user.tid,
+      'examination.write',
+    );
+    this.assertClockOrder(dto.startTime, dto.endTime);
+    const paper = await this.getPaper(user.tid, paperId);
+    const row = await (this.prisma as any).examPaperSchedule.update({
+      where: { id: paper.id },
+      data: {
+        examDate: new Date(dto.examDate),
+        startTime: this.wallClock(dto.startTime),
+        endTime: this.wallClock(dto.endTime),
+      },
+    });
+    await this.audit.log(user, 'IA_PAPER', paper.id, 'RESCHEDULE', paper, row);
+    void this.examCalendar.syncSession(user, paper.sessionId);
+    return row;
+  }
+
+  async reschedulePapers(user: JwtUser, dto: RescheduleIaPapersDto) {
+    await this.licenseEnforcement.assertWriteAllowed(
+      user.tid,
+      'examination.write',
+    );
+    const session = await (this.prisma as any).examSession.findFirst({
+      where: { id: dto.sessionId, tenantId: user.tid, deletedAt: null },
+    });
+    if (!session || !isIaExamType(session.examType)) {
+      throw new NotFoundException('IA session not found');
+    }
+    if (!dto.papers.length) {
+      throw new BadRequestException('Choose at least one paper to reschedule.');
+    }
+    for (const paper of dto.papers)
+      this.assertClockOrder(paper.startTime, paper.endTime);
+    const existing = await (this.prisma as any).examPaperSchedule.findMany({
+      where: {
+        tenantId: user.tid,
+        sessionId: dto.sessionId,
+        deletedAt: null,
+        id: { in: dto.papers.map((paper) => paper.id) },
+      },
+      select: { id: true },
+    });
+    const allowed = new Set(existing.map((paper: { id: string }) => paper.id));
+    const rows = dto.papers.filter((paper) => allowed.has(paper.id));
+    if (!rows.length) throw new NotFoundException('IA paper not found');
+    await this.prisma.$transaction(
+      rows.map((paper) =>
+        (this.prisma as any).examPaperSchedule.update({
+          where: { id: paper.id },
+          data: {
+            examDate: new Date(paper.examDate),
+            startTime: this.wallClock(paper.startTime),
+            endTime: this.wallClock(paper.endTime),
+          },
+        }),
+      ),
+    );
+    await this.audit.log(
+      user,
+      'IA_SESSION',
+      dto.sessionId,
+      'RESCHEDULE',
+      null,
+      {
+        updated: rows.length,
+      },
+    );
+    void this.examCalendar.syncSession(user, dto.sessionId);
+    return { updated: rows.length };
   }
 
   async getPaper(tenantId: string, paperId: string) {

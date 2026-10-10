@@ -2,7 +2,7 @@
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { IaExaminationShell } from '@/components/examinations/ia/ia-examination-shell';
-import { IaPlaceholderWorkspace } from '@/components/examinations/ia/ia-admin-workspaces';
+import { IaReportsWorkspace } from '@/components/examinations/ia/ia-reports-workspace';
 import { useRequireAuth } from '@/hooks/use-auth';
 
 export default function IaReportsPage() {
@@ -11,10 +11,7 @@ export default function IaReportsPage() {
   return (
     <DashboardShell role="admin" pageHeader={false} title="IA Reports">
       <IaExaminationShell>
-        <IaPlaceholderWorkspace
-          title="Operational Reports"
-          description="Subject-wise mark registers, department summaries, and audit trail exports."
-        />
+        <IaReportsWorkspace />
       </IaExaminationShell>
     </DashboardShell>
   );

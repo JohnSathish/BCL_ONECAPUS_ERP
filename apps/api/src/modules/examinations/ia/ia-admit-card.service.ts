@@ -330,11 +330,58 @@ export class IaAdmitCardService {
         status: true,
         instructions: true,
         academicYearId: true,
+        shiftId: true,
       },
     });
-    return sessions.map((s: { name: string }) => ({
+    const typedSessions = sessions as Array<{
+      id: string;
+      name: string;
+      examType: string;
+      semesterNo: number | null;
+      startDate: Date | null;
+      endDate: Date | null;
+      status: string;
+      instructions: string | null;
+      academicYearId: string | null;
+      shiftId: string | null;
+    }>;
+    const shiftIds = [
+      ...new Set(
+        typedSessions
+          .map((s) => s.shiftId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const yearIds = [
+      ...new Set(
+        typedSessions
+          .map((s) => s.academicYearId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const [shifts, years] = await Promise.all([
+      shiftIds.length
+        ? this.prisma.shift.findMany({
+            where: { id: { in: shiftIds } },
+            select: { id: true, name: true },
+          })
+        : [],
+      yearIds.length
+        ? this.prisma.academicYear.findMany({
+            where: { id: { in: yearIds } },
+            select: { id: true, name: true },
+          })
+        : [],
+    ]);
+    const shiftName = new Map(shifts.map((s) => [s.id, s.name]));
+    const yearName = new Map(years.map((y) => [y.id, y.name]));
+    return typedSessions.map((s) => ({
       ...s,
       isDemo: /demo/i.test(s.name),
+      shiftName: s.shiftId ? (shiftName.get(s.shiftId) ?? null) : null,
+      academicYearName: s.academicYearId
+        ? (yearName.get(s.academicYearId) ?? null)
+        : null,
     }));
   }
 
@@ -442,6 +489,7 @@ export class IaAdmitCardService {
         departmentId?: string | null;
         paperCount: number;
         isDefaulter: boolean;
+        semesterNos: number[];
       }
     >();
 
@@ -451,6 +499,12 @@ export class IaAdmitCardService {
         const existing = byStudent.get(s.id);
         if (existing) {
           existing.paperCount += 1;
+          if (
+            paper.semesterNo != null &&
+            !existing.semesterNos.includes(paper.semesterNo)
+          ) {
+            existing.semesterNos.push(paper.semesterNo);
+          }
         } else {
           byStudent.set(s.id, {
             id: s.id,
@@ -464,6 +518,7 @@ export class IaAdmitCardService {
             departmentId: s.departmentId,
             paperCount: 1,
             isDefaulter: defaulterIds.has(s.id),
+            semesterNos: paper.semesterNo != null ? [paper.semesterNo] : [],
           });
         }
       }
@@ -480,6 +535,11 @@ export class IaAdmitCardService {
     if (filters?.departmentId) {
       studentRows = studentRows.filter(
         (s) => s.departmentId === filters.departmentId,
+      );
+    }
+    if (filters?.semesterNo != null) {
+      studentRows = studentRows.filter((s) =>
+        s.semesterNos.includes(filters.semesterNo as number),
       );
     }
 
@@ -658,14 +718,23 @@ export class IaAdmitCardService {
     };
   }
 
-  private buildTemplateInput(
+  private async shiftName(shiftId?: string | null) {
+    if (!shiftId) return null;
+    const shift = await this.prisma.shift.findFirst({
+      where: { id: shiftId },
+      select: { name: true },
+    });
+    return shift?.name ?? null;
+  }
+
+  private async buildTemplateInput(
     ctx: Awaited<ReturnType<IaAdmitCardService['loadStudentCardContext']>>,
     institution: Awaited<ReturnType<IaAdmitCardService['institutionContext']>>,
     academicYear: string | null,
     admitCardNumber: string,
     verifyToken: string,
     verifyCode: string,
-  ): IaAdmitCardTemplateInput {
+  ): Promise<IaAdmitCardTemplateInput> {
     const { session, student, studentPapers } = ctx;
     const verifyUrl = `${this.verifyBaseUrl()}/verify/ia-admit/${verifyToken}`;
     return {
@@ -676,6 +745,7 @@ export class IaAdmitCardService {
         semesterNo: session.semesterNo,
         academicYear,
         instructions: session.instructions,
+        shiftName: await this.shiftName(session.shiftId),
       },
       student: {
         fullName: student.masterProfile?.fullName ?? student.user?.displayName,
@@ -763,7 +833,7 @@ export class IaAdmitCardService {
       issue?.admitCardNumber ??
       (await this.nextAdmitCardNumber(tenantId, ctx.session.semesterNo));
 
-    const template = this.buildTemplateInput(
+    const template = await this.buildTemplateInput(
       ctx,
       institution,
       academicYear,
@@ -975,7 +1045,7 @@ export class IaAdmitCardService {
         this.academicYearLabel(tenantId, session.academicYearId),
       ]);
       templates.push(
-        this.buildTemplateInput(
+        await this.buildTemplateInput(
           await this.loadStudentCardContext(tenantId, sessionId, studentId),
           institution,
           academicYear,
@@ -1063,7 +1133,7 @@ export class IaAdmitCardService {
         this.institutionContext(tenantId),
         this.academicYearLabel(tenantId, session.academicYearId),
       ]);
-      const template = this.buildTemplateInput(
+      const template = await this.buildTemplateInput(
         await this.loadStudentCardContext(tenantId, sessionId, studentId),
         institution,
         academicYear,
@@ -1130,7 +1200,7 @@ export class IaAdmitCardService {
         this.academicYearLabel(tenantId, ctx.session.academicYearId),
       ]);
       return renderIaAdmitCardHtml(
-        this.buildTemplateInput(
+        await this.buildTemplateInput(
           ctx,
           institution,
           academicYear,

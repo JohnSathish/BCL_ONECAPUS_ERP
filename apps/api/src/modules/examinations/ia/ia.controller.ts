@@ -20,6 +20,8 @@ import {
   IaApprovalActionDto,
   IaConsolidationGenerateDto,
   IaPaperDto,
+  RescheduleIaPapersDto,
+  UpdateIaPaperScheduleDto,
   IaQueryDto,
   IaSchemeDto,
   IaSessionDto,
@@ -34,6 +36,7 @@ import {
   UpdateIaExamDto,
 } from './dto/create-ia-exam.dto';
 import { IaAdmitCardService } from './ia-admit-card.service';
+import { IaAnalyticsService } from './ia-analytics.service';
 import { IaConsolidationService } from './ia-consolidation.service';
 import { IaDashboardService } from './ia-dashboard.service';
 import { IaDefaulterService } from './ia-defaulter.service';
@@ -64,6 +67,7 @@ export class IaController {
     private readonly defaulters: IaDefaulterService,
     private readonly portal: IaPortalService,
     private readonly admitCards: IaAdmitCardService,
+    private readonly analytics: IaAnalyticsService,
     private readonly noticeboard: IaNoticeboardRoutineService,
   ) {}
 
@@ -228,6 +232,25 @@ export class IaController {
     return this.sessions.createPaper(user, dto);
   }
 
+  @Post('papers/reschedule')
+  @RequireAnyPermission('ia:manage', 'exam:create', 'exam:admin')
+  reschedulePapers(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: RescheduleIaPapersDto,
+  ) {
+    return this.sessions.reschedulePapers(user, dto);
+  }
+
+  @Patch('papers/:paperId')
+  @RequireAnyPermission('ia:manage', 'exam:create', 'exam:admin')
+  updatePaperSchedule(
+    @CurrentUser() user: JwtUser,
+    @Param('paperId') paperId: string,
+    @Body() dto: UpdateIaPaperScheduleDto,
+  ) {
+    return this.sessions.updatePaperSchedule(user, paperId, dto);
+  }
+
   @Get('faculty/my-subjects')
   @RequireAnyPermission(
     'ia:marks:enter',
@@ -348,10 +371,44 @@ export class IaController {
     return this.nehuExport.exportSheet(user.tid, sheetId, format, res);
   }
 
+  @Get('analytics')
+  @RequireAnyPermission('ia:view', 'exam:view', 'exam:admin')
+  iaAnalytics(
+    @CurrentUser() user: JwtUser,
+    @Query('sessionId') sessionId?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('programmeCode') programmeCode?: string,
+    @Query('semesterNo') semesterNo?: string,
+    @Query('shiftId') shiftId?: string,
+  ) {
+    const semester = semesterNo ? Number(semesterNo) : undefined;
+    return this.analytics.report(user.tid, {
+      sessionId: sessionId || undefined,
+      departmentId: departmentId || undefined,
+      programmeCode: programmeCode || undefined,
+      semesterNo:
+        semester != null && Number.isFinite(semester) ? semester : undefined,
+      shiftId: shiftId || undefined,
+    });
+  }
+
   @Get('defaulters')
   @RequireAnyPermission('ia:view', 'exam:view', 'exam:admin')
-  listDefaulters(@CurrentUser() user: JwtUser) {
-    return this.defaulters.list(user.tid);
+  listDefaulters(
+    @CurrentUser() user: JwtUser,
+    @Query('sessionId') sessionId?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('programmeCode') programmeCode?: string,
+    @Query('semesterNo') semesterNo?: string,
+  ) {
+    const semester = semesterNo ? Number(semesterNo) : undefined;
+    return this.defaulters.report(user.tid, {
+      sessionId: sessionId || undefined,
+      departmentId: departmentId || undefined,
+      programmeCode: programmeCode || undefined,
+      semesterNo:
+        semester != null && Number.isFinite(semester) ? semester : undefined,
+    });
   }
 
   @Get('admit-cards/sessions')

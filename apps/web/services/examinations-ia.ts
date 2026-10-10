@@ -108,6 +108,13 @@ export async function createIaScheme(payload: {
   return data;
 }
 
+export async function updateIaSchemeComponents(schemeId: string, components: IaComponent[]) {
+  const { data } = await api.patch(`/v1/examinations/ia/schemes/${schemeId}/components`, {
+    components,
+  });
+  return data;
+}
+
 export async function fetchIaSessions(params?: Record<string, string | number | undefined>) {
   const { data } = await api.get<IaSession[]>('/v1/examinations/ia/sessions', { params });
   return data;
@@ -137,6 +144,22 @@ export async function fetchIaPapers(params?: Record<string, string | number | un
 export async function createIaPaper(payload: Partial<IaPaper> & { sessionId: string }) {
   const { data } = await api.post('/v1/examinations/ia/papers', payload);
   return data;
+}
+
+export async function updateIaPaperSchedule(
+  paperId: string,
+  payload: { examDate: string; startTime: string; endTime: string },
+) {
+  const { data } = await api.patch(`/v1/examinations/ia/papers/${paperId}`, payload);
+  return data;
+}
+
+export async function rescheduleIaPapers(payload: {
+  sessionId: string;
+  papers: Array<{ id: string; examDate: string; startTime: string; endTime: string }>;
+}) {
+  const { data } = await api.post('/v1/examinations/ia/papers/reschedule', payload);
+  return data as { updated: number };
 }
 
 export async function fetchFacultyIaSubjects() {
@@ -409,8 +432,24 @@ export async function fetchPendingIaApprovals() {
   return data;
 }
 
-export async function fetchIaDefaulters() {
-  const { data } = await api.get('/v1/examinations/ia/defaulters');
+export async function fetchIaAnalytics(filters?: {
+  sessionId?: string;
+  departmentId?: string;
+  programmeCode?: string;
+  semesterNo?: number;
+  shiftId?: string;
+}) {
+  const { data } = await api.get('/v1/examinations/ia/analytics', { params: filters });
+  return data;
+}
+
+export async function fetchIaDefaulters(filters?: {
+  sessionId?: string;
+  departmentId?: string;
+  programmeCode?: string;
+  semesterNo?: number;
+}) {
+  const { data } = await api.get('/v1/examinations/ia/defaulters', { params: filters });
   return data;
 }
 

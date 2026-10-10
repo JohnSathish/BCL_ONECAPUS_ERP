@@ -8,6 +8,7 @@ import { ExaminationsController } from './examinations.controller';
 import { ExaminationsService } from './examinations.service';
 import { IaController } from './ia/ia.controller';
 import { IaAdmitCardService } from './ia/ia-admit-card.service';
+import { IaAnalyticsService } from './ia/ia-analytics.service';
 import { IaAdmitEligibilityService } from './ia/ia-admit-eligibility.service';
 import { IaAdmitPdfService } from './ia/ia-admit-pdf.service';
 import { IaAuditService } from './ia/ia-audit.service';
@@ -50,6 +51,7 @@ import { IaWorkflowService } from './ia/ia-workflow.service';
     IaAdmitEligibilityService,
     IaAdmitPdfService,
     IaAdmitCardService,
+    IaAnalyticsService,
     IaNoticeboardRoutineService,
   ],
   exports: [ExaminationsService, IaSettingsService, IaDashboardService],

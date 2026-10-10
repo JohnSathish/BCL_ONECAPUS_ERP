@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -201,6 +202,32 @@ export class IaPaperDto {
   @Type(() => Number)
   @IsNumber()
   maxMarks?: number;
+}
+
+export class UpdateIaPaperScheduleDto {
+  @IsDateString()
+  examDate!: string;
+
+  @Matches(/^\d{2}:\d{2}$/)
+  startTime!: string;
+
+  @Matches(/^\d{2}:\d{2}$/)
+  endTime!: string;
+}
+
+export class RescheduleIaPaperDto extends UpdateIaPaperScheduleDto {
+  @IsUUID()
+  id!: string;
+}
+
+export class RescheduleIaPapersDto {
+  @IsUUID()
+  sessionId!: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RescheduleIaPaperDto)
+  papers!: RescheduleIaPaperDto[];
 }
 
 export class IaMarkRowDto {
