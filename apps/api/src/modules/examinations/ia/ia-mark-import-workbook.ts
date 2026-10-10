@@ -36,7 +36,7 @@ export type IaMarkImportParsedRow = {
 };
 
 const NAVY = 'FF1E4E8C';
-const TITLE = 'FF2F6FE0';
+const GOLD = 'FFE8B931';
 const INK = 'FF1E293B';
 const MUTED = 'FF64748B';
 const LINE = 'FFD6E0EA';
@@ -61,8 +61,8 @@ export async function buildIaMarkImportWorkbook(
       {
         showGridLines: false,
         state: 'frozen',
-        ySplit: 11,
-        activeCell: 'E12',
+        ySplit: 13,
+        activeCell: 'E14',
       },
     ],
     pageSetup: {
@@ -74,73 +74,77 @@ export async function buildIaMarkImportWorkbook(
     },
   });
 
-  sheet.getColumn(1).width = 7;
-  sheet.getColumn(2).width = 16;
-  sheet.getColumn(3).width = 36;
-  sheet.getColumn(4).width = 16;
+  sheet.getColumn(1).width = 8;
+  sheet.getColumn(2).width = 18;
+  sheet.getColumn(3).width = 42;
+  sheet.getColumn(4).width = 18;
   for (let index = 0; index < components.length; index++) {
     sheet.getColumn(5 + index).width = 18;
   }
   sheet.getColumn(lastCol).width = 24;
 
-  sheet.getRow(1).height = 24;
+  sheet.getRow(1).height = 8;
   sheet.getRow(2).height = 22;
-  sheet.getRow(3).height = 18;
-  sheet.mergeCells(1, 2, 2, 3);
-  sheet.mergeCells(3, 2, 3, 3);
-  sheet.mergeCells(1, 4, 3, lastCol);
+  sheet.getRow(3).height = 22;
+  sheet.getRow(4).height = 18;
+  sheet.getRow(5).height = 8;
+  paint(sheet, 1, 1, 1, lastCol, GOLD, GOLD);
+  paint(sheet, 5, 5, 1, lastCol, GOLD, GOLD);
+  paint(sheet, 2, 4, 1, 1, WHITE, WHITE);
+  paint(sheet, 2, 4, 2, lastCol, NAVY, NAVY);
 
-  const nameCell = sheet.getCell(1, 2);
+  sheet.mergeCells(2, 2, 3, 3);
+  sheet.mergeCells(4, 2, 4, 3);
+  sheet.mergeCells(2, 4, 4, lastCol);
+
+  const nameCell = sheet.getCell(2, 2);
   nameCell.value = input.collegeName.toUpperCase();
   nameCell.font = {
     name: 'Calibri',
-    size: 18,
+    size: 20,
     bold: true,
-    color: { argb: NAVY },
+    color: { argb: WHITE },
   };
   nameCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  nameCell.fill = solid(NAVY);
 
-  const mottoCell = sheet.getCell(3, 2);
-  mottoCell.value = (input.motto || '').toUpperCase();
-  mottoCell.font = { name: 'Calibri', size: 9, color: { argb: 'FF94A3B8' } };
+  const mottoCell = sheet.getCell(4, 2);
+  mottoCell.value = (input.motto || 'Internal assessment').toUpperCase();
+  mottoCell.font = {
+    name: 'Calibri',
+    size: 10,
+    italic: true,
+    color: { argb: 'FFF6D98A' },
+  };
   mottoCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  mottoCell.fill = solid(NAVY);
 
-  const titleCell = sheet.getCell(1, 4);
+  const titleCell = sheet.getCell(2, 4);
   titleCell.value = {
     richText: [
       {
-        text: 'Internal Assessment Marks\n',
+        text: 'INTERNAL ASSESSMENT MARKS\n',
         font: { name: 'Calibri', size: 18, bold: true, color: { argb: WHITE } },
       },
       {
-        text: 'Import Template (Excel)',
-        font: { name: 'Calibri', size: 12, color: { argb: 'FFE0ECFF' } },
+        text: 'Import template',
+        font: { name: 'Calibri', size: 12, color: { argb: 'FFF6D98A' } },
       },
     ],
   };
   titleCell.alignment = {
     vertical: 'middle',
-    horizontal: 'left',
+    horizontal: 'right',
     wrapText: true,
     indent: 1,
   };
-  for (let col = 4; col <= lastCol; col++) {
-    for (let row = 1; row <= 3; row++) {
-      const cell = sheet.getCell(row, col);
-      cell.fill = solid(TITLE);
-    }
-  }
-  for (let col = 1; col <= 3; col++) {
-    for (let row = 1; row <= 3; row++) {
-      sheet.getCell(row, col).fill = solid(WHITE);
-    }
-  }
+  titleCell.fill = solid(NAVY);
 
   await embedLogo(workbook, sheet, input.logoUrl);
 
-  sheet.mergeCells(4, 1, 4, lastCol);
-  sheet.getRow(4).height = 22;
-  const summary = sheet.getCell(4, 1);
+  sheet.mergeCells(6, 1, 6, lastCol);
+  sheet.getRow(6).height = 22;
+  const summary = sheet.getCell(6, 1);
   summary.value = [
     input.academicYear,
     input.programme,
@@ -167,7 +171,7 @@ export async function buildIaMarkImportWorkbook(
     ['Subject', input.subject || '—'],
   ];
   meta.forEach(([label, value], index) => {
-    const row = 5 + index;
+    const row = 7 + index;
     sheet.getRow(row).height = 18;
     sheet.mergeCells(row, 1, row, 2);
     const cell = sheet.getCell(row, 1);
@@ -185,14 +189,15 @@ export async function buildIaMarkImportWorkbook(
     };
     cell.alignment = { vertical: 'middle', horizontal: 'left' };
   });
+  paint(sheet, 7, 11, 1, 2, 'FFF8FBFE', 'FFD6DEEA');
 
   const maxShown = components.map((component) => Number(component.maxMarks));
   const maxLabel =
     maxShown.length === 1
       ? String(maxShown[0])
       : 'the maximum shown in each column';
-  sheet.mergeCells(5, 3, 9, 4);
-  const instructions = sheet.getCell(5, 3);
+  sheet.mergeCells(7, 3, 11, 4);
+  const instructions = sheet.getCell(7, 3);
   instructions.value = {
     richText: [
       {
@@ -213,10 +218,10 @@ export async function buildIaMarkImportWorkbook(
     ],
   };
   instructions.alignment = { wrapText: true, vertical: 'top', indent: 1 };
-  paint(sheet, 5, 9, 3, 4, INSTRUCTION, 'FF7EB6E0');
+  paint(sheet, 7, 11, 3, 4, INSTRUCTION, 'FF7EB6E0');
 
-  sheet.mergeCells(5, 5, 9, lastCol);
-  const important = sheet.getCell(5, 5);
+  sheet.mergeCells(7, 5, 11, lastCol);
+  const important = sheet.getCell(7, 5);
   important.value = {
     richText: [
       {
@@ -242,9 +247,9 @@ export async function buildIaMarkImportWorkbook(
     ],
   };
   important.alignment = { wrapText: true, vertical: 'top', indent: 1 };
-  paint(sheet, 5, 9, 5, lastCol, IMPORTANT, 'FFF5CBA7');
+  paint(sheet, 7, 11, 5, lastCol, IMPORTANT, 'FFF5CBA7');
 
-  const headerRow = 11;
+  const headerRow = 13;
   const headers = [
     '#',
     'Roll Number',
@@ -311,7 +316,8 @@ export async function buildIaMarkImportWorkbook(
       };
       const isMark = column >= 5 && column < lastCol;
       const isRemark = column === lastCol;
-      cell.fill = solid(isMark || isRemark ? WHITE : IDENTITY);
+      const band = index % 2 === 0 ? IDENTITY : 'FFF8FBFE';
+      cell.fill = solid(isMark ? 'FFFFF4D6' : isRemark ? WHITE : band);
       cell.border = thin(LINE);
       if (isMark) cell.numFmt = '0.##';
     });
@@ -518,8 +524,8 @@ async function embedLogo(
     extension: image.extension,
   });
   sheet.addImage(imageId, {
-    tl: { col: 0.15, row: 0.15 },
-    ext: { width: 54, height: 64 },
+    tl: { col: 0.18, row: 1.2 },
+    ext: { width: 52, height: 58 },
   });
 }
 

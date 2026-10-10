@@ -587,33 +587,7 @@ export function IaMarkEntryWorkspace({
   };
 
   const exportCsv = () => {
-    const headers = [
-      'Roll Number',
-      'Student Name',
-      'Shift',
-      ...components.map((cell) => cell.label),
-      'Remarks',
-    ];
-    const lines = visibleStudents.map((student) => [
-      student.rollNumber ?? '',
-      student.fullName ?? '',
-      student.shiftName ?? '',
-      ...student.marks.map((cell) => {
-        const value = valueFor(student, cell);
-        return value == null ? '' : String(value);
-      }),
-      remarksFor(student),
-    ]);
-    const csv = [headers, ...lines]
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${selectedPaper?.paperCode || 'ia'}-marks.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    void downloadTemplate();
   };
 
   const resetFiltersForExam = (nextExamId: string) => {
@@ -1289,9 +1263,10 @@ export function IaMarkEntryWorkspace({
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Import and export</h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            Download the Excel template for this paper. It lists each student, the shift, and a
-            marks column out of the real maximum. Fill the marks, keep the roll numbers, and import
-            the same file. A blank marks cell leaves the saved mark unchanged.
+            Download the Excel template for this paper. It opens with the college header, the exam
+            details, and a marks column out of the real maximum. Fill the yellow marks cells, keep
+            the roll numbers, and import the same file. A blank marks cell leaves the saved mark
+            unchanged.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <GhostButton
@@ -1314,7 +1289,7 @@ export function IaMarkEntryWorkspace({
               />
             </label>
             <GhostButton onClick={exportCsv} icon={<Download className="h-4 w-4" />}>
-              Export current list
+              Download Excel
             </GhostButton>
           </div>
         </section>
