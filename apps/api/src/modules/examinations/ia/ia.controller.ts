@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -7,7 +8,11 @@ import {
   Post,
   Query,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import {
@@ -280,6 +285,46 @@ export class IaController {
     @Body() dto: SaveIaMarksDto,
   ) {
     return this.marks.saveMarks(user, paperId, dto);
+  }
+
+  @Get('papers/:paperId/marks/template')
+  @RequireAnyPermission('ia:marks:enter', 'exam:marks', 'exam:admin', 'ia:view')
+  async markImportTemplate(
+    @CurrentUser() user: JwtUser,
+    @Param('paperId') paperId: string,
+    @Res() res: Response,
+  ) {
+    const file = await this.marks.buildImportTemplate(user, paperId);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    return res.send(file.buffer);
+  }
+
+  @Post('papers/:paperId/marks/import-file')
+  @RequireAnyPermission('ia:marks:enter', 'exam:marks', 'exam:admin')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 8 * 1024 * 1024 },
+    }),
+  )
+  importMarkFile(
+    @CurrentUser() user: JwtUser,
+    @Param('paperId') paperId: string,
+    @UploadedFile()
+    file: { buffer?: Buffer; originalname?: string } | undefined,
+    @Body('schemeId') schemeId?: string,
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Choose the Excel template.');
+    }
+    return this.marks.importWorkbook(user, paperId, schemeId, file.buffer);
   }
 
   @Post('papers/:paperId/marks/import')

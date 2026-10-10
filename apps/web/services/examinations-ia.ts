@@ -387,10 +387,29 @@ export async function importIaMarks(
   paperId: string,
   payload: {
     schemeId: string;
-    rows: Array<{ rollNumber: string; componentCode: string; marks: number }>;
+    rows: Array<{ rollNumber: string; componentCode: string; marks: number; remarks?: string }>;
   },
 ) {
   const { data } = await api.post(`/v1/examinations/ia/papers/${paperId}/marks/import`, payload);
+  return data;
+}
+
+export async function downloadIaMarkTemplate(paperId: string): Promise<Blob> {
+  const { data } = await api.get(`/v1/examinations/ia/papers/${paperId}/marks/template`, {
+    responseType: 'blob',
+  });
+  return data as Blob;
+}
+
+export async function importIaMarkFile(paperId: string, file: File, schemeId?: string) {
+  const form = new FormData();
+  form.append('file', file);
+  if (schemeId) form.append('schemeId', schemeId);
+  const { data } = await api.post<{ saved?: number; skipped?: number }>(
+    `/v1/examinations/ia/papers/${paperId}/marks/import-file`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
   return data;
 }
 

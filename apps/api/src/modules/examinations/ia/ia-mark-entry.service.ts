@@ -6,6 +6,12 @@ import {
 } from '@nestjs/common';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
+import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
+import {
+  buildIaMarkImportWorkbook,
+  parseIaMarkImportWorkbook,
+  safeWorkbookName,
+} from './ia-mark-import-workbook';
 import { IaAuditService } from './ia-audit.service';
 import { IaSchemeService } from './ia-scheme.service';
 import { IaSessionService } from './ia-session.service';
@@ -596,7 +602,12 @@ export class IaMarkEntryService {
     user: JwtUser,
     paperId: string,
     schemeId: string,
-    rows: Array<{ rollNumber: string; componentCode: string; marks: number }>,
+    rows: Array<{
+      rollNumber: string;
+      componentCode: string;
+      marks: number;
+      remarks?: string;
+    }>,
   ) {
     const roster = await this.getRoster(user, paperId, schemeId);
     const studentByRoll = new Map(
@@ -615,18 +626,157 @@ export class IaMarkEntryService {
     );
 
     const markRows: SaveIaMarksDto['rows'] = [];
+    let skipped = 0;
     for (const row of rows) {
       const studentId = studentByRoll.get(row.rollNumber.trim().toUpperCase());
       const componentId = compByCode.get(
         row.componentCode.trim().toUpperCase(),
       );
-      if (!studentId || !componentId) continue;
+      if (!studentId || !componentId) {
+        skipped++;
+        continue;
+      }
       markRows.push({
         studentId: String(studentId),
         componentId: String(componentId),
         marks: row.marks,
+        remarks: row.remarks,
       });
     }
-    return this.saveMarks(user, paperId, { schemeId, rows: markRows });
+    if (!markRows.length) {
+      throw new BadRequestException(
+        skipped
+          ? 'None of the roll numbers in this file match the selected paper.'
+          : 'Enter at least one mark before importing.',
+      );
+    }
+    const saved = await this.saveMarks(user, paperId, {
+      schemeId: roster.scheme.id,
+      rows: markRows,
+    });
+    return { ...saved, skipped };
+  }
+
+  async buildImportTemplate(user: JwtUser, paperId: string) {
+    const roster = await this.getRoster(user, paperId);
+    const [branding, programme] = await Promise.all([
+      this.importBranding(user.tid),
+      this.programmeLabel(
+        user.tid,
+        roster.students.map((student: { id: string }) => student.id),
+      ),
+    ]);
+    const context = roster.context ?? {};
+    const paper = roster.paper ?? {};
+    const shifts = [
+      ...new Set(
+        roster.students
+          .map((student: { shiftName?: string | null }) => student.shiftName)
+          .filter((name: string | null | undefined): name is string =>
+            Boolean(name),
+          ),
+      ),
+    ];
+    const buffer = await buildIaMarkImportWorkbook({
+      collegeName: branding.displayName,
+      motto: branding.motto,
+      logoUrl: branding.logoUrl,
+      academicYear: context.academicYearName || '—',
+      programme,
+      examName: context.sessionName || 'Internal assessment',
+      shiftName:
+        shifts.length === 1 ? shifts[0] : context.shiftName || 'All shifts',
+      subject:
+        [paper.paperCode, paper.paperName].filter(Boolean).join(' — ') || '—',
+      components: (roster.scheme.components ?? []).map(
+        (component: { code: string; label: string; maxMarks: unknown }) => ({
+          code: component.code,
+          label: component.label,
+          maxMarks: Number(component.maxMarks),
+        }),
+      ),
+      students: roster.students.map(
+        (student: {
+          rollNumber?: string | null;
+          fullName?: string | null;
+          shiftName?: string | null;
+          marks: Array<{
+            code: string;
+            marks: number | null;
+            remarks?: string | null;
+          }>;
+        }) => ({
+          rollNumber: student.rollNumber,
+          fullName: student.fullName,
+          shiftName: student.shiftName,
+          marks: student.marks,
+        }),
+      ),
+    });
+    const filename = `${safeWorkbookName(paper.paperCode || context.sessionName || 'ia-marks')}-marks.xlsx`;
+    return { buffer, filename };
+  }
+
+  async importWorkbook(
+    user: JwtUser,
+    paperId: string,
+    schemeId: string | undefined,
+    buffer: Buffer,
+  ) {
+    let rows;
+    try {
+      rows = await parseIaMarkImportWorkbook(buffer);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error
+          ? error.message
+          : 'The Excel file could not be read.',
+      );
+    }
+    return this.importMarksFromRows(user, paperId, schemeId || '', rows);
+  }
+
+  private async importBranding(tenantId: string) {
+    const [tenant, branding] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { name: true },
+      }),
+      this.prisma.tenantBranding.findUnique({
+        where: { tenantId },
+        select: { displayName: true, portalSubtitle: true, logoUrl: true },
+      }),
+    ]);
+    return {
+      displayName: branding?.displayName || tenant?.name || 'College',
+      motto: branding?.portalSubtitle?.trim() || null,
+      logoUrl:
+        toPublicUploadUrl(branding?.logoUrl) ?? branding?.logoUrl ?? null,
+    };
+  }
+
+  private async programmeLabel(tenantId: string, studentIds: string[]) {
+    if (!studentIds.length) return '—';
+    const students = await this.prisma.student.findMany({
+      where: { tenantId, id: { in: studentIds.slice(0, 800) } },
+      select: {
+        programVersion: {
+          select: { program: { select: { name: true, code: true } } },
+        },
+      },
+    });
+    const names = [
+      ...new Set(
+        students
+          .map(
+            (student) =>
+              student.programVersion?.program?.code ||
+              student.programVersion?.program?.name,
+          )
+          .filter((name): name is string => Boolean(name)),
+      ),
+    ];
+    if (!names.length) return '—';
+    return names.length === 1 ? names[0] : names.slice(0, 3).join(', ');
   }
 }

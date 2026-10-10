@@ -28,7 +28,9 @@ import {
   fetchFacultyIaSubjects,
   fetchIaExams,
   fetchIaPapers,
+  downloadIaMarkTemplate,
   fetchIaRoster,
+  importIaMarkFile,
   importIaMarks,
   saveIaMarks,
   type IaExamSummary,
@@ -530,27 +532,57 @@ export function IaMarkEntryWorkspace({
     onError: (error) => setNotice(apiErrorMessage(error, 'Unable to save marks.')),
   });
 
-  const onImportCsv = async (file: File) => {
-    if (!schemeId) {
+  const importNotice = (result?: { saved?: number; skipped?: number }, fallback = 0) => {
+    const saved = result?.saved ?? fallback;
+    const skipped = result?.skipped
+      ? ` ${result.skipped} row${result.skipped === 1 ? '' : 's'} did not match this paper.`
+      : '';
+    setNotice(`Imported ${saved} mark${saved === 1 ? '' : 's'}.${skipped}`);
+  };
+
+  const onImportFile = async (file: File) => {
+    if (!paperId) return;
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
+    if (isCsv && !schemeId) {
       setNotice('No mark scheme is linked to this paper.');
       return;
     }
-    const text = await file.text();
-    const lines = text.trim().split(/\r?\n/).slice(1);
-    const rows = lines
-      .map((line) => line.split(','))
-      .filter((cols) => cols.length >= 3)
-      .map(([rollNumber, componentCode, marks]) => ({
-        rollNumber: rollNumber.trim(),
-        componentCode: componentCode.trim(),
-        marks: Number(marks),
-      }));
     try {
-      const result = await importIaMarks(paperId, { schemeId, rows });
-      setNotice(`Imported ${result?.saved ?? rows.length} marks.`);
+      if (isCsv) {
+        const text = await file.text();
+        const lines = text.trim().split(/\r?\n/).slice(1);
+        const rows = lines
+          .map((line) => line.split(','))
+          .filter((cols) => cols.length >= 3)
+          .map(([rollNumber, componentCode, marks]) => ({
+            rollNumber: rollNumber.trim(),
+            componentCode: componentCode.trim(),
+            marks: Number(marks),
+          }));
+        const result = await importIaMarks(paperId, { schemeId, rows });
+        importNotice(result, rows.length);
+      } else {
+        const result = await importIaMarkFile(paperId, file, schemeId || undefined);
+        importNotice(result);
+      }
       qc.invalidateQueries({ queryKey: ['ia', 'roster', paperId] });
     } catch (error) {
-      setNotice(apiErrorMessage(error, 'Unable to import the CSV.'));
+      setNotice(apiErrorMessage(error, 'Unable to import this file.'));
+    }
+  };
+
+  const downloadTemplate = async () => {
+    if (!paperId) return;
+    try {
+      const blob = await downloadIaMarkTemplate(paperId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${selectedPaper?.paperCode || 'ia'}-marks.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setNotice(apiErrorMessage(error, 'Unable to download the Excel template.'));
     }
   };
 
@@ -927,20 +959,23 @@ export function IaMarkEntryWorkspace({
                 Preview
               </GhostButton>
               <label className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                <Upload className="h-4 w-4" /> Import CSV
+                <Upload className="h-4 w-4" /> Import Excel
                 <input
                   type="file"
-                  accept=".csv,text/csv"
+                  accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                   className="hidden"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
-                    if (file) void onImportCsv(file);
+                    if (file) void onImportFile(file);
                     event.target.value = '';
                   }}
                 />
               </label>
-              <GhostButton onClick={exportCsv} icon={<Download className="h-4 w-4" />}>
-                Export CSV
+              <GhostButton
+                onClick={() => void downloadTemplate()}
+                icon={<Download className="h-4 w-4" />}
+              >
+                Excel template
               </GhostButton>
               <button
                 type="button"
@@ -1254,19 +1289,26 @@ export function IaMarkEntryWorkspace({
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Import and export</h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            CSV columns are roll number, component code, and marks. The first row is the heading.
-            Component code for this paper: {components.map((cell) => cell.code).join(', ') || '—'}.
+            Download the Excel template for this paper. It lists each student, the shift, and a
+            marks column out of the real maximum. Fill the marks, keep the roll numbers, and import
+            the same file. A blank marks cell leaves the saved mark unchanged.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
+            <GhostButton
+              onClick={() => void downloadTemplate()}
+              icon={<Download className="h-4 w-4" />}
+            >
+              Download Excel template
+            </GhostButton>
             <label className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700">
-              <Upload className="h-4 w-4" /> Choose CSV
+              <Upload className="h-4 w-4" /> Import filled Excel
               <input
                 type="file"
-                accept=".csv,text/csv"
+                accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
-                  if (file) void onImportCsv(file);
+                  if (file) void onImportFile(file);
                   event.target.value = '';
                 }}
               />
