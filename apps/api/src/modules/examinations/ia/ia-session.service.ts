@@ -68,16 +68,59 @@ export class IaSessionService {
     return row;
   }
 
-  listPapers(tenantId: string, query: IaQueryDto) {
-    return (this.prisma as any).examPaperSchedule.findMany({
+  async listPapers(tenantId: string, query: IaQueryDto) {
+    const papers = await (this.prisma as any).examPaperSchedule.findMany({
       where: {
         tenantId,
         deletedAt: null,
         ...(query.sessionId ? { sessionId: query.sessionId } : {}),
         ...(query.semesterNo ? { semesterNo: query.semesterNo } : {}),
       },
-      orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }],
-      take: 500,
+      orderBy: [
+        { examDate: 'asc' },
+        { startTime: 'asc' },
+        { paperCode: 'asc' },
+      ],
+      take: query.sessionId ? 1000 : 500,
+    });
+    const courseIds: string[] = [
+      ...new Set(
+        (papers as Array<{ courseId?: string | null }>)
+          .map((paper) => paper.courseId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const courses = courseIds.length
+      ? await this.prisma.course.findMany({
+          where: { tenantId, id: { in: courseIds } },
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            credits: true,
+            courseType: true,
+            departmentId: true,
+            department: { select: { id: true, name: true } },
+          },
+        })
+      : [];
+    const courseById = new Map(courses.map((course) => [course.id, course]));
+    return papers.map((paper: { courseId?: string | null }) => {
+      const course = paper.courseId ? courseById.get(paper.courseId) : null;
+      return {
+        ...paper,
+        course: course
+          ? {
+              id: course.id,
+              code: course.code,
+              title: course.title,
+              credits: course.credits != null ? Number(course.credits) : null,
+              courseType: course.courseType,
+              departmentId: course.department?.id ?? course.departmentId,
+              departmentName: course.department?.name ?? null,
+            }
+          : null,
+      };
     });
   }
 

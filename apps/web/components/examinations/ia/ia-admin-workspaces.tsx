@@ -10,7 +10,6 @@ import {
   Loader2,
   Plus,
   Printer,
-  Save,
   Send,
   Sparkles,
 } from 'lucide-react';
@@ -23,28 +22,26 @@ import {
   createIaSession,
   downloadIaNehuExport,
   downloadIaNoticeboardRoutinePdf,
-  fetchFacultyIaSubjects,
   fetchIaAdminDashboard,
   fetchIaConsolidationSheets,
   fetchIaDefaulters,
   fetchIaExams,
   fetchIaNoticeboardRoutineHtml,
   fetchIaPapers,
-  fetchIaRoster,
   fetchIaSchemes,
   fetchIaSessions,
   fetchIaSettings,
   fetchPendingIaApprovals,
   generateIaConsolidation,
   generateIaTimetable,
-  importIaMarks,
-  saveIaMarks,
   submitIaSheet,
   updateIaSettings,
   type IaComponent,
 } from '@/services/examinations-ia';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+
+export { IaMarkEntryWorkspace } from './ia-mark-entry-workspace';
 
 function formatPaperClock(value: string | Date | null | undefined) {
   if (value == null || value === '') return '—';
@@ -627,178 +624,6 @@ export function IaTimetableWorkspace() {
             </p>
           ) : null}
         </div>
-      </Card>
-    </div>
-  );
-}
-
-export function IaMarkEntryWorkspace({ staffMode = false }: { staffMode?: boolean }) {
-  const qc = useQueryClient();
-  const subjects = useQuery({
-    queryKey: ['ia', staffMode ? 'faculty-subjects' : 'papers'],
-    queryFn: staffMode ? fetchFacultyIaSubjects : () => fetchIaPapers(),
-  });
-  const [paperId, setPaperId] = useState('');
-
-  const paperOptions = useMemo((): Array<{ id: string; label: string }> => {
-    if (staffMode) {
-      return (subjects.data ?? []).flatMap(
-        (s: {
-          papers?: Array<{ id: string; paperCode: string; paperName: string }>;
-          courseCode: string;
-        }) =>
-          (s.papers ?? []).map((p) => ({
-            id: p.id,
-            label: `${s.courseCode} — ${p.paperName || p.paperCode}`,
-          })),
-      );
-    }
-    return (subjects.data ?? []).map((p: { id: string; paperCode: string; paperName: string }) => ({
-      id: p.id,
-      label: `${p.paperCode} — ${p.paperName}`,
-    }));
-  }, [staffMode, subjects.data]);
-
-  const activePaper = paperId || paperOptions[0]?.id || '';
-
-  const roster = useQuery({
-    queryKey: ['ia', 'roster', activePaper],
-    queryFn: () => fetchIaRoster(activePaper),
-    enabled: Boolean(activePaper),
-  });
-
-  const resolvedSchemeId = roster.data?.scheme?.id ?? '';
-
-  const [draft, setDraft] = useState<Record<string, number | null>>({});
-
-  const save = useMutation({
-    mutationFn: () => {
-      if (!resolvedSchemeId) throw new Error('No mark scheme linked to this subject');
-      const rows = Object.entries(draft).map(([key, marks]) => {
-        const [studentId, componentId] = key.split(':');
-        return { studentId, componentId, marks };
-      });
-      return saveIaMarks(activePaper, { schemeId: resolvedSchemeId, rows });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['ia', 'roster', activePaper] });
-      setDraft({});
-    },
-  });
-
-  const onImportCsv = async (file: File) => {
-    if (!resolvedSchemeId) return;
-    const text = await file.text();
-    const lines = text.trim().split('\n').slice(1);
-    const rows = lines
-      .map((line) => line.split(','))
-      .filter((cols) => cols.length >= 3)
-      .map(([rollNumber, componentCode, marks]) => ({
-        rollNumber: rollNumber.trim(),
-        componentCode: componentCode.trim(),
-        marks: Number(marks),
-      }));
-    await importIaMarks(activePaper, { schemeId: resolvedSchemeId, rows });
-    qc.invalidateQueries({ queryKey: ['ia', 'roster', activePaper] });
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <select
-          value={activePaper}
-          onChange={(e) => setPaperId(e.target.value)}
-          className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
-        >
-          {paperOptions.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-        {roster.data?.scheme ? (
-          <span className="inline-flex items-center rounded-xl border border-border px-3 py-1.5 text-xs text-muted-foreground">
-            Max {Number(roster.data.scheme.totalMaxMarks)} marks ·{' '}
-            {roster.data.scheme.components?.length ?? 0} component(s)
-          </span>
-        ) : null}
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border px-3 py-1.5 text-xs">
-          Import CSV
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={(e) => e.target.files?.[0] && onImportCsv(e.target.files[0])}
-          />
-        </label>
-        <Button
-          size="sm"
-          onClick={() => save.mutate()}
-          disabled={save.isPending || !Object.keys(draft).length || !resolvedSchemeId}
-        >
-          <Save className="h-4 w-4" /> Save Marks
-        </Button>
-      </div>
-      <Card title="Mark Entry">
-        {roster.isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading roster…</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="py-2 pr-3">Roll</th>
-                  <th className="py-2 pr-3">Name</th>
-                  {(roster.data?.scheme?.components ?? []).map(
-                    (c: IaComponent & { id: string }) => (
-                      <th key={c.id} className="py-2 px-2 text-center">
-                        {c.label}
-                        <br />
-                        <span className="text-[10px]">/{c.maxMarks}</span>
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {(roster.data?.students ?? []).map(
-                  (s: {
-                    id: string;
-                    rollNumber?: string;
-                    fullName?: string;
-                    marks: Array<{ componentId: string; marks: number | null; maxMarks: number }>;
-                  }) => (
-                    <tr key={s.id} className="border-b border-border/40">
-                      <td className="py-2 pr-3">{s.rollNumber}</td>
-                      <td className="py-2 pr-3">{s.fullName}</td>
-                      {s.marks.map((m) => {
-                        const key = `${s.id}:${m.componentId}`;
-                        const value = key in draft ? draft[key] : m.marks;
-                        return (
-                          <td key={m.componentId} className="px-1 py-2 text-center">
-                            <input
-                              type="number"
-                              min={0}
-                              max={m.maxMarks}
-                              value={value ?? ''}
-                              onChange={(e) =>
-                                setDraft((prev) => ({
-                                  ...prev,
-                                  [key]: e.target.value === '' ? null : Number(e.target.value),
-                                }))
-                              }
-                              className="h-8 w-16 rounded-lg border border-border bg-background text-center text-xs"
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ),
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
       </Card>
     </div>
   );

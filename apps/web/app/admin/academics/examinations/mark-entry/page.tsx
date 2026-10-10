@@ -10,7 +10,7 @@ export default function IaMarkEntryPage() {
   if (!session) return null;
   return (
     <DashboardShell role="admin" pageHeader={false} title="IA Mark Entry">
-      <IaExaminationShell>
+      <IaExaminationShell banner={false}>
         <IaMarkEntryWorkspace />
       </IaExaminationShell>
     </DashboardShell>

@@ -52,6 +52,16 @@ export type IaPaper = {
   endTime: string;
   semesterNo?: number | null;
   status: string;
+  metadata?: { category?: string; maxMarks?: number; schemeId?: string } | null;
+  course?: {
+    id: string;
+    code: string;
+    title: string;
+    credits: number | null;
+    courseType: string | null;
+    departmentId: string | null;
+    departmentName: string | null;
+  } | null;
 };
 
 export type IaMarkRow = {
