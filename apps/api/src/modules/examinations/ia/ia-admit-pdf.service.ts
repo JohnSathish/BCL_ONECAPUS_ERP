@@ -26,7 +26,7 @@ function embedAdmitCardImages(
 
 @Injectable()
 export class IaAdmitPdfService {
-  async htmlToPdf(html: string) {
+  async htmlToPdf(html: string, layout: 'single' | 'pair' = 'single') {
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -41,7 +41,11 @@ export class IaAdmitPdfService {
       const pdf = await page.pdf({
         format: 'A4',
         printBackground: true,
-        margin: { top: '8mm', right: '8mm', bottom: '8mm', left: '8mm' },
+        preferCSSPageSize: true,
+        margin:
+          layout === 'pair'
+            ? { top: '0', right: '0', bottom: '0', left: '0' }
+            : { top: '8mm', right: '8mm', bottom: '8mm', left: '8mm' },
       });
       return Buffer.from(pdf);
     } finally {
@@ -49,17 +53,20 @@ export class IaAdmitPdfService {
     }
   }
 
-  renderDocumentHtml(cards: IaAdmitCardTemplateInput[]) {
+  renderDocumentHtml(
+    cards: IaAdmitCardTemplateInput[],
+    layout: 'single' | 'pair' = 'single',
+  ) {
     const prepared = cards.map((c) => embedAdmitCardImages(c));
-    return renderIaAdmitCardsDocumentHtml(prepared);
+    return renderIaAdmitCardsDocumentHtml(prepared, layout);
   }
 
   async renderCardPdf(card: IaAdmitCardTemplateInput) {
     const html = renderIaAdmitCardHtml(embedAdmitCardImages(card));
-    return this.htmlToPdf(html);
+    return this.htmlToPdf(html, 'single');
   }
 
   async renderBatchPdf(cards: IaAdmitCardTemplateInput[]) {
-    return this.htmlToPdf(this.renderDocumentHtml(cards));
+    return this.htmlToPdf(this.renderDocumentHtml(cards, 'pair'), 'pair');
   }
 }

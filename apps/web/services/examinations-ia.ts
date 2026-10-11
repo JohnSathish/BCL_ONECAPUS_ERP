@@ -518,11 +518,16 @@ export async function fetchIaAdmitStudents(
 export async function fetchIaAdmitCard(
   sessionId: string,
   studentId: string,
-  options?: { preview?: boolean },
+  options?: { preview?: boolean; feeBookVerified?: boolean },
 ) {
   const { data } = await api.get(
     `/v1/examinations/ia/admit-cards/sessions/${sessionId}/students/${studentId}`,
-    { params: options?.preview ? { preview: '1' } : undefined },
+    {
+      params: {
+        ...(options?.preview ? { preview: '1' } : {}),
+        ...(options?.feeBookVerified ? { feeBookVerified: '1' } : {}),
+      },
+    },
   );
   return data;
 }
@@ -535,28 +540,40 @@ export async function bulkGenerateIaAdmitCards(sessionId: string, studentIds: st
   return data;
 }
 
-export async function downloadIaAdmitPdf(sessionId: string, studentIds: string[]) {
+export async function downloadIaAdmitPdf(
+  sessionId: string,
+  studentIds: string[],
+  options?: { feeBookVerified?: boolean },
+) {
   const { data } = await api.post(
     '/v1/examinations/ia/admit-cards/export/pdf',
-    { sessionId, studentIds },
+    { sessionId, studentIds, feeBookVerified: options?.feeBookVerified === true },
     { responseType: 'blob' },
   );
   return data as Blob;
 }
 
-export async function fetchIaAdmitPrintHtml(sessionId: string, studentIds: string[]) {
+export async function fetchIaAdmitPrintHtml(
+  sessionId: string,
+  studentIds: string[],
+  options?: { feeBookVerified?: boolean },
+) {
   const { data } = await api.post<string>(
     '/v1/examinations/ia/admit-cards/export/html',
-    { sessionId, studentIds },
+    { sessionId, studentIds, feeBookVerified: options?.feeBookVerified === true },
     { responseType: 'text' },
   );
   return data;
 }
 
-export async function downloadIaAdmitZip(sessionId: string, studentIds: string[]) {
+export async function downloadIaAdmitZip(
+  sessionId: string,
+  studentIds: string[],
+  options?: { feeBookVerified?: boolean },
+) {
   const { data } = await api.post(
     '/v1/examinations/ia/admit-cards/export/zip',
-    { sessionId, studentIds },
+    { sessionId, studentIds, feeBookVerified: options?.feeBookVerified === true },
     { responseType: 'blob' },
   );
   return data as Blob;

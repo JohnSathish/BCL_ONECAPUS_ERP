@@ -710,6 +710,7 @@ export class IaAdmitCardService {
     tenantId: string,
     sessionId: string,
     studentId: string,
+    options?: { waiveFee?: boolean },
   ) {
     const session = await this.getSession(tenantId, sessionId);
     await this.provisioning.syncSessionPapersFromRegistrations(
@@ -744,6 +745,7 @@ export class IaAdmitCardService {
     const elig = await this.eligibility.evaluateStudent(tenantId, student, {
       semesterNo: session.semesterNo,
       isDefaulter,
+      waiveFee: options?.waiveFee,
     });
 
     const papers: PaperRow[] = await this.db().examPaperSchedule.findMany({
@@ -867,12 +869,13 @@ export class IaAdmitCardService {
     sessionId: string,
     studentId: string,
     user?: JwtUser,
-    options?: { persist?: boolean; force?: boolean },
+    options?: { persist?: boolean; force?: boolean; waiveFee?: boolean },
   ) {
     const ctx = await this.loadStudentCardContext(
       tenantId,
       sessionId,
       studentId,
+      { waiveFee: options?.waiveFee },
     );
     const cfg = await this.settings.getOrCreate(tenantId);
 
@@ -976,7 +979,11 @@ export class IaAdmitCardService {
           issue.id,
           issue.regeneratedCount > 0 ? 'REGENERATED' : 'GENERATED',
           undefined,
-          { admitCardNumber, studentId },
+          {
+            admitCardNumber,
+            studentId,
+            feeBookVerified: options?.waiveFee === true,
+          },
         );
       }
     }
@@ -1106,6 +1113,7 @@ export class IaAdmitCardService {
     studentIds: string[],
     user?: JwtUser,
     audit?: 'download' | 'print',
+    options?: { waiveFee?: boolean },
   ): Promise<IaAdmitCardTemplateInput[]> {
     if (!studentIds.length) {
       throw new BadRequestException('No students selected');
@@ -1118,6 +1126,7 @@ export class IaAdmitCardService {
         sessionId,
         studentId,
         user,
+        { waiveFee: options?.waiveFee },
       );
       if (card.blocked || !('admitCardNumber' in card)) continue;
       const [institution, academicYear] = await Promise.all([
@@ -1126,7 +1135,9 @@ export class IaAdmitCardService {
       ]);
       templates.push(
         await this.buildTemplateInput(
-          await this.loadStudentCardContext(tenantId, sessionId, studentId),
+          await this.loadStudentCardContext(tenantId, sessionId, studentId, {
+            waiveFee: options?.waiveFee,
+          }),
           institution,
           academicYear,
           card.admitCardNumber,
@@ -1153,6 +1164,7 @@ export class IaAdmitCardService {
     sessionId: string,
     studentIds: string[],
     user?: JwtUser,
+    options?: { waiveFee?: boolean },
   ) {
     const templates = await this.buildExportTemplates(
       tenantId,
@@ -1160,8 +1172,10 @@ export class IaAdmitCardService {
       studentIds,
       user,
       'print',
+      options,
     );
-    const html = this.pdf.renderDocumentHtml(templates);
+    const layout = templates.length > 1 ? 'pair' : 'single';
+    const html = this.pdf.renderDocumentHtml(templates, layout);
     return { html, count: templates.length };
   }
 
@@ -1170,6 +1184,7 @@ export class IaAdmitCardService {
     sessionId: string,
     studentIds: string[],
     user?: JwtUser,
+    options?: { waiveFee?: boolean },
   ) {
     const templates = await this.buildExportTemplates(
       tenantId,
@@ -1177,6 +1192,7 @@ export class IaAdmitCardService {
       studentIds,
       user,
       'download',
+      options,
     );
     const buffer =
       templates.length === 1
@@ -1185,7 +1201,7 @@ export class IaAdmitCardService {
     const filename =
       templates.length === 1
         ? `ia-admit-${templates[0].student.rollNumber ?? 'student'}.pdf`
-        : `ia-admit-batch-${sessionId.slice(0, 8)}.pdf`;
+        : `ia-admit-cards-${templates.length}.pdf`;
     return { buffer, filename, count: templates.length };
   }
 
@@ -1194,6 +1210,7 @@ export class IaAdmitCardService {
     sessionId: string,
     studentIds: string[],
     user?: JwtUser,
+    options?: { waiveFee?: boolean },
   ) {
     const session = await this.getSession(tenantId, sessionId);
     const folder = `Semester-${session.semesterNo ?? 'All'}`;
@@ -1207,6 +1224,7 @@ export class IaAdmitCardService {
         sessionId,
         studentId,
         user,
+        { waiveFee: options?.waiveFee },
       );
       if (card.blocked || !('admitCardNumber' in card)) continue;
       const [institution, academicYear] = await Promise.all([
@@ -1214,7 +1232,9 @@ export class IaAdmitCardService {
         this.academicYearLabel(tenantId, session.academicYearId),
       ]);
       const template = await this.buildTemplateInput(
-        await this.loadStudentCardContext(tenantId, sessionId, studentId),
+        await this.loadStudentCardContext(tenantId, sessionId, studentId, {
+          waiveFee: options?.waiveFee,
+        }),
         institution,
         academicYear,
         card.admitCardNumber as string,

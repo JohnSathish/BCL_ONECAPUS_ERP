@@ -47,7 +47,11 @@ export class IaAdmitEligibilityService {
   async evaluateStudent(
     tenantId: string,
     student: StudentEligibilityInput,
-    options?: { semesterNo?: number | null; isDefaulter?: boolean },
+    options?: {
+      semesterNo?: number | null;
+      isDefaulter?: boolean;
+      waiveFee?: boolean;
+    },
   ): Promise<IaAdmitEligibilityResult> {
     const cfg = await this.settings.getOrCreate(tenantId);
     const minAttendance = Number(cfg.attendanceMinPercent);
@@ -147,14 +151,17 @@ export class IaAdmitEligibilityService {
     });
     const feeDue = Number(feeRow?.totalOutstanding ?? 0);
     let feeOk = true;
-    if (feeDue > 0) {
+    if (!options?.waiveFee && feeDue > 0) {
       feeOk = false;
       reasons.push(
         `Examination/fee dues pending (₹${feeDue.toLocaleString('en-IN')})`,
       );
     }
     const feeStatus = (feeRow?.feeStatus ?? '').toUpperCase();
-    if (feeStatus === 'HOLD' || feeStatus === 'CRITICAL_HOLD') {
+    if (
+      !options?.waiveFee &&
+      (feeStatus === 'HOLD' || feeStatus === 'CRITICAL_HOLD')
+    ) {
       feeOk = false;
       reasons.push(`Critical fee hold (${feeStatus})`);
     }

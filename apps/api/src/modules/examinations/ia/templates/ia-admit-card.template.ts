@@ -300,6 +300,78 @@ const IA_ADMIT_CARD_STYLES = `
     color: #1e3a8a;
     font-weight: 700;
   }
+  .sheet {
+    position: relative;
+    width: 210mm;
+    height: 296mm;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+  }
+  .sheet:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  .half-slot {
+    height: 148mm;
+    padding: 2.5mm 5mm 2mm;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .sheet .page {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    margin: 0;
+    padding: 3mm 3.5mm;
+    page-break-before: auto;
+    break-before: auto;
+    overflow: hidden;
+  }
+  .sheet .page + .page { page-break-before: auto; break-before: auto; }
+  .sheet .watermark { font-size: 40px; }
+  .sheet .header { gap: 8px; padding-bottom: 4px; }
+  .sheet .logo { width: 40px; height: 40px; }
+  .sheet .header-main h1 { font-size: 13px; }
+  .sheet .header-main p { font-size: 8px; margin: 0; }
+  .sheet .badge { min-width: 78px; padding: 4px 6px; font-size: 7px; }
+  .sheet .exam-bar { margin-top: 4px; padding: 4px 6px; }
+  .sheet .exam-bar strong { font-size: 10px; }
+  .sheet .verify-block img { width: 46px; height: 46px; }
+  .sheet .student-grid { margin-top: 4px; gap: 6px; grid-template-columns: 1fr 76px; }
+  .sheet .fields { gap: 2px 8px; }
+  .sheet .field label { font-size: 7px; }
+  .sheet .field span { font-size: 9px; }
+  .sheet .photo-box { padding: 3px; }
+  .sheet .photo-box img { width: 58px; height: 68px; }
+  .sheet .sig-line { margin-top: 3px; font-size: 7px; }
+  .sheet table.papers { margin-top: 4px; font-size: 8px; }
+  .sheet table.papers th, .sheet table.papers td { padding: 1px 3px; }
+  .sheet table.papers th { font-size: 7px; }
+  .sheet .footer { margin-top: 4px; padding-top: 3px; gap: 6px; grid-template-columns: 1fr 110px; }
+  .sheet .footer li { margin-bottom: 0; font-size: 7.5px; }
+  .sheet .auth .line { margin-top: 14px; font-size: 8px; }
+  .sheet .disclaimer { display: none; }
+  .cut-line {
+    position: absolute;
+    top: 148mm;
+    left: 8mm;
+    right: 8mm;
+    border-top: 0.35mm dashed #64748b;
+    z-index: 3;
+  }
+  .cut-line span {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    padding: 0 3mm;
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
 `;
 
 export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
@@ -409,20 +481,47 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
 
 export function renderIaAdmitCardsDocumentHtml(
   cards: IaAdmitCardTemplateInput[],
+  layout: 'single' | 'pair' = 'single',
 ) {
   const titleRoll = esc(cards[0]?.student.rollNumber ?? 'batch');
-  const pages = cards.map((c) => renderIaAdmitCardPage(c)).join('\n');
+  const styles =
+    layout === 'pair'
+      ? IA_ADMIT_CARD_STYLES.replace(
+          '@page { size: A4 portrait; margin: 10mm; }',
+          '@page { size: A4 portrait; margin: 0; }',
+        )
+      : IA_ADMIT_CARD_STYLES;
+  const pages =
+    layout === 'pair'
+      ? pairSheets(cards)
+      : cards.map((card) => renderIaAdmitCardPage(card)).join('\n');
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>IA Admit Card — ${titleRoll}</title>
-  <style>${IA_ADMIT_CARD_STYLES}</style>
+  <style>${styles}</style>
 </head>
 <body>
 ${pages}
 </body>
 </html>`;
+}
+
+function pairSheets(cards: IaAdmitCardTemplateInput[]) {
+  const sheets: string[] = [];
+  for (let index = 0; index < cards.length; index += 2) {
+    const top = renderIaAdmitCardPage(cards[index]);
+    const bottom = cards[index + 1]
+      ? renderIaAdmitCardPage(cards[index + 1])
+      : '';
+    sheets.push(`<section class="sheet">
+      <div class="half-slot">${top}</div>
+      <div class="cut-line"><span>Cut here</span></div>
+      <div class="half-slot">${bottom}</div>
+    </section>`);
+  }
+  return sheets.join('\n');
 }
 
 /** Single-card document — used by PDF renderer and browser print. */

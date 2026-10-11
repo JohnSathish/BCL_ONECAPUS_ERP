@@ -517,7 +517,9 @@ export class IaController {
     @Param('sessionId') sessionId: string,
     @Param('studentId') studentId: string,
     @Query('preview') preview?: string,
+    @Query('feeBookVerified') feeBookVerified?: string,
   ) {
+    const waiveFee = feeBookVerified === '1';
     if (preview === '1') {
       return this.admitCards.generateCard(
         user.tid,
@@ -526,10 +528,13 @@ export class IaController {
         user,
         {
           persist: false,
+          waiveFee,
         },
       );
     }
-    return this.admitCards.generateCard(user.tid, sessionId, studentId, user);
+    return this.admitCards.generateCard(user.tid, sessionId, studentId, user, {
+      waiveFee,
+    });
   }
 
   @Post('admit-cards/bulk')
@@ -545,7 +550,12 @@ export class IaController {
   @RequireAnyPermission('ia:manage', 'exam:admin', 'ia:view')
   async exportAdmitPdf(
     @CurrentUser() user: JwtUser,
-    @Body() body: { sessionId: string; studentIds: string[] },
+    @Body()
+    body: {
+      sessionId: string;
+      studentIds: string[];
+      feeBookVerified?: boolean;
+    },
     @Res() res: Response,
   ) {
     const { buffer, filename } = await this.admitCards.exportPdf(
@@ -553,6 +563,7 @@ export class IaController {
       body.sessionId,
       body.studentIds,
       user,
+      { waiveFee: body.feeBookVerified === true },
     );
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -563,7 +574,12 @@ export class IaController {
   @RequireAnyPermission('ia:manage', 'exam:admin', 'ia:view')
   async exportAdmitHtml(
     @CurrentUser() user: JwtUser,
-    @Body() body: { sessionId: string; studentIds: string[] },
+    @Body()
+    body: {
+      sessionId: string;
+      studentIds: string[];
+      feeBookVerified?: boolean;
+    },
     @Res() res: Response,
   ) {
     const { html } = await this.admitCards.exportHtml(
@@ -571,6 +587,7 @@ export class IaController {
       body.sessionId,
       body.studentIds,
       user,
+      { waiveFee: body.feeBookVerified === true },
     );
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
@@ -580,7 +597,12 @@ export class IaController {
   @RequireAnyPermission('ia:manage', 'exam:admin')
   async exportAdmitZip(
     @CurrentUser() user: JwtUser,
-    @Body() body: { sessionId: string; studentIds: string[] },
+    @Body()
+    body: {
+      sessionId: string;
+      studentIds: string[];
+      feeBookVerified?: boolean;
+    },
     @Res() res: Response,
   ) {
     const { buffer, filename } = await this.admitCards.exportZip(
@@ -588,6 +610,7 @@ export class IaController {
       body.sessionId,
       body.studentIds,
       user,
+      { waiveFee: body.feeBookVerified === true },
     );
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

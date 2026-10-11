@@ -72,6 +72,14 @@ type StudentRow = {
   admitCardNumber?: string | null;
 };
 
+function feeHoldOnly(student: StudentRow) {
+  if (student.eligible || student.missingFields.length) return false;
+  return (
+    student.ineligibilityReasons.length > 0 &&
+    student.ineligibilityReasons.every((reason) => /fee|dues/i.test(reason))
+  );
+}
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -126,6 +134,8 @@ export function IaAdmitCardsWorkspace() {
   const [previewCard, setPreviewCard] = useState<IaAdmitCardData | null>(null);
   const [previewStudentId, setPreviewStudentId] = useState<string | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [feeBookVerified, setFeeBookVerified] = useState(false);
 
   const sessions = useQuery({ queryKey: ['ia', 'admit-sessions'], queryFn: fetchIaAdmitSessions });
   const sessionRows: AdmitSession[] = sessions.data ?? [];
@@ -216,15 +226,16 @@ export function IaAdmitCardsWorkspace() {
   const tableStudents = useMemo(() => {
     const query = search.trim().toLowerCase();
     return cohort.filter((student) => {
-      if (statusFilter === 'eligible' && !student.eligible) return false;
-      if (statusFilter === 'ineligible' && student.eligible) return false;
+      const feeBookStudent = feeBookVerified && feeHoldOnly(student);
+      if (statusFilter === 'eligible' && !student.eligible && !feeBookStudent) return false;
+      if (statusFilter === 'ineligible' && (student.eligible || feeBookStudent)) return false;
       if (!query) return true;
       return (
         (student.rollNumber ?? '').toLowerCase().includes(query) ||
         (student.fullName ?? '').toLowerCase().includes(query)
       );
     });
-  }, [cohort, statusFilter, search]);
+  }, [cohort, statusFilter, search, feeBookVerified]);
 
   const eligible = useMemo(() => cohort.filter((student) => student.eligible), [cohort]);
   const generated = cohort.filter((student) => student.admitCardNumber).length;
@@ -233,9 +244,15 @@ export function IaAdmitCardsWorkspace() {
   const pageCount = Math.max(1, Math.ceil(tableStudents.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const pageRows = tableStudents.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const canIssue = (student: StudentRow) =>
+    student.eligible || (feeBookVerified && feeHoldOnly(student));
   const selectedEligibleIds = [...selected].filter((id) =>
     eligible.some((student) => student.id === id),
   );
+  const selectedIssuableIds = [...selected].filter((id) =>
+    tableStudents.some((student) => student.id === id && canIssue(student)),
+  );
+  const shownIssuableIds = tableStudents.filter(canIssue).map((student) => student.id);
 
   useEffect(() => {
     setPage(1);
@@ -243,7 +260,10 @@ export function IaAdmitCardsWorkspace() {
 
   const preview = useMutation({
     mutationFn: (studentId: string) =>
-      fetchIaAdmitCard(activeSession, studentId, { preview: true }),
+      fetchIaAdmitCard(activeSession, studentId, {
+        preview: true,
+        feeBookVerified,
+      }),
     onSuccess: (data, studentId) => {
       setPreviewStudentId(studentId);
       setPreviewCard(data as IaAdmitCardData);
@@ -270,7 +290,9 @@ export function IaAdmitCardsWorkspace() {
   const admitPrint = useMutation({
     mutationFn: async (studentIds: string[]) => {
       setPrintError(null);
-      const html = await fetchIaAdmitPrintHtml(activeSession, studentIds);
+      const html = await fetchIaAdmitPrintHtml(activeSession, studentIds, {
+        feeBookVerified,
+      });
       await printHtmlDocument(html);
     },
     onSuccess: () => roster.refetch(),
@@ -279,15 +301,18 @@ export function IaAdmitCardsWorkspace() {
   });
 
   const pdfDownload = useMutation({
-    mutationFn: (ids: string[]) => downloadIaAdmitPdf(activeSession, ids),
+    mutationFn: (ids: string[]) => downloadIaAdmitPdf(activeSession, ids, { feeBookVerified }),
     onSuccess: (blob, ids) => {
-      downloadBlob(blob, ids.length === 1 ? 'ia-admit-card.pdf' : 'ia-admit-cards-batch.pdf');
+      setPdfError(null);
+      downloadBlob(blob, ids.length === 1 ? 'ia-admit-card.pdf' : 'ia-admit-cards.pdf');
       roster.refetch();
     },
+    onError: (error) =>
+      setPdfError(apiErrorMessage(error, 'Unable to download the admit card PDF.')),
   });
 
   const zipDownload = useMutation({
-    mutationFn: (ids: string[]) => downloadIaAdmitZip(activeSession, ids),
+    mutationFn: (ids: string[]) => downloadIaAdmitZip(activeSession, ids, { feeBookVerified }),
     onSuccess: (blob) => downloadBlob(blob, 'ia-admit-cards.zip'),
   });
 
@@ -324,7 +349,7 @@ export function IaAdmitCardsWorkspace() {
   }, [setHeaderAside, yearControl]);
 
   const toggleAll = () => {
-    const ids = tableStudents.filter((student) => student.eligible).map((student) => student.id);
+    const ids = tableStudents.filter(canIssue).map((student) => student.id);
     setSelected((prev) =>
       ids.length > 0 && ids.every((id) => prev.has(id)) ? new Set() : new Set(ids),
     );
@@ -353,11 +378,8 @@ export function IaAdmitCardsWorkspace() {
     );
   }
 
-  const allEligibleChecked =
-    tableStudents.some((student) => student.eligible) &&
-    tableStudents
-      .filter((student) => student.eligible)
-      .every((student) => selected.has(student.id));
+  const allIssuableChecked =
+    shownIssuableIds.length > 0 && shownIssuableIds.every((id) => selected.has(id));
 
   return (
     <div className="space-y-4">
@@ -518,6 +540,22 @@ export function IaAdmitCardsWorkspace() {
             </Field>
           </div>
 
+          <label className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={feeBookVerified}
+              onChange={(event) => setFeeBookVerified(event.target.checked)}
+            />
+            <span>
+              <span className="font-semibold">Fee book verified.</span> Download admit cards even
+              when the fee payment is not yet entered in the software. Check the fee book before
+              issuing the card. Attendance and other holds still apply. One student prints on a full
+              A4 page. Two or more print two cards on each A4 page, with a cut line through the
+              middle.
+            </span>
+          </label>
+
           <div className="mt-4 flex flex-wrap gap-2">
             <ActionButton
               className="bg-blue-600 text-white"
@@ -535,29 +573,36 @@ export function IaAdmitCardsWorkspace() {
             </ActionButton>
             <ActionButton
               className="bg-emerald-50 text-emerald-700"
-              disabled={!selectedEligibleIds.length || preview.isPending}
-              onClick={() => openPreview(selectedEligibleIds[0])}
+              disabled={!selectedIssuableIds.length || preview.isPending}
+              onClick={() => openPreview(selectedIssuableIds[0])}
             >
               <Eye className="h-4 w-4" /> Preview Selected
             </ActionButton>
             <ActionButton
               className="bg-rose-50 text-rose-600"
-              disabled={!selectedEligibleIds.length || pdfDownload.isPending}
-              onClick={() => pdfDownload.mutate(selectedEligibleIds)}
+              disabled={!selectedIssuableIds.length || pdfDownload.isPending}
+              onClick={() => pdfDownload.mutate(selectedIssuableIds)}
             >
-              <Download className="h-4 w-4" /> Download PDF
+              <Download className="h-4 w-4" /> Download PDF ({selectedIssuableIds.length})
+            </ActionButton>
+            <ActionButton
+              className="bg-rose-600 text-white"
+              disabled={!shownIssuableIds.length || pdfDownload.isPending}
+              onClick={() => pdfDownload.mutate(shownIssuableIds)}
+            >
+              <Download className="h-4 w-4" /> Download all shown ({shownIssuableIds.length})
             </ActionButton>
             <ActionButton
               className="bg-violet-50 text-violet-700"
-              disabled={!selectedEligibleIds.length || admitPrint.isPending}
-              onClick={() => admitPrint.mutate(selectedEligibleIds)}
+              disabled={!selectedIssuableIds.length || admitPrint.isPending}
+              onClick={() => admitPrint.mutate(selectedIssuableIds)}
             >
               <Printer className="h-4 w-4" /> Print Selected
             </ActionButton>
             <ActionButton
               className="bg-slate-50 text-slate-600"
-              disabled={!selectedEligibleIds.length || zipDownload.isPending}
-              onClick={() => zipDownload.mutate(selectedEligibleIds)}
+              disabled={!selectedIssuableIds.length || zipDownload.isPending}
+              onClick={() => zipDownload.mutate(selectedIssuableIds)}
             >
               <Archive className="h-4 w-4" /> ZIP
             </ActionButton>
@@ -585,9 +630,9 @@ export function IaAdmitCardsWorkspace() {
                     <th className="py-2 pr-2">
                       <input
                         type="checkbox"
-                        checked={allEligibleChecked}
+                        checked={allIssuableChecked}
                         onChange={toggleAll}
-                        aria-label="Select eligible students"
+                        aria-label="Select students who can be issued an admit card"
                       />
                     </th>
                     <th className="py-2 pr-3">#</th>
@@ -606,6 +651,7 @@ export function IaAdmitCardsWorkspace() {
                         <input
                           type="checkbox"
                           checked={selected.has(student.id)}
+                          disabled={!canIssue(student)}
                           onChange={() => toggleOne(student.id)}
                           aria-label={`Select ${student.fullName ?? student.rollNumber}`}
                         />
@@ -624,6 +670,13 @@ export function IaAdmitCardsWorkspace() {
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                             <CheckCircle2 className="h-3 w-3" /> Eligible
                           </span>
+                        ) : feeBookVerified && feeHoldOnly(student) ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800"
+                            title={student.ineligibilityReasons.join('; ')}
+                          >
+                            <Ticket className="h-3 w-3" /> Fee book
+                          </span>
                         ) : (
                           <span
                             className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-600"
@@ -641,6 +694,15 @@ export function IaAdmitCardsWorkspace() {
                           aria-label={`Preview ${student.fullName ?? student.rollNumber}`}
                         >
                           <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50 disabled:opacity-40"
+                          disabled={!canIssue(student) || pdfDownload.isPending}
+                          onClick={() => pdfDownload.mutate([student.id])}
+                          aria-label={`Download admit card for ${student.fullName ?? student.rollNumber}`}
+                        >
+                          <Download className="h-4 w-4" />
                         </button>
                       </td>
                     </tr>
@@ -680,6 +742,7 @@ export function IaAdmitCardsWorkspace() {
             </div>
           </div>
           {printError ? <p className="mt-2 text-xs text-rose-600">{printError}</p> : null}
+          {pdfError ? <p className="mt-2 text-xs text-rose-600">{pdfError}</p> : null}
         </div>
 
         <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-4">
