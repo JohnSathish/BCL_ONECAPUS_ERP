@@ -90,6 +90,37 @@ export class IaSessionService {
     return row;
   }
 
+  async offeringLabels(
+    tenantId: string,
+    offeringIds: Array<string | null | undefined>,
+  ) {
+    const ids = [
+      ...new Set(offeringIds.filter((id): id is string => Boolean(id))),
+    ];
+    const rows = ids.length
+      ? await this.prisma.courseOffering.findMany({
+          where: { tenantId, id: { in: ids } },
+          select: {
+            id: true,
+            category: true,
+            programVersion: {
+              select: { program: { select: { code: true, name: true } } },
+            },
+          },
+        })
+      : [];
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        {
+          category: row.category,
+          programmeCode: row.programVersion?.program?.code ?? null,
+          programmeName: row.programVersion?.program?.name ?? null,
+        },
+      ]),
+    );
+  }
+
   async listPapers(tenantId: string, query: IaQueryDto) {
     const papers = await (this.prisma as any).examPaperSchedule.findMany({
       where: {
@@ -105,6 +136,10 @@ export class IaSessionService {
       ],
       take: query.sessionId ? 1000 : 500,
     });
+    const offeringLabels = await this.offeringLabels(
+      tenantId,
+      papers.map((paper: { offeringId?: string | null }) => paper.offeringId),
+    );
     const courseIds: string[] = [
       ...new Set(
         (papers as Array<{ courseId?: string | null }>)
@@ -127,23 +162,36 @@ export class IaSessionService {
         })
       : [];
     const courseById = new Map(courses.map((course) => [course.id, course]));
-    return papers.map((paper: { courseId?: string | null }) => {
-      const course = paper.courseId ? courseById.get(paper.courseId) : null;
-      return {
-        ...paper,
-        course: course
-          ? {
-              id: course.id,
-              code: course.code,
-              title: course.title,
-              credits: course.credits != null ? Number(course.credits) : null,
-              courseType: course.courseType,
-              departmentId: course.department?.id ?? course.departmentId,
-              departmentName: course.department?.name ?? null,
-            }
-          : null,
-      };
-    });
+    return papers.map(
+      (paper: {
+        courseId?: string | null;
+        offeringId?: string | null;
+        metadata?: { category?: string; programmeCode?: string } | null;
+      }) => {
+        const course = paper.courseId ? courseById.get(paper.courseId) : null;
+        const offering = paper.offeringId
+          ? offeringLabels.get(paper.offeringId)
+          : undefined;
+        const meta = paper.metadata ?? {};
+        return {
+          ...paper,
+          category: offering?.category ?? meta.category ?? null,
+          programmeCode: offering?.programmeCode ?? meta.programmeCode ?? null,
+          programmeName: offering?.programmeName ?? null,
+          course: course
+            ? {
+                id: course.id,
+                code: course.code,
+                title: course.title,
+                credits: course.credits != null ? Number(course.credits) : null,
+                courseType: course.courseType,
+                departmentId: course.department?.id ?? course.departmentId,
+                departmentName: course.department?.name ?? null,
+              }
+            : null,
+        };
+      },
+    );
   }
 
   async createPaper(user: JwtUser, dto: IaPaperDto) {

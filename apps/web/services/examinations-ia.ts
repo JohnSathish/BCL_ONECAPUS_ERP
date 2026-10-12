@@ -51,8 +51,17 @@ export type IaPaper = {
   startTime: string;
   endTime: string;
   semesterNo?: number | null;
+  expectedCount?: number | null;
   status: string;
-  metadata?: { category?: string; maxMarks?: number; schemeId?: string } | null;
+  category?: string | null;
+  programmeCode?: string | null;
+  programmeName?: string | null;
+  metadata?: {
+    category?: string;
+    maxMarks?: number;
+    schemeId?: string;
+    programmeCode?: string;
+  } | null;
   course?: {
     id: string;
     code: string;

@@ -10,6 +10,9 @@ export type IaPaper = {
   endTime?: string;
   semesterNo?: number | null;
   status?: string;
+  category?: string | null;
+  programmeCode?: string | null;
+  programmeName?: string | null;
 };
 
 export type FacultyIaSubject = {

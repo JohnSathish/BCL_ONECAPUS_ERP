@@ -128,6 +128,10 @@ export class IaMarkEntryService {
       sessions.map((session: { id: string }) => [session.id, session]),
     );
     const yearById = new Map(years.map((year) => [year.id, year.name]));
+    const offeringLabels = await this.sessions.offeringLabels(
+      user.tid,
+      papers.map((paper: { offeringId?: string | null }) => paper.offeringId),
+    );
 
     return assignments.map((a) => ({
       assignmentId: a.id,
@@ -143,31 +147,45 @@ export class IaMarkEntryService {
       programmeName: a.programVersion?.program?.name,
       papers: papers
         .filter((p: { courseId?: string }) => p.courseId === a.courseId)
-        .map((paper: { sessionId: string }) => {
-          const session = sessionById.get(paper.sessionId) as
-            | {
-                name?: string;
-                examType?: string;
-                academicYearId?: string | null;
-                status?: string;
-                metadata?: { shiftName?: string; academicYearName?: string };
-              }
-            | undefined;
-          return {
-            ...paper,
-            sessionName: session?.name ?? null,
-            examType: session?.examType ?? null,
-            academicYearId: session?.academicYearId ?? null,
-            academicYearName:
-              session?.metadata?.academicYearName ??
-              (session?.academicYearId
-                ? yearById.get(session.academicYearId)
-                : null) ??
-              null,
-            sessionStatus: session?.status ?? null,
-            shiftName: session?.metadata?.shiftName ?? null,
-          };
-        }),
+        .map(
+          (paper: {
+            sessionId: string;
+            offeringId?: string | null;
+            metadata?: { category?: string; programmeCode?: string } | null;
+          }) => {
+            const session = sessionById.get(paper.sessionId) as
+              | {
+                  name?: string;
+                  examType?: string;
+                  academicYearId?: string | null;
+                  status?: string;
+                  metadata?: { shiftName?: string; academicYearName?: string };
+                }
+              | undefined;
+            const offering = paper.offeringId
+              ? offeringLabels.get(paper.offeringId)
+              : undefined;
+            const meta = paper.metadata ?? {};
+            return {
+              ...paper,
+              category: offering?.category ?? meta.category ?? null,
+              programmeCode:
+                offering?.programmeCode ?? meta.programmeCode ?? null,
+              programmeName: offering?.programmeName ?? null,
+              sessionName: session?.name ?? null,
+              examType: session?.examType ?? null,
+              academicYearId: session?.academicYearId ?? null,
+              academicYearName:
+                session?.metadata?.academicYearName ??
+                (session?.academicYearId
+                  ? yearById.get(session.academicYearId)
+                  : null) ??
+                null,
+              sessionStatus: session?.status ?? null,
+              shiftName: session?.metadata?.shiftName ?? null,
+            };
+          },
+        ),
     }));
   }
 

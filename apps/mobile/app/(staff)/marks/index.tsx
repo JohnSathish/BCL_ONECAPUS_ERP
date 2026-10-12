@@ -13,6 +13,14 @@ import { FacultyScreenShell } from '@/components/faculty-portal/faculty-screen-s
 import { facultyTheme } from '@/components/faculty-portal/theme';
 import { fetchFacultyIaSubjects, type FacultyIaSubject } from '@/services/faculty-marks';
 
+function slotLabel(value?: string | null) {
+  if (!value) return '';
+  return value
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export default function FacultyMarksIndexScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -64,7 +72,13 @@ export default function FacultyMarksIndexScreen() {
                       pathname: '/(staff)/marks/[paperId]',
                       params: {
                         paperId: paper.id,
-                        title: subject.courseName,
+                        title: [
+                          paper.paperName || subject.courseName,
+                          slotLabel(paper.category),
+                          paper.programmeName || paper.programmeCode,
+                        ]
+                          .filter(Boolean)
+                          .join(' · '),
                         paperCode: paper.paperCode,
                       },
                     } as never)
@@ -73,6 +87,10 @@ export default function FacultyMarksIndexScreen() {
                   <Text style={styles.paperTitle}>{paper.paperName || paper.paperCode}</Text>
                   <Text style={styles.paperMeta}>
                     {paper.paperCode}
+                    {paper.category ? ` · ${slotLabel(paper.category)}` : ''}
+                    {paper.programmeName || paper.programmeCode
+                      ? ` · ${paper.programmeName || paper.programmeCode}`
+                      : ''}
                     {paper.examDate ? ` · ${paper.examDate.slice(0, 10)}` : ''}
                   </Text>
                   <Text style={styles.action}>Enter marks →</Text>

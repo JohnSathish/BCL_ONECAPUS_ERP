@@ -104,6 +104,9 @@ type PaperChoice = {
   departmentId: string;
   departmentName: string;
   courseType: string | null;
+  programmeCode: string | null;
+  programmeName: string | null;
+  expectedCount: number | null;
   credits: number | null;
   maxMarks: number | null;
 };
@@ -113,6 +116,7 @@ type FacultySubject = {
   courseName: string;
   credits?: number | null;
   courseType?: string | null;
+  programmeName?: string | null;
   departmentId?: string | null;
   departmentName?: string | null;
   semesterNo?: number | null;
@@ -123,7 +127,11 @@ type FacultySubject = {
       academicYearId?: string | null;
       academicYearName?: string | null;
       shiftName?: string | null;
-      metadata?: { category?: string; maxMarks?: number } | null;
+      category?: string | null;
+      programmeCode?: string | null;
+      programmeName?: string | null;
+      expectedCount?: number | null;
+      metadata?: { category?: string; maxMarks?: number; programmeCode?: string } | null;
     }
   >;
 };
@@ -180,6 +188,50 @@ function compareRoll(a?: string | null, b?: string | null) {
   });
 }
 
+const CATEGORY_RANK: Record<string, number> = {
+  MAJOR: 0,
+  MINOR: 1,
+  MDC: 2,
+  AEC: 3,
+  SEC: 4,
+  VAC: 5,
+  VTC: 6,
+  INTERNSHIP: 7,
+};
+
+function categoryRank(value?: string | null) {
+  if (!value) return 50;
+  return CATEGORY_RANK[value.trim().toUpperCase()] ?? 40;
+}
+
+function programmeLabel(paper: Pick<PaperChoice, 'programmeName' | 'programmeCode'>) {
+  return paper.programmeName || paper.programmeCode || null;
+}
+
+/** Major/Minor, and the programme when the same paper is listed more than once. */
+export function paperOptionLabel(paper: PaperChoice, peers: PaperChoice[]) {
+  const slot = paper.courseType ? prettyToken(paper.courseType) : null;
+  const programme = programmeLabel(paper);
+  const twins = peers.filter((peer) => peer.paperCode === paper.paperCode);
+  const showProgramme = twins.length > 1 && Boolean(programme);
+  const identity = `${slot ?? ''}|${showProgramme ? programme : ''}`;
+  const stillShared =
+    twins.filter((peer) => {
+      const peerSlot = peer.courseType ? prettyToken(peer.courseType) : null;
+      const peerProgramme = programmeLabel(peer);
+      const peerShow = twins.length > 1 && Boolean(peerProgramme);
+      return `${peerSlot ?? ''}|${peerShow ? peerProgramme : ''}` === identity;
+    }).length > 1;
+  const details = [
+    slot,
+    showProgramme ? programme : null,
+    stillShared && paper.expectedCount != null ? `${paper.expectedCount} students` : null,
+  ].filter(Boolean);
+  return details.length
+    ? `${paper.paperCode} — ${paper.paperName} · ${details.join(' · ')}`
+    : `${paper.paperCode} — ${paper.paperName}`;
+}
+
 function paperChoiceFromExam(exam: IaExamSummary, paper: IaPaper): PaperChoice {
   const meta = paper.metadata ?? {};
   return {
@@ -194,7 +246,10 @@ function paperChoiceFromExam(exam: IaExamSummary, paper: IaPaper): PaperChoice {
     paperName: paper.paperName,
     departmentId: paper.course?.departmentId || 'none',
     departmentName: paper.course?.departmentName || 'Unassigned',
-    courseType: meta.category || paper.course?.courseType || null,
+    courseType: paper.category || meta.category || paper.course?.courseType || null,
+    programmeCode: paper.programmeCode || meta.programmeCode || null,
+    programmeName: paper.programmeName || null,
+    expectedCount: paper.expectedCount ?? null,
     credits: paper.course?.credits ?? null,
     maxMarks: meta.maxMarks ?? exam.stats?.maxMarks ?? exam.metadata?.maxMarks ?? null,
   };
@@ -254,7 +309,10 @@ export function IaMarkEntryWorkspace({
         paperName: paper.paperName,
         departmentId: subject.departmentId || 'none',
         departmentName: subject.departmentName || 'Unassigned',
-        courseType: paper.metadata?.category || subject.courseType || null,
+        courseType: paper.category || paper.metadata?.category || subject.courseType || null,
+        programmeCode: paper.programmeCode || paper.metadata?.programmeCode || null,
+        programmeName: paper.programmeName || subject.programmeName || null,
+        expectedCount: paper.expectedCount ?? null,
         credits: subject.credits ?? null,
         maxMarks: paper.metadata?.maxMarks ?? null,
       })),
@@ -353,7 +411,12 @@ export function IaMarkEntryWorkspace({
       paperChoices
         .filter((paper) => !semester || String(paper.semesterNo ?? '') === semester)
         .filter((paper) => departmentId === 'all' || paper.departmentId === departmentId)
-        .sort((a, b) => a.paperCode.localeCompare(b.paperCode)),
+        .sort(
+          (a, b) =>
+            a.paperCode.localeCompare(b.paperCode) ||
+            categoryRank(a.courseType) - categoryRank(b.courseType) ||
+            (programmeLabel(a) || '').localeCompare(programmeLabel(b) || ''),
+        ),
     [paperChoices, semester, departmentId],
   );
 
@@ -770,7 +833,7 @@ export function IaMarkEntryWorkspace({
           >
             {subjectChoices.map((paper) => (
               <option key={paper.id} value={paper.id}>
-                {paper.paperCode} — {paper.paperName}
+                {paperOptionLabel(paper, subjectChoices)}
               </option>
             ))}
           </select>
@@ -784,9 +847,7 @@ export function IaMarkEntryWorkspace({
           </div>
           <div>
             <h2 className="text-base font-semibold text-slate-900">
-              {selectedPaper
-                ? `${selectedPaper.paperCode} — ${selectedPaper.paperName}`
-                : 'Select a paper'}
+              {selectedPaper ? paperOptionLabel(selectedPaper, subjectChoices) : 'Select a paper'}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
               Course Type: {prettyToken(courseType)} <span className="mx-1 text-slate-300">|</span>{' '}
