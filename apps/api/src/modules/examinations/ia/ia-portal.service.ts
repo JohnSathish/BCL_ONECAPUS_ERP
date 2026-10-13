@@ -3,7 +3,7 @@ import type { JwtUser } from '../../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../../database/prisma.service';
 import { IA_EXAM_TYPES } from './ia.constants';
 import { IaAdmitCardService } from './ia-admit-card.service';
-import { registrationPaperTitle } from '../../academic-engine/domain/offering-paper-title';
+import { registeredSubjectPrint } from '../../academic-engine/domain/offering-paper-title';
 import { pickIaPaperForRegistration } from './ia-category-policy';
 import { formatExamWallClock } from './ia-noticeboard-grid';
 import { IaDefaulterService } from './ia-defaulter.service';
@@ -166,7 +166,7 @@ export class IaPortalService {
     }
 
     const matched: PaperRow[] = [];
-    const paperTitles = new Map<string, string>();
+    const printedSubjects = new Map<string, { code: string; title: string }>();
     const seenIds = new Set<string>();
     for (const line of effectiveLines) {
       for (const session of sessions) {
@@ -187,12 +187,13 @@ export class IaPortalService {
         });
         if (paper && !seenIds.has(paper.id)) {
           seenIds.add(paper.id);
-          const title = registrationPaperTitle(
+          const printed = registeredSubjectPrint(
             line.offering?.course,
             line.offering,
-            line.category,
           );
-          if (title) paperTitles.set(paper.id, title);
+          if (printed.code || printed.title) {
+            printedSubjects.set(paper.id, printed);
+          }
           matched.push(paper);
         }
       }
@@ -215,8 +216,8 @@ export class IaPortalService {
       })
       .map((p) => ({
         id: p.id,
-        paperCode: p.paperCode,
-        paperName: paperTitles.get(p.id) || p.paperName,
+        paperCode: printedSubjects.get(p.id)?.code || p.paperCode,
+        paperName: printedSubjects.get(p.id)?.title || p.paperName,
         examDate: p.examDate,
         startTime: formatExamWallClock(p.startTime),
         endTime: formatExamWallClock(p.endTime),

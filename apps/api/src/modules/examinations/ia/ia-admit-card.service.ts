@@ -16,7 +16,7 @@ import { IaAuditService } from './ia-audit.service';
 import { IaDefaulterService } from './ia-defaulter.service';
 import { IaExamProvisioningService } from './ia-exam-provisioning.service';
 import { formatExamWallClock } from './ia-noticeboard-grid';
-import { registrationPaperTitle } from '../../academic-engine/domain/offering-paper-title';
+import { registeredSubjectPrint } from '../../academic-engine/domain/offering-paper-title';
 import {
   iaPaperCategory,
   normalizeIaSubjectCategory,
@@ -306,17 +306,17 @@ export class IaAdmitCardService {
           lineCategory ||
           normalizeIaSubjectCategory(line.offering.category) ||
           iaPaperCategory(paper.metadata);
-        const paperName =
-          registrationPaperTitle(
-            line.offering.course,
-            line.offering,
-            category,
-          ) || paper.paperName;
+        const printed = registeredSubjectPrint(
+          line.offering.course,
+          line.offering,
+        );
+        const paperName = printed.title || paper.paperName;
+        const paperCode = printed.code || paper.paperCode;
         const metadata =
           paper.metadata && typeof paper.metadata === 'object'
             ? { ...(paper.metadata as Record<string, unknown>), category }
             : { category };
-        matched.push({ ...paper, paperName, metadata });
+        matched.push({ ...paper, paperCode, paperName, metadata });
       }
     }
 

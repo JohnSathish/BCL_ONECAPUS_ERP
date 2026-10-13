@@ -1,6 +1,7 @@
 import {
   offeringPaperTitle,
   offeringTitleOverride,
+  registeredSubjectPrint,
   registrationPaperTitle,
 } from './offering-paper-title';
 
@@ -29,36 +30,46 @@ describe('offering paper title', () => {
     ).toBe('Inclusive Education I');
   });
 
-  it('prints Inclusive Education I for a minor registration on EDN-302', () => {
+  it('prints the registration mapping, not a catalog substitute', () => {
     const course = {
       code: 'EDN-302',
       title: 'Education for Sustainable Development',
     };
-    expect(registrationPaperTitle(course, null, 'MINOR')).toBe(
-      'Inclusive Education I',
-    );
-    expect(registrationPaperTitle(course, null, 'MAJOR')).toBe(
-      'Education for Sustainable Development',
-    );
+    expect(registeredSubjectPrint(course, { titleOverride: null })).toEqual({
+      code: 'EDN-302',
+      title: 'Education for Sustainable Development',
+    });
+    expect(
+      registeredSubjectPrint(course, {
+        titleOverride: 'Inclusive Education I',
+      }),
+    ).toEqual({
+      code: 'EDN-302',
+      title: 'Inclusive Education I',
+    });
+    expect(
+      registrationPaperTitle(course, { titleOverride: null }, 'MINOR'),
+    ).toBe(offeringPaperTitle(course, { titleOverride: null }));
   });
 
   it('keeps a renamed course title instead of the old catalog name', () => {
     expect(
-      registrationPaperTitle(
+      registeredSubjectPrint(
         {
           code: 'GAR-300',
           title: 'Literary Theory and Criticism – II',
         },
-        { titleOverride: null, category: 'MAJOR' },
-        'MAJOR',
+        { titleOverride: null },
       ),
-    ).toBe('Literary Theory and Criticism – II');
+    ).toEqual({
+      code: 'GAR-300',
+      title: 'Literary Theory and Criticism – II',
+    });
     expect(
-      registrationPaperTitle(
+      registeredSubjectPrint(
         { code: 'GAR-302', title: 'Garo Fiction – I' },
         null,
-        'MINOR',
       ),
-    ).toBe('Garo Fiction – I');
+    ).toEqual({ code: 'GAR-302', title: 'Garo Fiction – I' });
   });
 });

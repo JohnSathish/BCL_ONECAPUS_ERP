@@ -63,33 +63,29 @@ export function sharedCodeMinorTitle(
 }
 
 /**
- * Name printed for one student's registration.
- * Major (and every other category) uses the live curriculum name.
- * Minor uses the mapping title, or the catalog minor title when this code
- * still carries the major name on the course master.
+ * Subject line printed for one registration.
+ * Code and name are the curriculum mapping on that registration:
+ * titleOverride when the offering has one, otherwise the course master title.
+ * This is the same pair the student profile and Curriculum & delivery show.
+ * A catalog list is not used, so a card cannot invent a different paper name.
  */
+export function registeredSubjectPrint(
+  course: { code?: string | null; title?: string | null } | null | undefined,
+  offering?: { titleOverride?: string | null } | null,
+): { code: string; title: string } {
+  return {
+    code: course?.code?.trim() ?? '',
+    title: offeringPaperTitle(course, offering),
+  };
+}
+
+/** @deprecated Use registeredSubjectPrint. Kept so older call sites stay aligned. */
 export function registrationPaperTitle(
   course: { code?: string | null; title?: string | null } | null | undefined,
-  offering?: {
-    titleOverride?: string | null;
-    category?: string | null;
-  } | null,
-  lineCategory?: string | null,
+  offering?: { titleOverride?: string | null } | null,
+  _lineCategory?: string | null,
 ): string {
-  const courseTitle = course?.title?.trim() ?? '';
-  const override = offering?.titleOverride?.trim() ?? '';
-  const category = (lineCategory || offering?.category || '')
-    .trim()
-    .toUpperCase();
-  if (category === 'MINOR' || category.startsWith('MINOR')) {
-    if (override && !titlesEqual(override, courseTitle)) return override;
-    const catalogMinor = sharedCodeMinorTitle(course?.code, courseTitle);
-    if (catalogMinor) return catalogMinor;
-    if (override) return override;
-    return courseTitle;
-  }
-  if (override) return override;
-  return courseTitle;
+  return registeredSubjectPrint(course, offering).title;
 }
 
 export function offeringTitleOverride(

@@ -4,7 +4,6 @@ import { paginate } from '../../common/dto/pagination.dto';
 import { MAPPING_SOURCE } from '../academic-engine/domain/category-pools';
 import { CurriculumResolutionService } from '../academic-engine/services/curriculum-resolution.service';
 import { PrismaService } from '../../database/prisma.service';
-import { syncSharedCodeMinorTitles } from '../academic-engine/services/shared-code-minor-title.sync';
 import {
   applyQuickToggle,
   computeEnrollmentStatus,
@@ -37,7 +36,6 @@ export class CurriculumOfferingListService {
     rawQuery: CurriculumOfferingListQueryDto,
   ) {
     const query = applyQuickToggle(rawQuery);
-    await syncSharedCodeMinorTitles(this.prisma, tenantId);
     const page = query.page ?? 1;
     const limit = query.limit ?? 30;
 

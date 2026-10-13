@@ -1,15 +1,8 @@
 import type { PrismaService } from '../../../database/prisma.service';
-import { registrationPaperTitle } from '../../academic-engine/domain/offering-paper-title';
-import { syncSharedCodeMinorTitles } from '../../academic-engine/services/shared-code-minor-title.sync';
+import { offeringPaperTitle } from '../../academic-engine/domain/offering-paper-title';
 
 const refreshedAt = new Map<string, number>();
 const inflight = new Map<string, Promise<void>>();
-
-function categoryFromMetadata(metadata: unknown) {
-  if (!metadata || typeof metadata !== 'object') return null;
-  const category = (metadata as { category?: unknown }).category;
-  return typeof category === 'string' ? category : null;
-}
 
 /**
  * Rewrite sitting names from the current curriculum. Admit cards and mark
@@ -39,13 +32,11 @@ async function applyExamPaperNames(
   tenantId: string,
   sessionId: string,
 ) {
-  await syncSharedCodeMinorTitles(prisma, tenantId);
   const papers = await prisma.examPaperSchedule.findMany({
     where: { tenantId, sessionId, deletedAt: null },
     select: {
       id: true,
       paperName: true,
-      metadata: true,
       courseId: true,
       offeringId: true,
     },
@@ -90,11 +81,7 @@ async function applyExamPaperNames(
       ? offeringById.get(paper.offeringId)
       : undefined;
     const course = paper.courseId ? courseById.get(paper.courseId) : undefined;
-    const next = registrationPaperTitle(
-      course,
-      offering,
-      offering?.category ?? categoryFromMetadata(paper.metadata),
-    );
+    const next = offeringPaperTitle(course, offering);
     if (!next || next === paper.paperName) continue;
     await prisma.examPaperSchedule.update({
       where: { id: paper.id },
