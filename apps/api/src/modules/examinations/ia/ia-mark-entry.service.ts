@@ -84,6 +84,20 @@ export class IaMarkEntryService {
       orderBy: [{ semesterNo: 'asc' }],
     });
 
+    const sessionRows = await (this.prisma as any).examPaperSchedule.findMany({
+      where: {
+        tenantId: user.tid,
+        deletedAt: null,
+        courseId: { in: assignments.map((a) => a.courseId) },
+      },
+      select: { sessionId: true },
+      distinct: ['sessionId'],
+    });
+    for (const row of sessionRows as Array<{ sessionId?: string | null }>) {
+      if (row.sessionId) {
+        await this.sessions.ensureMajorMinorPapers(user.tid, row.sessionId);
+      }
+    }
     const papers = await (this.prisma as any).examPaperSchedule.findMany({
       where: {
         tenantId: user.tid,
@@ -265,13 +279,15 @@ export class IaMarkEntryService {
       category?: string | null;
     },
   ) {
-    const direct = this.paperCategory(paper);
-    if (direct || !paper.offeringId) return direct;
-    const offering = await this.prisma.courseOffering.findFirst({
-      where: { id: paper.offeringId, tenantId },
-      select: { category: true },
-    });
-    return normalizeIaSubjectCategory(offering?.category);
+    if (paper.offeringId) {
+      const offering = await this.prisma.courseOffering.findFirst({
+        where: { id: paper.offeringId, tenantId },
+        select: { category: true },
+      });
+      const offeringCategory = normalizeIaSubjectCategory(offering?.category);
+      if (offeringCategory) return offeringCategory;
+    }
+    return this.paperCategory(paper);
   }
 
   /**
@@ -346,8 +362,8 @@ export class IaMarkEntryService {
         category?: string | null;
       }) => {
         const rowCategory =
-          this.paperCategory(row) ??
-          (row.offeringId ? categoryByOffering.get(row.offeringId) : null);
+          (row.offeringId ? categoryByOffering.get(row.offeringId) : null) ??
+          this.paperCategory(row);
         if (rowCategory !== category) return false;
         const rowCode = (row.paperCode ?? '').trim().toUpperCase();
         if (shared) return !code || rowCode === code;
@@ -441,9 +457,10 @@ export class IaMarkEntryService {
     category: string | null,
     paperOfferingIds: string[],
   ) {
-    if (!this.isSharedMarkCategory(category)) return paperOfferingIds;
     const code = (paper.paperCode ?? '').trim();
     if (!paper.courseId && !code) return paperOfferingIds;
+    const splitByRegistration =
+      category === 'MAJOR' || this.isSharedMarkCategory(category);
     const offerings = await this.prisma.courseOffering.findMany({
       where: {
         tenantId,
@@ -467,7 +484,11 @@ export class IaMarkEntryService {
       select: { id: true, category: true },
     });
     const matched = offerings
-      .filter((row) => normalizeIaSubjectCategory(row.category) === category)
+      .filter(
+        (row) =>
+          splitByRegistration ||
+          normalizeIaSubjectCategory(row.category) === category,
+      )
       .map((row) => row.id);
     return [...new Set([...paperOfferingIds, ...matched])];
   }
@@ -730,7 +751,11 @@ export class IaMarkEntryService {
       shiftName: meta.shiftName ?? shift?.name ?? null,
       departmentId: course?.department?.id ?? null,
       departmentName: course?.department?.name ?? null,
-      courseType: paperMeta.category || course?.courseType || null,
+      courseType:
+        (await this.resolvePaperCategory(tenantId, paper)) ||
+        paperMeta.category ||
+        course?.courseType ||
+        null,
       credits: course?.credits != null ? Number(course.credits) : null,
       maxMarks: paperMeta.maxMarks ?? null,
     };

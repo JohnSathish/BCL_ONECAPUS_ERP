@@ -165,7 +165,222 @@ export class IaSessionService {
     return byPaper;
   }
 
+  /**
+   * Major and Minor are different question papers. Semester 1 often registers
+   * minor students on the major offering, so the exam has only a Major paper.
+   * Add the missing category paper without moving marks or registrations.
+   */
+  async ensureMajorMinorPapers(tenantId: string, sessionId: string) {
+    const papers = await (this.prisma as any).examPaperSchedule.findMany({
+      where: { tenantId, sessionId, deletedAt: null },
+    });
+    if (!papers.length) return 0;
+    const courseIds = [
+      ...new Set(
+        papers
+          .map((paper: { courseId?: string | null }) => paper.courseId)
+          .filter((id: string | null | undefined): id is string => Boolean(id)),
+      ),
+    ] as string[];
+    const semesters = [
+      ...new Set(
+        papers
+          .map((paper: { semesterNo?: number | null }) => paper.semesterNo)
+          .filter(
+            (semester: number | null | undefined): semester is number =>
+              semester != null,
+          ),
+      ),
+    ] as number[];
+    if (!courseIds.length || !semesters.length) return 0;
+
+    const offeringIds = [
+      ...new Set(
+        papers
+          .map((paper: { offeringId?: string | null }) => paper.offeringId)
+          .filter((id: string | null | undefined): id is string => Boolean(id)),
+      ),
+    ] as string[];
+    const [paperOfferings, courseOfferings, lineGroups] = await Promise.all([
+      offeringIds.length
+        ? this.prisma.courseOffering.findMany({
+            where: { tenantId, id: { in: offeringIds } },
+            select: { id: true, category: true },
+          })
+        : [],
+      this.prisma.courseOffering.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          courseId: { in: courseIds },
+          semesterSequence: { in: semesters },
+        },
+        select: {
+          id: true,
+          courseId: true,
+          semesterSequence: true,
+          course: { select: { code: true, title: true, departmentId: true } },
+        },
+      }),
+      this.prisma.semesterRegistrationLine.groupBy({
+        by: ['offeringId', 'category'],
+        where: {
+          tenantId,
+          status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
+          registration: { semesterSequence: { in: semesters } },
+          offering: {
+            deletedAt: null,
+            courseId: { in: courseIds },
+            semesterSequence: { in: semesters },
+          },
+        },
+        _count: { _all: true },
+      }),
+    ]);
+    const offeringCategory = new Map(
+      paperOfferings.map((row) => [
+        row.id,
+        normalizeIaSubjectCategory(row.category),
+      ]),
+    );
+    const offeringInfo = new Map(courseOfferings.map((row) => [row.id, row]));
+    const paperKey = (
+      semesterNo: number | null | undefined,
+      code: string,
+      category: string | null,
+    ) => `${semesterNo ?? ''}|${code.trim().toUpperCase()}|${category ?? ''}`;
+    const present = new Set<string>();
+    for (const paper of papers as Array<{
+      offeringId?: string | null;
+      semesterNo?: number | null;
+      paperCode?: string | null;
+      metadata?: { category?: string } | null;
+    }>) {
+      const category =
+        (paper.offeringId
+          ? offeringCategory.get(paper.offeringId)
+          : undefined) ?? normalizeIaSubjectCategory(paper.metadata?.category);
+      present.add(paperKey(paper.semesterNo, paper.paperCode ?? '', category));
+    }
+
+    let created = 0;
+    const seen = new Set<string>();
+    for (const group of lineGroups) {
+      const category = normalizeIaSubjectCategory(group.category);
+      if (category !== 'MAJOR' && category !== 'MINOR') continue;
+      const offering = offeringInfo.get(group.offeringId);
+      if (!offering?.course) continue;
+      const key = paperKey(
+        offering.semesterSequence,
+        offering.course.code,
+        category,
+      );
+      if (present.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      const sibling = (
+        papers as Array<{
+          courseId?: string | null;
+          semesterNo?: number | null;
+          paperCode?: string | null;
+          paperName?: string | null;
+          examDate: Date;
+          startTime: Date;
+          endTime: Date;
+          metadata?: { schemeId?: string; maxMarks?: number } | null;
+        }>
+      ).find(
+        (paper) =>
+          paper.courseId === offering.courseId &&
+          paper.semesterNo === offering.semesterSequence,
+      );
+      if (!sibling) continue;
+      const already = await (this.prisma as any).examPaperSchedule.findFirst({
+        where: {
+          tenantId,
+          sessionId,
+          deletedAt: null,
+          courseId: offering.courseId,
+          semesterNo: offering.semesterSequence,
+          offeringId: null,
+          metadata: { path: ['category'], equals: category },
+        },
+      });
+      if (already) {
+        present.add(key);
+        continue;
+      }
+      const schemeMeta = sibling.metadata ?? {};
+      const siblingScheme = schemeMeta.schemeId
+        ? await this.prisma.iaAssessmentScheme.findFirst({
+            where: { id: schemeMeta.schemeId, tenantId },
+            include: { components: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+          })
+        : null;
+      const component = siblingScheme?.components[0];
+      const maxMarks = Number(
+        schemeMeta.maxMarks ??
+          siblingScheme?.totalMaxMarks ??
+          component?.maxMarks ??
+          0,
+      );
+      const scheme = await this.prisma.iaAssessmentScheme.create({
+        data: {
+          tenantId,
+          name: `${sibling.paperCode} ${category}`,
+          academicYearId: siblingScheme?.academicYearId,
+          departmentId: offering.course.departmentId,
+          courseId: offering.courseId,
+          semesterNo: offering.semesterSequence,
+          totalMaxMarks: maxMarks || 15,
+          passMark: siblingScheme?.passMark,
+          status: 'ACTIVE',
+          components: {
+            create: [
+              {
+                tenantId,
+                code: component?.code ?? 'IA',
+                label: component?.label ?? sibling.paperName ?? category,
+                maxMarks: component?.maxMarks ?? (maxMarks || 15),
+                isMandatory: true,
+                sortOrder: 1,
+              },
+            ],
+          },
+        },
+      });
+      await (this.prisma as any).examPaperSchedule.create({
+        data: {
+          tenantId,
+          sessionId,
+          courseId: offering.courseId,
+          paperCode: (offering.course.code || sibling.paperCode || '')
+            .trim()
+            .toUpperCase(),
+          paperName: sibling.paperName ?? offering.course.title,
+          examDate: sibling.examDate,
+          startTime: sibling.startTime,
+          endTime: sibling.endTime,
+          semesterNo: offering.semesterSequence,
+          expectedCount: group._count._all,
+          metadata: {
+            module: 'ia',
+            schemeId: scheme.id,
+            category,
+            maxMarks: Number(component?.maxMarks ?? maxMarks ?? 15),
+            separateQuestionPaper: true,
+          },
+        },
+      });
+      present.add(key);
+      created += 1;
+    }
+    return created;
+  }
+
   async listPapers(tenantId: string, query: IaQueryDto) {
+    if (query.sessionId) {
+      await this.ensureMajorMinorPapers(tenantId, query.sessionId);
+    }
     const papers = await (this.prisma as any).examPaperSchedule.findMany({
       where: {
         tenantId,
