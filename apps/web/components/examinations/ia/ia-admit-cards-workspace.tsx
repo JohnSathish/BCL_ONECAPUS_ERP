@@ -583,14 +583,20 @@ export function IaAdmitCardsWorkspace() {
               disabled={!selectedIssuableIds.length || pdfDownload.isPending}
               onClick={() => pdfDownload.mutate(selectedIssuableIds)}
             >
-              <Download className="h-4 w-4" /> Download PDF ({selectedIssuableIds.length})
+              <Download className="h-4 w-4" />{' '}
+              {pdfDownload.isPending
+                ? 'Preparing PDF…'
+                : `Download PDF (${selectedIssuableIds.length})`}
             </ActionButton>
             <ActionButton
               className="bg-rose-600 text-white"
               disabled={!shownIssuableIds.length || pdfDownload.isPending}
               onClick={() => pdfDownload.mutate(shownIssuableIds)}
             >
-              <Download className="h-4 w-4" /> Download all shown ({shownIssuableIds.length})
+              <Download className="h-4 w-4" />{' '}
+              {pdfDownload.isPending
+                ? 'Preparing PDF…'
+                : `Download all shown (${shownIssuableIds.length})`}
             </ActionButton>
             <ActionButton
               className="bg-violet-50 text-violet-700"

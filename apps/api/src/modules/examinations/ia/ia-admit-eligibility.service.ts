@@ -51,9 +51,19 @@ export class IaAdmitEligibilityService {
       semesterNo?: number | null;
       isDefaulter?: boolean;
       waiveFee?: boolean;
+      settings?: {
+        attendanceMinPercent: unknown;
+        blockAdmitOnDefaulter?: boolean | null;
+      };
+      preloaded?: {
+        attendancePercent: number | null;
+        feeDue: number;
+        feeStatus: string | null;
+      };
     },
   ): Promise<IaAdmitEligibilityResult> {
-    const cfg = await this.settings.getOrCreate(tenantId);
+    const cfg =
+      options?.settings ?? (await this.settings.getOrCreate(tenantId));
     const minAttendance = Number(cfg.attendanceMinPercent);
     const reasons: string[] = [];
     const missingFields: string[] = [];
@@ -115,23 +125,29 @@ export class IaAdmitEligibilityService {
       reasons.push('Registration locked');
     }
 
-    const attendanceRows = await this.prisma.studentAttendanceSummary.findMany({
-      where: {
-        tenantId,
-        studentId: student.id,
-        periodKey: 'SEMESTER',
-        ...(options?.semesterNo != null
-          ? { semesterNo: options.semesterNo }
-          : {}),
-      },
-      select: { percentage: true },
-    });
-    const attendancePercent = attendanceRows.length
-      ? Math.round(
-          attendanceRows.reduce((s, r) => s + Number(r.percentage ?? 0), 0) /
-            attendanceRows.length,
-        )
-      : null;
+    let attendancePercent: number | null;
+    if (options?.preloaded) {
+      attendancePercent = options.preloaded.attendancePercent;
+    } else {
+      const attendanceRows =
+        await this.prisma.studentAttendanceSummary.findMany({
+          where: {
+            tenantId,
+            studentId: student.id,
+            periodKey: 'SEMESTER',
+            ...(options?.semesterNo != null
+              ? { semesterNo: options.semesterNo }
+              : {}),
+          },
+          select: { percentage: true },
+        });
+      attendancePercent = attendanceRows.length
+        ? Math.round(
+            attendanceRows.reduce((s, r) => s + Number(r.percentage ?? 0), 0) /
+              attendanceRows.length,
+          )
+        : null;
+    }
     let attendanceOk = true;
     if (attendancePercent != null && attendancePercent < minAttendance) {
       attendanceOk = false;
@@ -143,13 +159,21 @@ export class IaAdmitEligibilityService {
       reasons.push('Attendance record not available');
     }
 
-    const feeRow = await this.prisma.studentFeeSummary.findUnique({
-      where: {
-        tenantId_studentId: { tenantId, studentId: student.id },
-      },
-      select: { totalOutstanding: true, feeStatus: true },
-    });
-    const feeDue = Number(feeRow?.totalOutstanding ?? 0);
+    let feeDue: number;
+    let feeStatus: string;
+    if (options?.preloaded) {
+      feeDue = options.preloaded.feeDue;
+      feeStatus = (options.preloaded.feeStatus ?? '').toUpperCase();
+    } else {
+      const feeRow = await this.prisma.studentFeeSummary.findUnique({
+        where: {
+          tenantId_studentId: { tenantId, studentId: student.id },
+        },
+        select: { totalOutstanding: true, feeStatus: true },
+      });
+      feeDue = Number(feeRow?.totalOutstanding ?? 0);
+      feeStatus = (feeRow?.feeStatus ?? '').toUpperCase();
+    }
     let feeOk = true;
     if (!options?.waiveFee && feeDue > 0) {
       feeOk = false;
@@ -157,7 +181,6 @@ export class IaAdmitEligibilityService {
         `Examination/fee dues pending (₹${feeDue.toLocaleString('en-IN')})`,
       );
     }
-    const feeStatus = (feeRow?.feeStatus ?? '').toUpperCase();
     if (
       !options?.waiveFee &&
       (feeStatus === 'HOLD' || feeStatus === 'CRITICAL_HOLD')

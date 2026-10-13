@@ -107,7 +107,7 @@ const DEFAULT_INSTRUCTIONS = [
 ];
 
 const IA_ADMIT_CARD_STYLES = `
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: A4 portrait; margin: 6mm; }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
@@ -128,9 +128,9 @@ const IA_ADMIT_CARD_STYLES = `
   .page {
     position: relative;
     width: 100%;
-    max-width: 190mm;
-    margin: 0 auto;
-    padding: 8mm;
+    max-width: none;
+    margin: 0;
+    padding: 4mm 3.5mm;
     border: 2px solid #1e3a8a;
     background: #fff;
     page-break-inside: avoid;
@@ -250,12 +250,21 @@ const IA_ADMIT_CARD_STYLES = `
   }
   table.papers {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     margin-top: 10px;
     font-size: 10px;
     page-break-inside: avoid;
     break-inside: avoid;
   }
+  table.papers col.sl { width: 8mm; }
+  table.papers col.code { width: 22mm; }
+  table.papers col.type { width: 16mm; }
+  table.papers col.max { width: 12mm; }
+  table.papers col.when { width: 28mm; }
+  table.papers col.invigilator { width: 36mm; }
+  table.papers th.when,
+  table.papers td.when { white-space: nowrap; }
   table.papers th, table.papers td {
     border: 1px solid #cbd5e1;
     padding: 5px 6px;
@@ -270,8 +279,7 @@ const IA_ADMIT_CARD_STYLES = `
   table.papers tr:nth-child(even) td { background: #f8fafc; }
   table.papers th.invigilator,
   table.papers td.invigilator {
-    width: 32mm;
-    min-width: 32mm;
+    width: 36mm;
   }
   table.papers td.invigilator {
     height: 9mm;
@@ -356,8 +364,11 @@ const IA_ADMIT_CARD_STYLES = `
   .sheet table.papers { margin-top: 4px; font-size: 8px; }
   .sheet table.papers th, .sheet table.papers td { padding: 1px 3px; }
   .sheet table.papers th { font-size: 7px; }
+  .sheet table.papers col.code { width: 18mm; }
+  .sheet table.papers col.when { width: 22mm; }
+  .sheet table.papers col.invigilator { width: 22mm; }
   .sheet table.papers th.invigilator,
-  .sheet table.papers td.invigilator { width: 22mm; min-width: 22mm; }
+  .sheet table.papers td.invigilator { width: 22mm; }
   .sheet .footer { margin-top: 4px; padding-top: 3px; gap: 6px; grid-template-columns: 1fr 110px; }
   .sheet .footer li { margin-bottom: 0; font-size: 7.5px; }
   .sheet .auth .line { margin-top: 14px; font-size: 8px; }
@@ -393,11 +404,11 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
       <tr>
         <td>${i + 1}</td>
         <td><strong>${esc(p.paperCode)}</strong></td>
-        <td>${esc(p.paperName)}</td>
+        <td class="title">${esc(p.paperName)}</td>
         <td>${esc(p.paperType ?? '—')}</td>
         <td>${p.maxMarks ?? '—'}</td>
-        <td>${fmtDate(p.examDate)}</td>
-        <td>${fmtTime(p.startTime)} – ${fmtTime(p.endTime)}</td>
+        <td class="when">${fmtDate(p.examDate)}</td>
+        <td class="when">${fmtTime(p.startTime)} – ${fmtTime(p.endTime)}</td>
         <td class="invigilator">&nbsp;</td>
       </tr>`,
     )
@@ -460,15 +471,25 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
       </div>
 
       <table class="papers">
+        <colgroup>
+          <col class="sl" />
+          <col class="code" />
+          <col class="title" />
+          <col class="type" />
+          <col class="max" />
+          <col class="when" />
+          <col class="when" />
+          <col class="invigilator" />
+        </colgroup>
         <thead>
           <tr>
             <th>Sl.</th>
             <th>Paper Code</th>
-            <th>Paper Title</th>
+            <th class="title">Paper Title</th>
             <th>Type</th>
             <th>Max</th>
-            <th>Date</th>
-            <th>Time</th>
+            <th class="when">Date</th>
+            <th class="when">Time</th>
             <th class="invigilator">Signature of Invigilator</th>
           </tr>
         </thead>
@@ -499,7 +520,7 @@ export function renderIaAdmitCardsDocumentHtml(
   const styles =
     layout === 'pair'
       ? IA_ADMIT_CARD_STYLES.replace(
-          '@page { size: A4 portrait; margin: 10mm; }',
+          '@page { size: A4 portrait; margin: 6mm; }',
           '@page { size: A4 portrait; margin: 0; }',
         )
       : IA_ADMIT_CARD_STYLES;

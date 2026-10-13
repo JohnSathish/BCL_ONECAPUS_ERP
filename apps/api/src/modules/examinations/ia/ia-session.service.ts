@@ -362,7 +362,7 @@ export class IaSessionService {
           paperName:
             registrationPaperTitle(
               offering.course,
-              { titleOverride: offering.titleOverride, category },
+              { titleOverride: offering.titleOverride },
               category,
             ) ||
             sibling.paperName ||

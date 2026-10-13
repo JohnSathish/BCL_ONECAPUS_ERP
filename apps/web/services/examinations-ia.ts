@@ -551,6 +551,11 @@ export async function bulkGenerateIaAdmitCards(sessionId: string, studentIds: st
   return data;
 }
 
+/** A full cohort is hundreds of pages. The default 15s client timeout aborts it. */
+function admitExportTimeout(studentCount: number) {
+  return Math.min(600_000, 90_000 + Math.max(studentCount, 1) * 500);
+}
+
 export async function downloadIaAdmitPdf(
   sessionId: string,
   studentIds: string[],
@@ -559,7 +564,7 @@ export async function downloadIaAdmitPdf(
   const { data } = await api.post(
     '/v1/examinations/ia/admit-cards/export/pdf',
     { sessionId, studentIds, feeBookVerified: options?.feeBookVerified === true },
-    { responseType: 'blob' },
+    { responseType: 'blob', timeout: admitExportTimeout(studentIds.length) },
   );
   return data as Blob;
 }
@@ -572,7 +577,7 @@ export async function fetchIaAdmitPrintHtml(
   const { data } = await api.post<string>(
     '/v1/examinations/ia/admit-cards/export/html',
     { sessionId, studentIds, feeBookVerified: options?.feeBookVerified === true },
-    { responseType: 'text' },
+    { responseType: 'text', timeout: admitExportTimeout(studentIds.length) },
   );
   return data;
 }
@@ -585,7 +590,7 @@ export async function downloadIaAdmitZip(
   const { data } = await api.post(
     '/v1/examinations/ia/admit-cards/export/zip',
     { sessionId, studentIds, feeBookVerified: options?.feeBookVerified === true },
-    { responseType: 'blob' },
+    { responseType: 'blob', timeout: admitExportTimeout(studentIds.length) },
   );
   return data as Blob;
 }

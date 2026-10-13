@@ -228,6 +228,22 @@ export class IaAdmitCardService {
    * keeps only the first one. Match each registered subject to the paper for
    * that subject and semester, not to session.semesterNo.
    */
+  private registrationLineInclude() {
+    return {
+      offering: {
+        select: {
+          courseId: true,
+          category: true,
+          titleOverride: true,
+          course: { select: { code: true, title: true } },
+        },
+      },
+      registration: {
+        select: { studentId: true, shiftId: true, semesterSequence: true },
+      },
+    } as const;
+  }
+
   private async papersForStudentFromRegistrations(
     tenantId: string,
     studentId: string,
@@ -251,20 +267,35 @@ export class IaAdmitCardService {
             : {}),
         },
       },
-      include: {
-        offering: {
-          select: {
-            courseId: true,
-            category: true,
-            titleOverride: true,
-            course: { select: { code: true, title: true } },
-          },
-        },
-        registration: { select: { shiftId: true, semesterSequence: true } },
-      },
+      include: this.registrationLineInclude(),
     });
+    return this.matchRegisteredPapers(
+      lines,
+      session.shiftId ?? null,
+      sessionPapers,
+      studentShiftId,
+    );
+  }
 
-    const sessionShiftId = session.shiftId ?? null;
+  private matchRegisteredPapers(
+    lines: Array<{
+      offeringId: string;
+      category?: string | null;
+      offering: {
+        courseId: string;
+        category?: string | null;
+        titleOverride?: string | null;
+        course: { code?: string | null; title?: string | null };
+      };
+      registration: {
+        shiftId?: string | null;
+        semesterSequence?: number | null;
+      };
+    }>,
+    sessionShiftId: string | null,
+    sessionPapers: PaperRow[],
+    studentShiftId?: string | null,
+  ) {
     const eligible = sessionShiftId
       ? lines.filter((line) => {
           const shift = line.registration.shiftId || studentShiftId;
@@ -864,9 +895,10 @@ export class IaAdmitCardService {
     admitCardNumber: string,
     verifyToken: string,
     verifyCode: string,
+    hints?: { verifyBase?: string; shiftName?: string | null },
   ): Promise<IaAdmitCardTemplateInput> {
     const { session, student, studentPapers } = ctx;
-    const verifyUrl = `${await this.verifyBaseUrl(tenantId)}/verify/ia-admit/${verifyToken}`;
+    const verifyUrl = `${hints?.verifyBase ?? (await this.verifyBaseUrl(tenantId))}/verify/ia-admit/${verifyToken}`;
     const sittingSemesters = [
       ...new Set(
         studentPapers
@@ -895,7 +927,9 @@ export class IaAdmitCardService {
         semesterLabel,
         academicYear,
         instructions: session.instructions,
-        shiftName: await this.shiftName(session.shiftId),
+        shiftName: hints
+          ? (hints.shiftName ?? null)
+          : await this.shiftName(session.shiftId),
       },
       student: {
         fullName: student.masterProfile?.fullName ?? student.user?.displayName,
@@ -1177,6 +1211,24 @@ export class IaAdmitCardService {
     }));
   }
 
+  private async eachChunk<T>(
+    items: T[],
+    size: number,
+    run: (item: T) => Promise<unknown>,
+  ) {
+    for (let index = 0; index < items.length; index += size) {
+      await Promise.all(
+        items.slice(index, index + size).map((item) => run(item)),
+      );
+    }
+  }
+
+  /**
+   * Bulk export used to rebuild every card from scratch, including a full
+   * defaulter scan, then load that student again for the PDF. A cohort of
+   * ~1,000 cards never finished inside the client and proxy timeouts.
+   * Session papers, institution, and eligibility settings are loaded once.
+   */
   private async buildExportTemplates(
     tenantId: string,
     sessionId: string,
@@ -1185,49 +1237,381 @@ export class IaAdmitCardService {
     audit?: 'download' | 'print',
     options?: { waiveFee?: boolean },
   ): Promise<IaAdmitCardTemplateInput[]> {
-    if (!studentIds.length) {
+    const orderedIds = [...new Set(studentIds)];
+    if (!orderedIds.length) {
       throw new BadRequestException('No students selected');
     }
-    const templates: IaAdmitCardTemplateInput[] = [];
+
+    await this.provisioning.syncSessionPapersFromRegistrations(
+      tenantId,
+      sessionId,
+    );
+    await refreshExamPaperNames(this.prisma, tenantId, sessionId);
     const session = await this.getSession(tenantId, sessionId);
-    for (const studentId of studentIds) {
-      const card = await this.generateCard(
+    const [
+      institution,
+      academicYear,
+      verifyBase,
+      shiftLabel,
+      cfg,
+      defaulterList,
+      papers,
+    ] = await Promise.all([
+      this.institutionContext(tenantId),
+      this.academicYearLabel(tenantId, session.academicYearId),
+      this.verifyBaseUrl(tenantId),
+      this.shiftName(session.shiftId),
+      this.settings.getOrCreate(tenantId),
+      this.defaulters.list(tenantId),
+      this.db().examPaperSchedule.findMany({
+        where: { tenantId, sessionId, deletedAt: null },
+        orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }],
+      }) as Promise<PaperRow[]>,
+    ]);
+    const defaulterIds = new Set(
+      (defaulterList.items as Array<{ studentId: string }>).map(
+        (row) => row.studentId,
+      ),
+    );
+    const semesterNos = this.sessionSemesterNos(session, papers);
+
+    const slices: string[][] = [];
+    for (let index = 0; index < orderedIds.length; index += 300) {
+      slices.push(orderedIds.slice(index, index + 300));
+    }
+    const loaded = await Promise.all(
+      slices.map(async (slice) => {
+        const [studentBatch, lineBatch] = await Promise.all([
+          this.prisma.student.findMany({
+            where: { id: { in: slice }, tenantId, deletedAt: null },
+            include: {
+              user: { select: { displayName: true } },
+              masterProfile: true,
+              programVersion: {
+                include: { program: { select: { name: true, code: true } } },
+              },
+              department: { select: { name: true, code: true } },
+              abcAccount: { select: { abcId: true } },
+              guardians: { select: { guardianType: true, fullName: true } },
+              academicStanding: true,
+              semesterProgress: {
+                select: { semesterSequence: true },
+                take: 1,
+                orderBy: { semesterSequence: 'desc' },
+              },
+            },
+          }),
+          this.prisma.semesterRegistrationLine.findMany({
+            where: {
+              tenantId,
+              status: {
+                in: ['approved', 'confirmed', 'registered', 'pending'],
+              },
+              registration: {
+                studentId: { in: slice },
+                ...(semesterNos.length
+                  ? { semesterSequence: { in: semesterNos } }
+                  : {}),
+              },
+            },
+            include: this.registrationLineInclude(),
+          }),
+        ]);
+        return { studentBatch, lineBatch };
+      }),
+    );
+    const students = loaded.flatMap((batch) => batch.studentBatch);
+    const lines = loaded.flatMap((batch) => batch.lineBatch);
+
+    const studentById = new Map(
+      students.map((student) => [student.id, student]),
+    );
+    const linesByStudent = new Map<string, typeof lines>();
+    for (const line of lines) {
+      const studentId = line.registration.studentId;
+      const bucket = linesByStudent.get(studentId);
+      if (bucket) bucket.push(line);
+      else linesByStudent.set(studentId, [line]);
+    }
+
+    const existingIssues: Array<{
+      id: string;
+      studentId: string;
+      admitCardNumber: string;
+      verifyToken: string;
+      verifyHash: string;
+    }> = await this.db().iaAdmitCardIssue.findMany({
+      where: {
         tenantId,
         sessionId,
-        studentId,
-        user,
-        { waiveFee: options?.waiveFee },
-      );
-      if (card.blocked || !('admitCardNumber' in card)) continue;
-      const [institution, academicYear] = await Promise.all([
-        this.institutionContext(tenantId),
-        this.academicYearLabel(tenantId, session.academicYearId),
-      ]);
-      templates.push(
-        await this.buildTemplateInput(
+        studentId: { in: orderedIds },
+        deletedAt: null,
+      },
+    });
+    const issueByStudent = new Map(
+      existingIssues.map((issue) => [issue.studentId, issue]),
+    );
+
+    const [attendanceRows, feeRows] = await Promise.all([
+      this.prisma.studentAttendanceSummary.findMany({
+        where: {
           tenantId,
-          await this.loadStudentCardContext(tenantId, sessionId, studentId, {
-            waiveFee: options?.waiveFee,
-          }),
-          institution,
-          academicYear,
-          card.admitCardNumber,
-          card.verifyToken,
-          card.verifyCode,
-        ),
-      );
-      if ('issueId' in card && card.issueId && user && audit) {
-        if (audit === 'download') {
-          await this.recordDownload(user, card.issueId);
-        } else {
-          await this.recordPrint(user, card.issueId);
-        }
-      }
+          studentId: { in: orderedIds },
+          periodKey: 'SEMESTER',
+          ...(session.semesterNo != null
+            ? { semesterNo: session.semesterNo }
+            : {}),
+        },
+        select: { studentId: true, percentage: true },
+      }),
+      this.prisma.studentFeeSummary.findMany({
+        where: { tenantId, studentId: { in: orderedIds } },
+        select: { studentId: true, totalOutstanding: true, feeStatus: true },
+      }),
+    ]);
+    const attendanceByStudent = new Map<string, number[]>();
+    for (const row of attendanceRows) {
+      const bucket = attendanceByStudent.get(row.studentId) ?? [];
+      bucket.push(Number(row.percentage ?? 0));
+      attendanceByStudent.set(row.studentId, bucket);
     }
-    if (!templates.length) {
+    const feeByStudent = new Map(
+      feeRows.map((row) => [
+        row.studentId,
+        {
+          feeDue: Number(row.totalOutstanding ?? 0),
+          feeStatus: row.feeStatus ?? null,
+        },
+      ]),
+    );
+
+    const year = new Date().getFullYear() % 100;
+    const sem = String(session.semesterNo ?? 0).padStart(2, '0');
+    const prefix = `AC${year}${sem}`;
+    const last = await this.db().iaAdmitCardIssue.findFirst({
+      where: { tenantId, admitCardNumber: { startsWith: prefix } },
+      orderBy: { admitCardNumber: 'desc' },
+    });
+    let seq = last
+      ? parseInt(String(last.admitCardNumber).slice(-4), 10) + 1
+      : 1;
+
+    const prepared: Array<{
+      studentId: string;
+      existing: (typeof existingIssues)[number] | undefined;
+      template: IaAdmitCardTemplateInput;
+      cardPayload: Record<string, unknown>;
+      verifyToken: string;
+      verifyHash: string;
+      admitCardNumber: string;
+      elig: unknown;
+    }> = [];
+
+    for (const studentId of orderedIds) {
+      const student = studentById.get(studentId);
+      if (!student) continue;
+      const isDefaulter = defaulterIds.has(studentId);
+      const attendanceSamples = attendanceByStudent.get(studentId) ?? [];
+      const fee = feeByStudent.get(studentId);
+      const elig = await this.eligibility.evaluateStudent(tenantId, student, {
+        semesterNo: session.semesterNo,
+        isDefaulter,
+        waiveFee: options?.waiveFee,
+        settings: cfg,
+        preloaded: {
+          attendancePercent: attendanceSamples.length
+            ? Math.round(
+                attendanceSamples.reduce((sum, value) => sum + value, 0) /
+                  attendanceSamples.length,
+              )
+            : null,
+          feeDue: fee?.feeDue ?? 0,
+          feeStatus: fee?.feeStatus ?? null,
+        },
+      });
+      if (!elig.eligible) continue;
+      if (cfg.blockAdmitOnDefaulter && isDefaulter) continue;
+
+      const studentPapers = this.matchRegisteredPapers(
+        linesByStudent.get(studentId) ?? [],
+        session.shiftId ?? null,
+        papers,
+        student.primaryShiftId,
+      );
+      const father = student.guardians.find((guardian) =>
+        /father/i.test(guardian.guardianType),
+      );
+      const mother = student.guardians.find((guardian) =>
+        /mother/i.test(guardian.guardianType),
+      );
+      const issue = issueByStudent.get(studentId);
+      const verifyToken = issue?.verifyToken ?? randomUUID();
+      const verifyHash =
+        issue?.verifyHash ??
+        createHash('sha256')
+          .update(`${studentId}:${sessionId}:${verifyToken}`)
+          .digest('hex');
+      const verifyCode = verifyHash.slice(0, 16).toUpperCase();
+      const admitCardNumber =
+        issue?.admitCardNumber ?? `${prefix}${String(seq++).padStart(4, '0')}`;
+      const ctx = {
+        session,
+        student,
+        elig,
+        isDefaulter,
+        studentPapers,
+        fatherName: father?.fullName ?? student.masterProfile?.guardianName,
+        motherName: mother?.fullName ?? null,
+      } as Awaited<ReturnType<IaAdmitCardService['loadStudentCardContext']>>;
+      const template = await this.buildTemplateInput(
+        tenantId,
+        ctx,
+        institution,
+        academicYear,
+        admitCardNumber,
+        verifyToken,
+        verifyCode,
+        { verifyBase, shiftName: shiftLabel },
+      );
+      prepared.push({
+        studentId,
+        existing: issue,
+        template,
+        verifyToken,
+        verifyHash,
+        admitCardNumber,
+        elig,
+        cardPayload: {
+          blocked: false,
+          admitCardNumber,
+          verifyToken,
+          verifyCode,
+          verifyUrl: template.verifyUrl,
+          qrPayload: `IA-ADMIT:${verifyToken}`,
+          session: template.session,
+          institutionName: institution.displayName ?? institution.name,
+          institution,
+          student: template.student,
+          papers: template.papers,
+          eligibility: elig,
+          generatedAt: new Date().toISOString(),
+        },
+      });
+    }
+
+    if (!prepared.length) {
       throw new BadRequestException('No eligible admit cards to export');
     }
-    return templates;
+
+    const now = new Date();
+    const updates = prepared.filter((row) => row.existing);
+    const creates = prepared.filter((row) => !row.existing);
+    await this.eachChunk(updates, 20, (row) =>
+      this.db().iaAdmitCardIssue.update({
+        where: { id: row.existing!.id },
+        data: {
+          cardSnapshot: row.cardPayload,
+          eligibilitySnapshot: row.elig,
+          regeneratedCount: { increment: 1 },
+          generatedById: user?.sub,
+          generatedAt: now,
+          verifyHash: row.verifyHash,
+        },
+      }),
+    );
+    if (creates.length) {
+      await this.db().iaAdmitCardIssue.createMany({
+        data: creates.map((row) => ({
+          tenantId,
+          sessionId,
+          studentId: row.studentId,
+          admitCardNumber: row.admitCardNumber,
+          verifyToken: row.verifyToken,
+          verifyHash: row.verifyHash,
+          cardSnapshot: row.cardPayload,
+          eligibilitySnapshot: row.elig,
+          generatedById: user?.sub,
+        })),
+      });
+    }
+
+    const saved: Array<{ id: string; studentId: string }> =
+      await this.db().iaAdmitCardIssue.findMany({
+        where: {
+          tenantId,
+          sessionId,
+          studentId: { in: prepared.map((row) => row.studentId) },
+          deletedAt: null,
+        },
+        select: { id: true, studentId: true },
+      });
+    if (user) {
+      await this.db().iaAdmitCardEvent.createMany({
+        data: saved.map((row) => ({
+          tenantId,
+          issueId: row.id,
+          action: issueByStudent.has(row.studentId)
+            ? 'REGENERATED'
+            : 'GENERATED',
+          actorId: user.sub,
+        })),
+      });
+      const admitByStudent = new Map(
+        prepared.map((row) => [row.studentId, row.admitCardNumber]),
+      );
+      await this.db().examAuditLog.createMany({
+        data: saved.map((row) => ({
+          tenantId: user.tid,
+          actorId: user.sub,
+          entity: 'ia_admit_card',
+          entityId: row.id,
+          action: issueByStudent.has(row.studentId)
+            ? 'REGENERATED'
+            : 'GENERATED',
+          after: {
+            admitCardNumber: admitByStudent.get(row.studentId),
+            studentId: row.studentId,
+            feeBookVerified: options?.waiveFee === true,
+          },
+          metadata: { module: 'ia' },
+        })),
+      });
+    }
+
+    if (user && audit) {
+      const issueIds = saved.map((row) => row.id);
+      if (audit === 'download') {
+        await this.db().iaAdmitCardIssue.updateMany({
+          where: { id: { in: issueIds } },
+          data: { downloadCount: { increment: 1 }, lastDownloadAt: now },
+        });
+      } else {
+        await this.db().iaAdmitCardIssue.updateMany({
+          where: { id: { in: issueIds } },
+          data: { printCount: { increment: 1 }, lastPrintAt: now },
+        });
+      }
+      await this.db().iaAdmitCardEvent.createMany({
+        data: issueIds.map((issueId) => ({
+          tenantId,
+          issueId,
+          action: audit === 'download' ? 'DOWNLOADED' : 'PRINTED',
+          actorId: user.sub,
+        })),
+      });
+      await this.db().examAuditLog.createMany({
+        data: issueIds.map((issueId) => ({
+          tenantId: user.tid,
+          actorId: user.sub,
+          entity: 'ia_admit_card',
+          entityId: issueId,
+          action: audit === 'download' ? 'DOWNLOADED' : 'PRINTED',
+          metadata: { module: 'ia' },
+        })),
+      });
+    }
+
+    return prepared.map((row) => row.template);
   }
 
   async exportHtml(
@@ -1246,7 +1630,7 @@ export class IaAdmitCardService {
       options,
     );
     const layout = templates.length > 1 ? 'pair' : 'single';
-    const html = this.pdf.renderDocumentHtml(templates, layout);
+    const html = await this.pdf.renderDocumentHtml(templates, layout);
     return { html, count: templates.length };
   }
 
@@ -1289,37 +1673,27 @@ export class IaAdmitCardService {
     const folderNode = zip.folder(folder);
     if (!folderNode) throw new BadRequestException('ZIP creation failed');
 
-    for (const studentId of studentIds) {
-      const card = await this.generateCard(
-        tenantId,
-        sessionId,
-        studentId,
-        user,
-        { waiveFee: options?.waiveFee },
-      );
-      if (card.blocked || !('admitCardNumber' in card)) continue;
-      const [institution, academicYear] = await Promise.all([
-        this.institutionContext(tenantId),
-        this.academicYearLabel(tenantId, session.academicYearId),
-      ]);
-      const template = await this.buildTemplateInput(
-        tenantId,
-        await this.loadStudentCardContext(tenantId, sessionId, studentId, {
-          waiveFee: options?.waiveFee,
-        }),
-        institution,
-        academicYear,
-        card.admitCardNumber as string,
-        card.verifyToken as string,
-        card.verifyCode as string,
-      );
-      const pdf = await this.pdf.renderCardPdf(template);
-      const name = `${template.student.rollNumber ?? studentId.slice(0, 8)}.pdf`;
-      folderNode.file(name, pdf);
-      if ('issueId' in card && card.issueId && user) {
-        await this.recordDownload(user, card.issueId);
+    const templates = await this.buildExportTemplates(
+      tenantId,
+      sessionId,
+      studentIds,
+      user,
+      'download',
+      options,
+    );
+    const usedNames = new Set<string>();
+    await this.pdf.writeSinglePdfs(templates, (index, pdf) => {
+      const roll = templates[index].student.rollNumber?.trim();
+      const base = roll || `student-${index + 1}`;
+      let name = `${base}.pdf`;
+      let suffix = 2;
+      while (usedNames.has(name)) {
+        name = `${base}-${suffix}.pdf`;
+        suffix += 1;
       }
-    }
+      usedNames.add(name);
+      folderNode.file(name, pdf);
+    });
 
     const buffer = await zip.generateAsync({ type: 'nodebuffer' });
     return {
