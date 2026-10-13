@@ -13,6 +13,43 @@ import { FacultyScreenShell } from '@/components/faculty-portal/faculty-screen-s
 import { facultyTheme } from '@/components/faculty-portal/theme';
 import { fetchFacultyIaSubjects, type FacultyIaSubject } from '@/services/faculty-marks';
 
+function paperKey(subject: FacultyIaSubject, paper: FacultyIaSubject['papers'][number]) {
+  const category = (paper.category || '').trim().toUpperCase();
+  const courseId = paper.courseId || subject.courseId;
+  if (!category || !courseId) return paper.id;
+  return [
+    paper.sessionId,
+    paper.semesterNo ?? subject.semesterNo ?? '',
+    courseId,
+    category,
+    (paper.paperCode || '').trim().toUpperCase(),
+    paper.assessmentKey || '',
+  ].join('|');
+}
+
+function collapsePapers(subject: FacultyIaSubject, papers: FacultyIaSubject['papers']) {
+  const result: FacultyIaSubject['papers'] = [];
+  const indexByKey = new Map<string, number>();
+  for (const paper of papers) {
+    const key = paperKey(subject, paper);
+    const index = indexByKey.get(key);
+    if (index == null) {
+      indexByKey.set(key, result.length);
+      result.push({ ...paper });
+      continue;
+    }
+    const existing = result[index];
+    if (
+      existing.programmeName &&
+      paper.programmeName &&
+      existing.programmeName !== paper.programmeName
+    ) {
+      result[index] = { ...existing, programmeName: null, programmeCode: null };
+    }
+  }
+  return result;
+}
+
 function slotLabel(value?: string | null) {
   if (!value) return '';
   return value
@@ -42,7 +79,27 @@ export default function FacultyMarksIndexScreen() {
     void load();
   }, [load]);
 
-  const withPapers = subjects.filter((s) => s.papers.length > 0);
+  const grouped = new Map<string, FacultyIaSubject>();
+  for (const subject of subjects) {
+    const key = `${subject.courseId}|${subject.semesterNo ?? ''}`;
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, {
+        ...subject,
+        papers: collapsePapers(subject, subject.papers),
+      });
+      continue;
+    }
+    existing.papers = collapsePapers(subject, [...existing.papers, ...subject.papers]);
+    if (
+      existing.programmeName &&
+      subject.programmeName &&
+      existing.programmeName !== subject.programmeName
+    ) {
+      existing.programmeName = null;
+    }
+  }
+  const withPapers = [...grouped.values()].filter((s) => s.papers.length > 0);
 
   return (
     <FacultyScreenShell title="Internal Marks" subtitle="IA mark entry by subject">

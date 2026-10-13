@@ -94,12 +94,17 @@ export default function FacultyMarksEntryScreen() {
     setSaving(true);
     try {
       const rows = students.map((student) => {
-        const raw = draft[student.id]?.[activeComponent.id]?.trim() ?? '';
+        const own = student.marks.find(
+          (mark) => mark.code.toUpperCase() === activeComponent.code.toUpperCase(),
+        );
+        const componentId = own?.componentId ?? activeComponent.id;
+        const raw = draft[student.id]?.[componentId]?.trim() ?? '';
         const isAbsent = raw.toUpperCase() === 'AB';
         const marks = isAbsent || raw === '' ? undefined : Number(raw);
         return {
           studentId: student.id,
-          componentId: activeComponent.id,
+          componentId,
+          paperId: student.paperId || undefined,
           marks,
           isAbsent,
         };
@@ -150,7 +155,12 @@ export default function FacultyMarksEntryScreen() {
 
           <ScrollView contentContainerStyle={styles.list}>
             {students.map((student) => {
-              const componentId = activeComponent?.id ?? '';
+              const own = activeComponent
+                ? student.marks.find(
+                    (mark) => mark.code.toUpperCase() === activeComponent.code.toUpperCase(),
+                  )
+                : undefined;
+              const componentId = own?.componentId ?? activeComponent?.id ?? '';
               const value = draft[student.id]?.[componentId] ?? '';
               return (
                 <View key={student.id} style={styles.row}>

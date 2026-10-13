@@ -12,6 +12,7 @@ import {
   parseIaMarkImportWorkbook,
   safeWorkbookName,
 } from './ia-mark-import-workbook';
+import { normalizeIaSubjectCategory } from './ia-category-policy';
 import { IaAuditService } from './ia-audit.service';
 import { IaSchemeService } from './ia-scheme.service';
 import { IaSessionService } from './ia-session.service';
@@ -132,6 +133,10 @@ export class IaMarkEntryService {
       user.tid,
       papers.map((paper: { offeringId?: string | null }) => paper.offeringId),
     );
+    const assessmentKeys = await this.sessions.assessmentSignatures(
+      user.tid,
+      papers,
+    );
 
     return assignments.map((a) => ({
       assignmentId: a.id,
@@ -149,6 +154,7 @@ export class IaMarkEntryService {
         .filter((p: { courseId?: string }) => p.courseId === a.courseId)
         .map(
           (paper: {
+            id: string;
             sessionId: string;
             offeringId?: string | null;
             metadata?: { category?: string; programmeCode?: string } | null;
@@ -172,6 +178,7 @@ export class IaMarkEntryService {
               programmeCode:
                 offering?.programmeCode ?? meta.programmeCode ?? null,
               programmeName: offering?.programmeName ?? null,
+              assessmentKey: assessmentKeys.get(paper.id) ?? '',
               sessionName: session?.name ?? null,
               examType: session?.examType ?? null,
               academicYearId: session?.academicYearId ?? null,
@@ -227,35 +234,174 @@ export class IaMarkEntryService {
     }
   }
 
+  private paperCategory(paper: {
+    metadata?: unknown;
+    category?: string | null;
+  }) {
+    const meta = (paper.metadata ?? {}) as { category?: string };
+    return normalizeIaSubjectCategory(paper.category ?? meta.category);
+  }
+
+  /**
+   * Papers that are the same subject, course type, and assessment.
+   * A shared code is not enough: a different subject record, category, or
+   * component set stays on its own list. Major lists stay inside the
+   * department that owns the subject. Minor, MDC, AEC, SEC, and VAC lists
+   * include every programme that registered students for that paper.
+   */
+  private async subjectCohort(
+    tenantId: string,
+    paper: {
+      id: string;
+      sessionId?: string | null;
+      semesterNo?: number | null;
+      courseId?: string | null;
+      offeringId?: string | null;
+      paperCode?: string | null;
+      metadata?: unknown;
+      category?: string | null;
+    },
+  ) {
+    const category = this.paperCategory(paper);
+    if (!category || !paper.sessionId || !paper.courseId) return [paper];
+    const code = (paper.paperCode ?? '').trim().toUpperCase();
+    const rows = await (this.prisma as any).examPaperSchedule.findMany({
+      where: {
+        tenantId,
+        sessionId: paper.sessionId,
+        courseId: paper.courseId,
+        deletedAt: null,
+        ...(paper.semesterNo != null ? { semesterNo: paper.semesterNo } : {}),
+      },
+    });
+    let same = rows.filter(
+      (row: {
+        paperCode?: string | null;
+        metadata?: unknown;
+        category?: string | null;
+      }) =>
+        this.paperCategory(row) === category &&
+        (row.paperCode ?? '').trim().toUpperCase() === code,
+    );
+    if (!same.some((row: { id: string }) => row.id === paper.id)) {
+      same = [paper, ...same];
+    }
+    const signatures = await this.sessions.assessmentSignatures(tenantId, same);
+    const selectedKey = signatures.get(paper.id) ?? '';
+    same = same.filter(
+      (row: { id: string }) => (signatures.get(row.id) ?? '') === selectedKey,
+    );
+    if (!same.some((row: { id: string }) => row.id === paper.id)) {
+      same = [paper, ...same];
+    }
+    if (category !== 'MAJOR') return same;
+    return this.majorProgrammePapers(tenantId, paper, same);
+  }
+
+  /** Major students belong to programmes in the subject department. */
+  private async majorProgrammePapers(
+    tenantId: string,
+    paper: { id: string; courseId?: string | null; offeringId?: string | null },
+    pool: Array<{ id: string; offeringId?: string | null }>,
+  ) {
+    const offeringIds = [
+      ...new Set(
+        pool
+          .map((row) => row.offeringId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const [course, offerings] = await Promise.all([
+      paper.courseId
+        ? this.prisma.course.findFirst({
+            where: { id: paper.courseId, tenantId },
+            select: { departmentId: true },
+          })
+        : null,
+      offeringIds.length
+        ? this.prisma.courseOffering.findMany({
+            where: { tenantId, id: { in: offeringIds } },
+            select: {
+              id: true,
+              programVersion: {
+                select: {
+                  program: { select: { id: true, departmentId: true } },
+                },
+              },
+            },
+          })
+        : [],
+    ]);
+    const programmeByOffering = new Map(
+      offerings.map((row) => [row.id, row.programVersion?.program ?? null]),
+    );
+    const selectedProgramme = paper.offeringId
+      ? programmeByOffering.get(paper.offeringId)
+      : null;
+    const homeDepartmentId =
+      course?.departmentId ?? selectedProgramme?.departmentId ?? null;
+    if (!homeDepartmentId) return pool;
+    const kept = pool.filter((row) => {
+      if (!row.offeringId) return row.id === paper.id;
+      const programme = programmeByOffering.get(row.offeringId);
+      if (!programme) return row.id === paper.id;
+      return programme.departmentId === homeDepartmentId;
+    });
+    return kept.length ? kept : [paper];
+  }
+
+  private async schemeForPaper(
+    tenantId: string,
+    paper: {
+      id: string;
+      offeringId?: string | null;
+      courseId?: string | null;
+      metadata?: unknown;
+    },
+    fallbackSchemeId?: string,
+  ) {
+    const meta = (paper.metadata ?? {}) as { schemeId?: string };
+    if (meta.schemeId) return this.schemes.get(tenantId, meta.schemeId);
+    if (paper.offeringId) {
+      const byOffering = await this.schemes.findForOffering(
+        tenantId,
+        paper.offeringId,
+      );
+      if (byOffering) return byOffering;
+    }
+    if (fallbackSchemeId) return this.schemes.get(tenantId, fallbackSchemeId);
+    throw new BadRequestException(
+      'No mark scheme linked to this subject. Create an IA Exam first or configure a scheme in Settings.',
+    );
+  }
+
   async getRoster(user: JwtUser, paperId: string, schemeId?: string) {
     const paper = await this.sessions.getPaper(user.tid, paperId);
-    let scheme;
-    if (schemeId) {
-      scheme = await this.schemes.get(user.tid, schemeId);
-    } else {
-      const paperMeta = (paper.metadata ?? {}) as { schemeId?: string };
-      if (paperMeta.schemeId) {
-        scheme = await this.schemes.get(user.tid, paperMeta.schemeId);
-      } else {
-        const found = await this.schemes.findForOffering(
-          user.tid,
-          paper.offeringId,
-          paper.courseId,
-        );
-        if (!found) {
-          throw new BadRequestException(
-            'No mark scheme linked to this subject. Create an IA Exam first or configure a scheme in Settings.',
-          );
-        }
-        scheme = found;
-      }
+    const cohort = await this.subjectCohort(user.tid, paper);
+    const scheme = schemeId
+      ? await this.schemes.get(user.tid, schemeId)
+      : await this.schemeForPaper(user.tid, paper);
+    const schemeByPaperId = new Map<string, typeof scheme>();
+    for (const row of cohort) {
+      schemeByPaperId.set(
+        row.id,
+        row.id === paper.id
+          ? scheme
+          : await this.schemeForPaper(user.tid, row, scheme.id),
+      );
     }
+    const paperByOffering = new Map(
+      cohort
+        .filter((row: { offeringId?: string | null }) => row.offeringId)
+        .map((row: { offeringId: string }) => [row.offeringId, row]),
+    );
+    const offeringIds = [...paperByOffering.keys()] as string[];
 
-    const lines = paper.offeringId
+    const lines = offeringIds.length
       ? await this.prisma.semesterRegistrationLine.findMany({
           where: {
             tenantId: user.tid,
-            offeringId: paper.offeringId,
+            offeringId: { in: offeringIds },
             status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
           },
           include: {
@@ -269,30 +415,59 @@ export class IaMarkEntryService {
         })
       : [];
 
-    const students =
-      lines.length > 0
-        ? Array.from(
-            new Map(
-              lines.map((line) => [
-                line.registration.student.id,
-                {
-                  student: line.registration.student,
-                  shift:
-                    line.registration.shift ??
-                    line.registration.student.primaryShift,
-                },
-              ]),
-            ).values(),
-          )
-        : await this.studentsForPaper(user.tid, paper);
+    const statusRank: Record<string, number> = {
+      approved: 0,
+      confirmed: 1,
+      registered: 2,
+      pending: 3,
+    };
+    const students = new Map<
+      string,
+      {
+        student: (typeof lines)[number]['registration']['student'];
+        shift: { id: string; name: string } | null;
+        paperId: string;
+        scheme: typeof scheme;
+        rank: number;
+      }
+    >();
+    const wantedCategory = this.paperCategory(paper);
+    for (const line of lines) {
+      const lineCategory = normalizeIaSubjectCategory(line.category);
+      if (wantedCategory && lineCategory && lineCategory !== wantedCategory) {
+        continue;
+      }
+      const owner = paperByOffering.get(line.offeringId) ?? paper;
+      const nextRank = statusRank[line.status] ?? 9;
+      const existing = students.get(line.registration.student.id);
+      if (existing && existing.rank <= nextRank) continue;
+      students.set(line.registration.student.id, {
+        student: line.registration.student,
+        shift:
+          line.registration.shift ?? line.registration.student.primaryShift,
+        paperId: owner.id,
+        scheme: schemeByPaperId.get(owner.id) ?? scheme,
+        rank: nextRank,
+      });
+    }
+    if (!students.size) {
+      for (const row of await this.studentsForPaper(user.tid, paper)) {
+        students.set(row.student.id, {
+          student: row.student,
+          shift: row.shift,
+          paperId: paper.id,
+          scheme,
+          rank: 0,
+        });
+      }
+    }
 
-    const resolvedSchemeId = scheme.id;
-
+    const rosterRows = [...students.values()];
+    const paperIds = [...new Set(rosterRows.map((row) => row.paperId))];
     const marks = await (this.prisma as any).iaComponentMark.findMany({
       where: {
         tenantId: user.tid,
-        paperId,
-        schemeId: resolvedSchemeId,
+        paperId: { in: paperIds },
         deletedAt: null,
       },
     });
@@ -301,7 +476,8 @@ export class IaMarkEntryService {
     const previousMarks = await this.previousMarksForCourse(
       user.tid,
       paper,
-      students.map((row) => row.student.id),
+      rosterRows.map((row) => row.student.id),
+      cohort.map((row: { id: string }) => row.id),
     );
 
     return {
@@ -309,13 +485,14 @@ export class IaMarkEntryService {
       scheme,
       context,
       previousMarks,
-      students: students.map((row) => ({
+      students: rosterRows.map((row) => ({
         id: row.student.id,
         rollNumber: row.student.rollNumber,
         enrollmentNumber: row.student.enrollmentNumber,
         fullName: rosterStudentName(row.student),
         shiftId: row.shift?.id ?? null,
         shiftName: row.shift?.name ?? null,
+        paperId: row.paperId,
         marks: scheme.components.map(
           (c: {
             id: string;
@@ -323,15 +500,25 @@ export class IaMarkEntryService {
             label: string;
             maxMarks: unknown;
           }) => {
+            const own =
+              row.scheme.components.find(
+                (component: { code: string }) => component.code === c.code,
+              ) ?? c;
             const saved = marks.find(
-              (m: { studentId: string; componentId: string }) =>
-                m.studentId === row.student.id && m.componentId === c.id,
+              (m: {
+                studentId: string;
+                componentId: string;
+                paperId: string;
+              }) =>
+                m.studentId === row.student.id &&
+                m.componentId === own.id &&
+                m.paperId === row.paperId,
             );
             return {
-              componentId: c.id,
-              code: c.code,
+              componentId: own.id,
+              code: own.code,
               label: c.label,
-              maxMarks: Number(c.maxMarks),
+              maxMarks: Number(own.maxMarks ?? c.maxMarks),
               marks: saved?.marks != null ? Number(saved.marks) : null,
               isAbsent: saved?.isAbsent ?? false,
               status: saved?.status ?? 'DRAFT',
@@ -414,6 +601,7 @@ export class IaMarkEntryService {
     tenantId: string,
     paper: { id: string; courseId?: string | null },
     studentIds: string[],
+    excludePaperIds: string[] = [paper.id],
   ) {
     if (!paper.courseId || !studentIds.length) return [];
     const papers = await (this.prisma as any).examPaperSchedule.findMany({
@@ -421,7 +609,7 @@ export class IaMarkEntryService {
         tenantId,
         courseId: paper.courseId,
         deletedAt: null,
-        id: { not: paper.id },
+        id: { notIn: excludePaperIds },
       },
       select: { id: true, sessionId: true, paperCode: true, paperName: true },
       take: 40,
@@ -506,60 +694,79 @@ export class IaMarkEntryService {
   async saveMarks(user: JwtUser, paperId: string, dto: SaveIaMarksDto) {
     const paper = await this.sessions.getPaper(user.tid, paperId);
     await this.assertFacultyAccess(user, paper);
-    await this.assertCanEditMarks(user, paperId);
-
-    const scheme = await this.schemes.get(user.tid, dto.schemeId);
-    const componentMap = new Map(
-      scheme.components.map((c: { id: string; maxMarks: unknown }) => [
-        c.id,
-        c,
-      ]),
+    const cohort = await this.subjectCohort(user.tid, paper);
+    const paperById = new Map(
+      cohort.map((row: { id: string }) => [row.id, row]),
     );
-
-    let saved = 0;
+    const buckets = new Map<string, SaveIaMarksDto['rows']>();
     for (const row of dto.rows) {
-      const comp = componentMap.get(row.componentId);
-      if (!comp) continue;
-      const maxMarks = Number((comp as { maxMarks: unknown }).maxMarks);
-      if (row.marks != null && row.marks > maxMarks) {
-        throw new BadRequestException(
-          `Marks exceed max for component ${row.componentId}`,
-        );
-      }
-
-      await (this.prisma as any).iaComponentMark.upsert({
-        where: {
-          componentId_studentId_paperId: {
-            componentId: row.componentId,
-            studentId: row.studentId,
-            paperId,
-          },
-        },
-        create: {
-          tenantId: user.tid,
-          sessionId: paper.sessionId,
-          paperId,
-          schemeId: dto.schemeId,
-          componentId: row.componentId,
-          studentId: row.studentId,
-          marks: row.marks,
-          maxMarks,
-          isAbsent: row.isAbsent ?? false,
-          remarks: row.remarks,
-          enteredById: user.sub,
-          status: 'DRAFT',
-        },
-        update: {
-          marks: row.marks,
-          isAbsent: row.isAbsent ?? false,
-          remarks: row.remarks,
-          enteredById: user.sub,
-        },
-      });
-      saved++;
+      const targetId =
+        row.paperId && paperById.has(row.paperId) ? row.paperId : paperId;
+      const bucket = buckets.get(targetId) ?? [];
+      bucket.push(row);
+      buckets.set(targetId, bucket);
     }
 
-    await this.schemes.lockScheme(user.tid, dto.schemeId);
+    let saved = 0;
+    for (const [targetId, rows] of buckets) {
+      const target = paperById.get(targetId) ?? paper;
+      await this.assertCanEditMarks(user, targetId);
+      const scheme = await this.schemeForPaper(
+        user.tid,
+        target,
+        targetId === paperId ? dto.schemeId : undefined,
+      );
+      const componentMap = new Map(
+        scheme.components.map((c: { id: string; maxMarks: unknown }) => [
+          c.id,
+          c,
+        ]),
+      );
+
+      for (const row of rows) {
+        const comp = componentMap.get(row.componentId);
+        if (!comp) continue;
+        const maxMarks = Number((comp as { maxMarks: unknown }).maxMarks);
+        if (row.marks != null && row.marks > maxMarks) {
+          throw new BadRequestException(
+            `Marks exceed max for component ${row.componentId}`,
+          );
+        }
+
+        await (this.prisma as any).iaComponentMark.upsert({
+          where: {
+            componentId_studentId_paperId: {
+              componentId: row.componentId,
+              studentId: row.studentId,
+              paperId: targetId,
+            },
+          },
+          create: {
+            tenantId: user.tid,
+            sessionId: target.sessionId ?? paper.sessionId,
+            paperId: targetId,
+            schemeId: scheme.id,
+            componentId: row.componentId,
+            studentId: row.studentId,
+            marks: row.marks,
+            maxMarks,
+            isAbsent: row.isAbsent ?? false,
+            remarks: row.remarks,
+            enteredById: user.sub,
+            status: 'DRAFT',
+          },
+          update: {
+            marks: row.marks,
+            isAbsent: row.isAbsent ?? false,
+            remarks: row.remarks,
+            enteredById: user.sub,
+          },
+        });
+        saved++;
+      }
+      await this.schemes.lockScheme(user.tid, scheme.id);
+    }
+
     await this.audit.log(user, 'IA_MARKS', paperId, 'SAVE', null, {
       saved,
       schemeId: dto.schemeId,
@@ -629,12 +836,19 @@ export class IaMarkEntryService {
   ) {
     const roster = await this.getRoster(user, paperId, schemeId);
     const studentByRoll = new Map(
-      roster.students.map((s: { rollNumber?: string | null; id: string }) => [
-        String(s.rollNumber ?? '')
-          .trim()
-          .toUpperCase(),
-        s.id,
-      ]),
+      roster.students.map(
+        (s: {
+          rollNumber?: string | null;
+          id: string;
+          paperId?: string;
+          marks: Array<{ code: string; componentId: string }>;
+        }) => [
+          String(s.rollNumber ?? '')
+            .trim()
+            .toUpperCase(),
+          s,
+        ],
+      ),
     );
     const compByCode = new Map(
       roster.scheme.components.map((c: { code: string; id: string }) => [
@@ -646,17 +860,19 @@ export class IaMarkEntryService {
     const markRows: SaveIaMarksDto['rows'] = [];
     let skipped = 0;
     for (const row of rows) {
-      const studentId = studentByRoll.get(row.rollNumber.trim().toUpperCase());
-      const componentId = compByCode.get(
-        row.componentCode.trim().toUpperCase(),
-      );
-      if (!studentId || !componentId) {
+      const student = studentByRoll.get(row.rollNumber.trim().toUpperCase());
+      const code = row.componentCode.trim().toUpperCase();
+      const componentId =
+        student?.marks.find((cell) => cell.code.toUpperCase() === code)
+          ?.componentId ?? compByCode.get(code);
+      if (!student || !componentId) {
         skipped++;
         continue;
       }
       markRows.push({
-        studentId: String(studentId),
+        studentId: String(student.id),
         componentId: String(componentId),
+        paperId: student.paperId,
         marks: row.marks,
         remarks: row.remarks,
       });
@@ -706,7 +922,13 @@ export class IaMarkEntryService {
       shiftName:
         shifts.length === 1 ? shifts[0] : context.shiftName || 'All shifts',
       subject:
-        [paper.paperCode, paper.paperName].filter(Boolean).join(' — ') || '—',
+        [
+          paper.paperCode,
+          paper.paperName,
+          this.paperCategory(paper) === 'MINOR' ? 'Minor' : null,
+        ]
+          .filter(Boolean)
+          .join(' — ') || '—',
       components: (roster.scheme.components ?? []).map(
         (component: { code: string; label: string; maxMarks: unknown }) => ({
           code: component.code,

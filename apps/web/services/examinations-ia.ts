@@ -56,6 +56,7 @@ export type IaPaper = {
   category?: string | null;
   programmeCode?: string | null;
   programmeName?: string | null;
+  assessmentKey?: string | null;
   metadata?: {
     category?: string;
     maxMarks?: number;
@@ -76,6 +77,7 @@ export type IaPaper = {
 export type IaMarkRow = {
   studentId: string;
   componentId: string;
+  paperId?: string;
   marks?: number | null;
   isAbsent?: boolean;
   remarks?: string;

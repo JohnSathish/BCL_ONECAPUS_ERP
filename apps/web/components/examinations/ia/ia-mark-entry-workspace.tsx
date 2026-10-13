@@ -55,6 +55,7 @@ type RosterStudent = {
   fullName?: string | null;
   shiftId?: string | null;
   shiftName?: string | null;
+  paperId?: string | null;
   marks: MarkCell[];
 };
 
@@ -103,9 +104,11 @@ type PaperChoice = {
   paperName: string;
   departmentId: string;
   departmentName: string;
+  courseId: string | null;
   courseType: string | null;
   programmeCode: string | null;
   programmeName: string | null;
+  assessmentKey: string | null;
   expectedCount: number | null;
   credits: number | null;
   maxMarks: number | null;
@@ -130,6 +133,7 @@ type FacultySubject = {
       category?: string | null;
       programmeCode?: string | null;
       programmeName?: string | null;
+      assessmentKey?: string | null;
       expectedCount?: number | null;
       metadata?: { category?: string; maxMarks?: number; programmeCode?: string } | null;
     }
@@ -208,6 +212,69 @@ function programmeLabel(paper: Pick<PaperChoice, 'programmeName' | 'programmeCod
   return paper.programmeName || paper.programmeCode || null;
 }
 
+function normalizedCategory(value?: string | null) {
+  if (!value?.trim()) return '';
+  const cat = value
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+  if (cat.startsWith('MAJOR')) return 'MAJOR';
+  if (cat.startsWith('MINOR')) return 'MINOR';
+  if (cat.startsWith('MDC')) return 'MDC';
+  if (cat.startsWith('AEC')) return 'AEC';
+  if (cat.startsWith('SEC')) return 'SEC';
+  if (cat.startsWith('VAC')) return 'VAC';
+  if (cat.startsWith('VTC')) return 'VTC';
+  if (cat.startsWith('INTERNSHIP')) return 'INTERNSHIP';
+  return '';
+}
+
+/**
+ * One option per subject, course type, and assessment.
+ * Papers split only by programme stay together. A different subject record,
+ * course type, or assessment stays as its own option.
+ */
+function paperIdentity(paper: PaperChoice) {
+  const category = normalizedCategory(paper.courseType);
+  const courseId = paper.courseId?.trim() || '';
+  if (!category || !courseId) return null;
+  return [
+    paper.sessionId,
+    paper.semesterNo ?? '',
+    courseId,
+    category,
+    paper.paperCode.trim().toUpperCase(),
+    paper.assessmentKey ?? '',
+  ].join('|');
+}
+
+function collapseEquivalentPaperChoices(papers: PaperChoice[]): PaperChoice[] {
+  const result: PaperChoice[] = [];
+  const indexByKey = new Map<string, number>();
+  for (const paper of papers) {
+    const key = paperIdentity(paper);
+    if (!key) {
+      result.push(paper);
+      continue;
+    }
+    const index = indexByKey.get(key);
+    if (index == null) {
+      indexByKey.set(key, result.length);
+      result.push({ ...paper });
+      continue;
+    }
+    const existing = result[index];
+    existing.expectedCount = (existing.expectedCount ?? 0) + (paper.expectedCount ?? 0);
+    const existingProgramme = programmeLabel(existing);
+    const nextProgramme = programmeLabel(paper);
+    if (existingProgramme && nextProgramme && existingProgramme !== nextProgramme) {
+      existing.programmeCode = null;
+      existing.programmeName = null;
+    }
+  }
+  return result;
+}
+
 /** Major/Minor, and the programme when the same paper is listed more than once. */
 export function paperOptionLabel(paper: PaperChoice, peers: PaperChoice[]) {
   const slot = paper.courseType ? prettyToken(paper.courseType) : null;
@@ -246,9 +313,11 @@ function paperChoiceFromExam(exam: IaExamSummary, paper: IaPaper): PaperChoice {
     paperName: paper.paperName,
     departmentId: paper.course?.departmentId || 'none',
     departmentName: paper.course?.departmentName || 'Unassigned',
+    courseId: paper.courseId || paper.course?.id || null,
     courseType: paper.category || meta.category || paper.course?.courseType || null,
     programmeCode: paper.programmeCode || meta.programmeCode || null,
     programmeName: paper.programmeName || null,
+    assessmentKey: paper.assessmentKey || null,
     expectedCount: paper.expectedCount ?? null,
     credits: paper.course?.credits ?? null,
     maxMarks: meta.maxMarks ?? exam.stats?.maxMarks ?? exam.metadata?.maxMarks ?? null,
@@ -309,9 +378,11 @@ export function IaMarkEntryWorkspace({
         paperName: paper.paperName,
         departmentId: subject.departmentId || 'none',
         departmentName: subject.departmentName || 'Unassigned',
+        courseId: paper.courseId || null,
         courseType: paper.category || paper.metadata?.category || subject.courseType || null,
         programmeCode: paper.programmeCode || paper.metadata?.programmeCode || null,
         programmeName: paper.programmeName || subject.programmeName || null,
+        assessmentKey: paper.assessmentKey || null,
         expectedCount: paper.expectedCount ?? null,
         credits: subject.credits ?? null,
         maxMarks: paper.metadata?.maxMarks ?? null,
@@ -408,15 +479,17 @@ export function IaMarkEntryWorkspace({
 
   const subjectChoices = useMemo(
     () =>
-      paperChoices
-        .filter((paper) => !semester || String(paper.semesterNo ?? '') === semester)
-        .filter((paper) => departmentId === 'all' || paper.departmentId === departmentId)
-        .sort(
-          (a, b) =>
-            a.paperCode.localeCompare(b.paperCode) ||
-            categoryRank(a.courseType) - categoryRank(b.courseType) ||
-            (programmeLabel(a) || '').localeCompare(programmeLabel(b) || ''),
-        ),
+      collapseEquivalentPaperChoices(
+        paperChoices
+          .filter((paper) => !semester || String(paper.semesterNo ?? '') === semester)
+          .filter((paper) => departmentId === 'all' || paper.departmentId === departmentId)
+          .sort(
+            (a, b) =>
+              a.paperCode.localeCompare(b.paperCode) ||
+              categoryRank(a.courseType) - categoryRank(b.courseType) ||
+              (programmeLabel(a) || '').localeCompare(programmeLabel(b) || ''),
+          ),
+      ),
     [paperChoices, semester, departmentId],
   );
 
@@ -571,6 +644,7 @@ export function IaMarkEntryWorkspace({
         rows.push({
           studentId: student.id,
           componentId: cell.componentId,
+          paperId: student.paperId || undefined,
           marks,
           remarks,
         });
@@ -1232,8 +1306,10 @@ export function IaMarkEntryWorkspace({
             Mark entry settings for this paper
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            These components were created with the examination. Marks are stored against this paper
-            only.
+            These components were created with the examination. Each subject is listed once for its
+            course type. Minor, MDC, AEC, SEC, and VAC papers include every registered student. A
+            Major paper includes the students registered for that major in its own department. Each
+            mark stays on that student's registration.
           </p>
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">
             <Info label="Scheme" value={roster.data?.scheme?.name || 'Linked IA scheme'} />

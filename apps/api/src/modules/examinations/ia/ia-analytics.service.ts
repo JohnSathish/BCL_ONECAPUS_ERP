@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { normalizeIaSubjectCategory } from './ia-category-policy';
 import { IA_EXAM_TYPES } from './ia.constants';
 import { IaSettingsService } from './ia-settings.service';
 
@@ -10,6 +11,24 @@ type Filters = {
   semesterNo?: number;
   shiftId?: string;
 };
+
+function analyticsSubjectKey(
+  paper?: {
+    id: string;
+    sessionId?: string | null;
+    semesterNo?: number | null;
+    courseId?: string | null;
+    paperCode?: string | null;
+    metadata?: unknown;
+  } | null,
+) {
+  if (!paper?.courseId) return paper?.id ?? null;
+  const meta = (paper.metadata ?? {}) as { category?: string };
+  const category = normalizeIaSubjectCategory(meta.category);
+  if (!category) return paper.id;
+  const code = (paper.paperCode ?? '').trim().toUpperCase();
+  return `${category}:${paper.sessionId ?? ''}:${paper.semesterNo ?? ''}:${paper.courseId}:${code}`;
+}
 
 type RosterStudent = {
   id: string;
@@ -57,11 +76,13 @@ export class IaAnalyticsService {
           },
           select: {
             id: true,
+            sessionId: true,
             paperCode: true,
             paperName: true,
             semesterNo: true,
             offeringId: true,
             courseId: true,
+            metadata: true,
           },
         })
       : [];
@@ -175,9 +196,11 @@ export class IaAnalyticsService {
         const scores = studentScores.get(studentId) ?? [];
         scores.push(percent);
         studentScores.set(studentId, scores);
-        const paper = paperScores.get(paperId) ?? [];
+        const source = paperById.get(paperId);
+        const subjectKey = analyticsSubjectKey(source) ?? paperId;
+        const paper = paperScores.get(subjectKey) ?? [];
         paper.push(percent);
-        paperScores.set(paperId, paper);
+        paperScores.set(subjectKey, paper);
       } else if (value.rows > 0 && value.absentRows === value.rows) {
         studentAbsentPapers.set(
           studentId,
@@ -223,7 +246,11 @@ export class IaAnalyticsService {
 
     const subjects = [...paperScores.entries()]
       .map(([paperId, scores]) => {
-        const paper = paperById.get(paperId);
+        const paper =
+          paperById.get(paperId) ??
+          [...paperById.values()].find(
+            (row) => analyticsSubjectKey(row) === paperId,
+          );
         const average = round1(
           scores.reduce((sum, score) => sum + score, 0) / scores.length,
         );

@@ -237,6 +237,11 @@ export class IaMarkRowDto {
   @IsUUID()
   componentId!: string;
 
+  /** The student's own paper when a Minor list combines several programmes. */
+  @IsOptional()
+  @IsUUID()
+  paperId?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

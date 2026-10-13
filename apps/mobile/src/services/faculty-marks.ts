@@ -13,6 +13,8 @@ export type IaPaper = {
   category?: string | null;
   programmeCode?: string | null;
   programmeName?: string | null;
+  courseId?: string | null;
+  assessmentKey?: string | null;
 };
 
 export type FacultyIaSubject = {
@@ -35,6 +37,7 @@ export type IaSchemeComponent = {
 
 export type IaMarkRosterStudent = {
   id: string;
+  paperId?: string | null;
   rollNumber?: string | null;
   enrollmentNumber?: string | null;
   fullName?: string | null;
@@ -71,6 +74,7 @@ export function saveIaMarks(
     rows: {
       studentId: string;
       componentId: string;
+      paperId?: string;
       marks?: number;
       isAbsent?: boolean;
       remarks?: string;

@@ -104,7 +104,11 @@ export class IaSessionService {
             id: true,
             category: true,
             programVersion: {
-              select: { program: { select: { code: true, name: true } } },
+              select: {
+                program: {
+                  select: { code: true, name: true, departmentId: true },
+                },
+              },
             },
           },
         })
@@ -116,9 +120,48 @@ export class IaSessionService {
           category: row.category,
           programmeCode: row.programVersion?.program?.code ?? null,
           programmeName: row.programVersion?.program?.name ?? null,
+          programmeDepartmentId:
+            row.programVersion?.program?.departmentId ?? null,
         },
       ]),
     );
+  }
+
+  /** Component-code signature so two different assessments of one subject stay apart. */
+  async assessmentSignatures(
+    tenantId: string,
+    papers: Array<{ id: string; metadata?: unknown }>,
+  ) {
+    const schemeIds = [
+      ...new Set(
+        papers
+          .map((paper) => {
+            const meta = (paper.metadata ?? {}) as { schemeId?: string };
+            return meta.schemeId;
+          })
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const components = schemeIds.length
+      ? await this.prisma.iaAssessmentComponent.findMany({
+          where: { tenantId, schemeId: { in: schemeIds } },
+          select: { schemeId: true, code: true },
+        })
+      : [];
+    const codesByScheme = new Map<string, string[]>();
+    for (const row of components) {
+      const list = codesByScheme.get(row.schemeId) ?? [];
+      list.push(row.code.trim().toUpperCase());
+      codesByScheme.set(row.schemeId, list);
+    }
+    const byPaper = new Map<string, string>();
+    for (const paper of papers) {
+      const schemeId = ((paper.metadata ?? {}) as { schemeId?: string })
+        .schemeId;
+      const codes = schemeId ? (codesByScheme.get(schemeId) ?? []) : [];
+      byPaper.set(paper.id, [...codes].sort().join('+'));
+    }
+    return byPaper;
   }
 
   async listPapers(tenantId: string, query: IaQueryDto) {
@@ -162,8 +205,10 @@ export class IaSessionService {
         })
       : [];
     const courseById = new Map(courses.map((course) => [course.id, course]));
+    const assessmentKeys = await this.assessmentSignatures(tenantId, papers);
     return papers.map(
       (paper: {
+        id: string;
         courseId?: string | null;
         offeringId?: string | null;
         metadata?: { category?: string; programmeCode?: string } | null;
@@ -178,6 +223,7 @@ export class IaSessionService {
           category: offering?.category ?? meta.category ?? null,
           programmeCode: offering?.programmeCode ?? meta.programmeCode ?? null,
           programmeName: offering?.programmeName ?? null,
+          assessmentKey: assessmentKeys.get(paper.id) ?? '',
           course: course
             ? {
                 id: course.id,
