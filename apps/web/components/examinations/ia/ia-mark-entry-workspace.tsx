@@ -45,6 +45,7 @@ type MarkCell = {
   label: string;
   maxMarks: number;
   marks: number | null;
+  isAbsent?: boolean;
   remarks?: string;
   updatedAt?: string | null;
 };
@@ -364,6 +365,7 @@ export function IaMarkEntryWorkspace({
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [draftMarks, setDraftMarks] = useState<Record<string, number | null>>({});
+  const [draftAbsent, setDraftAbsent] = useState<Record<string, boolean>>({});
   const [draftRemarks, setDraftRemarks] = useState<Record<string, string>>({});
   const [helpOpen, setHelpOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -544,6 +546,7 @@ export function IaMarkEntryWorkspace({
     }
     setPage(1);
     setDraftMarks({});
+    setDraftAbsent({});
     setDraftRemarks({});
     setSelected({});
   }, [roster.data, paperId]);
@@ -556,6 +559,28 @@ export function IaMarkEntryWorkspace({
     const key = `${student.id}:${cell.componentId}`;
     return key in draftMarks ? draftMarks[key] : cell.marks;
   };
+  const absentFor = (student: RosterStudent, cell: MarkCell) => {
+    const key = `${student.id}:${cell.componentId}`;
+    return key in draftAbsent ? draftAbsent[key] : Boolean(cell.isAbsent);
+  };
+  const applyMarkDraft = (key: string, raw: string) => {
+    const text = raw.trim().toUpperCase();
+    if (!text) {
+      setDraftMarks((prev) => ({ ...prev, [key]: null }));
+      setDraftAbsent((prev) => ({ ...prev, [key]: false }));
+      return;
+    }
+    if (text === 'A' || text === 'AB' || text === 'ABS' || text === 'ABSENT') {
+      setDraftMarks((prev) => ({ ...prev, [key]: null }));
+      setDraftAbsent((prev) => ({ ...prev, [key]: true }));
+      return;
+    }
+    if (!/^\d+(\.\d{0,2})?$/.test(text)) return;
+    const marks = Number(text);
+    if (Number.isNaN(marks)) return;
+    setDraftAbsent((prev) => ({ ...prev, [key]: false }));
+    setDraftMarks((prev) => ({ ...prev, [key]: marks }));
+  };
   const remarksFor = (student: RosterStudent) =>
     student.id in draftRemarks
       ? draftRemarks[student.id]
@@ -563,11 +588,14 @@ export function IaMarkEntryWorkspace({
   const savedRemarks = (student: RosterStudent) =>
     student.marks.find((cell) => cell.remarks)?.remarks ?? '';
   const isDirty = (student: RosterStudent) =>
-    student.marks.some((cell) => `${student.id}:${cell.componentId}` in draftMarks) ||
-    student.id in draftRemarks;
+    student.marks.some(
+      (cell) =>
+        `${student.id}:${cell.componentId}` in draftMarks ||
+        `${student.id}:${cell.componentId}` in draftAbsent,
+    ) || student.id in draftRemarks;
   const rowStatus = (student: RosterStudent) => {
     if (isDirty(student)) return 'unsaved';
-    if (student.marks.some((cell) => cell.marks != null)) return 'saved';
+    if (student.marks.some((cell) => cell.marks != null || cell.isAbsent)) return 'saved';
     return 'pending';
   };
 
@@ -604,7 +632,7 @@ export function IaMarkEntryWorkspace({
         : compareRoll(a.rollNumber, b.rollNumber),
     );
     return rows;
-  }, [students, search, shift, statusFilter, sortBy, draftMarks, draftRemarks]);
+  }, [students, search, shift, statusFilter, sortBy, draftMarks, draftAbsent, draftRemarks]);
 
   const pageCount = Math.max(1, Math.ceil(visibleStudents.length / pageSize));
   const safePage = Math.min(page, pageCount);
@@ -613,7 +641,7 @@ export function IaMarkEntryWorkspace({
     (student) => shift === 'all' || student.shiftName === shift,
   );
   const enteredCount = shiftStudents.filter((student) =>
-    student.marks.some((cell) => cell.marks != null),
+    student.marks.some((cell) => cell.marks != null || absentFor(student, cell)),
   ).length;
   const pendingCount = Math.max(0, shiftStudents.length - enteredCount);
   const completion = shiftStudents.length
@@ -639,6 +667,7 @@ export function IaMarkEntryWorkspace({
       studentId: string;
       componentId: string;
       marks: number | null;
+      isAbsent: boolean;
       remarks: string;
     }> = [];
     for (const student of students) {
@@ -646,7 +675,8 @@ export function IaMarkEntryWorkspace({
       if (!isDirty(student)) continue;
       const remarks = remarksFor(student);
       for (const cell of student.marks) {
-        const marks = valueFor(student, cell);
+        const absent = absentFor(student, cell);
+        const marks = absent ? null : valueFor(student, cell);
         if (marks != null && marks > cell.maxMarks) {
           throw new Error(
             `Marks for ${student.rollNumber || student.fullName} cannot exceed ${cell.maxMarks}.`,
@@ -657,6 +687,7 @@ export function IaMarkEntryWorkspace({
           componentId: cell.componentId,
           paperId: student.paperId || undefined,
           marks,
+          isAbsent: absent,
           remarks,
         });
       }
@@ -674,6 +705,7 @@ export function IaMarkEntryWorkspace({
     onSuccess: (result: { saved?: number }) => {
       setNotice(`Saved ${result?.saved ?? 0} mark${result?.saved === 1 ? '' : 's'}.`);
       setDraftMarks({});
+      setDraftAbsent({});
       setDraftRemarks({});
       qc.invalidateQueries({ queryKey: ['ia', 'roster', paperId] });
     },
@@ -1198,22 +1230,19 @@ export function IaMarkEntryWorkspace({
                           return (
                             <td key={cell.componentId} className="px-2 py-2">
                               <input
-                                type="number"
-                                min={0}
-                                max={cell.maxMarks}
-                                value={value ?? ''}
-                                onChange={(event) =>
-                                  setDraftMarks((prev) => ({
-                                    ...prev,
-                                    [key]:
-                                      event.target.value === '' ? null : Number(event.target.value),
-                                  }))
-                                }
+                                type="text"
+                                inputMode="decimal"
+                                aria-label={`Marks for ${student.fullName || student.rollNumber}. Type A if absent.`}
+                                title="Type the mark, or A if the student was absent"
+                                value={absentFor(student, cell) ? 'A' : (value ?? '')}
+                                onChange={(event) => applyMarkDraft(key, event.target.value)}
                                 className={cn(
                                   'h-9 w-20 rounded-lg border bg-white text-center text-sm outline-none',
                                   invalid
                                     ? 'border-rose-400'
-                                    : 'border-slate-200 focus:border-blue-400',
+                                    : absentFor(student, cell)
+                                      ? 'border-amber-400 font-semibold text-amber-800'
+                                      : 'border-slate-200 focus:border-blue-400',
                                 )}
                               />
                             </td>
@@ -1292,6 +1321,7 @@ export function IaMarkEntryWorkspace({
               <GhostButton
                 onClick={() => {
                   setDraftMarks({});
+                  setDraftAbsent({});
                   setDraftRemarks({});
                   setNotice('Cleared unsaved marks on this paper.');
                 }}
@@ -1450,7 +1480,10 @@ export function IaMarkEntryWorkspace({
             <li>
               The shift filter opens on that examination’s shift, so Day and Morning stay separate.
             </li>
-            <li>Type the marks. A row stays Not Saved until you press Save.</li>
+            <li>
+              Type the marks, or type A when the student was absent. A row stays Not Saved until you
+              press Save.
+            </li>
             <li>Save Marks stores the ticked rows, or every unsaved row when none are ticked.</li>
             <li>Save All Marks stores every unsaved row on this paper.</li>
           </ol>
@@ -1484,7 +1517,7 @@ export function IaMarkEntryWorkspace({
                     <td className="py-1.5">{student.fullName}</td>
                     {student.marks.map((cell) => (
                       <td key={cell.componentId} className="py-1.5">
-                        {valueFor(student, cell) ?? '—'}
+                        {absentFor(student, cell) ? 'A' : (valueFor(student, cell) ?? '—')}
                       </td>
                     ))}
                     <td className="py-1.5">
