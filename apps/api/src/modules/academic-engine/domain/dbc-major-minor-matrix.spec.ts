@@ -1,6 +1,7 @@
 import {
   DBC_MAJOR_MINOR_MATRIX,
   allowedMinorsForDbcMajor,
+  buildFyugpSem1MinorMappings,
   canonicalDbcMajorName,
   isAllowedDbcMajorMinorPair,
 } from './dbc-major-minor-matrix';
@@ -99,5 +100,22 @@ describe('DBC major-minor matrix', () => {
     expect(isAllowedDbcMajorMinorPair('CHEMISTRY', 'MATHS')).toBe(true);
     expect(isAllowedDbcMajorMinorPair('PHYSICS', 'MATHS')).toBe(true);
     expect(isAllowedDbcMajorMinorPair('BOTANY', 'ZOOLOGY')).toBe(true);
+  });
+
+  it('maps Semester 1 minors to the other department 100-level paper', () => {
+    expect(
+      buildFyugpSem1MinorMappings('BA-ENG').map((row) => row.courseCode),
+    ).toEqual(['EDN-100', 'GEO-100', 'PHI-100', 'POL-100']);
+    expect(
+      buildFyugpSem1MinorMappings('BA-ECO').map((row) => row.courseCode),
+    ).toEqual(['GEO-100', 'HIS-100', 'POL-100', 'SOC-100']);
+    expect(
+      buildFyugpSem1MinorMappings('BSC-PHY').map((row) => row.courseCode),
+    ).toEqual(['CHE-100', 'MTH-100']);
+    expect(
+      buildFyugpSem1MinorMappings('BA-ENG').some(
+        (row) => row.courseCode === 'ENG-100',
+      ),
+    ).toBe(false);
   });
 });

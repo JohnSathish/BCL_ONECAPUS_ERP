@@ -6,6 +6,7 @@ import {
 } from '../src/modules/academic-engine/domain/commerce-fyugp-even-catalog';
 import { buildCommerceFyugpOddCourses } from '../src/modules/academic-engine/domain/commerce-fyugp-odd-catalog';
 import { COMMERCE_FYUGP_DEPARTMENTS } from '../src/modules/academic-engine/domain/commerce-fyugp-odd-catalog';
+import { buildFyugpSem1MinorMappings } from '../src/modules/academic-engine/domain/dbc-major-minor-matrix';
 
 const prisma = new PrismaClient();
 
@@ -74,6 +75,9 @@ async function main() {
     }
 
     const minors = [
+      ...buildFyugpSem1MinorMappings(dept.programCode).map(
+        (row) => row.courseCode,
+      ),
       ...buildCommerceFyugpSem2MinorCourseDefs(dept.programCode).map(
         (c) => c.code,
       ),

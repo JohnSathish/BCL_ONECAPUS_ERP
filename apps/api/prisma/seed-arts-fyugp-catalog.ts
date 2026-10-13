@@ -21,6 +21,7 @@ import { FYUGP_SEM2_PROGRAM_DEPARTMENTS } from '../src/modules/academic-engine/d
 import { DEFAULT_FYUGP_SEMESTER_RULES } from '../src/modules/academic-engine/domain/fyugp-templates';
 import { upsertSemesterStructureRules } from '../src/modules/academic-engine/services/structure-rules.helper';
 import { syncProgramPromotionMappings } from '../src/modules/academic-lifecycle/utils/sync-promotion-mappings';
+import { ensureSem1MinorOfferings } from './ensure-sem1-minor-offerings';
 import { resolveMappingTitleOverride } from './offering-title-override';
 
 export type SeedArtsFyugpCatalogContext = {
@@ -511,8 +512,9 @@ export async function seedArtsFyugpCatalog(ctx: SeedArtsFyugpCatalogContext) {
     promotionMappings += result.created;
   }
 
+  const sem1Minors = await ensureSem1MinorOfferings(prisma, tenantId);
   console.log(
-    `Arts FYUGP catalog seeded: ${oddCourses.length} ODD + ${evenCourses.length} EVEN courses, ${programVersions.size} FYUGP programmes (BA/B.Sc./B.Com.), ${promotionMappings} promotion mappings`,
+    `Arts FYUGP catalog seeded: ${oddCourses.length} ODD + ${evenCourses.length} EVEN courses, ${programVersions.size} FYUGP programmes (BA/B.Sc./B.Com.), ${promotionMappings} promotion mappings, ${sem1Minors.created} Semester 1 minor mappings`,
   );
 
   return {

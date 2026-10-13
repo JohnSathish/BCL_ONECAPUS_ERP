@@ -35,6 +35,24 @@ export const DBC_MAJOR_MINOR_PROGRAMME_GROUP: Record<string, string> = {
   Commerce: 'COMMERCE',
 };
 
+export const DBC_MAJOR_PROGRAM_CODE: Record<string, string> = {
+  Economics: 'BA-ECO',
+  Education: 'BA-EDU',
+  English: 'BA-ENG',
+  Garo: 'BA-GAR',
+  Geography: 'BA-GEO',
+  History: 'BA-HIS',
+  Philosophy: 'BA-PHI',
+  'Political Science': 'BA-POL',
+  Sociology: 'BA-SOC',
+  Botany: 'BSC-BOT',
+  Chemistry: 'BSC-CHE',
+  Mathematics: 'BSC-MTH',
+  Zoology: 'BSC-ZOO',
+  Physics: 'BSC-PHY',
+  Commerce: 'BCOM',
+};
+
 export const DBC_MAJOR_MINOR_DEPT_CODE: Record<string, string> = {
   Economics: 'ECO',
   Education: 'EDN',
@@ -88,6 +106,31 @@ export function canonicalDbcMajorName(name: string): string | undefined {
 export function allowedMinorsForDbcMajor(majorName: string): readonly string[] {
   const canonical = canonicalDbcMajorName(majorName);
   return canonical ? (DBC_MAJOR_MINOR_MATRIX[canonical] ?? []) : [];
+}
+
+/** Semester 1 minor is the other department's existing -100 major paper. */
+export function buildFyugpSem1MinorMappings(hostProgramCode: string): Array<{
+  programCode: string;
+  courseCode: string;
+  minorName: string;
+  departmentCode: string;
+}> {
+  const majorName = Object.entries(DBC_MAJOR_PROGRAM_CODE).find(
+    ([, code]) => code === hostProgramCode,
+  )?.[0];
+  if (!majorName) return [];
+  return (DBC_MAJOR_MINOR_MATRIX[majorName] ?? []).flatMap((minorName) => {
+    const departmentCode = DBC_MAJOR_MINOR_DEPT_CODE[minorName];
+    if (!departmentCode) return [];
+    return [
+      {
+        programCode: hostProgramCode,
+        courseCode: `${departmentCode}-100`,
+        minorName,
+        departmentCode,
+      },
+    ];
+  });
 }
 
 export function isAllowedDbcMajorMinorPair(

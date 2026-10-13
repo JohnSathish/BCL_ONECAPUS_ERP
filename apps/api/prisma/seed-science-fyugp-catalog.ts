@@ -17,6 +17,7 @@ import {
 import { DEFAULT_FYUGP_SEMESTER_RULES } from '../src/modules/academic-engine/domain/fyugp-templates';
 import { upsertSemesterStructureRules } from '../src/modules/academic-engine/services/structure-rules.helper';
 import { syncProgramPromotionMappings } from '../src/modules/academic-lifecycle/utils/sync-promotion-mappings';
+import { ensureSem1MinorOfferings } from './ensure-sem1-minor-offerings';
 import { resolveMappingTitleOverride } from './offering-title-override';
 
 export type SeedScienceFyugpCatalogContext = {
@@ -328,8 +329,9 @@ export async function seedScienceFyugpCatalog(
     promotionMappings += result.created;
   }
 
+  const sem1Minors = await ensureSem1MinorOfferings(prisma, tenantId);
   console.log(
-    `Science FYUGP catalog seeded: ${oddCourses.length} ODD + ${evenCourses.length} EVEN courses, ${programVersions.size} science programmes, ${promotionMappings} promotion mappings`,
+    `Science FYUGP catalog seeded: ${oddCourses.length} ODD + ${evenCourses.length} EVEN courses, ${programVersions.size} science programmes, ${promotionMappings} promotion mappings, ${sem1Minors.created} Semester 1 minor mappings`,
   );
 
   return {

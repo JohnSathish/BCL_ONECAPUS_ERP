@@ -3,6 +3,7 @@ import { buildArtsFyugpEvenCourses } from '../src/modules/academic-engine/domain
 import { buildArtsFyugpOddCourses } from '../src/modules/academic-engine/domain/arts-fyugp-odd-catalog';
 import { buildArtsFyugpSem2MinorCourseDefs } from '../src/modules/academic-engine/domain/arts-fyugp-even-catalog';
 import { buildArtsFyugpSem5MinorCourseDefs } from '../src/modules/academic-engine/domain/arts-fyugp-odd-catalog';
+import { buildFyugpSem1MinorMappings } from '../src/modules/academic-engine/domain/dbc-major-minor-matrix';
 import { ARTS_FYUGP_DEPARTMENTS } from '../src/modules/academic-engine/domain/arts-fyugp-odd-catalog';
 
 const prisma = new PrismaClient();
@@ -36,13 +37,16 @@ function expectedDirectCodes(programCode: string): string[] {
 }
 
 function expectedMinorCodes(programCode: string): string[] {
+  const sem1 = buildFyugpSem1MinorMappings(programCode).map(
+    (row) => row.courseCode,
+  );
   const sem2 = buildArtsFyugpSem2MinorCourseDefs(programCode).map(
     (c) => c.code,
   );
   const sem5 = buildArtsFyugpSem5MinorCourseDefs(programCode).map(
     (c) => c.code,
   );
-  return [...new Set([...sem2, ...sem5])].sort();
+  return [...new Set([...sem1, ...sem2, ...sem5])].sort();
 }
 
 async function main() {

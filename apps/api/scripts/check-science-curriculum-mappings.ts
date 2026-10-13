@@ -6,6 +6,7 @@ import {
   buildScienceFyugpSem5MinorCourseDefs,
 } from '../src/modules/academic-engine/domain/science-fyugp-even-catalog';
 import { SCIENCE_FYUGP_DEPARTMENTS } from '../src/modules/academic-engine/domain/science-fyugp-odd-catalog';
+import { buildFyugpSem1MinorMappings } from '../src/modules/academic-engine/domain/dbc-major-minor-matrix';
 
 const prisma = new PrismaClient();
 
@@ -36,13 +37,16 @@ function expectedDirectCodes(programCode: string): string[] {
 }
 
 function expectedMinorCodes(programCode: string): string[] {
+  const sem1 = buildFyugpSem1MinorMappings(programCode).map(
+    (row) => row.courseCode,
+  );
   const sem2 = buildScienceFyugpSem2MinorCourseDefs(programCode).map(
     (c) => c.code,
   );
   const sem5 = buildScienceFyugpSem5MinorCourseDefs(programCode).map(
     (c) => c.code,
   );
-  return [...new Set([...sem2, ...sem5])].sort();
+  return [...new Set([...sem1, ...sem2, ...sem5])].sort();
 }
 
 async function main() {
