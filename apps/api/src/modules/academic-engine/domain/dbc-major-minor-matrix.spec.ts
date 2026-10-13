@@ -117,5 +117,8 @@ describe('DBC major-minor matrix', () => {
         (row) => row.courseCode === 'ENG-100',
       ),
     ).toBe(false);
+    expect(
+      buildFyugpSem1MinorMappings('COM').map((row) => row.courseCode),
+    ).toEqual(['ECO-100', 'MTH-100', 'GEO-100']);
   });
 });

@@ -13,7 +13,7 @@ async function main() {
   for (const tenant of tenants) {
     const result = await ensureSem1MinorOfferings(prisma, tenant.id);
     console.log(
-      `${tenant.slug}: created ${result.created}, already present ${result.alreadyPresent}`,
+      `${tenant.slug}: created ${result.created}, already present ${result.alreadyPresent}, COM minors ${result.commerceAliasMinors}, COM pools ${result.commerceAliasPools}`,
     );
     if (result.missingCourses.length) {
       console.log(`  missing courses: ${result.missingCourses.join(', ')}`);

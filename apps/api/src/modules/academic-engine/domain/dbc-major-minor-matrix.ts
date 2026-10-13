@@ -53,6 +53,21 @@ export const DBC_MAJOR_PROGRAM_CODE: Record<string, string> = {
   Commerce: 'BCOM',
 };
 
+/** Live catalogues sometimes keep Commerce under COM as well as BCOM. */
+export const DBC_EXTRA_MAJOR_PROGRAM_CODES: Record<string, readonly string[]> =
+  {
+    Commerce: ['COM'],
+  };
+
+export function listDbcMajorProgramCodes(): string[] {
+  return [
+    ...new Set([
+      ...Object.values(DBC_MAJOR_PROGRAM_CODE),
+      ...Object.values(DBC_EXTRA_MAJOR_PROGRAM_CODES).flat(),
+    ]),
+  ];
+}
+
 export const DBC_MAJOR_MINOR_DEPT_CODE: Record<string, string> = {
   Economics: 'ECO',
   Education: 'EDN',
@@ -115,9 +130,13 @@ export function buildFyugpSem1MinorMappings(hostProgramCode: string): Array<{
   minorName: string;
   departmentCode: string;
 }> {
-  const majorName = Object.entries(DBC_MAJOR_PROGRAM_CODE).find(
-    ([, code]) => code === hostProgramCode,
-  )?.[0];
+  const majorName =
+    Object.entries(DBC_MAJOR_PROGRAM_CODE).find(
+      ([, code]) => code === hostProgramCode,
+    )?.[0] ??
+    Object.entries(DBC_EXTRA_MAJOR_PROGRAM_CODES).find(([, codes]) =>
+      codes.includes(hostProgramCode),
+    )?.[0];
   if (!majorName) return [];
   return (DBC_MAJOR_MINOR_MATRIX[majorName] ?? []).flatMap((minorName) => {
     const departmentCode = DBC_MAJOR_MINOR_DEPT_CODE[minorName];
