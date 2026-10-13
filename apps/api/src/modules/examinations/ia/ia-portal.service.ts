@@ -318,7 +318,12 @@ export class IaPortalService {
    * Office-only look at saved marks, including drafts. The student app still
    * hides these until the consolidation sheet is locked or the marks are published.
    */
-  async previewSavedMarks(user: JwtUser, query?: string, studentId?: string) {
+  async previewSavedMarks(
+    user: JwtUser,
+    query?: string,
+    studentId?: string,
+    sessionId?: string,
+  ) {
     const q = query?.trim() ?? '';
     if (!studentId && q.length < 2) {
       throw new BadRequestException(
@@ -356,8 +361,14 @@ export class IaPortalService {
         });
 
     const matches = students.map((row) => this.previewStudent(row));
+    const exam = sessionId
+      ? await (this.prisma as any).examSession.findFirst({
+          where: { id: sessionId, tenantId: user.tid, deletedAt: null },
+          select: { id: true, name: true },
+        })
+      : null;
     if (matches.length !== 1) {
-      return { preview: true, matches, student: null, papers: [] };
+      return { preview: true, exam, matches, student: null, papers: [] };
     }
 
     const student = matches[0];
@@ -368,10 +379,11 @@ export class IaPortalService {
         deletedAt: null,
         status: { in: ['DRAFT', 'LOCKED', 'PUBLISHED'] },
         OR: [{ marks: { not: null } }, { isAbsent: true }],
+        ...(sessionId ? { sessionId } : {}),
       },
     });
     const papers = await this.papersFromMarks(user.tid, marks);
-    return { preview: true, matches, student, papers };
+    return { preview: true, exam, matches, student, papers };
   }
 
   private previewStudentSelect() {
@@ -380,6 +392,9 @@ export class IaPortalService {
       rollNumber: true,
       user: { select: { displayName: true } },
       masterProfile: { select: { fullName: true } },
+      programVersion: {
+        select: { program: { select: { name: true, code: true } } },
+      },
     } as const;
   }
 
@@ -388,6 +403,9 @@ export class IaPortalService {
     rollNumber: string | null;
     user?: { displayName?: string | null } | null;
     masterProfile?: { fullName?: string | null } | null;
+    programVersion?: {
+      program?: { name?: string | null; code?: string | null } | null;
+    } | null;
   }) {
     return {
       id: row.id,
@@ -396,6 +414,7 @@ export class IaPortalService {
         row.masterProfile?.fullName?.trim() ||
         row.user?.displayName?.trim() ||
         null,
+      programme: row.programVersion?.program?.name?.trim() || null,
     };
   }
 
@@ -407,6 +426,7 @@ export class IaPortalService {
       maxMarks?: unknown;
       marks?: unknown;
       isAbsent?: boolean;
+      status?: string;
     }>,
   ) {
     const paperIds = [
@@ -518,6 +538,9 @@ export class IaPortalService {
           passMark,
           isAbsent: absent,
           outcome,
+          released: group.every(
+            (mark) => mark.status === 'LOCKED' || mark.status === 'PUBLISHED',
+          ),
         };
       })
       .sort((a, b) => {

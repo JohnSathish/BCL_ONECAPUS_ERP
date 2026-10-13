@@ -667,8 +667,9 @@ export class IaController {
     @CurrentUser() user: JwtUser,
     @Query('q') q?: string,
     @Query('studentId') studentId?: string,
+    @Query('sessionId') sessionId?: string,
   ) {
-    return this.portal.previewSavedMarks(user, q, studentId);
+    return this.portal.previewSavedMarks(user, q, studentId, sessionId);
   }
 
   @Get('portal/marks')

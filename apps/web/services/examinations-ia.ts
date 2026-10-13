@@ -392,22 +392,29 @@ export type IaResultPreviewPaper = {
   passMark: number;
   isAbsent: boolean;
   outcome: 'PASS' | 'FAIL' | 'ABSENT' | string;
+  released?: boolean;
 };
 
 export type IaResultPreviewMatch = {
   id: string;
   rollNumber?: string | null;
   fullName?: string | null;
+  programme?: string | null;
 };
 
 export type IaResultPreview = {
   preview: boolean;
+  exam?: { id: string; name: string } | null;
   matches: IaResultPreviewMatch[];
   student: IaResultPreviewMatch | null;
   papers: IaResultPreviewPaper[];
 };
 
-export async function fetchIaResultPreview(params: { q?: string; studentId?: string }) {
+export async function fetchIaResultPreview(params: {
+  q?: string;
+  studentId?: string;
+  sessionId?: string;
+}) {
   const { data } = await api.get<IaResultPreview>('/v1/examinations/ia/marks/preview', {
     params,
   });
