@@ -13,6 +13,7 @@ import {
   safeWorkbookName,
 } from './ia-mark-import-workbook';
 import { normalizeIaSubjectCategory } from './ia-category-policy';
+import { refreshExamPaperNames } from './ia-paper-names';
 import { IaAuditService } from './ia-audit.service';
 import { IaSchemeService } from './ia-scheme.service';
 import { IaSessionService } from './ia-session.service';
@@ -96,6 +97,7 @@ export class IaMarkEntryService {
     for (const row of sessionRows as Array<{ sessionId?: string | null }>) {
       if (row.sessionId) {
         await this.sessions.ensureMajorMinorPapers(user.tid, row.sessionId);
+        await refreshExamPaperNames(this.prisma, user.tid, row.sessionId);
       }
     }
     const papers = await (this.prisma as any).examPaperSchedule.findMany({

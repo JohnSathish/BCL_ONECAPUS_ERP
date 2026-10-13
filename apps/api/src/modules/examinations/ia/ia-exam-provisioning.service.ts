@@ -7,6 +7,7 @@ import type { JwtUser } from '../../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../../database/prisma.service';
 import { LicenseEnforcementService } from '../../licensing/services/license-enforcement.service';
 import { ExamCalendarSyncService } from '../exam-calendar-sync.service';
+import { registrationPaperTitle } from '../../academic-engine/domain/offering-paper-title';
 import { isIaExamType, IA_EXAM_TYPES } from './ia.constants';
 import { IaAuditService } from './ia-audit.service';
 import type {
@@ -627,7 +628,13 @@ export class IaExamProvisioningService {
           sessionId: session.id,
           paperCode: (offering.course?.code ?? 'SUB').trim().toUpperCase(),
           paperName:
-            offering.course?.title ?? offering.course?.code ?? 'Subject',
+            registrationPaperTitle(
+              offering.course,
+              offering,
+              offering.category,
+            ) ||
+            offering.course?.code ||
+            'Subject',
           examDate,
           startTime: this.timeDate('10:00'),
           endTime: this.timeDate('12:00'),
@@ -1246,7 +1253,13 @@ export class IaExamProvisioningService {
           sessionId,
           paperCode: (offering.course?.code ?? 'SUB').trim().toUpperCase(),
           paperName:
-            offering.course?.title ?? offering.course?.code ?? 'Subject',
+            registrationPaperTitle(
+              offering.course,
+              offering,
+              offering.category,
+            ) ||
+            offering.course?.code ||
+            'Subject',
           examDate,
           startTime: this.timeDate('10:00'),
           endTime: this.timeDate('12:00'),

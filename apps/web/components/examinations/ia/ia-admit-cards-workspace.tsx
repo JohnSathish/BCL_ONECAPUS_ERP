@@ -1055,6 +1055,7 @@ function AdmitPreview({ card, shiftLabel }: { card: IaAdmitCardData; shiftLabel?
               <th className="px-1.5 py-1">Subject Code</th>
               <th className="px-1.5 py-1">Subject / Paper</th>
               <th className="px-1.5 py-1">Time</th>
+              <th className="px-1.5 py-1">Signature of Invigilator</th>
             </tr>
           </thead>
           <tbody>
@@ -1073,6 +1074,7 @@ function AdmitPreview({ card, shiftLabel }: { card: IaAdmitCardData; shiftLabel?
                 <td className="border-t border-slate-100 px-1.5 py-1">
                   {clock12(paper.startTime)} – {clock12(paper.endTime)}
                 </td>
+                <td className="border-t border-slate-100 px-1.5 py-1">&nbsp;</td>
               </tr>
             ))}
           </tbody>

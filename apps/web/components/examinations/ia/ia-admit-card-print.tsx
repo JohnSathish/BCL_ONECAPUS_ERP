@@ -230,6 +230,9 @@ export function IaAdmitCardPrint({ card }: { card: IaAdmitCardData }) {
             <th className="border border-blue-800 px-2 py-1.5">Max</th>
             <th className="border border-blue-800 px-2 py-1.5">Date</th>
             <th className="border border-blue-800 px-2 py-1.5">Time</th>
+            <th className="w-[28mm] border border-blue-800 px-2 py-1.5">
+              Signature of Invigilator
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -244,6 +247,7 @@ export function IaAdmitCardPrint({ card }: { card: IaAdmitCardData }) {
               <td className="border border-slate-200 px-2 py-1.5">
                 {timeOnly(p.startTime)} – {timeOnly(p.endTime)}
               </td>
+              <td className="w-[28mm] border border-slate-200 px-2 py-1.5">&nbsp;</td>
             </tr>
           ))}
         </tbody>

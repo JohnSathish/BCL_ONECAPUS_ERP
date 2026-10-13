@@ -4,6 +4,7 @@ import { paginate } from '../../common/dto/pagination.dto';
 import { MAPPING_SOURCE } from '../academic-engine/domain/category-pools';
 import { CurriculumResolutionService } from '../academic-engine/services/curriculum-resolution.service';
 import { PrismaService } from '../../database/prisma.service';
+import { syncSharedCodeMinorTitles } from '../academic-engine/services/shared-code-minor-title.sync';
 import {
   applyQuickToggle,
   computeEnrollmentStatus,
@@ -36,6 +37,7 @@ export class CurriculumOfferingListService {
     rawQuery: CurriculumOfferingListQueryDto,
   ) {
     const query = applyQuickToggle(rawQuery);
+    await syncSharedCodeMinorTitles(this.prisma, tenantId);
     const page = query.page ?? 1;
     const limit = query.limit ?? 30;
 
@@ -271,44 +273,55 @@ export class CurriculumOfferingListService {
     return null;
   }
 
+  private searchTerms(raw: string) {
+    const term = raw.trim();
+    const stripped = term
+      .replace(/\s*\((?:minor|major|mdc|aec|sec|vac|internship)\)\s*$/i, '')
+      .trim();
+    return stripped && stripped !== term ? [term, stripped] : [term];
+  }
+
   private buildSearchOr(
     term: string,
     sectionActive: Prisma.OfferingSectionWhereInput,
   ): Prisma.CourseOfferingWhereInput[] {
-    const contains = { contains: term, mode: 'insensitive' as const };
-    return [
-      { course: { code: contains } },
-      { course: { title: contains } },
-      {
-        course: {
-          department: { OR: [{ name: contains }, { code: contains }] },
-        },
-      },
-      {
-        sections: {
-          some: {
-            ...sectionActive,
-            OR: [
-              { sectionCode: contains },
-              {
-                staffProfile: {
-                  OR: [
-                    { fullName: contains },
-                    { employeeCode: contains },
-                    { portalUser: { email: contains } },
-                  ],
-                },
-              },
-            ],
+    return this.searchTerms(term).flatMap((value) => {
+      const contains = { contains: value, mode: 'insensitive' as const };
+      return [
+        { titleOverride: contains },
+        { course: { code: contains } },
+        { course: { title: contains } },
+        {
+          course: {
+            department: { OR: [{ name: contains }, { code: contains }] },
           },
         },
-      },
-      {
-        programVersion: {
-          program: { OR: [{ code: contains }, { name: contains }] },
+        {
+          sections: {
+            some: {
+              ...sectionActive,
+              OR: [
+                { sectionCode: contains },
+                {
+                  staffProfile: {
+                    OR: [
+                      { fullName: contains },
+                      { employeeCode: contains },
+                      { portalUser: { email: contains } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
         },
-      },
-    ];
+        {
+          programVersion: {
+            program: { OR: [{ code: contains }, { name: contains }] },
+          },
+        },
+      ];
+    });
   }
 
   private matchesMemoryFilters(

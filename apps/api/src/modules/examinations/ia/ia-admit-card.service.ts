@@ -16,10 +16,12 @@ import { IaAuditService } from './ia-audit.service';
 import { IaDefaulterService } from './ia-defaulter.service';
 import { IaExamProvisioningService } from './ia-exam-provisioning.service';
 import { formatExamWallClock } from './ia-noticeboard-grid';
+import { registrationPaperTitle } from '../../academic-engine/domain/offering-paper-title';
 import {
   iaPaperCategory,
   normalizeIaSubjectCategory,
 } from './ia-category-policy';
+import { refreshExamPaperNames } from './ia-paper-names';
 import { IaSettingsService } from './ia-settings.service';
 import {
   renderIaAdmitCardHtml,
@@ -55,12 +57,55 @@ export class IaAdmitCardService {
     return this.prisma as any;
   }
 
-  private verifyBaseUrl() {
+  private isLoopbackOrigin(value: string) {
+    const host = value
+      .trim()
+      .replace(/^https?:\/\//i, '')
+      .split('/')[0]
+      .split(':')[0]
+      .toLowerCase();
     return (
-      process.env.WEB_PUBLIC_URL ??
-      process.env.APP_URL ??
-      'http://localhost:3000'
-    ).replace(/\/$/, '');
+      !host ||
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '0.0.0.0' ||
+      host.endsWith('.localhost')
+    );
+  }
+
+  /** Printed QR must open the public ERP, not the machine that generated the card. */
+  private configuredPublicOrigin() {
+    const candidates = [
+      process.env.WEB_PUBLIC_URL,
+      process.env.APP_PUBLIC_URL,
+      process.env.WEB_ORIGIN,
+      process.env.WEB_APP_URL,
+      process.env.APP_URL,
+    ];
+    for (const raw of candidates) {
+      const value = raw?.trim().replace(/\/$/, '') ?? '';
+      if (!value || this.isLoopbackOrigin(value)) continue;
+      return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    }
+    return null;
+  }
+
+  private async verifyBaseUrl(tenantId: string) {
+    const configured = this.configuredPublicOrigin();
+    if (configured) return configured;
+
+    const domains = await this.prisma.tenantDomain.findMany({
+      where: { tenantId, deletedAt: null },
+      select: { host: true, verified: true },
+      orderBy: { verified: 'desc' },
+    });
+    const hosts = domains
+      .map((row) => row.host.trim().toLowerCase())
+      .filter((host) => host && !this.isLoopbackOrigin(host));
+    const erp = hosts.find((host) => host.startsWith('erp.'));
+    if (erp) return `https://${erp}`;
+    if (hosts[0]) return `https://${hosts[0]}`;
+    return 'https://erp.donboscocollege.ac.in';
   }
 
   private async getSession(tenantId: string, sessionId: string) {
@@ -207,7 +252,14 @@ export class IaAdmitCardService {
         },
       },
       include: {
-        offering: { select: { courseId: true } },
+        offering: {
+          select: {
+            courseId: true,
+            category: true,
+            titleOverride: true,
+            course: { select: { code: true, title: true } },
+          },
+        },
         registration: { select: { shiftId: true, semesterSequence: true } },
       },
     });
@@ -250,7 +302,21 @@ export class IaAdmitCardService {
       for (const paper of chosen) {
         if (seen.has(paper.id)) continue;
         seen.add(paper.id);
-        matched.push(paper);
+        const category =
+          lineCategory ||
+          normalizeIaSubjectCategory(line.offering.category) ||
+          iaPaperCategory(paper.metadata);
+        const paperName =
+          registrationPaperTitle(
+            line.offering.course,
+            line.offering,
+            category,
+          ) || paper.paperName;
+        const metadata =
+          paper.metadata && typeof paper.metadata === 'object'
+            ? { ...(paper.metadata as Record<string, unknown>), category }
+            : { category };
+        matched.push({ ...paper, paperName, metadata });
       }
     }
 
@@ -535,6 +601,7 @@ export class IaAdmitCardService {
       tenantId,
       sessionId,
     );
+    await refreshExamPaperNames(this.prisma, tenantId, sessionId);
     const papers: PaperRow[] = await this.db().examPaperSchedule.findMany({
       where: { tenantId, sessionId, deletedAt: null },
       orderBy: [{ examDate: 'asc' }],
@@ -717,6 +784,7 @@ export class IaAdmitCardService {
       tenantId,
       sessionId,
     );
+    await refreshExamPaperNames(this.prisma, tenantId, sessionId);
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId, deletedAt: null },
       include: {
@@ -789,6 +857,7 @@ export class IaAdmitCardService {
   }
 
   private async buildTemplateInput(
+    tenantId: string,
     ctx: Awaited<ReturnType<IaAdmitCardService['loadStudentCardContext']>>,
     institution: Awaited<ReturnType<IaAdmitCardService['institutionContext']>>,
     academicYear: string | null,
@@ -797,7 +866,7 @@ export class IaAdmitCardService {
     verifyCode: string,
   ): Promise<IaAdmitCardTemplateInput> {
     const { session, student, studentPapers } = ctx;
-    const verifyUrl = `${this.verifyBaseUrl()}/verify/ia-admit/${verifyToken}`;
+    const verifyUrl = `${await this.verifyBaseUrl(tenantId)}/verify/ia-admit/${verifyToken}`;
     const sittingSemesters = [
       ...new Set(
         studentPapers
@@ -917,6 +986,7 @@ export class IaAdmitCardService {
       (await this.nextAdmitCardNumber(tenantId, ctx.session.semesterNo));
 
     const template = await this.buildTemplateInput(
+      tenantId,
       ctx,
       institution,
       academicYear,
@@ -1135,6 +1205,7 @@ export class IaAdmitCardService {
       ]);
       templates.push(
         await this.buildTemplateInput(
+          tenantId,
           await this.loadStudentCardContext(tenantId, sessionId, studentId, {
             waiveFee: options?.waiveFee,
           }),
@@ -1232,6 +1303,7 @@ export class IaAdmitCardService {
         this.academicYearLabel(tenantId, session.academicYearId),
       ]);
       const template = await this.buildTemplateInput(
+        tenantId,
         await this.loadStudentCardContext(tenantId, sessionId, studentId, {
           waiveFee: options?.waiveFee,
         }),
@@ -1301,6 +1373,7 @@ export class IaAdmitCardService {
       ]);
       return renderIaAdmitCardHtml(
         await this.buildTemplateInput(
+          tenantId,
           ctx,
           institution,
           academicYear,

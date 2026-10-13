@@ -7,7 +7,9 @@ import type { JwtUser } from '../../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../../database/prisma.service';
 import { LicenseEnforcementService } from '../../licensing/services/license-enforcement.service';
 import { ExamCalendarSyncService } from '../exam-calendar-sync.service';
+import { registrationPaperTitle } from '../../academic-engine/domain/offering-paper-title';
 import { normalizeIaSubjectCategory } from './ia-category-policy';
+import { refreshExamPaperNames } from './ia-paper-names';
 import { IA_EXAM_TYPES, isIaExamType } from './ia.constants';
 import { IaAuditService } from './ia-audit.service';
 import type {
@@ -219,6 +221,7 @@ export class IaSessionService {
           id: true,
           courseId: true,
           semesterSequence: true,
+          titleOverride: true,
           course: { select: { code: true, title: true, departmentId: true } },
         },
       }),
@@ -356,7 +359,14 @@ export class IaSessionService {
           paperCode: (offering.course.code || sibling.paperCode || '')
             .trim()
             .toUpperCase(),
-          paperName: sibling.paperName ?? offering.course.title,
+          paperName:
+            registrationPaperTitle(
+              offering.course,
+              { titleOverride: offering.titleOverride, category },
+              category,
+            ) ||
+            sibling.paperName ||
+            offering.course.title,
           examDate: sibling.examDate,
           startTime: sibling.startTime,
           endTime: sibling.endTime,
@@ -380,6 +390,7 @@ export class IaSessionService {
   async listPapers(tenantId: string, query: IaQueryDto) {
     if (query.sessionId) {
       await this.ensureMajorMinorPapers(tenantId, query.sessionId);
+      await refreshExamPaperNames(this.prisma, tenantId, query.sessionId);
     }
     const papers = await (this.prisma as any).examPaperSchedule.findMany({
       where: {

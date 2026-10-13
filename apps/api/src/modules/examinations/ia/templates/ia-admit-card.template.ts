@@ -268,6 +268,14 @@ const IA_ADMIT_CARD_STYLES = `
     text-transform: uppercase;
   }
   table.papers tr:nth-child(even) td { background: #f8fafc; }
+  table.papers th.invigilator,
+  table.papers td.invigilator {
+    width: 32mm;
+    min-width: 32mm;
+  }
+  table.papers td.invigilator {
+    height: 9mm;
+  }
   .footer {
     margin-top: 12px;
     display: grid;
@@ -348,6 +356,8 @@ const IA_ADMIT_CARD_STYLES = `
   .sheet table.papers { margin-top: 4px; font-size: 8px; }
   .sheet table.papers th, .sheet table.papers td { padding: 1px 3px; }
   .sheet table.papers th { font-size: 7px; }
+  .sheet table.papers th.invigilator,
+  .sheet table.papers td.invigilator { width: 22mm; min-width: 22mm; }
   .sheet .footer { margin-top: 4px; padding-top: 3px; gap: 6px; grid-template-columns: 1fr 110px; }
   .sheet .footer li { margin-bottom: 0; font-size: 7.5px; }
   .sheet .auth .line { margin-top: 14px; font-size: 8px; }
@@ -388,6 +398,7 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
         <td>${p.maxMarks ?? '—'}</td>
         <td>${fmtDate(p.examDate)}</td>
         <td>${fmtTime(p.startTime)} – ${fmtTime(p.endTime)}</td>
+        <td class="invigilator">&nbsp;</td>
       </tr>`,
     )
     .join('');
@@ -458,10 +469,11 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
             <th>Max</th>
             <th>Date</th>
             <th>Time</th>
+            <th class="invigilator">Signature of Invigilator</th>
           </tr>
         </thead>
         <tbody>
-          ${paperRows || '<tr><td colspan="7">No papers scheduled</td></tr>'}
+          ${paperRows || '<tr><td colspan="8">No papers scheduled</td></tr>'}
         </tbody>
       </table>
 

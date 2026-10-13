@@ -1,6 +1,7 @@
 import {
   offeringPaperTitle,
   offeringTitleOverride,
+  registrationPaperTitle,
 } from './offering-paper-title';
 
 describe('offering paper title', () => {
@@ -26,5 +27,38 @@ describe('offering paper title', () => {
         { titleOverride: 'Inclusive Education I' },
       ),
     ).toBe('Inclusive Education I');
+  });
+
+  it('prints Inclusive Education I for a minor registration on EDN-302', () => {
+    const course = {
+      code: 'EDN-302',
+      title: 'Education for Sustainable Development',
+    };
+    expect(registrationPaperTitle(course, null, 'MINOR')).toBe(
+      'Inclusive Education I',
+    );
+    expect(registrationPaperTitle(course, null, 'MAJOR')).toBe(
+      'Education for Sustainable Development',
+    );
+  });
+
+  it('keeps a renamed course title instead of the old catalog name', () => {
+    expect(
+      registrationPaperTitle(
+        {
+          code: 'GAR-300',
+          title: 'Literary Theory and Criticism – II',
+        },
+        { titleOverride: null, category: 'MAJOR' },
+        'MAJOR',
+      ),
+    ).toBe('Literary Theory and Criticism – II');
+    expect(
+      registrationPaperTitle(
+        { code: 'GAR-302', title: 'Garo Fiction – I' },
+        null,
+        'MINOR',
+      ),
+    ).toBe('Garo Fiction – I');
   });
 });
