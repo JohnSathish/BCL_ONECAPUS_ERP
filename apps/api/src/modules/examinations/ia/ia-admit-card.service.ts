@@ -20,6 +20,7 @@ import { registeredSubjectPrint } from '../../academic-engine/domain/offering-pa
 import {
   iaPaperCategory,
   normalizeIaSubjectCategory,
+  pickIaPaperForRegistration,
 } from './ia-category-policy';
 import { refreshExamPaperNames } from './ia-paper-names';
 import { IaSettingsService } from './ia-settings.service';
@@ -305,50 +306,41 @@ export class IaAdmitCardService {
 
     const matched: PaperRow[] = [];
     const seen = new Set<string>();
+    // Semester 1 minors are often stored twice: the offering paper and a
+    // course-level copy with the same code, title, and sitting.
+    const seenPrint = new Set<string>();
     for (const line of eligible) {
-      const scoped = sessionPapers.filter((paper) => {
-        if (
-          paper.semesterNo != null &&
-          paper.semesterNo !== line.registration.semesterSequence
-        ) {
-          return false;
-        }
-        if (paper.offeringId) return paper.offeringId === line.offeringId;
-        return Boolean(
-          paper.courseId && paper.courseId === line.offering.courseId,
-        );
-      });
-      const lineCategory = normalizeIaSubjectCategory(line.category) ?? '';
-      const categories = new Set(
-        scoped.map((paper) => iaPaperCategory(paper.metadata)).filter(Boolean),
+      const semesterPapers = sessionPapers.filter(
+        (paper) =>
+          paper.semesterNo == null ||
+          paper.semesterNo === line.registration.semesterSequence,
       );
-      const chosen =
-        lineCategory && categories.size > 1
-          ? scoped.filter(
-              (paper) => iaPaperCategory(paper.metadata) === lineCategory,
-            )
-          : categories.size > 1
-            ? []
-            : scoped;
-      for (const paper of chosen) {
-        if (seen.has(paper.id)) continue;
-        seen.add(paper.id);
-        const category =
-          lineCategory ||
-          normalizeIaSubjectCategory(line.offering.category) ||
-          iaPaperCategory(paper.metadata);
-        const printed = registeredSubjectPrint(
-          line.offering.course,
-          line.offering,
-        );
-        const paperName = printed.title || paper.paperName;
-        const paperCode = printed.code || paper.paperCode;
-        const metadata =
-          paper.metadata && typeof paper.metadata === 'object'
-            ? { ...(paper.metadata as Record<string, unknown>), category }
-            : { category };
-        matched.push({ ...paper, paperCode, paperName, metadata });
-      }
+      const paper = pickIaPaperForRegistration(semesterPapers, {
+        offeringId: line.offeringId,
+        category: line.category,
+        courseId: line.offering.courseId,
+      });
+      if (!paper || seen.has(paper.id)) continue;
+      const lineCategory = normalizeIaSubjectCategory(line.category) ?? '';
+      const category =
+        lineCategory ||
+        normalizeIaSubjectCategory(line.offering.category) ||
+        iaPaperCategory(paper.metadata);
+      const printed = registeredSubjectPrint(
+        line.offering.course,
+        line.offering,
+      );
+      const paperName = printed.title || paper.paperName;
+      const paperCode = printed.code || paper.paperCode;
+      const printKey = `${paperCode.trim().toUpperCase()}|${category}`;
+      if (seenPrint.has(printKey)) continue;
+      seen.add(paper.id);
+      seenPrint.add(printKey);
+      const metadata =
+        paper.metadata && typeof paper.metadata === 'object'
+          ? { ...(paper.metadata as Record<string, unknown>), category }
+          : { category };
+      matched.push({ ...paper, paperCode, paperName, metadata });
     }
 
     return matched.sort((a, b) => {
@@ -936,6 +928,10 @@ export class IaAdmitCardService {
         rollNumber: student.rollNumber,
         enrollmentNumber: student.enrollmentNumber,
         admissionNumber: student.admissionNumber,
+        universityRollNumber:
+          student.universityRollNumber?.trim() ||
+          student.admissionNumber?.trim() ||
+          null,
         abcId: student.abcAccount?.abcId ?? null,
         programme: student.programVersion?.program?.name,
         department: student.department?.name,

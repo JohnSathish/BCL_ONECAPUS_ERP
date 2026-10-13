@@ -54,6 +54,7 @@ export type IaAdmitCardData = {
     rollNumber?: string | null;
     enrollmentNumber?: string | null;
     admissionNumber?: string | null;
+    universityRollNumber?: string | null;
     abcId?: string | null;
     programme?: string | null;
     department?: string | null;
@@ -189,12 +190,13 @@ export function IaAdmitCardPrint({ card }: { card: IaAdmitCardData }) {
       <div className="relative mt-3 grid grid-cols-[1fr_110px] gap-3">
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
           <Field label="Roll Number" value={card.student?.rollNumber} />
-          <Field label="Admission No" value={card.student?.admissionNumber} />
+          <Field
+            label="NEHU Roll No."
+            value={card.student?.universityRollNumber || card.student?.admissionNumber}
+          />
           <Field label="Name" value={card.student?.fullName} className="col-span-2 sm:col-span-1" />
           <Field label="Reg. No" value={card.student?.enrollmentNumber} />
-          <Field label="Father's Name" value={card.student?.fatherName} />
           <Field label="ABC ID" value={card.student?.abcId} />
-          <Field label="Mother's Name" value={card.student?.motherName} />
           <Field label="Programme" value={card.student?.programme} />
           <Field label="Department" value={card.student?.department} />
           <Field label="Semester" value={card.student?.semesterNo?.toString()} />
@@ -267,7 +269,7 @@ export function IaAdmitCardPrint({ card }: { card: IaAdmitCardData }) {
         </div>
         <div className="text-center">
           <div className="mt-8 border-t border-slate-600 pt-1 text-[9px] font-semibold">
-            Controller of Examinations
+            Principal's Signature
           </div>
         </div>
       </footer>

@@ -21,6 +21,7 @@ export type IaAdmitCardTemplateInput = {
     rollNumber?: string | null;
     enrollmentNumber?: string | null;
     admissionNumber?: string | null;
+    universityRollNumber?: string | null;
     abcId?: string | null;
     programme?: string | null;
     department?: string | null;
@@ -267,8 +268,9 @@ const IA_ADMIT_CARD_STYLES = `
   table.papers td.when { white-space: nowrap; }
   table.papers th, table.papers td {
     border: 1px solid #cbd5e1;
-    padding: 5px 6px;
+    padding: 3px 4px;
     text-align: left;
+    line-height: 1.2;
   }
   table.papers th {
     background: #1e3a8a;
@@ -282,7 +284,7 @@ const IA_ADMIT_CARD_STYLES = `
     width: 36mm;
   }
   table.papers td.invigilator {
-    height: 9mm;
+    height: 6mm;
   }
   .footer {
     margin-top: 12px;
@@ -361,17 +363,18 @@ const IA_ADMIT_CARD_STYLES = `
   .sheet .photo-box { padding: 3px; }
   .sheet .photo-box img { width: 58px; height: 68px; }
   .sheet .sig-line { margin-top: 3px; font-size: 7px; }
-  .sheet table.papers { margin-top: 4px; font-size: 8px; }
-  .sheet table.papers th, .sheet table.papers td { padding: 1px 3px; }
+  .sheet table.papers { margin-top: 3px; font-size: 8px; }
+  .sheet table.papers th, .sheet table.papers td { padding: 0 2px; line-height: 1.15; }
   .sheet table.papers th { font-size: 7px; }
+  .sheet table.papers td.invigilator { height: 4mm; }
   .sheet table.papers col.code { width: 18mm; }
   .sheet table.papers col.when { width: 22mm; }
   .sheet table.papers col.invigilator { width: 22mm; }
   .sheet table.papers th.invigilator,
   .sheet table.papers td.invigilator { width: 22mm; }
-  .sheet .footer { margin-top: 4px; padding-top: 3px; gap: 6px; grid-template-columns: 1fr 110px; }
-  .sheet .footer li { margin-bottom: 0; font-size: 7.5px; }
-  .sheet .auth .line { margin-top: 14px; font-size: 8px; }
+  .sheet .footer { margin-top: 2px; padding-top: 2px; gap: 4px; grid-template-columns: 1fr 110px; }
+  .sheet .footer li { margin-bottom: 0; font-size: 7.5px; line-height: 1.2; }
+  .sheet .auth .line { margin-top: 8px; font-size: 8px; }
   .sheet .disclaimer { display: none; }
   .cut-line {
     position: absolute;
@@ -452,12 +455,10 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
       <div class="student-grid">
         <div class="fields">
           <div class="field"><label>Roll Number</label><span>${esc(card.student.rollNumber)}</span></div>
-          <div class="field"><label>Admission No</label><span>${esc(card.student.admissionNumber)}</span></div>
+          <div class="field"><label>NEHU Roll No.</label><span>${esc(card.student.universityRollNumber || card.student.admissionNumber)}</span></div>
           <div class="field"><label>Name</label><span>${esc(card.student.fullName)}</span></div>
           <div class="field"><label>Reg. No</label><span>${esc(card.student.enrollmentNumber)}</span></div>
-          <div class="field"><label>Father's Name</label><span>${esc(card.student.fatherName)}</span></div>
           <div class="field"><label>ABC ID</label><span>${esc(card.student.abcId)}</span></div>
-          <div class="field"><label>Mother's Name</label><span>${esc(card.student.motherName)}</span></div>
           <div class="field"><label>Programme</label><span>${esc(card.student.programme)}</span></div>
           <div class="field"><label>Department</label><span>${esc(card.student.department)}</span></div>
           <div class="field"><label>Semester</label><span>${semesterText ? esc(semesterText) : '—'}</span></div>
@@ -504,7 +505,7 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
           <ol>${instructions.map((i) => `<li>${esc(i)}</li>`).join('')}</ol>
         </div>
         <div class="auth">
-          <div class="line">Controller of Examinations</div>
+          <div class="line">Principal's Signature</div>
         </div>
       </div>
       <p class="disclaimer">Note: This is a computer generated admit card. QR verification available at ${esc(card.verifyUrl ?? 'college portal')}.</p>

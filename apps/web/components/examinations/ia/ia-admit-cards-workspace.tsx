@@ -1102,7 +1102,7 @@ function AdmitPreview({ card, shiftLabel }: { card: IaAdmitCardData; shiftLabel?
         </div>
         <div className="self-end text-center">
           <div className="border-t border-slate-400 pt-1 font-semibold text-slate-700">
-            Controller of Examinations
+            Principal's Signature
           </div>
           <p className="text-slate-500">{name}</p>
         </div>
