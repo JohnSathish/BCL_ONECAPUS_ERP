@@ -258,7 +258,7 @@ export function IaAdmitCardPrint({ card }: { card: IaAdmitCardData }) {
         <p className="mt-2 text-xs text-slate-500">No scheduled papers for this student.</p>
       ) : null}
 
-      <footer className="relative mt-4 grid grid-cols-[1fr_140px] gap-4 border-t border-slate-200 pt-3 text-[10px]">
+      <footer className="relative mt-4 grid grid-cols-[1fr_58mm] items-end gap-4 border-t border-slate-200 pt-3 text-[10px]">
         <div>
           <p className="font-semibold text-slate-800">Instructions to Students</p>
           <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-slate-600">
@@ -268,7 +268,8 @@ export function IaAdmitCardPrint({ card }: { card: IaAdmitCardData }) {
           </ol>
         </div>
         <div className="text-center">
-          <div className="mt-8 border-t border-slate-600 pt-1 text-[9px] font-semibold">
+          <div className="h-[22mm]" />
+          <div className="border-t border-slate-600 pt-1 text-[9px] font-semibold">
             Principal's Signature
           </div>
         </div>

@@ -289,20 +289,21 @@ const IA_ADMIT_CARD_STYLES = `
   .footer {
     margin-top: 12px;
     display: grid;
-    grid-template-columns: 1fr 160px;
+    grid-template-columns: 1fr 58mm;
     gap: 12px;
+    align-items: end;
     border-top: 1px solid #cbd5e1;
-    padding-top: 10px;
+    padding-top: 8px;
     page-break-inside: avoid;
     break-inside: avoid;
   }
   .footer ol { margin: 4px 0 0 16px; padding: 0; }
   .footer li { margin-bottom: 3px; color: #334155; }
   .auth { text-align: center; }
+  .auth .sign-blank { height: 22mm; }
   .auth .line {
-    margin-top: 36px;
     border-top: 1px solid #334155;
-    padding-top: 4px;
+    padding-top: 3px;
     font-size: 9px;
     font-weight: 600;
   }
@@ -372,9 +373,10 @@ const IA_ADMIT_CARD_STYLES = `
   .sheet table.papers col.invigilator { width: 22mm; }
   .sheet table.papers th.invigilator,
   .sheet table.papers td.invigilator { width: 22mm; }
-  .sheet .footer { margin-top: 2px; padding-top: 2px; gap: 4px; grid-template-columns: 1fr 110px; }
+  .sheet .footer { margin-top: 2px; padding-top: 2px; gap: 4px; grid-template-columns: 1fr 46mm; }
   .sheet .footer li { margin-bottom: 0; font-size: 7.5px; line-height: 1.2; }
-  .sheet .auth .line { margin-top: 8px; font-size: 8px; }
+  .sheet .auth .sign-blank { height: 12mm; }
+  .sheet .auth .line { font-size: 8px; }
   .sheet .disclaimer { display: none; }
   .cut-line {
     position: absolute;
@@ -505,6 +507,7 @@ export function renderIaAdmitCardPage(card: IaAdmitCardTemplateInput) {
           <ol>${instructions.map((i) => `<li>${esc(i)}</li>`).join('')}</ol>
         </div>
         <div class="auth">
+          <div class="sign-blank"></div>
           <div class="line">Principal's Signature</div>
         </div>
       </div>

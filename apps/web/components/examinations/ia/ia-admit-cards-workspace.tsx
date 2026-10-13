@@ -1091,7 +1091,7 @@ function AdmitPreview({ card, shiftLabel }: { card: IaAdmitCardData; shiftLabel?
           </p>
         ) : null}
       </div>
-      <footer className="grid grid-cols-[1fr_120px] gap-3 border-t border-slate-100 px-4 py-3 text-[10px]">
+      <footer className="grid grid-cols-[1fr_46mm] items-end gap-3 border-t border-slate-100 px-4 py-3 text-[10px]">
         <div>
           <p className="font-semibold text-slate-800">Important Instructions:</p>
           <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-slate-600">
@@ -1100,7 +1100,8 @@ function AdmitPreview({ card, shiftLabel }: { card: IaAdmitCardData; shiftLabel?
             ))}
           </ol>
         </div>
-        <div className="self-end text-center">
+        <div className="text-center">
+          <div className="h-16" />
           <div className="border-t border-slate-400 pt-1 font-semibold text-slate-700">
             Principal's Signature
           </div>
