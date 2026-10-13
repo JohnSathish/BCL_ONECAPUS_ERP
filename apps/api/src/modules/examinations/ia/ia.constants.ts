@@ -62,3 +62,24 @@ export function isIaExamType(examType?: string | null) {
 export function isLegacyExamType(examType?: string | null) {
   return examType === 'SEMESTER_END';
 }
+
+/** A datetime without a zone is the college wall clock in India. */
+export function marksDeadlineInstant(value: unknown): Date | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const text = value.trim();
+  const zoned = /[zZ]$|[+-]\d{2}:\d{2}$/.test(text) ? text : `${text}+05:30`;
+  const date = new Date(zoned);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function formatMarksDeadline(date: Date) {
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
+}

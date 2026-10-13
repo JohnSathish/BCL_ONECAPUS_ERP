@@ -95,6 +95,14 @@ function isoDate(value?: string | null) {
   return text.length >= 10 ? text.slice(0, 10) : '';
 }
 
+function deadlineLocalValue(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function typeLabel(examType: string) {
   return examType.replaceAll('_', ' ');
 }
@@ -175,6 +183,7 @@ export function IaExamsWorkspace() {
   const [status, setStatus] = useState('DRAFT');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [marksDeadline, setMarksDeadline] = useState('');
   const [semesterNos, setSemesterNos] = useState<number[]>([1, 3, 5]);
   const [categoryPolicy, setCategoryPolicy] = useState<Record<string, string[]>>(() =>
     buildDefaultCategoryPolicy([1, 3, 5]),
@@ -230,6 +239,7 @@ export function IaExamsWorkspace() {
       examType,
       maxMarks,
       remarks: remarks || undefined,
+      marksEntryDeadline: marksDeadline ? new Date(marksDeadline).toISOString() : undefined,
       enabledCategoriesBySemester: categoryPolicy,
     }),
     [
@@ -244,6 +254,7 @@ export function IaExamsWorkspace() {
       examType,
       maxMarks,
       remarks,
+      marksDeadline,
       categoryPolicy,
     ],
   );
@@ -299,6 +310,7 @@ export function IaExamsWorkspace() {
     setStatus('DRAFT');
     setStartDate('');
     setEndDate('');
+    setMarksDeadline('');
     setSemesterNos([1, 3, 5]);
     setCategoryPolicy(buildDefaultCategoryPolicy([1, 3, 5]));
     setStreamId('');
@@ -322,6 +334,7 @@ export function IaExamsWorkspace() {
     setStatus(exam.status);
     setStartDate(isoDate(exam.startDate));
     setEndDate(isoDate(exam.endDate));
+    setMarksDeadline(deadlineLocalValue(exam.metadata?.marksEntryDeadline));
     setSemesterNos(exam.stats?.semesterNos ?? (exam.semesterNo ? [exam.semesterNo] : []));
     setStep(0);
     setViewing(null);
@@ -623,6 +636,18 @@ export function IaExamsWorkspace() {
                   ))}
                 </select>
               </Field>
+              <Field label="Mark entry deadline">
+                <Input
+                  className={fieldClass}
+                  type="datetime-local"
+                  value={marksDeadline}
+                  onChange={(e) => setMarksDeadline(e.target.value)}
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Staff can enter marks until this time. After it, the marks cannot be changed
+                  unless you move the deadline forward.
+                </p>
+              </Field>
               <Field label="Remarks (Optional)" icon={<FileText className="h-4 w-4" />}>
                 <Input
                   className={cn(fieldClass, 'pl-10')}
@@ -911,6 +936,9 @@ export function IaExamsWorkspace() {
                       status,
                       startDate: startDate || null,
                       endDate: endDate || null,
+                      marksEntryDeadline: marksDeadline
+                        ? new Date(marksDeadline).toISOString()
+                        : null,
                     });
                     return;
                   }

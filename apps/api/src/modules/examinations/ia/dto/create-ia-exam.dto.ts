@@ -83,6 +83,12 @@ export class CreateIaExamDto {
   @IsDateString()
   endDate?: string;
 
+  /** Staff cannot change marks after this time. Empty leaves entry open. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== '')
+  @IsDateString()
+  marksEntryDeadline?: string | null;
+
   @IsOptional()
   @IsString()
   remarks?: string;
@@ -154,6 +160,12 @@ export class UpdateIaExamDto {
   @ValidateIf((_, value) => value !== null && value !== '')
   @IsDateString()
   endDate?: string | null;
+
+  /** Null or empty reopens mark entry. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== '')
+  @IsDateString()
+  marksEntryDeadline?: string | null;
 }
 
 export class GenerateIaTimetableDto {

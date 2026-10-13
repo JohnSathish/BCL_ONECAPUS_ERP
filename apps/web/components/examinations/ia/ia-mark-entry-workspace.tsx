@@ -16,6 +16,7 @@ import {
   History,
   List,
   Loader2,
+  Lock,
   Save,
   Search,
   Settings2,
@@ -32,6 +33,7 @@ import {
   downloadIaMarkTemplate,
   fetchIaResultPreview,
   fetchIaRoster,
+  updateIaExam,
   importIaMarkFile,
   importIaMarks,
   saveIaMarks,
@@ -116,6 +118,7 @@ type PaperChoice = {
   expectedCount: number | null;
   credits: number | null;
   maxMarks: number | null;
+  marksEntryDeadline?: string | null;
 };
 
 type FacultySubject = {
@@ -134,6 +137,7 @@ type FacultySubject = {
       academicYearId?: string | null;
       academicYearName?: string | null;
       shiftName?: string | null;
+      marksEntryDeadline?: string | null;
       category?: string | null;
       programmeCode?: string | null;
       programmeName?: string | null;
@@ -187,6 +191,32 @@ function formatUpdated(value?: string | null) {
   const suffix = hours >= 12 ? 'PM' : 'AM';
   const hour12 = hours % 12 || 12;
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}, ${hour12}:${minutes} ${suffix}`;
+}
+
+function deadlineInstant(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function deadlineLocalValue(value?: string | null) {
+  const date = deadlineInstant(value);
+  if (!date) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatDeadline(value?: string | null) {
+  const date = deadlineInstant(value);
+  if (!date) return '';
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
 }
 
 function compareRoll(a?: string | null, b?: string | null) {
@@ -399,6 +429,7 @@ export function IaMarkEntryWorkspace({
         expectedCount: paper.expectedCount ?? null,
         credits: subject.credits ?? null,
         maxMarks: paper.metadata?.maxMarks ?? null,
+        marksEntryDeadline: paper.marksEntryDeadline ?? null,
       })),
     );
   }, [subjects.data]);
@@ -532,6 +563,29 @@ export function IaMarkEntryWorkspace({
   const selectedExam = staffMode
     ? (examOptions as PaperChoice[]).find((exam) => exam.sessionId === examId)
     : (exams.data ?? []).find((exam) => exam.id === examId);
+  const savedDeadline = staffMode
+    ? (selectedExam as PaperChoice | undefined)?.marksEntryDeadline
+    : (selectedExam as IaExamSummary | undefined)?.metadata?.marksEntryDeadline;
+  const marksClosed = Boolean(
+    deadlineInstant(savedDeadline) && Date.now() > deadlineInstant(savedDeadline)!.getTime(),
+  );
+  const [deadlineInput, setDeadlineInput] = useState('');
+  useEffect(() => {
+    setDeadlineInput(deadlineLocalValue(savedDeadline));
+  }, [examId, savedDeadline]);
+  const saveDeadline = useMutation({
+    mutationFn: (iso: string | null) => updateIaExam(examId, { marksEntryDeadline: iso }),
+    onSuccess: (_data, iso) => {
+      setNotice(
+        iso
+          ? `Staff can enter marks until ${formatDeadline(iso)}.`
+          : 'Mark entry deadline cleared. Staff can enter marks again.',
+      );
+      void qc.invalidateQueries({ queryKey: ['ia', 'exams'] });
+      void qc.invalidateQueries({ queryKey: ['ia', 'faculty-subjects'] });
+    },
+    onError: (error) => setNotice(apiErrorMessage(error, 'The deadline could not be saved.')),
+  });
 
   const roster = useQuery({
     queryKey: ['ia', 'roster', paperId],
@@ -961,6 +1015,58 @@ export function IaMarkEntryWorkspace({
         </FilterCard>
       </section>
 
+      {examId ? (
+        <section
+          className={cn(
+            'flex flex-wrap items-end justify-between gap-3 rounded-2xl border px-4 py-3 shadow-sm',
+            marksClosed ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white',
+          )}
+        >
+          <div>
+            <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              <Lock className="h-4 w-4" />
+              Mark entry deadline
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              {marksClosed
+                ? `Closed on ${formatDeadline(savedDeadline)}. Marks cannot be changed.`
+                : savedDeadline
+                  ? `Open until ${formatDeadline(savedDeadline)}.`
+                  : 'No deadline yet. Staff can keep entering marks.'}
+              {!staffMode && marksClosed ? ' Move the deadline forward to reopen entry.' : ''}
+            </p>
+          </div>
+          {staffMode ? null : (
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="datetime-local"
+                value={deadlineInput}
+                onChange={(event) => setDeadlineInput(event.target.value)}
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800"
+              />
+              <button
+                type="button"
+                disabled={!examId || saveDeadline.isPending}
+                onClick={() =>
+                  saveDeadline.mutate(deadlineInput ? new Date(deadlineInput).toISOString() : null)
+                }
+                className="h-10 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                Save deadline
+              </button>
+              <button
+                type="button"
+                disabled={!examId || saveDeadline.isPending}
+                onClick={() => saveDeadline.mutate(new Date().toISOString())}
+                className="h-10 rounded-lg border border-rose-200 bg-white px-3 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+              >
+                Freeze now
+              </button>
+            </div>
+          )}
+        </section>
+      ) : null}
+
       <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.7fr))]">
         <div className="flex gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
@@ -1120,7 +1226,12 @@ export function IaMarkEntryWorkspace({
               <GhostButton onClick={() => setPreviewOpen(true)} icon={<Eye className="h-4 w-4" />}>
                 Preview
               </GhostButton>
-              <label className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <label
+                className={cn(
+                  'inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50',
+                  marksClosed && 'pointer-events-none opacity-50',
+                )}
+              >
                 <Upload className="h-4 w-4" /> Import Excel
                 <input
                   type="file"
@@ -1147,7 +1258,7 @@ export function IaMarkEntryWorkspace({
                     .map(([id]) => id);
                   save.mutate(ids.length ? ids : undefined);
                 }}
-                disabled={save.isPending || !dirtyCount || !schemeId}
+                disabled={marksClosed || save.isPending || !dirtyCount || !schemeId}
                 className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {save.isPending ? (
@@ -1245,6 +1356,7 @@ export function IaMarkEntryWorkspace({
                                 aria-label={`Marks for ${student.fullName || student.rollNumber}. Type A if absent.`}
                                 title="Type the mark, or A if the student was absent"
                                 value={absentFor(student, cell) ? 'A' : (value ?? '')}
+                                disabled={marksClosed}
                                 onChange={(event) => applyMarkDraft(key, event.target.value)}
                                 className={cn(
                                   'h-9 w-20 rounded-lg border bg-white text-center text-sm outline-none',
@@ -1268,6 +1380,7 @@ export function IaMarkEntryWorkspace({
                           <input
                             value={remarksFor(student)}
                             placeholder="Optional"
+                            disabled={marksClosed}
                             onChange={(event) =>
                               setDraftRemarks((prev) => ({
                                 ...prev,
@@ -1281,7 +1394,7 @@ export function IaMarkEntryWorkspace({
                           <button
                             type="button"
                             title="Save this student"
-                            disabled={!isDirty(student) || save.isPending}
+                            disabled={marksClosed || !isDirty(student) || save.isPending}
                             onClick={() => save.mutate([student.id])}
                             className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
                           >
@@ -1341,7 +1454,7 @@ export function IaMarkEntryWorkspace({
               <button
                 type="button"
                 onClick={() => save.mutate(undefined)}
-                disabled={save.isPending || !dirtyCount || !schemeId}
+                disabled={marksClosed || save.isPending || !dirtyCount || !schemeId}
                 className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 <Save className="h-4 w-4" /> Save All Marks
@@ -1463,7 +1576,12 @@ export function IaMarkEntryWorkspace({
             >
               Download Excel template
             </GhostButton>
-            <label className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700">
+            <label
+              className={cn(
+                'inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700',
+                marksClosed && 'pointer-events-none opacity-50',
+              )}
+            >
               <Upload className="h-4 w-4" /> Import filled Excel
               <input
                 type="file"
@@ -1495,6 +1613,10 @@ export function IaMarkEntryWorkspace({
               press Save.
             </li>
             <li>Save Marks stores the ticked rows, or every unsaved row when none are ticked.</li>
+            <li>
+              The examination cell sets a mark entry deadline. After that time the marks cannot be
+              changed.
+            </li>
             <li>Save All Marks stores every unsaved row on this paper.</li>
           </ol>
         </Modal>

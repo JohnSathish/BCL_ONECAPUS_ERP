@@ -187,6 +187,7 @@ export type IaExamSummary = IaSession & {
     semesterNos?: number[];
     streamName?: string;
     shiftName?: string;
+    marksEntryDeadline?: string | null;
     departmentCount?: number;
     studentsRegistered?: number;
   };
@@ -216,6 +217,7 @@ export type UpdateIaExamPayload = {
   status?: string;
   startDate?: string | null;
   endDate?: string | null;
+  marksEntryDeadline?: string | null;
 };
 
 export type CreateIaExamPayload = {
@@ -227,6 +229,7 @@ export type CreateIaExamPayload = {
   shiftId?: string;
   examType: string;
   maxMarks: number;
+  marksEntryDeadline?: string | null;
   startDate?: string;
   endDate?: string;
   remarks?: string;

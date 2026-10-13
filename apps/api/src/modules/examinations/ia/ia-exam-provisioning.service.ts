@@ -8,7 +8,11 @@ import { PrismaService } from '../../../database/prisma.service';
 import { LicenseEnforcementService } from '../../licensing/services/license-enforcement.service';
 import { ExamCalendarSyncService } from '../exam-calendar-sync.service';
 import { registrationPaperTitle } from '../../academic-engine/domain/offering-paper-title';
-import { isIaExamType, IA_EXAM_TYPES } from './ia.constants';
+import {
+  isIaExamType,
+  IA_EXAM_TYPES,
+  marksDeadlineInstant,
+} from './ia.constants';
 import { IaAuditService } from './ia-audit.service';
 import type {
   CreateIaExamDto,
@@ -57,6 +61,7 @@ type NormalizedExamInput = {
   maxMarks: number;
   startDate?: string;
   endDate?: string;
+  marksEntryDeadline?: string | null;
   remarks?: string;
   /** null = legacy include-all; otherwise semester → enabled categories */
   categoryPolicy: SemesterCategoryMap | null;
@@ -127,6 +132,7 @@ export class IaExamProvisioningService {
       maxMarks: dto.maxMarks,
       startDate: dto.startDate,
       endDate: dto.endDate,
+      marksEntryDeadline: dto.marksEntryDeadline,
       remarks: dto.remarks,
       categoryPolicy,
     };
@@ -560,6 +566,9 @@ export class IaExamProvisioningService {
           departmentCount: preview.departmentCount,
           academicYearName: academicYear.name,
           maxMarks: input.maxMarks,
+          marksEntryDeadline:
+            marksDeadlineInstant(input.marksEntryDeadline)?.toISOString() ??
+            null,
           studentsRegistered: preview.students,
           subjectsLoaded: preview.subjects,
           enabledCategoriesBySemester: categoryPolicyToMetadata(
@@ -849,6 +858,11 @@ export class IaExamProvisioningService {
     const maxMarks =
       dto.maxMarks != null ? Number(dto.maxMarks) : Number(meta.maxMarks ?? 0);
     if (dto.maxMarks != null) meta.maxMarks = dto.maxMarks;
+    if (dto.marksEntryDeadline !== undefined) {
+      meta.marksEntryDeadline = dto.marksEntryDeadline
+        ? (marksDeadlineInstant(dto.marksEntryDeadline)?.toISOString() ?? null)
+        : null;
+    }
     meta.shiftId = shiftId;
     meta.shiftName = shiftName;
 

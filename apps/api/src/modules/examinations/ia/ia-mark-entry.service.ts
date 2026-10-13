@@ -18,6 +18,7 @@ import { IaAuditService } from './ia-audit.service';
 import { IaSchemeService } from './ia-scheme.service';
 import { IaSessionService } from './ia-session.service';
 import { IaWorkflowService } from './ia-workflow.service';
+import { formatMarksDeadline, marksDeadlineInstant } from './ia.constants';
 import type { SaveIaMarksDto } from './dto/ia.dto';
 
 const rosterStudentSelect = {
@@ -181,7 +182,11 @@ export class IaMarkEntryService {
                   examType?: string;
                   academicYearId?: string | null;
                   status?: string;
-                  metadata?: { shiftName?: string; academicYearName?: string };
+                  metadata?: {
+                    shiftName?: string;
+                    academicYearName?: string;
+                    marksEntryDeadline?: string | null;
+                  };
                 }
               | undefined;
             const offering = paper.offeringId
@@ -206,6 +211,7 @@ export class IaMarkEntryService {
                 null,
               sessionStatus: session?.status ?? null,
               shiftName: session?.metadata?.shiftName ?? null,
+              marksEntryDeadline: session?.metadata?.marksEntryDeadline ?? null,
             };
           },
         )
@@ -223,6 +229,26 @@ export class IaMarkEntryService {
         'Marks are locked pending approval workflow',
       );
     }
+    await this.assertMarksDeadlineOpen(user.tid, paperId);
+  }
+
+  private async assertMarksDeadlineOpen(tenantId: string, paperId: string) {
+    const paper = await (this.prisma as any).examPaperSchedule.findFirst({
+      where: { id: paperId, tenantId, deletedAt: null },
+      select: { sessionId: true },
+    });
+    if (!paper?.sessionId) return;
+    const session = await (this.prisma as any).examSession.findFirst({
+      where: { id: paper.sessionId, tenantId, deletedAt: null },
+      select: { metadata: true },
+    });
+    const deadline = marksDeadlineInstant(
+      session?.metadata?.marksEntryDeadline,
+    );
+    if (!deadline || Date.now() <= deadline.getTime()) return;
+    throw new ForbiddenException(
+      `Mark entry closed on ${formatMarksDeadline(deadline)}. Marks cannot be changed after the deadline.`,
+    );
   }
 
   private async assertFacultyAccess(
