@@ -24,6 +24,8 @@ import {
   fetchIaSettings,
   fetchPendingIaApprovals,
   generateIaConsolidation,
+  removeIaSheet,
+  revokeIaSheet,
   submitIaSheet,
   updateIaSchemeComponents,
   updateIaSettings,
@@ -577,16 +579,68 @@ export function IaSettingsWorkspace() {
               )
           }
           onSubmit={(id) =>
-            submitIaSheet(id).then(() => {
-              qc.invalidateQueries({ queryKey: ['ia', 'consolidation'] });
-              qc.invalidateQueries({ queryKey: ['ia', 'approvals'] });
-            })
+            submitIaSheet(id)
+              .then(() => {
+                qc.invalidateQueries({ queryKey: ['ia', 'consolidation'] });
+                qc.invalidateQueries({ queryKey: ['ia', 'approvals'] });
+                setNotice('Sheet submitted. Approve HOD, then Examination Cell, then Principal.');
+              })
+              .catch((error) =>
+                setNotice(apiErrorMessage(error, 'The sheet could not be submitted.')),
+              )
           }
+          onRemove={(id) => {
+            if (
+              !window.confirm(
+                'Remove this sheet from the list? If it was published, students stop seeing those marks.',
+              )
+            ) {
+              return;
+            }
+            removeIaSheet(id)
+              .then(() => {
+                qc.invalidateQueries({ queryKey: ['ia', 'consolidation'] });
+                qc.invalidateQueries({ queryKey: ['ia', 'approvals'] });
+                setNotice('Sheet removed.');
+              })
+              .catch((error) =>
+                setNotice(apiErrorMessage(error, 'The sheet could not be removed.')),
+              );
+          }}
+          onRevoke={(id) => {
+            if (
+              !window.confirm(
+                'Revoke this published result? Students stop seeing these marks. Correct the marks, then generate a new sheet and approve it through the Principal to publish again.',
+              )
+            ) {
+              return;
+            }
+            revokeIaSheet(id)
+              .then(() => {
+                qc.invalidateQueries({ queryKey: ['ia', 'consolidation'] });
+                qc.invalidateQueries({ queryKey: ['ia', 'approvals'] });
+                setNotice(
+                  'Result revoked. Correct the marks, generate a new sheet, and approve it through the Principal.',
+                );
+              })
+              .catch((error) =>
+                setNotice(apiErrorMessage(error, 'The result could not be revoked.')),
+              );
+          }}
           onApproval={(id, action) =>
-            actOnIaApproval(id, { action }).then(() => {
-              qc.invalidateQueries({ queryKey: ['ia', 'consolidation'] });
-              qc.invalidateQueries({ queryKey: ['ia', 'approvals'] });
-            })
+            actOnIaApproval(id, { action })
+              .then(() => {
+                qc.invalidateQueries({ queryKey: ['ia', 'consolidation'] });
+                qc.invalidateQueries({ queryKey: ['ia', 'approvals'] });
+                setNotice(
+                  action === 'APPROVE'
+                    ? 'Approval saved. The student app updates only after the Principal step.'
+                    : 'Sheet rejected. Submit it again when the marks are ready.',
+                );
+              })
+              .catch((error) =>
+                setNotice(apiErrorMessage(error, 'That approval could not be saved.')),
+              )
           }
           onDownload={async (id, format) => {
             setDownloading(`${id}-${format}`);
@@ -612,8 +666,21 @@ export function IaSettingsWorkspace() {
   );
 }
 
-type SheetRow = { id: string; name: string; status: string; rows?: unknown[] };
-type ApprovalRow = { id: string; step: string; status: string; sheet?: { name: string } };
+type SheetRow = {
+  id: string;
+  name: string;
+  status: string;
+  rows?: unknown[];
+  _count?: { rows?: number };
+};
+type ApprovalRow = {
+  id: string;
+  step: string;
+  sequence?: number;
+  stepHint?: string;
+  status: string;
+  sheet?: { name: string };
+};
 
 function UniversityFiles({
   sheets,
@@ -625,6 +692,8 @@ function UniversityFiles({
   onSemester,
   onGenerate,
   onSubmit,
+  onRemove,
+  onRevoke,
   onApproval,
   onDownload,
 }: {
@@ -637,6 +706,8 @@ function UniversityFiles({
   onSemester: (value: number) => void;
   onGenerate: () => void;
   onSubmit: (id: string) => void;
+  onRemove: (id: string) => void;
+  onRevoke: (id: string) => void;
   onApproval: (id: string, action: 'APPROVE' | 'REJECT') => void;
   onDownload: (id: string, format: 'xlsx' | 'csv' | 'pdf') => void;
 }) {
@@ -645,8 +716,10 @@ function UniversityFiles({
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">NEHU consolidation</h2>
         <p className="mb-3 text-xs text-slate-500">
-          Generate a sheet from entered internal assessment marks, then download it for university
-          submission.
+          Generate the sheet, press Submit, then approve HOD, Examination Cell, and Principal. The
+          Principal approval publishes the marks. Remove deletes a test sheet. Revoke takes a
+          published result off the student app. After correcting the marks, generate a new sheet and
+          approve it again to republish.
         </p>
         <div className="flex flex-wrap gap-2">
           <input
@@ -685,10 +758,28 @@ function UniversityFiles({
             <div>
               <p className="font-medium text-slate-800">{sheet.name}</p>
               <p className="text-xs text-slate-500">
-                {sheet.status} · {sheet.rows?.length ?? 0} rows
+                {sheet.status} · {sheet._count?.rows ?? sheet.rows?.length ?? 0} students
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {['LOCKED', 'PRINCIPAL_APPROVED', 'HOD_APPROVED', 'CONTROLLER_VERIFIED'].includes(
+                sheet.status,
+              ) ? (
+                <button
+                  type="button"
+                  onClick={() => onRevoke(sheet.id)}
+                  className="rounded-lg border border-amber-300 px-2 py-1 text-xs font-medium text-amber-800"
+                >
+                  Revoke
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => onRemove(sheet.id)}
+                className="rounded-lg border border-rose-200 px-2 py-1 text-xs text-rose-700"
+              >
+                Remove
+              </button>
               {sheet.status === 'DRAFT' ? (
                 <button
                   type="button"
@@ -726,7 +817,10 @@ function UniversityFiles({
             >
               <div>
                 <p className="font-medium text-slate-800">{approval.sheet?.name ?? 'Sheet'}</p>
-                <p className="text-xs text-slate-500">{approval.step}</p>
+                <p className="text-xs text-slate-500">{approval.step || 'Next approval'}</p>
+                {approval.stepHint ? (
+                  <p className="text-xs text-slate-400">{approval.stepHint}</p>
+                ) : null}
               </div>
               <div className="flex gap-2">
                 <button
@@ -734,7 +828,7 @@ function UniversityFiles({
                   onClick={() => onApproval(approval.id, 'APPROVE')}
                   className="rounded-lg bg-blue-600 px-2 py-1 text-xs text-white"
                 >
-                  Approve
+                  {(approval.sequence ?? 0) >= 3 ? 'Approve and publish' : 'Approve'}
                 </button>
                 <button
                   type="button"

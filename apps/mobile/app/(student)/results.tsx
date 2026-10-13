@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -13,26 +13,86 @@ import { studentTheme } from '@/components/student-portal/theme';
 import {
   fetchStudentExamResults,
   fetchStudentIaMarks,
-  markValue,
-  resultStatusColor,
   type ExamMarkEntry,
-  type ExamResultSummary,
-  type IaMarkComponent,
-  type IaMarkSummary,
+  type IaResultPaper,
 } from '@/services/student-exams';
 
-type TabKey = 'semester' | 'internal';
+type TabKey = 'internal' | 'semester';
+type Outcome = 'PASS' | 'FAIL' | 'ABSENT';
+
+type ResultRow = {
+  id: string;
+  code: string;
+  title: string;
+  sessionName?: string | null;
+  secured: number | null;
+  maxMarks: number;
+  passMark: number;
+  outcome: Outcome;
+};
+
+const TILES = ['#1d4ed8', '#7c3aed', '#d97706', '#059669', '#0f766e', '#be123c'] as const;
+
+function formatMark(value?: number | null) {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  const number = Number(value);
+  return Number.isInteger(number) ? String(number) : String(Math.round(number * 100) / 100);
+}
+
+function passMarkFor(maxMarks: number, explicit?: number | null) {
+  if (explicit != null && !Number.isNaN(Number(explicit))) return Number(explicit);
+  if (!maxMarks) return 0;
+  return Math.ceil(maxMarks * 0.4);
+}
+
+function outcomeOf(status?: string | null, secured?: number | null, passMark?: number): Outcome {
+  const text = String(status ?? '').toUpperCase();
+  if (text.includes('ABSENT')) return 'ABSENT';
+  if (text === 'PASS' || text === 'PASSED') return 'PASS';
+  if (text === 'FAIL' || text === 'FAILED') return 'FAIL';
+  if (secured == null) return 'FAIL';
+  return secured >= (passMark ?? 0) ? 'PASS' : 'FAIL';
+}
+
+function ResultCard({ row, tint }: { row: ResultRow; tint: string }) {
+  const passed = row.outcome === 'PASS';
+  const absent = row.outcome === 'ABSENT';
+  return (
+    <View style={styles.card}>
+      <View style={[styles.tile, { backgroundColor: tint }]}>
+        <Text style={styles.tileText}>{row.code}</Text>
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.cardTitle}>{row.title}</Text>
+        <Text style={styles.cardMeta}>
+          Maximum {formatMark(row.maxMarks)} · Pass mark {formatMark(row.passMark)}
+        </Text>
+      </View>
+      <View style={styles.scoreCol}>
+        <Text style={[styles.score, absent && styles.scoreAbsent]}>
+          {absent ? 'AB' : formatMark(row.secured)}
+        </Text>
+        <Text style={styles.scoreMax}>/ {formatMark(row.maxMarks)}</Text>
+        <Text
+          style={[
+            styles.outcome,
+            passed && styles.outcomePass,
+            row.outcome === 'FAIL' && styles.outcomeFail,
+            absent && styles.outcomeAbsent,
+          ]}
+        >
+          {absent ? 'Absent' : passed ? 'Pass' : 'Fail'}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 export default function StudentResultsScreen() {
-  const [tab, setTab] = useState<TabKey>('semester');
+  const [tab, setTab] = useState<TabKey>('internal');
   const [loading, setLoading] = useState(true);
-  const [summaries, setSummaries] = useState<ExamResultSummary[]>([]);
-  const [marks, setMarks] = useState<ExamMarkEntry[]>([]);
-  const [papers, setPapers] = useState<{ id: string; paperCode?: string; paperName?: string }[]>(
-    [],
-  );
-  const [iaComponents, setIaComponents] = useState<IaMarkComponent[]>([]);
-  const [iaSummaries, setIaSummaries] = useState<IaMarkSummary[]>([]);
+  const [iaPapers, setIaPapers] = useState<IaResultPaper[]>([]);
+  const [semesterRows, setSemesterRows] = useState<ResultRow[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,16 +103,47 @@ export default function StudentResultsScreen() {
           marks: [],
           papers: [],
         })),
-        fetchStudentIaMarks().catch(() => ({
-          components: [],
-          summaries: [],
-        })),
+        fetchStudentIaMarks().catch(() => ({ papers: [], components: [] })),
       ]);
-      setSummaries(semester.summaries ?? []);
-      setMarks(semester.marks ?? []);
-      setPapers(semester.papers ?? []);
-      setIaComponents(ia.components ?? []);
-      setIaSummaries(ia.summaries ?? []);
+      const publishedPapers = ia.papers ?? [];
+      if (publishedPapers.length) {
+        setIaPapers(publishedPapers);
+      } else {
+        setIaPapers(
+          (ia.components ?? []).map((component) => {
+            const maxMarks = Number(component.maxMarks ?? 0);
+            const passMark = passMarkFor(maxMarks);
+            const absent = Boolean(component.isAbsent);
+            return {
+              paperCode: component.code,
+              paperName: component.label,
+              marks: absent ? null : (component.marks ?? null),
+              maxMarks,
+              passMark,
+              isAbsent: absent,
+              outcome: absent ? 'ABSENT' : (component.marks ?? 0) >= passMark ? 'PASS' : 'FAIL',
+            };
+          }),
+        );
+      }
+      const papers = semester.papers ?? [];
+      setSemesterRows(
+        (semester.marks ?? []).map((mark: ExamMarkEntry) => {
+          const paper = papers.find((item) => item.id === mark.paperId);
+          const maxMarks = Number(mark.maxMarks ?? 0);
+          const passMark = passMarkFor(maxMarks);
+          const secured = mark.totalMarks == null ? null : Number(mark.totalMarks);
+          return {
+            id: mark.id,
+            code: paper?.paperCode ?? 'Paper',
+            title: paper?.paperName ?? 'Semester paper',
+            secured,
+            maxMarks,
+            passMark,
+            outcome: outcomeOf(mark.resultStatus, secured, passMark),
+          };
+        }),
+      );
     } finally {
       setLoading(false);
     }
@@ -62,18 +153,46 @@ export default function StudentResultsScreen() {
     void load();
   }, [load]);
 
+  const internalRows = useMemo<ResultRow[]>(
+    () =>
+      iaPapers.map((paper, index) => ({
+        id: paper.paperId ?? `${paper.paperCode ?? 'paper'}-${index}`,
+        code: paper.paperCode || 'Paper',
+        title: paper.paperName || 'Internal paper',
+        sessionName: paper.sessionName,
+        secured: paper.isAbsent ? null : (paper.marks ?? null),
+        maxMarks: Number(paper.maxMarks ?? 0),
+        passMark: passMarkFor(Number(paper.maxMarks ?? 0), paper.passMark),
+        outcome: outcomeOf(paper.outcome, paper.marks, paper.passMark),
+      })),
+    [iaPapers],
+  );
+
+  const rows = tab === 'internal' ? internalRows : semesterRows;
+  const sessionTitle = useMemo(() => {
+    const names = [
+      ...new Set(internalRows.map((row) => row.sessionName?.trim()).filter(Boolean)),
+    ] as string[];
+    if (tab === 'semester') return 'Semester examination';
+    if (names.length === 1) return names[0];
+    return 'Internal assessment';
+  }, [internalRows, tab]);
+  const passed = rows.filter((row) => row.outcome === 'PASS').length;
+  const failed = rows.filter((row) => row.outcome === 'FAIL').length;
+  const absent = rows.filter((row) => row.outcome === 'ABSENT').length;
+
   return (
-    <StudentScreenShell title="Results" subtitle="Published semester & internal marks">
+    <StudentScreenShell title="Exam Results" subtitle="Marks secured against the pass mark">
       <View style={styles.tabs}>
         <TabButton
-          label="Semester Results"
-          active={tab === 'semester'}
-          onPress={() => setTab('semester')}
-        />
-        <TabButton
-          label="Internal Marks"
+          label="Internal (IA)"
           active={tab === 'internal'}
           onPress={() => setTab('internal')}
+        />
+        <TabButton
+          label="Semester Exams"
+          active={tab === 'semester'}
+          onPress={() => setTab('semester')}
         />
       </View>
 
@@ -83,74 +202,88 @@ export default function StudentResultsScreen() {
       >
         {loading ? (
           <ActivityIndicator color={studentTheme.primary} style={{ marginTop: 24 }} />
-        ) : tab === 'semester' ? (
-          <>
-            {summaries.map((summary) => (
-              <SummaryCard key={summary.id} summary={summary} />
-            ))}
-
-            {marks.length === 0 ? (
-              <Text style={styles.muted}>No published semester results yet.</Text>
-            ) : (
-              marks.map((mark) => {
-                const paper = papers.find((item) => item.id === mark.paperId);
-                const color = resultStatusColor(mark.resultStatus);
-                return (
-                  <View key={mark.id} style={styles.markCard}>
-                    <Text style={styles.paperCode}>{paper?.paperCode ?? 'Paper'}</Text>
-                    <Text style={styles.paperTitle}>{paper?.paperName ?? 'Subject'}</Text>
-                    <View style={styles.markGrid}>
-                      <MarkCell label="Internal" value={markValue(mark.internalMarks)} />
-                      <MarkCell label="External" value={markValue(mark.externalMarks)} />
-                      <MarkCell label="Practical" value={markValue(mark.practicalMarks)} />
-                      <MarkCell
-                        label="Total"
-                        value={`${markValue(mark.totalMarks)} / ${markValue(mark.maxMarks)}`}
-                      />
-                      <MarkCell label="Grade" value={markValue(mark.grade)} />
-                    </View>
-                    <View style={[styles.statusBadge, { backgroundColor: `${color}18` }]}>
-                      <Text style={[styles.statusText, { color }]}>
-                        {mark.resultStatus ?? 'Pending'}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </>
-        ) : iaComponents.length === 0 && iaSummaries.length === 0 ? (
-          <Text style={styles.muted}>No published internal marks yet.</Text>
+        ) : rows.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No published results yet</Text>
+            <Text style={styles.emptyBody}>
+              {tab === 'internal'
+                ? 'Internal marks appear here after the college locks and publishes them.'
+                : 'Semester results appear here after the examination cell publishes them.'}
+            </Text>
+          </View>
         ) : (
           <>
-            {iaSummaries.map((summary, index) => (
-              <View key={`ia-summary-${index}`} style={styles.summaryCard}>
-                <Text style={styles.summaryLabel}>IA Summary</Text>
-                <Text style={styles.summaryValue}>
-                  {summary.totalMarks ?? '—'} / {summary.maxMarks ?? '—'}
-                </Text>
-                <Text style={styles.summaryMeta}>
-                  {summary.percentage != null ? `${summary.percentage}%` : '—'} ·{' '}
-                  {summary.resultStatus ?? 'Pending'}
+            <View style={styles.summary}>
+              <Text style={styles.summaryEyebrow}>Published result</Text>
+              <Text style={styles.summaryTitle}>{sessionTitle}</Text>
+            </View>
+            <View style={styles.stats}>
+              <Stat value={String(rows.length)} label="Appeared" />
+              <Stat value={String(passed)} label="Passed" tone="pass" />
+              <Stat value={String(failed + absent)} label="Not passed" tone="fail" />
+            </View>
+            {rows.map((row, index) => (
+              <ResultCard key={row.id} row={row} tint={TILES[index % TILES.length] ?? TILES[0]} />
+            ))}
+            <View style={styles.footerCard}>
+              <Text style={styles.footerTitle}>Result summary</Text>
+              <View style={styles.footerRow}>
+                <Stat value={String(rows.length)} label="Papers" compact />
+                <Stat value={String(passed)} label="Pass" tone="pass" compact />
+                <Stat value={String(failed)} label="Fail" tone="fail" compact />
+                <Stat value={String(absent)} label="Absent" tone="absent" compact />
+              </View>
+            </View>
+            {failed === 0 && absent === 0 ? (
+              <View style={styles.bannerPass}>
+                <Text style={styles.bannerTitle}>All papers are a pass</Text>
+                <Text style={styles.bannerBody}>
+                  Every published paper is on or above its pass mark.
                 </Text>
               </View>
-            ))}
-
-            {iaComponents.map((component, index) => (
-              <View key={`${component.code ?? 'ia'}-${index}`} style={styles.markCard}>
-                <Text style={styles.paperCode}>{component.code ?? 'Component'}</Text>
-                <Text style={styles.paperTitle}>{component.label ?? 'Internal component'}</Text>
-                <Text style={styles.markTotal}>
-                  {component.isAbsent
-                    ? 'Absent'
-                    : `${component.marks ?? '—'} / ${component.maxMarks ?? '—'}`}
+            ) : (
+              <View style={styles.bannerFail}>
+                <Text style={styles.bannerFailTitle}>
+                  {failed + absent} paper{failed + absent === 1 ? '' : 's'} not passed
+                </Text>
+                <Text style={styles.bannerFailBody}>
+                  A paper is a pass only when the mark secured reaches the pass mark. Absent is not
+                  a pass.
                 </Text>
               </View>
-            ))}
+            )}
           </>
         )}
       </ScrollView>
     </StudentScreenShell>
+  );
+}
+
+function Stat({
+  value,
+  label,
+  tone,
+  compact,
+}: {
+  value: string;
+  label: string;
+  tone?: 'pass' | 'fail' | 'absent';
+  compact?: boolean;
+}) {
+  return (
+    <View style={[styles.stat, compact && styles.statCompact]}>
+      <Text
+        style={[
+          styles.statValue,
+          tone === 'pass' && styles.statPass,
+          tone === 'fail' && styles.statFail,
+          tone === 'absent' && styles.statAbsent,
+        ]}
+      >
+        {value}
+      </Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -170,95 +303,139 @@ function TabButton({
   );
 }
 
-function SummaryCard({ summary }: { summary: ExamResultSummary }) {
-  const color = resultStatusColor(summary.resultStatus);
-  return (
-    <View style={styles.summaryCard}>
-      <Text style={styles.summaryLabel}>Overall Result</Text>
-      <Text style={[styles.summaryValue, { color }]}>{summary.resultStatus ?? 'Pending'}</Text>
-      <Text style={styles.summaryMeta}>
-        {summary.percentage != null ? `${summary.percentage}%` : '—'}
-        {summary.sgpa != null ? ` · SGPA ${summary.sgpa}` : ''}
-        {summary.cgpa != null ? ` · CGPA ${summary.cgpa}` : ''}
-      </Text>
-      <Text style={styles.summaryMeta}>
-        Total {markValue(summary.totalMarks)} / {markValue(summary.maxMarks)}
-      </Text>
-    </View>
-  );
-}
-
-function MarkCell({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.markCell}>
-      <Text style={styles.markCellLabel}>{label}</Text>
-      <Text style={styles.markCellValue}>{value}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   tabs: {
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 4,
   },
   tabBtn: {
     flex: 1,
     borderRadius: 999,
-    paddingVertical: 10,
+    paddingVertical: 11,
     alignItems: 'center',
     backgroundColor: studentTheme.surface,
     borderWidth: 1,
     borderColor: studentTheme.border,
   },
-  tabBtnActive: { backgroundColor: '#eff6ff', borderColor: studentTheme.primaryLight },
-  tabText: { fontSize: 12, fontWeight: '700', color: studentTheme.textMuted },
-  tabTextActive: { color: studentTheme.primaryLight },
-  container: { padding: 16, gap: 10, paddingBottom: 28 },
-  muted: { fontSize: 13, color: studentTheme.textMuted },
-  summaryCard: {
+  tabBtnActive: {
+    backgroundColor: studentTheme.primaryLight,
+    borderColor: studentTheme.primaryLight,
+  },
+  tabText: { fontSize: 13, fontWeight: '700', color: studentTheme.textMuted },
+  tabTextActive: { color: '#fff' },
+  container: { padding: 16, gap: 12, paddingBottom: 32 },
+  summary: {
+    backgroundColor: studentTheme.surface,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: studentTheme.border,
+    gap: 4,
+  },
+  summaryEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: studentTheme.primaryLight,
+  },
+  summaryTitle: { fontSize: 18, fontWeight: '800', color: studentTheme.text, lineHeight: 24 },
+  stats: {
+    flexDirection: 'row',
+    backgroundColor: studentTheme.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: studentTheme.border,
+    paddingVertical: 12,
+  },
+  stat: { flex: 1, alignItems: 'center', gap: 2 },
+  statCompact: { paddingVertical: 2 },
+  statValue: { fontSize: 22, fontWeight: '800', color: studentTheme.text },
+  statPass: { color: '#059669' },
+  statFail: { color: '#dc2626' },
+  statAbsent: { color: '#d97706' },
+  statLabel: { fontSize: 11, fontWeight: '700', color: studentTheme.textMuted },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: studentTheme.surface,
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: studentTheme.border,
+  },
+  tile: {
+    width: 58,
+    height: 58,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tileText: { color: '#fff', fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  cardBody: { flex: 1, gap: 4 },
+  cardTitle: { fontSize: 15, fontWeight: '800', color: studentTheme.text, lineHeight: 20 },
+  cardMeta: { fontSize: 12, fontWeight: '600', color: studentTheme.textMuted, lineHeight: 17 },
+  scoreCol: { alignItems: 'flex-end', minWidth: 72, gap: 2 },
+  score: { fontSize: 22, fontWeight: '800', color: studentTheme.text },
+  scoreAbsent: { fontSize: 18, color: '#d97706' },
+  scoreMax: { fontSize: 11, fontWeight: '700', color: studentTheme.textMuted },
+  outcome: {
+    marginTop: 2,
+    overflow: 'hidden',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#fff',
+    backgroundColor: '#64748b',
+  },
+  outcomePass: { backgroundColor: '#059669' },
+  outcomeFail: { backgroundColor: '#dc2626' },
+  outcomeAbsent: { backgroundColor: '#d97706' },
+  footerCard: {
     backgroundColor: '#eff6ff',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 14,
     borderWidth: 1,
     borderColor: '#bfdbfe',
-    gap: 4,
+    gap: 10,
   },
-  summaryLabel: { fontSize: 11, fontWeight: '700', color: studentTheme.textMuted },
-  summaryValue: { fontSize: 22, fontWeight: '800', color: studentTheme.text },
-  summaryMeta: { fontSize: 12, color: studentTheme.textMuted },
-  markCard: {
-    backgroundColor: studentTheme.surface,
+  footerTitle: { fontSize: 14, fontWeight: '800', color: studentTheme.text },
+  footerRow: { flexDirection: 'row' },
+  bannerPass: {
+    backgroundColor: '#ecfdf5',
     borderRadius: 16,
     padding: 14,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    gap: 4,
+  },
+  bannerTitle: { fontSize: 15, fontWeight: '800', color: '#065f46' },
+  bannerBody: { fontSize: 12, color: '#047857', lineHeight: 18 },
+  bannerFail: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    gap: 4,
+  },
+  bannerFailTitle: { fontSize: 15, fontWeight: '800', color: '#991b1b' },
+  bannerFailBody: { fontSize: 12, color: '#b91c1c', lineHeight: 18 },
+  emptyCard: {
+    backgroundColor: studentTheme.surface,
+    borderRadius: 18,
+    padding: 18,
     borderWidth: 1,
     borderColor: studentTheme.border,
     gap: 6,
   },
-  paperCode: { fontSize: 11, fontWeight: '800', color: studentTheme.primaryLight },
-  paperTitle: { fontSize: 15, fontWeight: '800', color: studentTheme.text },
-  markGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  markCell: {
-    width: '30%',
-    minWidth: 92,
-    backgroundColor: '#f8fafc',
-    borderRadius: 10,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  markCellLabel: { fontSize: 10, color: studentTheme.textMuted, fontWeight: '700' },
-  markCellValue: { fontSize: 13, fontWeight: '800', color: studentTheme.text, marginTop: 2 },
-  markTotal: { fontSize: 16, fontWeight: '800', color: studentTheme.primary },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginTop: 4,
-  },
-  statusText: { fontSize: 11, fontWeight: '800' },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: studentTheme.text },
+  emptyBody: { fontSize: 13, color: studentTheme.textMuted, lineHeight: 19 },
 });

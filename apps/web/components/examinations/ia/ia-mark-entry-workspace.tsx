@@ -19,6 +19,7 @@ import {
   Save,
   Search,
   Settings2,
+  Smartphone,
   Upload,
   Users,
   X,
@@ -29,10 +30,12 @@ import {
   fetchIaExams,
   fetchIaPapers,
   downloadIaMarkTemplate,
+  fetchIaResultPreview,
   fetchIaRoster,
   importIaMarkFile,
   importIaMarks,
   saveIaMarks,
+  type IaResultPreview,
   type IaExamSummary,
   type IaPaper,
 } from '@/services/examinations-ia';
@@ -369,6 +372,7 @@ export function IaMarkEntryWorkspace({
   const [draftRemarks, setDraftRemarks] = useState<Record<string, string>>({});
   const [helpOpen, setHelpOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [resultPreviewOpen, setResultPreviewOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const shiftPinned = useRef('');
   const yearTouched = useRef(false);
@@ -1107,6 +1111,12 @@ export function IaMarkEntryWorkspace({
               students per page
             </label>
             <div className="ml-auto flex flex-wrap gap-2">
+              <GhostButton
+                onClick={() => setResultPreviewOpen(true)}
+                icon={<Smartphone className="h-4 w-4" />}
+              >
+                Student result
+              </GhostButton>
               <GhostButton onClick={() => setPreviewOpen(true)} icon={<Eye className="h-4 w-4" />}>
                 Preview
               </GhostButton>
@@ -1490,6 +1500,10 @@ export function IaMarkEntryWorkspace({
         </Modal>
       ) : null}
 
+      {resultPreviewOpen ? (
+        <StudentResultPreview onClose={() => setResultPreviewOpen(false)} />
+      ) : null}
+
       {previewOpen ? (
         <Modal title="Preview marks" onClose={() => setPreviewOpen(false)} wide>
           <p className="mb-3 text-sm text-slate-500">
@@ -1735,6 +1749,225 @@ function Info({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 text-sm font-medium text-slate-800">{value}</dd>
     </div>
   );
+}
+
+function StudentResultPreview({ onClose }: { onClose: () => void }) {
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<IaResultPreview | null>(null);
+
+  const load = async (params: { q?: string; studentId?: string }) => {
+    setLoading(true);
+    setError('');
+    try {
+      setResult(await fetchIaResultPreview(params));
+    } catch (err) {
+      setResult(null);
+      setError(apiErrorMessage(err, 'The student result could not be loaded.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const papers = result?.papers ?? [];
+  const passed = papers.filter((paper) => paper.outcome === 'PASS').length;
+  const notPassed = papers.length - passed;
+  const student = result?.student;
+
+  return (
+    <Modal title="Student result preview" onClose={onClose} wide>
+      <p className="text-sm text-slate-600">
+        Saved marks, including Ankit Hajong’s sample, can be viewed here before students see them.
+        The phone stays blank until Examination Settings, NEHU consolidation, is generated,
+        submitted, and approved by the HOD, the Examination Cell, and the Principal. The last
+        approval locks the marks and that is when the app shows them.
+      </p>
+      <form
+        className="mt-3 flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const q = query.trim();
+          if (q.length < 2) {
+            setError('Type at least two characters of the name or roll number.');
+            return;
+          }
+          void load({ q });
+        }}
+      >
+        <label className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Ankit Hajong or BA24-458"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-blue-400"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={loading}
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Smartphone className="h-4 w-4" />
+          )}
+          Show
+        </button>
+      </form>
+      {error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null}
+
+      {result && !student && result.matches.length > 1 ? (
+        <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
+          {result.matches.map((match) => (
+            <li key={match.id}>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50"
+                onClick={() => void load({ studentId: match.id })}
+              >
+                <span className="font-medium text-slate-800">{match.fullName || 'Student'}</span>
+                <span className="text-slate-500">{match.rollNumber}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {result && !student && result.matches.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-500">No student matches that name or roll number.</p>
+      ) : null}
+
+      {student ? (
+        <div className="mx-auto mt-4 max-w-sm overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50 shadow-sm">
+          <div className="bg-[#0f3c89] px-4 py-4 text-white">
+            <p className="text-base font-semibold">Exam Results</p>
+            <p className="text-xs text-blue-100">
+              {student.fullName || 'Student'}
+              {student.rollNumber ? ` · ${student.rollNumber}` : ''}
+            </p>
+          </div>
+          <div className="space-y-3 p-3">
+            <div className="grid grid-cols-3 gap-2 rounded-2xl bg-white p-3 text-center shadow-sm">
+              <PreviewStat label="Appeared" value={papers.length} />
+              <PreviewStat label="Passed" value={passed} tone="green" />
+              <PreviewStat
+                label="Not passed"
+                value={notPassed}
+                tone={notPassed ? 'red' : 'slate'}
+              />
+            </div>
+            {papers.length ? (
+              papers.map((paper, index) => {
+                const absent = paper.outcome === 'ABSENT' || paper.isAbsent;
+                const passedPaper = paper.outcome === 'PASS';
+                const tint = ['#1d4ed8', '#7c3aed', '#d97706', '#059669'][index % 4];
+                return (
+                  <div
+                    key={paper.paperId}
+                    className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm"
+                  >
+                    <div
+                      className="flex h-12 w-14 shrink-0 items-center justify-center rounded-xl text-center text-[10px] font-bold leading-tight text-white"
+                      style={{ backgroundColor: tint }}
+                    >
+                      {paper.paperCode || 'Paper'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {paper.paperName || 'Paper'}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Maximum {formatPreviewMark(paper.maxMarks)} · Pass mark{' '}
+                        {formatPreviewMark(paper.passMark)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className={cn(
+                          'text-xl font-bold',
+                          absent ? 'text-amber-600' : 'text-slate-900',
+                        )}
+                      >
+                        {absent ? 'AB' : formatPreviewMark(paper.marks)}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        / {formatPreviewMark(paper.maxMarks)}
+                      </p>
+                      <p
+                        className={cn(
+                          'text-xs font-semibold',
+                          passedPaper && 'text-emerald-600',
+                          paper.outcome === 'FAIL' && 'text-rose-600',
+                          absent && 'text-amber-600',
+                        )}
+                      >
+                        {absent ? 'Absent' : passedPaper ? 'Pass' : 'Fail'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="rounded-2xl bg-white p-4 text-sm text-slate-500 shadow-sm">
+                No saved marks for this student yet. Save the mark on the paper, then show the
+                result again.
+              </p>
+            )}
+            {papers.length ? (
+              <p
+                className={cn(
+                  'rounded-2xl px-3 py-2 text-sm',
+                  notPassed ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700',
+                )}
+              >
+                {notPassed
+                  ? `${notPassed} paper${notPassed === 1 ? '' : 's'} not passed.`
+                  : 'Passed every paper that has a saved mark.'}
+              </p>
+            ) : null}
+            <p className="px-1 text-[11px] text-slate-400">
+              Office preview only. Students do not see this until the sheet is locked.
+            </p>
+          </div>
+        </div>
+      ) : null}
+    </Modal>
+  );
+}
+
+function PreviewStat({
+  label,
+  value,
+  tone = 'slate',
+}: {
+  label: string;
+  value: number;
+  tone?: 'slate' | 'green' | 'red';
+}) {
+  return (
+    <div>
+      <p
+        className={cn(
+          'text-lg font-bold',
+          tone === 'green' && 'text-emerald-600',
+          tone === 'red' && 'text-rose-600',
+          tone === 'slate' && 'text-slate-900',
+        )}
+      >
+        {value}
+      </p>
+      <p className="text-[10px] text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+function formatPreviewMark(value?: number | null) {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  const number = Number(value);
+  return Number.isInteger(number) ? String(number) : String(Math.round(number * 100) / 100);
 }
 
 function Modal({

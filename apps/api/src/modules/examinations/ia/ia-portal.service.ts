@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { IA_EXAM_TYPES } from './ia.constants';
@@ -128,9 +132,12 @@ export class IaPortalService {
         examType: { in: [...IA_EXAM_TYPES] },
         status: { in: ['ACTIVE', 'SCHEDULED', 'OPEN'] },
       },
-      select: { id: true, shiftId: true },
-    })) as Array<{ id: string; shiftId: string | null }>;
+      select: { id: true, shiftId: true, name: true },
+    })) as Array<{ id: string; shiftId: string | null; name: string | null }>;
     const sessionIds = sessions.map((s) => s.id);
+    const sessionNameById = new Map(
+      sessions.map((session) => [session.id, session.name?.trim() || null]),
+    );
 
     type PaperRow = {
       id: string;
@@ -218,6 +225,9 @@ export class IaPortalService {
         id: p.id,
         paperCode: printedSubjects.get(p.id)?.code || p.paperCode,
         paperName: printedSubjects.get(p.id)?.title || p.paperName,
+        sessionName: p.sessionId
+          ? (sessionNameById.get(p.sessionId) ?? null)
+          : null,
         examDate: p.examDate,
         startTime: formatExamWallClock(p.startTime),
         endTime: formatExamWallClock(p.endTime),
@@ -261,6 +271,8 @@ export class IaPortalService {
       ? marks
       : marks.filter((m: { status: string }) => m.status === 'PUBLISHED');
 
+    const resultPapers = await this.papersFromMarks(user.tid, visible);
+
     const rows = await (this.prisma as any).iaConsolidationRow.findMany({
       where: { tenantId: user.tid, studentId: student.id },
       orderBy: { updatedAt: 'desc' },
@@ -269,6 +281,7 @@ export class IaPortalService {
 
     return {
       studentId: student.id,
+      papers: resultPapers,
       components: visible.map(
         (m: {
           component: { code: string; label: string };
@@ -299,6 +312,219 @@ export class IaPortalService {
         }),
       ),
     };
+  }
+
+  /**
+   * Office-only look at saved marks, including drafts. The student app still
+   * hides these until the consolidation sheet is locked or the marks are published.
+   */
+  async previewSavedMarks(user: JwtUser, query?: string, studentId?: string) {
+    const q = query?.trim() ?? '';
+    if (!studentId && q.length < 2) {
+      throw new BadRequestException(
+        'Type at least two characters of the name or roll number.',
+      );
+    }
+
+    const students = studentId
+      ? await this.prisma.student.findMany({
+          where: { tenantId: user.tid, id: studentId, deletedAt: null },
+          take: 1,
+          select: this.previewStudentSelect(),
+        })
+      : await this.prisma.student.findMany({
+          where: {
+            tenantId: user.tid,
+            deletedAt: null,
+            OR: [
+              { rollNumber: { contains: q, mode: 'insensitive' } },
+              {
+                masterProfile: {
+                  fullName: { contains: q, mode: 'insensitive' },
+                },
+              },
+              {
+                user: {
+                  displayName: { contains: q, mode: 'insensitive' },
+                },
+              },
+            ],
+          },
+          take: 8,
+          orderBy: { rollNumber: 'asc' },
+          select: this.previewStudentSelect(),
+        });
+
+    const matches = students.map((row) => this.previewStudent(row));
+    if (matches.length !== 1) {
+      return { preview: true, matches, student: null, papers: [] };
+    }
+
+    const student = matches[0];
+    const marks = await (this.prisma as any).iaComponentMark.findMany({
+      where: {
+        tenantId: user.tid,
+        studentId: student.id,
+        deletedAt: null,
+        status: { in: ['DRAFT', 'LOCKED', 'PUBLISHED'] },
+        OR: [{ marks: { not: null } }, { isAbsent: true }],
+      },
+    });
+    const papers = await this.papersFromMarks(user.tid, marks);
+    return { preview: true, matches, student, papers };
+  }
+
+  private previewStudentSelect() {
+    return {
+      id: true,
+      rollNumber: true,
+      user: { select: { displayName: true } },
+      masterProfile: { select: { fullName: true } },
+    } as const;
+  }
+
+  private previewStudent(row: {
+    id: string;
+    rollNumber: string | null;
+    user?: { displayName?: string | null } | null;
+    masterProfile?: { fullName?: string | null } | null;
+  }) {
+    return {
+      id: row.id,
+      rollNumber: row.rollNumber,
+      fullName:
+        row.masterProfile?.fullName?.trim() ||
+        row.user?.displayName?.trim() ||
+        null,
+    };
+  }
+
+  private async papersFromMarks(
+    tenantId: string,
+    visible: Array<{
+      paperId?: string | null;
+      schemeId: string;
+      maxMarks?: unknown;
+      marks?: unknown;
+      isAbsent?: boolean;
+    }>,
+  ) {
+    const paperIds = [
+      ...new Set(
+        visible
+          .map((mark) => mark.paperId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const schemeIds = [
+      ...new Set(visible.map((mark) => mark.schemeId).filter(Boolean)),
+    ];
+    const [paperRows, schemeRows] = await Promise.all([
+      paperIds.length
+        ? (this.prisma as any).examPaperSchedule.findMany({
+            where: { tenantId, id: { in: paperIds }, deletedAt: null },
+            select: {
+              id: true,
+              paperCode: true,
+              paperName: true,
+              sessionId: true,
+              examDate: true,
+            },
+          })
+        : [],
+      schemeIds.length
+        ? (this.prisma as any).iaAssessmentScheme.findMany({
+            where: { tenantId, id: { in: schemeIds }, deletedAt: null },
+            select: { id: true, passMark: true, totalMaxMarks: true },
+          })
+        : [],
+    ]);
+    const sessionIds = [
+      ...new Set(
+        paperRows
+          .map((paper: { sessionId?: string | null }) => paper.sessionId)
+          .filter((id: string | null | undefined): id is string => Boolean(id)),
+      ),
+    ];
+    const sessionRows = sessionIds.length
+      ? await (this.prisma as any).examSession.findMany({
+          where: { tenantId, id: { in: sessionIds }, deletedAt: null },
+          select: { id: true, name: true },
+        })
+      : [];
+    const paperById = new Map(
+      paperRows.map((paper: { id: string }) => [paper.id, paper]),
+    );
+    const schemeById = new Map(
+      schemeRows.map((scheme: { id: string }) => [scheme.id, scheme]),
+    );
+    const sessionNameById = new Map(
+      sessionRows.map((session: { id: string; name?: string | null }) => [
+        session.id,
+        session.name?.trim() || null,
+      ]),
+    );
+    const grouped = new Map<string, typeof visible>();
+    for (const mark of visible) {
+      const key = mark.paperId || mark.schemeId;
+      const list = grouped.get(key) ?? [];
+      list.push(mark);
+      grouped.set(key, list);
+    }
+    return [...grouped.values()]
+      .map((group) => {
+        const first = group[0];
+        const paper = first.paperId
+          ? (paperById.get(first.paperId) as
+              | {
+                  paperCode?: string;
+                  paperName?: string;
+                  sessionId?: string | null;
+                  examDate?: Date | null;
+                }
+              | undefined)
+          : undefined;
+        const scheme = schemeById.get(first.schemeId) as
+          | { passMark?: unknown; totalMaxMarks?: unknown }
+          | undefined;
+        const componentMax = group.reduce(
+          (sum, mark) => sum + Number(mark.maxMarks ?? 0),
+          0,
+        );
+        const maxMarks = componentMax || Number(scheme?.totalMaxMarks ?? 0);
+        const secured = group.reduce(
+          (sum, mark) => sum + (mark.isAbsent ? 0 : Number(mark.marks ?? 0)),
+          0,
+        );
+        const absent = group.every((mark) => mark.isAbsent);
+        const passMark = Number(
+          scheme?.passMark ?? (maxMarks > 0 ? Math.ceil(maxMarks * 0.4) : 0),
+        );
+        const outcome = absent
+          ? 'ABSENT'
+          : secured >= passMark
+            ? 'PASS'
+            : 'FAIL';
+        return {
+          paperId: first.paperId ?? first.schemeId,
+          paperCode: paper?.paperCode ?? null,
+          paperName: paper?.paperName ?? null,
+          sessionName: paper?.sessionId
+            ? (sessionNameById.get(paper.sessionId) ?? null)
+            : null,
+          examDate: paper?.examDate ?? null,
+          marks: absent ? null : secured,
+          maxMarks,
+          passMark,
+          isAbsent: absent,
+          outcome,
+        };
+      })
+      .sort((a, b) => {
+        const aTime = a.examDate ? new Date(a.examDate).getTime() : 0;
+        const bTime = b.examDate ? new Date(b.examDate).getTime() : 0;
+        return aTime - bTime;
+      });
   }
 
   async studentPerformance(user: JwtUser) {

@@ -49,6 +49,7 @@ export type IaExamScheduleItem = {
   id: string;
   paperCode?: string;
   paperName?: string;
+  sessionName?: string | null;
   examDate?: string;
   startTime?: string;
   endTime?: string;
@@ -113,8 +114,21 @@ export type IaMarkSummary = {
   resultStatus?: string;
 };
 
+export type IaResultPaper = {
+  paperId?: string;
+  paperCode?: string | null;
+  paperName?: string | null;
+  sessionName?: string | null;
+  marks?: number | null;
+  maxMarks?: number;
+  passMark?: number;
+  isAbsent?: boolean;
+  outcome?: 'PASS' | 'FAIL' | 'ABSENT' | string;
+};
+
 export type StudentIaMarks = {
   studentId?: string;
+  papers?: IaResultPaper[];
   components?: IaMarkComponent[];
   summaries?: IaMarkSummary[];
 };

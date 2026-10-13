@@ -5,7 +5,12 @@ export type IaMarkImportStudent = {
   rollNumber?: string | null;
   fullName?: string | null;
   shiftName?: string | null;
-  marks: Array<{ code: string; marks: number | null; remarks?: string | null }>;
+  marks: Array<{
+    code: string;
+    marks: number | null;
+    isAbsent?: boolean;
+    remarks?: string | null;
+  }>;
 };
 
 export type IaMarkImportComponent = {
@@ -31,7 +36,8 @@ export type IaMarkImportWorkbookInput = {
 export type IaMarkImportParsedRow = {
   rollNumber: string;
   componentCode: string;
-  marks: number;
+  marks: number | null;
+  isAbsent?: boolean;
   remarks?: string;
 };
 
@@ -207,7 +213,7 @@ export async function buildIaMarkImportWorkbook(
       {
         text: [
           '1. Do not change the column headers.',
-          `2. Enter marks only in the marks column (numbers from 0 to ${maxLabel}).`,
+          `2. Enter marks from 0 to ${maxLabel}. Type capital A if the student was absent.`,
           '3. Keep Roll Number and Shift exactly as per student records.',
           '4. Student Name is filled from the college record.',
           '5. Remarks are optional.',
@@ -235,8 +241,8 @@ export async function buildIaMarkImportWorkbook(
       },
       {
         text: [
-          `• Marks must be numbers only (0 to ${maxLabel}).`,
-          '• Do not use text or special characters in the marks column.',
+          `• Marks are numbers from 0 to ${maxLabel}.`,
+          '• Type capital A for an absentee. A is the only letter allowed.',
           '• Do not leave extra spaces in Roll Number.',
           '• Keep the file in .xlsx format.',
           '• Do not change the header names.',
@@ -258,7 +264,7 @@ export async function buildIaMarkImportWorkbook(
     ...components.map((component) => marksHeader(input, component)),
     'Remarks',
   ];
-  sheet.getRow(headerRow).height = 36;
+  sheet.getRow(headerRow).height = 48;
   headers.forEach((header, index) => {
     const cell = sheet.getCell(headerRow, index + 1);
     cell.value = header;
@@ -301,7 +307,8 @@ export async function buildIaMarkImportWorkbook(
     ];
     components.forEach((component) => {
       const saved = student.marks.find((cell) => cell.code === component.code);
-      values.push(saved?.marks == null ? '' : saved.marks);
+      if (saved?.isAbsent) values.push('A');
+      else values.push(saved?.marks == null ? '' : saved.marks);
     });
     values.push(remarks);
     values.forEach((value, columnIndex) => {
@@ -319,7 +326,7 @@ export async function buildIaMarkImportWorkbook(
       const band = index % 2 === 0 ? IDENTITY : 'FFF8FBFE';
       cell.fill = solid(isMark ? 'FFFFF4D6' : isRemark ? WHITE : band);
       cell.border = thin(LINE);
-      if (isMark) cell.numFmt = '0.##';
+      if (isMark && typeof value === 'number') cell.numFmt = '0.##';
     });
   });
 
@@ -336,15 +343,22 @@ export async function buildIaMarkImportWorkbook(
   }
   components.forEach((component, index) => {
     const column = 5 + index;
+    const letter = columnLetter(column);
     for (let rowNumber = firstData; rowNumber <= extraUntil; rowNumber++) {
+      const address = `${letter}${rowNumber}`;
       sheet.getCell(rowNumber, column).dataValidation = {
-        type: 'decimal',
-        operator: 'between',
+        type: 'custom',
         allowBlank: true,
-        formulae: ['0', String(component.maxMarks)],
+        formulae: [
+          `OR(AND(ISNUMBER(${address}),${address}>=0,${address}<=${component.maxMarks}),EXACT(UPPER(TRIM(${address})),"A"))`,
+        ],
         showErrorMessage: true,
+        errorStyle: 'stop',
         errorTitle: 'Invalid marks',
-        error: `Enter a number from 0 to ${component.maxMarks}, or leave the cell blank.`,
+        error: `Enter a number from 0 to ${component.maxMarks}, or capital A if the student was absent.`,
+        showInputMessage: true,
+        promptTitle: 'Absentees',
+        prompt: 'Type capital A if the student was absent.',
       };
     }
   });
@@ -423,10 +437,16 @@ export async function parseIaMarkImportWorkbook(
     for (const column of markColumns) {
       const raw = cellText(row.getCell(column).value);
       if (!raw) continue;
-      const marks = Number(raw);
-      if (!Number.isFinite(marks)) {
+      const token = raw.trim().toUpperCase();
+      const absent =
+        token === 'A' ||
+        token === 'AB' ||
+        token === 'ABS' ||
+        token === 'ABSENT';
+      const marks = absent ? null : Number(raw);
+      if (!absent && !Number.isFinite(marks)) {
         throw new Error(
-          `Marks for ${rollNumber} must be a number. Found "${raw}".`,
+          `Marks for ${rollNumber} must be a number, or capital A if absent. Found "${raw}".`,
         );
       }
       const componentCode =
@@ -435,6 +455,7 @@ export async function parseIaMarkImportWorkbook(
         rollNumber,
         componentCode,
         marks,
+        isAbsent: absent,
         remarks: remarks || undefined,
       });
     }
@@ -442,12 +463,23 @@ export async function parseIaMarkImportWorkbook(
   return parsed;
 }
 
+function columnLetter(column: number) {
+  let n = column;
+  let letters = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    letters = String.fromCharCode(65 + rem) + letters;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letters;
+}
+
 function marksHeader(
   input: IaMarkImportWorkbookInput,
   component: IaMarkImportComponent,
 ) {
   const title = input.components.length === 1 ? 'Marks' : component.label;
-  return `${title}\n(out of ${component.maxMarks})`;
+  return `${title}\n(out of ${component.maxMarks}, or capital A)`;
 }
 
 function workbookSheetName(paperCode?: string | null) {

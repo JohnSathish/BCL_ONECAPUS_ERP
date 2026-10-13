@@ -373,6 +373,24 @@ export class IaController {
     return this.workflow.submitSheet(user, id);
   }
 
+  @Post('sheets/:id/withdraw')
+  @RequireAnyPermission('ia:manage', 'exam:admin')
+  withdrawSheet(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.workflow.withdrawSheet(user, id);
+  }
+
+  @Post('sheets/:id/remove')
+  @RequireAnyPermission('ia:manage', 'exam:admin')
+  removeSheet(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.workflow.removeSheet(user, id);
+  }
+
+  @Post('sheets/:id/revoke')
+  @RequireAnyPermission('ia:manage', 'exam:admin')
+  revokeSheet(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.workflow.revokeSheet(user, id);
+  }
+
   @Post('approvals/:id/action')
   @RequireAnyPermission(
     'ia:marks:approve:hod',
@@ -641,6 +659,16 @@ export class IaController {
   @RequireAnyPermission('student:portal:self', 'ia:view')
   studentSchedule(@CurrentUser() user: JwtUser) {
     return this.portal.studentSchedule(user);
+  }
+
+  @Get('marks/preview')
+  @RequireAnyPermission('ia:marks:enter', 'exam:marks', 'exam:admin', 'ia:view')
+  previewSavedMarks(
+    @CurrentUser() user: JwtUser,
+    @Query('q') q?: string,
+    @Query('studentId') studentId?: string,
+  ) {
+    return this.portal.previewSavedMarks(user, q, studentId);
   }
 
   @Get('portal/marks')

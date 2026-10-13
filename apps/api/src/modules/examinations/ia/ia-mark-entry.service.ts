@@ -996,7 +996,8 @@ export class IaMarkEntryService {
     rows: Array<{
       rollNumber: string;
       componentCode: string;
-      marks: number;
+      marks: number | null;
+      isAbsent?: boolean;
       remarks?: string;
     }>,
   ) {
@@ -1039,7 +1040,8 @@ export class IaMarkEntryService {
         studentId: String(student.id),
         componentId: String(componentId),
         paperId: student.paperId,
-        marks: row.marks,
+        marks: row.isAbsent ? null : row.marks,
+        isAbsent: Boolean(row.isAbsent),
         remarks: row.remarks,
       });
     }
@@ -1110,6 +1112,7 @@ export class IaMarkEntryService {
           marks: Array<{
             code: string;
             marks: number | null;
+            isAbsent?: boolean;
             remarks?: string | null;
           }>;
         }) => ({

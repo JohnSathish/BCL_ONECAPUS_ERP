@@ -16,18 +16,36 @@ export class IaConsolidationService {
   list(tenantId: string) {
     return (this.prisma as any).iaConsolidationSheet.findMany({
       where: { tenantId, deletedAt: null },
-      include: { approvals: { orderBy: { sequence: 'asc' } } },
+      include: {
+        approvals: { orderBy: { sequence: 'asc' } },
+        _count: { select: { rows: true } },
+      },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
   }
 
   async generate(user: JwtUser, dto: IaConsolidationGenerateDto) {
+    const semesterPapers =
+      dto.semesterNo != null
+        ? await (this.prisma as any).examPaperSchedule.findMany({
+            where: {
+              tenantId: user.tid,
+              semesterNo: dto.semesterNo,
+              deletedAt: null,
+            },
+            select: { id: true },
+          })
+        : null;
+    const semesterPaperIds =
+      semesterPapers?.map((paper: { id: string }) => paper.id) ?? null;
     const marks = await (this.prisma as any).iaComponentMark.findMany({
       where: {
         tenantId: user.tid,
         deletedAt: null,
+        OR: [{ marks: { not: null } }, { isAbsent: true }],
         ...(dto.sessionId ? { sessionId: dto.sessionId } : {}),
+        ...(semesterPaperIds ? { paperId: { in: semesterPaperIds } } : {}),
       },
       include: { component: true },
     });
@@ -71,18 +89,34 @@ export class IaConsolidationService {
         ]),
       );
 
+      const paperIds = [
+        ...new Set(
+          group
+            .map((mark: { paperId?: string | null }) => mark.paperId)
+            .filter((id: string | null | undefined): id is string =>
+              Boolean(id),
+            ),
+        ),
+      ];
       const row = await (this.prisma as any).iaConsolidationRow.create({
         data: {
           tenantId: user.tid,
           sheetId: sheet.id,
           studentId: first.studentId,
           schemeId: first.schemeId,
-          offeringId: first.paperId ? undefined : scheme.offeringId,
+          offeringId: scheme.offeringId ?? undefined,
           totalMarks,
           maxMarks,
           percentage,
-          resultStatus: totalMarks >= passMark ? 'PASS' : 'FAIL',
+          resultStatus: group.every(
+            (mark: { isAbsent?: boolean }) => mark.isAbsent,
+          )
+            ? 'ABSENT'
+            : totalMarks >= passMark
+              ? 'PASS'
+              : 'FAIL',
           componentJson,
+          metadata: { paperIds },
         },
       });
       rows.push(row);

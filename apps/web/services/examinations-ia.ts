@@ -379,6 +379,38 @@ export async function fetchIaNoticeboardRoutineHtml(
   return data;
 }
 
+export type IaResultPreviewPaper = {
+  paperId: string;
+  paperCode?: string | null;
+  paperName?: string | null;
+  sessionName?: string | null;
+  marks: number | null;
+  maxMarks: number;
+  passMark: number;
+  isAbsent: boolean;
+  outcome: 'PASS' | 'FAIL' | 'ABSENT' | string;
+};
+
+export type IaResultPreviewMatch = {
+  id: string;
+  rollNumber?: string | null;
+  fullName?: string | null;
+};
+
+export type IaResultPreview = {
+  preview: boolean;
+  matches: IaResultPreviewMatch[];
+  student: IaResultPreviewMatch | null;
+  papers: IaResultPreviewPaper[];
+};
+
+export async function fetchIaResultPreview(params: { q?: string; studentId?: string }) {
+  const { data } = await api.get<IaResultPreview>('/v1/examinations/ia/marks/preview', {
+    params,
+  });
+  return data;
+}
+
 export async function fetchIaRoster(paperId: string, schemeId?: string) {
   const { data } = await api.get(`/v1/examinations/ia/papers/${paperId}/roster`, {
     params: schemeId ? { schemeId } : undefined,
@@ -446,6 +478,21 @@ export async function fetchIaConsolidationSheet(id: string) {
 
 export async function submitIaSheet(id: string) {
   const { data } = await api.post(`/v1/examinations/ia/sheets/${id}/submit`);
+  return data;
+}
+
+export async function withdrawIaSheet(id: string) {
+  const { data } = await api.post(`/v1/examinations/ia/sheets/${id}/withdraw`);
+  return data;
+}
+
+export async function removeIaSheet(id: string) {
+  const { data } = await api.post(`/v1/examinations/ia/sheets/${id}/remove`);
+  return data;
+}
+
+export async function revokeIaSheet(id: string) {
+  const { data } = await api.post(`/v1/examinations/ia/sheets/${id}/revoke`);
   return data;
 }
 

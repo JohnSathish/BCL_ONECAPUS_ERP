@@ -74,6 +74,112 @@ export class IaWorkflowService {
     return updated;
   }
 
+  /** Hide a test sheet. Published marks on that sheet leave the student app. */
+  async removeSheet(user: JwtUser, sheetId: string) {
+    const sheet = await this.getSheet(user.tid, sheetId);
+    await this.releaseLockedMarks(user.tid, sheetId);
+    await (this.prisma as any).iaApprovalStep.deleteMany({
+      where: { sheetId, tenantId: user.tid },
+    });
+    const updated = await (this.prisma as any).iaConsolidationSheet.update({
+      where: { id: sheetId },
+      data: { deletedAt: new Date(), lockedAt: null },
+    });
+    await this.audit.log(user, 'IA_SHEET', sheetId, 'REMOVE', sheet, updated);
+    return { id: sheetId, removed: true };
+  }
+
+  /**
+   * Take a published sheet off the student app. Correct the marks, generate a
+   * new sheet, and approve it through the Principal to publish again.
+   */
+  async revokeSheet(user: JwtUser, sheetId: string) {
+    const sheet = await this.getSheet(user.tid, sheetId);
+    const revocable = [
+      SHEET_STATUSES.HOD_APPROVED,
+      SHEET_STATUSES.CONTROLLER_VERIFIED,
+      SHEET_STATUSES.PRINCIPAL_APPROVED,
+      SHEET_STATUSES.LOCKED,
+    ];
+    if (!revocable.includes(sheet.status)) {
+      throw new BadRequestException(
+        'Only a published sheet can be revoked. Remove a test sheet instead.',
+      );
+    }
+    await this.releaseLockedMarks(user.tid, sheetId);
+    await (this.prisma as any).iaApprovalStep.deleteMany({
+      where: { sheetId, tenantId: user.tid },
+    });
+    const updated = await (this.prisma as any).iaConsolidationSheet.update({
+      where: { id: sheetId },
+      data: {
+        status: SHEET_STATUSES.REVOKED,
+        lockedAt: null,
+      },
+      include: { approvals: { orderBy: { sequence: 'asc' } } },
+    });
+    await this.audit.log(user, 'IA_SHEET', sheetId, 'REVOKE', sheet, updated);
+    return updated;
+  }
+
+  /** Return a test or submitted sheet to draft and take locked marks off the student app. */
+  async withdrawSheet(user: JwtUser, sheetId: string) {
+    const sheet = await this.getSheet(user.tid, sheetId);
+    if (sheet.status === SHEET_STATUSES.DRAFT) {
+      throw new BadRequestException('This sheet is already a draft.');
+    }
+    await this.releaseLockedMarks(user.tid, sheetId);
+    await (this.prisma as any).iaApprovalStep.deleteMany({
+      where: { sheetId, tenantId: user.tid },
+    });
+    const updated = await (this.prisma as any).iaConsolidationSheet.update({
+      where: { id: sheetId },
+      data: {
+        status: SHEET_STATUSES.DRAFT,
+        submittedAt: null,
+        lockedAt: null,
+      },
+      include: { approvals: { orderBy: { sequence: 'asc' } } },
+    });
+    await this.audit.log(user, 'IA_SHEET', sheetId, 'WITHDRAW', sheet, updated);
+    return updated;
+  }
+
+  private async releaseLockedMarks(tenantId: string, sheetId: string) {
+    const paperIds = await this.paperIdsForSheet(tenantId, sheetId);
+    if (!paperIds.length) return;
+    await (this.prisma as any).iaComponentMark.updateMany({
+      where: {
+        tenantId,
+        paperId: { in: paperIds },
+        status: 'LOCKED',
+        deletedAt: null,
+      },
+      data: { status: 'DRAFT', lockedAt: null },
+    });
+    const stillLocked = await (
+      this.prisma as any
+    ).iaConsolidationSheet.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        id: { not: sheetId },
+        status: {
+          in: [
+            SHEET_STATUSES.HOD_APPROVED,
+            SHEET_STATUSES.CONTROLLER_VERIFIED,
+            SHEET_STATUSES.PRINCIPAL_APPROVED,
+            SHEET_STATUSES.LOCKED,
+          ],
+        },
+      },
+      select: { id: true },
+    });
+    for (const other of stillLocked) {
+      await this.lockMarksForSheet(tenantId, other.id);
+    }
+  }
+
   async actOnApproval(
     user: JwtUser,
     approvalId: string,
@@ -87,6 +193,17 @@ export class IaWorkflowService {
     if (!approval) throw new NotFoundException('Approval step not found');
     if (approval.status !== 'PENDING') {
       throw new BadRequestException('Approval step already actioned');
+    }
+    const openForApproval = [
+      SHEET_STATUSES.SUBMITTED,
+      SHEET_STATUSES.HOD_APPROVED,
+      SHEET_STATUSES.CONTROLLER_VERIFIED,
+    ];
+    if (
+      approval.sheet.deletedAt ||
+      !openForApproval.includes(approval.sheet.status)
+    ) {
+      throw new BadRequestException('This sheet is not waiting for approval.');
     }
 
     const permMap: Record<string, string> = {
@@ -130,6 +247,14 @@ export class IaWorkflowService {
     let sheetStatus = approval.sheet.status;
     if (action === 'REJECT') {
       sheetStatus = SHEET_STATUSES.REJECTED;
+      await (this.prisma as any).iaApprovalStep.updateMany({
+        where: {
+          sheetId: approval.sheetId,
+          tenantId: user.tid,
+          status: 'PENDING',
+        },
+        data: { status: 'CANCELLED' },
+      });
     } else if (approval.stepCode === 'HOD_REVIEW') {
       sheetStatus = SHEET_STATUSES.HOD_APPROVED;
     } else if (approval.stepCode === 'CONTROLLER_VERIFY') {
@@ -162,21 +287,58 @@ export class IaWorkflowService {
     return this.getSheet(user.tid, approval.sheetId);
   }
 
-  private async lockMarksForSheet(tenantId: string, sheetId: string) {
+  private async paperIdsForSheet(tenantId: string, sheetId: string) {
     const rows = await (this.prisma as any).iaConsolidationRow.findMany({
       where: { sheetId, tenantId },
     });
+    const paperIds = new Set<string>();
+    for (const row of rows) {
+      const stored = row.metadata?.paperIds;
+      if (Array.isArray(stored)) {
+        for (const id of stored) {
+          if (typeof id === 'string' && id) paperIds.add(id);
+        }
+      }
+    }
     const offeringIds = [
       ...new Set(
-        rows.map((r: { offeringId?: string }) => r.offeringId).filter(Boolean),
+        rows
+          .map((row: { offeringId?: string | null }) => row.offeringId)
+          .filter((id: string | null | undefined): id is string => Boolean(id)),
       ),
     ];
-    if (!offeringIds.length) return;
+    if (offeringIds.length) {
+      const papers = await (this.prisma as any).examPaperSchedule.findMany({
+        where: { tenantId, offeringId: { in: offeringIds }, deletedAt: null },
+        select: { id: true },
+      });
+      for (const paper of papers) paperIds.add(paper.id);
+    }
+    if (!paperIds.size && rows.length) {
+      const marks = await (this.prisma as any).iaComponentMark.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          paperId: { not: null },
+          OR: rows.map(
+            (row: { studentId: string; schemeId?: string | null }) => ({
+              studentId: row.studentId,
+              ...(row.schemeId ? { schemeId: row.schemeId } : {}),
+            }),
+          ),
+        },
+        select: { paperId: true },
+      });
+      for (const mark of marks) {
+        if (mark.paperId) paperIds.add(mark.paperId);
+      }
+    }
+    return [...paperIds];
+  }
 
-    const papers = await (this.prisma as any).examPaperSchedule.findMany({
-      where: { tenantId, offeringId: { in: offeringIds }, deletedAt: null },
-    });
-    const paperIds = papers.map((p: { id: string }) => p.id);
+  private async lockMarksForSheet(tenantId: string, sheetId: string) {
+    const paperIds = await this.paperIdsForSheet(tenantId, sheetId);
+    if (!paperIds.length) return;
     await (this.prisma as any).iaComponentMark.updateMany({
       where: { tenantId, paperId: { in: paperIds }, deletedAt: null },
       data: { status: 'LOCKED', lockedAt: new Date() },
@@ -220,22 +382,53 @@ export class IaWorkflowService {
       where: {
         tenantId: user.tid,
         status: 'PENDING',
+        sheet: {
+          deletedAt: null,
+          status: {
+            in: [
+              SHEET_STATUSES.SUBMITTED,
+              SHEET_STATUSES.HOD_APPROVED,
+              SHEET_STATUSES.CONTROLLER_VERIFIED,
+            ],
+          },
+        },
       },
       include: { sheet: true },
-      orderBy: [{ createdAt: 'asc' }],
-      take: 50,
+      orderBy: [{ sequence: 'asc' }],
+      take: 200,
     });
-    return steps.filter((s: { roleSlug: string; stepCode: string }) => {
-      const permMap: Record<string, string> = {
-        HOD_REVIEW: 'ia:marks:approve:hod',
-        CONTROLLER_VERIFY: 'ia:marks:approve:controller',
-        PRINCIPAL_APPROVE: 'ia:marks:approve:principal',
-      };
-      return (
-        this.hasRole(user, s.roleSlug) ||
-        this.hasPermission(user, permMap[s.stepCode] ?? '') ||
-        this.hasPermission(user, 'ia:manage')
-      );
-    });
+    const nextBySheet = new Map<string, (typeof steps)[number]>();
+    for (const step of steps) {
+      const current = nextBySheet.get(step.sheetId);
+      if (!current || step.sequence < current.sequence) {
+        nextBySheet.set(step.sheetId, step);
+      }
+    }
+    return [...nextBySheet.values()]
+      .filter((step) => this.canActOnStep(user, step))
+      .map((step) => ({
+        ...step,
+        step: step.stepName,
+        stepHint:
+          step.sequence >= APPROVAL_STEPS.length
+            ? 'This approval publishes the marks to the student app.'
+            : `Step ${step.sequence} of ${APPROVAL_STEPS.length}. Later steps stay hidden until this one is approved.`,
+      }));
+  }
+
+  private canActOnStep(
+    user: JwtUser,
+    step: { roleSlug: string; stepCode: string },
+  ) {
+    const permMap: Record<string, string> = {
+      HOD_REVIEW: 'ia:marks:approve:hod',
+      CONTROLLER_VERIFY: 'ia:marks:approve:controller',
+      PRINCIPAL_APPROVE: 'ia:marks:approve:principal',
+    };
+    return (
+      this.hasRole(user, step.roleSlug) ||
+      this.hasPermission(user, permMap[step.stepCode] ?? '') ||
+      this.hasPermission(user, 'ia:manage')
+    );
   }
 }
