@@ -27,6 +27,15 @@ function analyticsSubjectKey(
   const category = normalizeIaSubjectCategory(meta.category);
   if (!category) return paper.id;
   const code = (paper.paperCode ?? '').trim().toUpperCase();
+  const shared =
+    category === 'MINOR' ||
+    category === 'MDC' ||
+    category === 'AEC' ||
+    category === 'SEC' ||
+    category === 'VAC';
+  if (shared) {
+    return `${category}:${paper.sessionId ?? ''}:${paper.semesterNo ?? ''}:${code}`;
+  }
   return `${category}:${paper.sessionId ?? ''}:${paper.semesterNo ?? ''}:${paper.courseId}:${code}`;
 }
 
@@ -86,8 +95,14 @@ export class IaAnalyticsService {
           },
         })
       : [];
+    const assessedPapers = papers.filter(
+      (paper) =>
+        normalizeIaSubjectCategory(
+          (paper.metadata as { category?: string } | null)?.category,
+        ) !== 'INTERNSHIP',
+    );
 
-    const roster = await this.rosterForPapers(tenantId, papers);
+    const roster = await this.rosterForPapers(tenantId, assessedPapers);
     const programmes = uniquePairs(
       roster.map(
         (student) => [student.programmeCode, student.programme] as const,
@@ -100,7 +115,7 @@ export class IaAnalyticsService {
     );
     const semesters = [
       ...new Set(
-        papers
+        assessedPapers
           .map((paper) => paper.semesterNo)
           .filter((semester): semester is number => semester != null),
       ),
@@ -132,7 +147,7 @@ export class IaAnalyticsService {
       return true;
     });
 
-    const paperIds = papers.map((paper) => paper.id);
+    const paperIds = assessedPapers.map((paper) => paper.id);
     const studentIds = cohort.map((student) => student.id);
     const marks =
       paperIds.length && studentIds.length
@@ -153,7 +168,7 @@ export class IaAnalyticsService {
           })
         : [];
 
-    const paperById = new Map(papers.map((paper) => [paper.id, paper]));
+    const paperById = new Map(assessedPapers.map((paper) => [paper.id, paper]));
     const byStudentPaper = new Map<
       string,
       {
@@ -334,7 +349,7 @@ export class IaAnalyticsService {
       appeared,
       absent,
       notEntered: Math.max(cohort.length - appeared - absent, 0),
-      subjects: papers.length,
+      subjects: assessedPapers.length,
       averageScore,
       passPercent,
       passed,

@@ -50,8 +50,10 @@ describe('filterOfferingsByCategoryPolicy', () => {
     { id: '4', semesterSequence: 5, category: 'MAJOR' },
   ];
 
-  it('keeps all offerings when policy is null', () => {
-    expect(filterOfferingsByCategoryPolicy(offerings, null)).toHaveLength(4);
+  it('keeps non-internship offerings when policy is null', () => {
+    expect(
+      filterOfferingsByCategoryPolicy(offerings, null).map((o) => o.id),
+    ).toEqual(['1', '2', '4']);
   });
 
   it('excludes VTC and INTERNSHIP when disabled', () => {
@@ -68,5 +70,9 @@ describe('filterOfferingsByCategoryPolicy', () => {
     expect(isCategoryEnabledForSemester('MAJOR', 3, policy)).toBe(true);
     expect(isCategoryEnabledForSemester('VTC', 3, policy)).toBe(false);
     expect(isCategoryEnabledForSemester('MAJOR', 3, null)).toBe(true);
+    expect(isCategoryEnabledForSemester('INTERNSHIP', 5, null)).toBe(false);
+    expect(
+      isCategoryEnabledForSemester('INTERNSHIP', 5, { 5: ['INTERNSHIP'] }),
+    ).toBe(false);
   });
 });

@@ -100,10 +100,12 @@ export function isCategoryEnabledForSemester(
   semesterNo: number,
   policy: SemesterCategoryMap | null,
 ): boolean {
+  const normalized = normalizeIaSubjectCategory(category);
+  // Internship has no internal assessment, in every semester and department.
+  if (normalized === 'INTERNSHIP') return false;
   if (!policy) return true;
   const enabled = policy[semesterNo];
   if (!enabled?.length) return false;
-  const normalized = normalizeIaSubjectCategory(category);
   if (!normalized) return false;
   return enabled.includes(normalized);
 }
@@ -111,7 +113,6 @@ export function isCategoryEnabledForSemester(
 export function filterOfferingsByCategoryPolicy<
   T extends { semesterSequence?: number | null; category?: string | null },
 >(offerings: T[], policy: SemesterCategoryMap | null): T[] {
-  if (!policy) return offerings;
   return offerings.filter((o) =>
     isCategoryEnabledForSemester(o.category, o.semesterSequence ?? 0, policy),
   );
@@ -174,12 +175,16 @@ export function pickIaPaperForRegistration<
   },
 ): T | undefined {
   const lineCat = normalizeIaSubjectCategory(line.category) ?? '';
-  const forOffering = papers.filter(
+  if (lineCat === 'INTERNSHIP') return undefined;
+  const sittings = papers.filter(
+    (paper) => iaPaperCategory(paper.metadata) !== 'INTERNSHIP',
+  );
+  const forOffering = sittings.filter(
     (paper) => paper.offeringId && paper.offeringId === line.offeringId,
   );
   const pool = forOffering.length
     ? forOffering
-    : papers.filter(
+    : sittings.filter(
         (paper) => paper.courseId && paper.courseId === line.courseId,
       );
   if (!pool.length) return undefined;

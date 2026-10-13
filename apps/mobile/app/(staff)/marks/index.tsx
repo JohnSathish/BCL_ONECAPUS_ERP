@@ -15,16 +15,21 @@ import { fetchFacultyIaSubjects, type FacultyIaSubject } from '@/services/facult
 
 function paperKey(subject: FacultyIaSubject, paper: FacultyIaSubject['papers'][number]) {
   const category = (paper.category || '').trim().toUpperCase();
+  const code = (paper.paperCode || '').trim().toUpperCase();
+  if (!category || !code || category === 'INTERNSHIP') return paper.id;
+  const semester = paper.semesterNo ?? subject.semesterNo ?? '';
+  if (
+    category === 'MINOR' ||
+    category === 'MDC' ||
+    category === 'AEC' ||
+    category === 'SEC' ||
+    category === 'VAC'
+  ) {
+    return [paper.sessionId, semester, category, code].join('|');
+  }
   const courseId = paper.courseId || subject.courseId;
-  if (!category || !courseId) return paper.id;
-  return [
-    paper.sessionId,
-    paper.semesterNo ?? subject.semesterNo ?? '',
-    courseId,
-    category,
-    (paper.paperCode || '').trim().toUpperCase(),
-    paper.assessmentKey || '',
-  ].join('|');
+  if (!courseId) return paper.id;
+  return [paper.sessionId, semester, courseId, category, code, paper.assessmentKey || ''].join('|');
 }
 
 function collapsePapers(subject: FacultyIaSubject, papers: FacultyIaSubject['papers']) {

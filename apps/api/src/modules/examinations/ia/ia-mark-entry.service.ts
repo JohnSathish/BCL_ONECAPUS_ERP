@@ -192,6 +192,10 @@ export class IaMarkEntryService {
               shiftName: session?.metadata?.shiftName ?? null,
             };
           },
+        )
+        .filter(
+          (paper: { category?: string | null }) =>
+            normalizeIaSubjectCategory(paper.category) !== 'INTERNSHIP',
         ),
     }));
   }
@@ -242,6 +246,34 @@ export class IaMarkEntryService {
     return normalizeIaSubjectCategory(paper.category ?? meta.category);
   }
 
+  /** Minor and basket papers are one subject, even when each programme has its own offering. */
+  private isSharedMarkCategory(category: string | null) {
+    return (
+      category === 'MINOR' ||
+      category === 'MDC' ||
+      category === 'AEC' ||
+      category === 'SEC' ||
+      category === 'VAC'
+    );
+  }
+
+  private async resolvePaperCategory(
+    tenantId: string,
+    paper: {
+      offeringId?: string | null;
+      metadata?: unknown;
+      category?: string | null;
+    },
+  ) {
+    const direct = this.paperCategory(paper);
+    if (direct || !paper.offeringId) return direct;
+    const offering = await this.prisma.courseOffering.findFirst({
+      where: { id: paper.offeringId, tenantId },
+      select: { category: true },
+    });
+    return normalizeIaSubjectCategory(offering?.category);
+  }
+
   /**
    * Papers that are the same subject, course type, and assessment.
    * A shared code is not enough: a different subject record, category, or
@@ -262,37 +294,81 @@ export class IaMarkEntryService {
       category?: string | null;
     },
   ) {
-    const category = this.paperCategory(paper);
-    if (!category || !paper.sessionId || !paper.courseId) return [paper];
+    const category = await this.resolvePaperCategory(tenantId, paper);
+    if (!category || !paper.sessionId) return [paper];
     const code = (paper.paperCode ?? '').trim().toUpperCase();
+    const shared = this.isSharedMarkCategory(category);
+    if (!shared && !paper.courseId) return [paper];
     const rows = await (this.prisma as any).examPaperSchedule.findMany({
       where: {
         tenantId,
         sessionId: paper.sessionId,
-        courseId: paper.courseId,
         deletedAt: null,
         ...(paper.semesterNo != null ? { semesterNo: paper.semesterNo } : {}),
+        ...(shared
+          ? {
+              OR: [
+                ...(code
+                  ? [{ paperCode: { equals: code, mode: 'insensitive' } }]
+                  : []),
+                ...(paper.courseId ? [{ courseId: paper.courseId }] : []),
+              ],
+            }
+          : { courseId: paper.courseId }),
       },
     });
+    const offeringIds = [
+      ...new Set(
+        rows
+          .map((row: { offeringId?: string | null }) => row.offeringId)
+          .filter((id: string | null | undefined): id is string => Boolean(id)),
+      ),
+    ] as string[];
+    const offerings = offeringIds.length
+      ? await this.prisma.courseOffering.findMany({
+          where: { tenantId, id: { in: offeringIds } },
+          select: { id: true, category: true },
+        })
+      : [];
+    const categoryByOffering = new Map(
+      offerings.map((row) => [
+        row.id,
+        normalizeIaSubjectCategory(row.category),
+      ]),
+    );
     let same = rows.filter(
       (row: {
+        id: string;
+        offeringId?: string | null;
         paperCode?: string | null;
+        courseId?: string | null;
         metadata?: unknown;
         category?: string | null;
-      }) =>
-        this.paperCategory(row) === category &&
-        (row.paperCode ?? '').trim().toUpperCase() === code,
+      }) => {
+        const rowCategory =
+          this.paperCategory(row) ??
+          (row.offeringId ? categoryByOffering.get(row.offeringId) : null);
+        if (rowCategory !== category) return false;
+        const rowCode = (row.paperCode ?? '').trim().toUpperCase();
+        if (shared) return !code || rowCode === code;
+        return row.courseId === paper.courseId && rowCode === code;
+      },
     );
     if (!same.some((row: { id: string }) => row.id === paper.id)) {
       same = [paper, ...same];
     }
-    const signatures = await this.sessions.assessmentSignatures(tenantId, same);
-    const selectedKey = signatures.get(paper.id) ?? '';
-    same = same.filter(
-      (row: { id: string }) => (signatures.get(row.id) ?? '') === selectedKey,
-    );
-    if (!same.some((row: { id: string }) => row.id === paper.id)) {
-      same = [paper, ...same];
+    if (!shared) {
+      const signatures = await this.sessions.assessmentSignatures(
+        tenantId,
+        same,
+      );
+      const selectedKey = signatures.get(paper.id) ?? '';
+      same = same.filter(
+        (row: { id: string }) => (signatures.get(row.id) ?? '') === selectedKey,
+      );
+      if (!same.some((row: { id: string }) => row.id === paper.id)) {
+        same = [paper, ...same];
+      }
     }
     if (category !== 'MAJOR') return same;
     return this.majorProgrammePapers(tenantId, paper, same);
@@ -350,6 +426,52 @@ export class IaMarkEntryService {
     return kept.length ? kept : [paper];
   }
 
+  /**
+   * Offerings that actually carry this subject for the semester.
+   * Shared papers are matched by subject code and category, so a Geography
+   * student registered for Economics minor is included with the Economics list.
+   */
+  private async rosterOfferingIds(
+    tenantId: string,
+    paper: {
+      semesterNo?: number | null;
+      courseId?: string | null;
+      paperCode?: string | null;
+    },
+    category: string | null,
+    paperOfferingIds: string[],
+  ) {
+    if (!this.isSharedMarkCategory(category)) return paperOfferingIds;
+    const code = (paper.paperCode ?? '').trim();
+    if (!paper.courseId && !code) return paperOfferingIds;
+    const offerings = await this.prisma.courseOffering.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        ...(paper.semesterNo != null
+          ? { semesterSequence: paper.semesterNo }
+          : {}),
+        OR: [
+          ...(paper.courseId ? [{ courseId: paper.courseId }] : []),
+          ...(code
+            ? [
+                {
+                  course: {
+                    code: { equals: code, mode: 'insensitive' as const },
+                  },
+                },
+              ]
+            : []),
+        ],
+      },
+      select: { id: true, category: true },
+    });
+    const matched = offerings
+      .filter((row) => normalizeIaSubjectCategory(row.category) === category)
+      .map((row) => row.id);
+    return [...new Set([...paperOfferingIds, ...matched])];
+  }
+
   private async schemeForPaper(
     tenantId: string,
     paper: {
@@ -395,7 +517,13 @@ export class IaMarkEntryService {
         .filter((row: { offeringId?: string | null }) => row.offeringId)
         .map((row: { offeringId: string }) => [row.offeringId, row]),
     );
-    const offeringIds = [...paperByOffering.keys()] as string[];
+    const wantedCategory = await this.resolvePaperCategory(user.tid, paper);
+    const offeringIds = await this.rosterOfferingIds(
+      user.tid,
+      paper,
+      wantedCategory,
+      [...paperByOffering.keys()] as string[],
+    );
 
     const lines = offeringIds.length
       ? await this.prisma.semesterRegistrationLine.findMany({
@@ -403,8 +531,12 @@ export class IaMarkEntryService {
             tenantId: user.tid,
             offeringId: { in: offeringIds },
             status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
+            ...(paper.semesterNo != null
+              ? { registration: { semesterSequence: paper.semesterNo } }
+              : {}),
           },
           include: {
+            offering: { select: { category: true, courseId: true } },
             registration: {
               include: {
                 shift: { select: { id: true, name: true } },
@@ -431,13 +563,20 @@ export class IaMarkEntryService {
         rank: number;
       }
     >();
-    const wantedCategory = this.paperCategory(paper);
     for (const line of lines) {
-      const lineCategory = normalizeIaSubjectCategory(line.category);
+      const lineCategory =
+        normalizeIaSubjectCategory(line.category) ??
+        normalizeIaSubjectCategory(line.offering?.category);
       if (wantedCategory && lineCategory && lineCategory !== wantedCategory) {
         continue;
       }
-      const owner = paperByOffering.get(line.offeringId) ?? paper;
+      const owner =
+        paperByOffering.get(line.offeringId) ??
+        cohort.find(
+          (row: { courseId?: string | null }) =>
+            line.offering?.courseId && row.courseId === line.offering.courseId,
+        ) ??
+        paper;
       const nextRank = statusRank[line.status] ?? 9;
       const existing = students.get(line.registration.student.id);
       if (existing && existing.rank <= nextRank) continue;

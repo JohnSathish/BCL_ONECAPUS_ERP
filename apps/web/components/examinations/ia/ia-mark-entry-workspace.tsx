@@ -229,21 +229,28 @@ function normalizedCategory(value?: string | null) {
   return '';
 }
 
+const SHARED_MARK_CATEGORIES = new Set(['MINOR', 'MDC', 'AEC', 'SEC', 'VAC']);
+
 /**
- * One option per subject, course type, and assessment.
- * Papers split only by programme stay together. A different subject record,
- * course type, or assessment stays as its own option.
+ * One option per subject and course type.
+ * Minor and basket papers stay together across programmes. Major papers stay
+ * with their own subject record. A different course type stays separate.
  */
 function paperIdentity(paper: PaperChoice) {
   const category = normalizedCategory(paper.courseType);
+  const code = paper.paperCode.trim().toUpperCase();
+  if (!category || !code || category === 'INTERNSHIP') return null;
+  if (SHARED_MARK_CATEGORIES.has(category)) {
+    return [paper.sessionId, paper.semesterNo ?? '', category, code].join('|');
+  }
   const courseId = paper.courseId?.trim() || '';
-  if (!category || !courseId) return null;
+  if (!courseId) return null;
   return [
     paper.sessionId,
     paper.semesterNo ?? '',
     courseId,
     category,
-    paper.paperCode.trim().toUpperCase(),
+    code,
     paper.assessmentKey ?? '',
   ].join('|');
 }
@@ -450,10 +457,14 @@ export function IaMarkEntryWorkspace({
   });
 
   const paperChoices = useMemo((): PaperChoice[] => {
-    if (staffMode) return staffPapers.filter((paper) => paper.sessionId === examId);
+    const withoutInternship = (rows: PaperChoice[]) =>
+      rows.filter((paper) => normalizedCategory(paper.courseType) !== 'INTERNSHIP');
+    if (staffMode) {
+      return withoutInternship(staffPapers.filter((paper) => paper.sessionId === examId));
+    }
     const exam = (exams.data ?? []).find((row) => row.id === examId);
     if (!exam) return [];
-    return (papers.data ?? []).map((paper) => paperChoiceFromExam(exam, paper));
+    return withoutInternship((papers.data ?? []).map((paper) => paperChoiceFromExam(exam, paper)));
   }, [staffMode, staffPapers, examId, exams.data, papers.data]);
 
   const semesters = useMemo(

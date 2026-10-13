@@ -7,6 +7,7 @@ import type { JwtUser } from '../../../common/decorators/current-user.decorator'
 import { PrismaService } from '../../../database/prisma.service';
 import { LicenseEnforcementService } from '../../licensing/services/license-enforcement.service';
 import { ExamCalendarSyncService } from '../exam-calendar-sync.service';
+import { normalizeIaSubjectCategory } from './ia-category-policy';
 import { IA_EXAM_TYPES, isIaExamType } from './ia.constants';
 import { IaAuditService } from './ia-audit.service';
 import type {
@@ -206,38 +207,45 @@ export class IaSessionService {
       : [];
     const courseById = new Map(courses.map((course) => [course.id, course]));
     const assessmentKeys = await this.assessmentSignatures(tenantId, papers);
-    return papers.map(
-      (paper: {
-        id: string;
-        courseId?: string | null;
-        offeringId?: string | null;
-        metadata?: { category?: string; programmeCode?: string } | null;
-      }) => {
-        const course = paper.courseId ? courseById.get(paper.courseId) : null;
-        const offering = paper.offeringId
-          ? offeringLabels.get(paper.offeringId)
-          : undefined;
-        const meta = paper.metadata ?? {};
-        return {
-          ...paper,
-          category: offering?.category ?? meta.category ?? null,
-          programmeCode: offering?.programmeCode ?? meta.programmeCode ?? null,
-          programmeName: offering?.programmeName ?? null,
-          assessmentKey: assessmentKeys.get(paper.id) ?? '',
-          course: course
-            ? {
-                id: course.id,
-                code: course.code,
-                title: course.title,
-                credits: course.credits != null ? Number(course.credits) : null,
-                courseType: course.courseType,
-                departmentId: course.department?.id ?? course.departmentId,
-                departmentName: course.department?.name ?? null,
-              }
-            : null,
-        };
-      },
-    );
+    return papers
+      .map(
+        (paper: {
+          id: string;
+          courseId?: string | null;
+          offeringId?: string | null;
+          metadata?: { category?: string; programmeCode?: string } | null;
+        }) => {
+          const course = paper.courseId ? courseById.get(paper.courseId) : null;
+          const offering = paper.offeringId
+            ? offeringLabels.get(paper.offeringId)
+            : undefined;
+          const meta = paper.metadata ?? {};
+          return {
+            ...paper,
+            category: offering?.category ?? meta.category ?? null,
+            programmeCode:
+              offering?.programmeCode ?? meta.programmeCode ?? null,
+            programmeName: offering?.programmeName ?? null,
+            assessmentKey: assessmentKeys.get(paper.id) ?? '',
+            course: course
+              ? {
+                  id: course.id,
+                  code: course.code,
+                  title: course.title,
+                  credits:
+                    course.credits != null ? Number(course.credits) : null,
+                  courseType: course.courseType,
+                  departmentId: course.department?.id ?? course.departmentId,
+                  departmentName: course.department?.name ?? null,
+                }
+              : null,
+          };
+        },
+      )
+      .filter(
+        (paper: { category?: string | null }) =>
+          normalizeIaSubjectCategory(paper.category) !== 'INTERNSHIP',
+      );
   }
 
   async createPaper(user: JwtUser, dto: IaPaperDto) {
