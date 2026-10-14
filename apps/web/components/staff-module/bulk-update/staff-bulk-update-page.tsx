@@ -1,25 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Eye, FileSpreadsheet, History, Search, Wand2 } from 'lucide-react';
-
 import {
-  BulkActionButton,
-  BulkActionToolbar,
-  BulkEmptyState,
-  BulkWorkflowStepper,
-  ResetAction,
-  SpreadsheetDropzone,
-  TemplateDownloadAction,
-} from '@/components/erp/bulk-actions';
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  HelpCircle,
+  Trash2,
+  Users,
+} from 'lucide-react';
+
 import { DashboardShell } from '@/components/layout/dashboard-shell';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useStaffPermissions } from '@/hooks/use-staff-permissions';
 import { fetchDepartments } from '@/services/organization';
-import { fetchDesignations, fetchAllStaff } from '@/services/staff';
+import { fetchAllStaff, fetchDesignations } from '@/services/staff';
 import { fetchShifts } from '@/services/shifts';
 import {
   applyStaffBulkUpdate,
@@ -33,29 +32,14 @@ import {
   type StaffBulkUpdateFieldDef,
   type StaffBulkUpdateMatchingKey,
   type StaffBulkUpdatePreviewResult,
+  type StaffBulkUpdatePreviewRow,
   uploadStaffBulkUpdatePreview,
 } from '@/services/staff-bulk-update';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
-type Step = 'mode' | 'fields' | 'data' | 'validate' | 'preview' | 'commit';
-type UpdateMode = 'spreadsheet' | 'inline';
-
-const STEPS: { key: Step; label: string }[] = [
-  { key: 'mode', label: 'Select Update Mode' },
-  { key: 'fields', label: 'Choose Fields' },
-  { key: 'data', label: 'Upload / Manual Edit' },
-  { key: 'validate', label: 'Validate' },
-  { key: 'preview', label: 'Preview Changes' },
-  { key: 'commit', label: 'Commit Update' },
-];
-
-const MATCHING_KEYS: { id: StaffBulkUpdateMatchingKey; label: string }[] = [
-  { id: 'employeeCode', label: 'Staff Code / Employee Code' },
-  { id: 'shortCode', label: 'Current Short Code' },
-  { id: 'portalEmail', label: 'Portal Email' },
-  { id: 'staffId', label: 'Internal Staff ID' },
-];
+type UpdateMode = 'spreadsheet' | 'same';
+type Audience = 'all' | 'department' | 'designation' | 'individual';
 
 const MATCHING_FIELD_CONFLICTS: Partial<Record<StaffBulkUpdateMatchingKey, string>> = {
   employeeCode: 'employeeCode',
@@ -74,50 +58,54 @@ function safeMatchingKey(
   return current;
 }
 
+function asCell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
 export function StaffBulkUpdatePage() {
   const session = useRequireAuth();
   const perms = useStaffPermissions();
   const qc = useQueryClient();
-  const [step, setStep] = useState<Step>('mode');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<UpdateMode>('spreadsheet');
-  const [matchingKey, setMatchingKey] = useState<StaffBulkUpdateMatchingKey>('employeeCode');
   const [fieldKeys, setFieldKeys] = useState<string[]>([]);
-  const [search, setSearch] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [inlineRows, setInlineRows] = useState<Record<string, string>[]>([]);
+  const [dragActive, setDragActive] = useState(false);
   const [preview, setPreview] = useState<StaffBulkUpdatePreviewResult | null>(null);
-  const [forceApply, setForceApply] = useState(false);
+  const [checked, setChecked] = useState<string[]>([]);
   const [message, setMessage] = useState('');
-  const [quickField, setQuickField] = useState('');
-  const [quickValue, setQuickValue] = useState('');
-  const [findText, setFindText] = useState('');
-  const [replaceText, setReplaceText] = useState('');
+  const [messageTone, setMessageTone] = useState<'ok' | 'bad'>('bad');
   const [templateGenerating, setTemplateGenerating] = useState(false);
-  const [templateReady, setTemplateReady] = useState(false);
-  const [templateFilters, setTemplateFilters] = useState({
-    staffType: '',
-    departmentId: '',
-    designationId: '',
-    shiftId: '',
-    status: 'ACTIVE',
-  });
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const [audience, setAudience] = useState<Audience>('all');
+  const [pickedIds, setPickedIds] = useState<string[]>([]);
+  const [sameValue, setSameValue] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [filters, setFilters] = useState({ departmentId: '', designationId: '' });
 
   const fields = useQuery({
     queryKey: ['staff-bulk-update', 'fields'],
     queryFn: fetchStaffBulkUpdateFields,
     enabled: Boolean(session) && perms.canBulkUpdate,
   });
+  const audienceFilterReady =
+    audience === 'all' ||
+    audience === 'individual' ||
+    (audience === 'department' && Boolean(filters.departmentId)) ||
+    (audience === 'designation' && Boolean(filters.designationId));
   const staffRows = useQuery({
-    queryKey: ['staff-bulk-update', 'staff-sample', mode, templateFilters],
+    queryKey: ['staff-bulk-update', 'audience', filters, audience],
     queryFn: () =>
       fetchAllStaff({
-        staffType: templateFilters.staffType || undefined,
-        departmentId: templateFilters.departmentId || undefined,
-        designationId: templateFilters.designationId || undefined,
-        shiftId: templateFilters.shiftId || undefined,
-        status: templateFilters.status || undefined,
+        departmentId: audience === 'department' ? filters.departmentId || undefined : undefined,
+        designationId: audience === 'designation' ? filters.designationId || undefined : undefined,
+        status: 'ACTIVE',
       }),
-    enabled: Boolean(session) && perms.canBulkUpdate && mode === 'inline',
+    enabled: Boolean(session) && perms.canBulkUpdate && audienceFilterReady,
   });
   const departments = useQuery({
     queryKey: ['org', 'departments', 'staff-bulk-update'],
@@ -144,105 +132,135 @@ export function StaffBulkUpdatePage() {
     () => (fields.data ?? []).flatMap((group) => group.fields),
     [fields.data],
   );
-  const selectedFields = flatFields.filter((field) => fieldKeys.includes(field.fieldKey));
-  const stepIndex = STEPS.findIndex((s) => s.key === step);
+  const selectedField =
+    flatFields.find((field) => field.fieldKey === fieldKeys[0]) ??
+    flatFields.find((field) => field.fieldKey === 'email' || /email/i.test(field.label)) ??
+    flatFields[0];
+  const activeFieldKey = selectedField?.fieldKey ?? '';
+  const staffList = staffRows.data?.data ?? [];
+  const audiencePeople =
+    audience === 'individual' ? staffList.filter((row) => pickedIds.includes(row.id)) : staffList;
+  const audienceCount =
+    audience === 'individual' ? pickedIds.length : (staffRows.data?.meta.total ?? 0);
+  const staffByCode = new Map(staffList.map((row) => [row.employeeCode, row]));
+  const inAudience = (row: StaffBulkUpdatePreviewRow) => {
+    if (audience === 'all') return true;
+    if (audience === 'individual') return pickedIds.includes(row.staffId);
+    return staffList.some((person) => person.id === row.staffId);
+  };
+  const scopeReady =
+    audience === 'all' ||
+    (audience === 'department' && Boolean(filters.departmentId)) ||
+    (audience === 'designation' && Boolean(filters.designationId)) ||
+    (audience === 'individual' && pickedIds.length > 0);
 
-  useEffect(() => {
-    const safe = safeMatchingKey(fieldKeys, matchingKey);
-    if (safe !== matchingKey) setMatchingKey(safe);
-  }, [fieldKeys, matchingKey]);
-
-  useEffect(() => {
-    if (mode !== 'inline') return;
-    setInlineRows([]);
-  }, [mode, templateFilters]);
-
-  useEffect(() => {
-    if (mode !== 'inline' || !staffRows.data?.data.length) return;
-    setInlineRows(
-      staffRows.data.data.map((row) => ({
-        employeeCode: row.employeeCode,
-        shortCode: row.shortCode ?? '',
-        portalEmail: row.email ?? '',
-        staffId: row.id,
-        fullName: row.fullName,
-        mobile: row.mobile ?? '',
-        email: row.email ?? '',
-        shortCodeValue: row.shortCode ?? '',
-        departmentId: row.departmentId ?? '',
-        designationId: row.designationId ?? '',
-        primaryShiftId: row.primaryShiftId ?? '',
-        staffType: String(row.staffType ?? ''),
-        status: String(row.status ?? ''),
-        rfidNo: row.rfidNo ?? '',
-      })),
+  const rememberPreview = (data: StaffBulkUpdatePreviewResult) => {
+    setPreview(data);
+    setChecked(
+      data.rows
+        .filter((row) => inAudience(row) && row.errors.length === 0 && row.changes.length > 0)
+        .map((row) => row.staffId),
     );
-  }, [mode, staffRows.data, templateFilters]);
+    setMessage('');
+  };
 
   const previewMut = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (uploaded?: File) => {
+      const fieldKey = activeFieldKey;
+      if (!fieldKey) throw new Error('Choose the field you want to update.');
+      const matchingKey = safeMatchingKey([fieldKey], 'employeeCode');
       if (mode === 'spreadsheet') {
-        if (!file) throw new Error('Upload an Excel or CSV file before validation.');
-        return uploadStaffBulkUpdatePreview(
-          file,
-          fieldKeys,
-          safeMatchingKey(fieldKeys, matchingKey),
-        );
+        const source = uploaded ?? file;
+        if (!source) throw new Error('Upload an Excel file before preview.');
+        return uploadStaffBulkUpdatePreview(source, [fieldKey], matchingKey);
       }
-      const effectiveMatchingKey = safeMatchingKey(fieldKeys, matchingKey);
+      if (!sameValue.trim()) throw new Error('Enter the value to set for the selected staff.');
+      if (!scopeReady || audiencePeople.length === 0) {
+        throw new Error('Choose the staff members to update.');
+      }
       return previewStaffBulkUpdate({
         scope: {},
-        fieldKeys,
+        fieldKeys: [fieldKey],
         updateMode: 'CSV',
-        matchingKey: effectiveMatchingKey,
-        csvRows: inlineRows.map((row) => {
-          const out: Record<string, string> = {
-            [effectiveMatchingKey]: row[effectiveMatchingKey] ?? row.employeeCode,
-          };
-          for (const field of fieldKeys) {
-            out[field] = row[field] ?? '';
-          }
-          return out;
-        }),
+        matchingKey,
+        csvRows: audiencePeople.map((row) => ({
+          [matchingKey]: matchingValue(matchingKey, row),
+          [fieldKey]: sameValue.trim(),
+        })),
       });
     },
-    onSuccess: (data) => {
-      setPreview(data);
-      setMessage('');
-      setStep('preview');
+    onSuccess: rememberPreview,
+    onError: (error) => {
+      setMessageTone('bad');
+      setMessage(apiErrorMessage(error, 'Validation failed'));
     },
-    onError: (error) => setMessage(apiErrorMessage(error, 'Validation failed')),
   });
 
   const applyMut = useMutation({
-    mutationFn: () => {
-      if (!preview?.batchId) throw new Error('Generate preview before commit.');
-      return applyStaffBulkUpdate(preview.batchId, forceApply);
+    mutationFn: async () => {
+      if (!preview?.batchId) throw new Error('Preview the changes before updating.');
+      const fieldKey = activeFieldKey;
+      const shownValid = preview.rows.filter(
+        (row) => inAudience(row) && row.errors.length === 0 && row.changes.length > 0,
+      );
+      const chosen = shownValid.filter((row) => checked.includes(row.staffId));
+      if (!chosen.length) throw new Error('Select at least one valid staff record.');
+      const allShownChecked = chosen.length === shownValid.length;
+      if (audience === 'all' && preview.invalid === 0 && allShownChecked) {
+        return applyStaffBulkUpdate(preview.batchId, false);
+      }
+      if (preview.rowsTruncated) {
+        throw new Error(
+          'This file has more rows than the preview. Correct invalid rows and upload it again.',
+        );
+      }
+      const matchingKey = safeMatchingKey([fieldKey], 'employeeCode');
+      const next = await previewStaffBulkUpdate({
+        scope: {},
+        fieldKeys: [fieldKey],
+        updateMode: 'CSV',
+        matchingKey,
+        csvRows: chosen.map((row) => ({
+          [matchingKey]: matchingKey === 'staffId' ? row.staffId : row.employeeCode,
+          [fieldKey]: asCell(row.changes.find((change) => change.fieldKey === fieldKey)?.after),
+        })),
+      });
+      if (next.invalid > 0 || next.valid === 0) {
+        throw new Error('The selected rows are not ready to update.');
+      }
+      return applyStaffBulkUpdate(next.batchId, false);
     },
     onSuccess: (result) => {
+      setMessageTone('ok');
       setMessage(result.message ?? `Updated ${result.applied ?? 0} staff records.`);
       void qc.invalidateQueries({ queryKey: ['staff'] });
-      void qc.invalidateQueries({ queryKey: ['staff-bulk-update', 'batches'] });
-      setStep('commit');
+      void qc.invalidateQueries({ queryKey: ['staff-bulk-update'] });
     },
-    onError: (error) => setMessage(apiErrorMessage(error, 'Commit failed')),
+    onError: (error) => {
+      setMessageTone('bad');
+      setMessage(apiErrorMessage(error, 'Update failed'));
+    },
   });
 
   const rollbackMut = useMutation({
     mutationFn: rollbackStaffBulkUpdate,
     onSuccess: (result) => {
+      setMessageTone('ok');
       setMessage(`Rolled back ${result.rolledBackStaff} staff records.`);
       void qc.invalidateQueries({ queryKey: ['staff-bulk-update', 'batches'] });
       void qc.invalidateQueries({ queryKey: ['staff'] });
     },
-    onError: (error) => setMessage(apiErrorMessage(error, 'Rollback failed')),
+    onError: (error) => {
+      setMessageTone('bad');
+      setMessage(apiErrorMessage(error, 'Rollback failed'));
+    },
   });
 
   if (!session) return null;
 
   if (!perms.canBulkUpdate) {
     return (
-      <DashboardShell role="admin" title="Staff Bulk Update">
+      <DashboardShell role="admin" title="Bulk Update Staff">
         <p className="text-sm text-muted-foreground">
           You do not have permission to bulk update staff.
         </p>
@@ -250,896 +268,906 @@ export function StaffBulkUpdatePage() {
     );
   }
 
-  const nextDisabled =
-    (step === 'fields' && fieldKeys.length === 0) ||
-    (step === 'data' && mode === 'spreadsheet' && !file) ||
-    (step === 'data' && mode === 'inline' && inlineRows.length === 0) ||
-    step === 'preview' ||
-    step === 'commit';
+  const chooseField = (fieldKey: string) => {
+    setFieldKeys([fieldKey]);
+    setPreview(null);
+    setSameValue('');
+    setMessage('');
+  };
 
-  const goNext = () => {
-    if (step === 'data' || step === 'validate') {
-      previewMut.mutate();
+  const chooseAudience = (next: Audience) => {
+    setAudience(next);
+    setPreview(null);
+    setMessage('');
+    if (next !== 'individual') setPickerOpen(false);
+    if (next === 'all') setFilters({ departmentId: '', designationId: '' });
+    if (next === 'department') setFilters((current) => ({ ...current, designationId: '' }));
+    if (next === 'designation') setFilters((current) => ({ ...current, departmentId: '' }));
+  };
+
+  const acceptFile = (next?: File | null) => {
+    if (!next) return;
+    const name = next.name.toLowerCase();
+    if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+      setMessageTone('bad');
+      setMessage('Only .xlsx or .xls files are allowed.');
       return;
     }
-    const next = STEPS[Math.min(stepIndex + 1, STEPS.length - 1)]?.key;
-    if (next) setStep(next);
+    if (next.size > 5 * 1024 * 1024) {
+      setMessageTone('bad');
+      setMessage('Maximum file size is 5 MB.');
+      return;
+    }
+    setFile(next);
+    setPreview(null);
+    setMessage('');
+    if (activeFieldKey) previewMut.mutate(next);
   };
 
-  const resetTemplateFilters = () => {
-    setTemplateFilters({
-      staffType: '',
-      departmentId: '',
-      designationId: '',
-      shiftId: '',
-      status: 'ACTIVE',
-    });
-    setTemplateReady(false);
+  const clearAll = () => {
+    setFile(null);
+    setPreview(null);
+    setChecked([]);
+    setSameValue('');
+    setMessage('');
+    setPickedIds([]);
+    setPickerQuery('');
   };
 
-  const handleTemplateDownload = async () => {
+  const downloadTemplate = async () => {
+    if (!activeFieldKey) return;
     setTemplateGenerating(true);
-    setTemplateReady(false);
     try {
-      await downloadStaffBulkUpdateTemplate(fieldKeys, safeMatchingKey(fieldKeys, matchingKey), {
-        staffType: templateFilters.staffType || undefined,
-        departmentId: templateFilters.departmentId || undefined,
-        designationId: templateFilters.designationId || undefined,
-        shiftId: templateFilters.shiftId || undefined,
-        status: templateFilters.status || undefined,
-      });
-      setTemplateReady(true);
-      window.setTimeout(() => setTemplateReady(false), 2500);
+      await downloadStaffBulkUpdateTemplate(
+        [activeFieldKey],
+        safeMatchingKey([activeFieldKey], 'employeeCode'),
+        {
+          departmentId: audience === 'department' ? filters.departmentId || undefined : undefined,
+          designationId:
+            audience === 'designation' ? filters.designationId || undefined : undefined,
+          status: 'ACTIVE',
+        },
+      );
+    } catch (error) {
+      setMessageTone('bad');
+      setMessage(apiErrorMessage(error, 'Could not download the template'));
     } finally {
       setTemplateGenerating(false);
     }
   };
 
+  const visibleRows = (preview?.rows ?? []).filter(inAudience);
+  const selectedCount = visibleRows.filter(
+    (row) => checked.includes(row.staffId) && row.errors.length === 0 && row.changes.length > 0,
+  ).length;
+  const validIds = visibleRows
+    .filter((row) => row.errors.length === 0 && row.changes.length > 0)
+    .map((row) => row.staffId);
+  const visibleInvalid = visibleRows.filter((row) => row.errors.length > 0).length;
+  const allValidChecked = validIds.length > 0 && validIds.every((id) => checked.includes(id));
+
   return (
-    <DashboardShell role="admin" title="Staff Bulk Update Studio">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <Link
-            href="/admin/staff"
-            className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="mr-1 h-3.5 w-3.5" />
-            Staff Directory
-          </Link>
-          <p className="text-xs text-muted-foreground">
-            Update selected staff columns through generated templates or an editable grid with
-            validation and rollback.
-          </p>
-        </div>
-        <BulkActionToolbar>
-          <TemplateDownloadAction
-            disabled={fieldKeys.length === 0}
-            loading={templateGenerating}
-            ready={templateReady}
-            onClick={() => void handleTemplateDownload()}
-          />
-          <BulkActionButton
+    <DashboardShell role="admin" pageHeader={false} title="Bulk Update Staff">
+      <div className="space-y-4">
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-100 bg-white px-4 py-4 shadow-sm dark:border-sky-900/60 dark:bg-slate-950">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2563eb] text-white shadow-sm">
+              <Users className="h-6 w-6" />
+            </span>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+                Bulk Update Staff Information
+              </h1>
+              <p className="text-sm text-slate-500">
+                Update email ID, mobile number or any selected field for multiple staff members at
+                once.
+              </p>
+            </div>
+          </div>
+          <Button
             type="button"
             variant="outline"
-            size="sm"
-            icon={<Eye className="h-4 w-4" />}
-            onClick={() =>
-              setMessage(
-                'Sample: choose fields, apply filters, download template, fill only New value columns, upload, validate, and commit.',
-              )
+            className="rounded-xl"
+            onClick={() => setHelpOpen((open) => !open)}
+          >
+            <HelpCircle className="mr-2 h-4 w-4 text-[#2563eb]" />
+            View Instructions
+          </Button>
+        </section>
+
+        {helpOpen ? (
+          <section className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-slate-700 dark:border-sky-900 dark:bg-sky-950/40 dark:text-slate-200">
+            <ol className="list-decimal space-y-1 pl-5">
+              <li>
+                Choose one field. Email, mobile, department, and designation are updated one at a
+                time.
+              </li>
+              <li>
+                Upload a filled Excel template, or type one value to set for every selected staff
+                member.
+              </li>
+              <li>Limit the list to a department, a designation, or the people you tick.</li>
+              <li>Check the preview. Valid rows can be updated. Invalid rows stay unchanged.</li>
+              <li>A previous update can be rolled back from Recent updates.</li>
+            </ol>
+          </section>
+        ) : null}
+
+        <div className="grid gap-4 xl:grid-cols-3">
+          <Panel
+            step="1"
+            tone="blue"
+            title="Select Field to Update"
+            subtitle="Choose which field you want to update."
+          >
+            <FieldSelect fields={flatFields} value={activeFieldKey} onChange={chooseField} icon />
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              You can update one field at a time.
+              <br />
+              Examples: Email ID, Mobile Number, Department, Designation, etc.
+            </p>
+          </Panel>
+
+          <Panel
+            step="2"
+            tone="green"
+            title="Choose Update Method"
+            subtitle="Select how you want to update the data."
+          >
+            <MethodCard
+              active={mode === 'spreadsheet'}
+              title="Upload from Excel"
+              body="Use different values for each staff member."
+              onClick={() => {
+                setMode('spreadsheet');
+                setPreview(null);
+              }}
+            />
+            <MethodCard
+              active={mode === 'same'}
+              title="Set Same Value for All"
+              body="Use the same value for all selected staff."
+              onClick={() => {
+                setMode('same');
+                setFile(null);
+                setPreview(null);
+              }}
+            />
+          </Panel>
+
+          <Panel
+            step="3"
+            tone="violet"
+            title="Select Staff Members"
+            subtitle="Choose which staff members to update."
+            extra={
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                Total Staff: {staffRows.isLoading ? '…' : audienceCount}
+              </span>
             }
           >
-            View Sample
-          </BulkActionButton>
-          <ResetAction onClick={resetTemplateFilters} />
-        </BulkActionToolbar>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
-        <div className="glass-card rounded-xl border border-border/60 p-4">
-          <BulkWorkflowStepper steps={STEPS} current={Math.max(0, stepIndex)} />
-          <div className="mt-5">
-            {fieldKeys.length === 0 && step === 'mode' ? (
-              <BulkEmptyState
-                title="No template generated yet"
-                description="Prepare a safe bulk update by choosing columns first, then generating an assisted Excel template."
-                steps={[
-                  'Choose fields',
-                  'Apply filters',
-                  'Generate template',
-                  'Upload edited sheet',
-                ]}
-              />
-            ) : null}
-            {step === 'mode' ? <ModeStep mode={mode} onChange={setMode} /> : null}
-            {step === 'fields' ? (
-              <FieldStep
-                groups={fields.data ?? []}
-                selected={fieldKeys}
-                search={search}
-                onSearch={setSearch}
-                onChange={setFieldKeys}
-              />
-            ) : null}
-            {step === 'data' || step === 'validate' ? (
-              <DataStep
-                mode={mode}
-                matchingKey={matchingKey}
-                onMatchingKeyChange={setMatchingKey}
-                fields={selectedFields}
-                file={file}
-                onFile={setFile}
-                rows={inlineRows}
-                onRows={setInlineRows}
-                lookupOptions={{
-                  departmentId: (departments.data ?? []).map((d) => ({ id: d.id, label: d.name })),
-                  designationId: (designations.data ?? []).map((d) => ({
-                    id: d.id,
-                    label: d.label,
-                  })),
-                  primaryShiftId: (shifts.data ?? []).map((s) => ({ id: s.id, label: s.name })),
+            <AudienceOption
+              checked={audience === 'all'}
+              label="All Staff"
+              onChange={() => chooseAudience('all')}
+            />
+            <AudienceOption
+              checked={audience === 'department'}
+              label="By Department"
+              onChange={() => chooseAudience('department')}
+            >
+              <select
+                className={selectClass}
+                value={filters.departmentId}
+                disabled={audience !== 'department'}
+                onChange={(event) => {
+                  setFilters((current) => ({ ...current, departmentId: event.target.value }));
+                  setPreview(null);
                 }}
-                quickField={quickField}
-                quickValue={quickValue}
-                findText={findText}
-                replaceText={replaceText}
-                onQuickField={setQuickField}
-                onQuickValue={setQuickValue}
-                onFindText={setFindText}
-                onReplaceText={setReplaceText}
-                templateFilters={templateFilters}
-                onTemplateFilters={setTemplateFilters}
-                uploadLoading={previewMut.isPending}
+              >
+                <option value="">-- Select Department --</option>
+                {(departments.data ?? []).map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </AudienceOption>
+            <AudienceOption
+              checked={audience === 'designation'}
+              label="By Designation"
+              onChange={() => chooseAudience('designation')}
+            >
+              <select
+                className={selectClass}
+                value={filters.designationId}
+                disabled={audience !== 'designation'}
+                onChange={(event) => {
+                  setFilters((current) => ({ ...current, designationId: event.target.value }));
+                  setPreview(null);
+                }}
+              >
+                <option value="">-- Select Designation --</option>
+                {(designations.data ?? []).map((designation) => (
+                  <option key={designation.id} value={designation.id}>
+                    {designation.label}
+                  </option>
+                ))}
+              </select>
+            </AudienceOption>
+            <AudienceOption
+              checked={audience === 'individual'}
+              label="Select Individual Staff"
+              onChange={() => chooseAudience('individual')}
+            >
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-lg"
+                disabled={audience !== 'individual'}
+                onClick={() => setPickerOpen((open) => !open)}
+              >
+                + Choose Staff{pickedIds.length ? ` (${pickedIds.length})` : ''}
+              </Button>
+            </AudienceOption>
+          </Panel>
+        </div>
+
+        {pickerOpen && audience === 'individual' ? (
+          <section className="rounded-2xl border border-violet-100 bg-white p-4 shadow-sm dark:border-violet-900/50 dark:bg-slate-950">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium">Choose staff</p>
+              <input
+                value={pickerQuery}
+                onChange={(event) => setPickerQuery(event.target.value)}
+                placeholder="Search name or staff ID"
+                className="h-9 w-full max-w-xs rounded-lg border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
               />
-            ) : null}
-            {step === 'preview' ? (
-              <PreviewStep
-                preview={preview}
-                forceApply={forceApply}
-                onForceApply={setForceApply}
-                onDownloadErrorReport={() =>
-                  preview?.batchId
-                    ? void downloadStaffBulkUpdateErrorReport(preview.batchId)
-                    : undefined
-                }
-              />
-            ) : null}
-            {step === 'commit' ? (
-              <CommitStep
-                message={message}
-                batches={batches.data ?? []}
-                canRollback={perms.canBulkUpdateRollback}
-                onRollback={(batchId) => rollbackMut.mutate(batchId)}
-              />
-            ) : null}
+            </div>
+            <div className="max-h-64 space-y-1 overflow-auto">
+              {staffList
+                .filter((row) => {
+                  const query = pickerQuery.trim().toLowerCase();
+                  if (!query) return true;
+                  return (
+                    row.fullName.toLowerCase().includes(query) ||
+                    row.employeeCode.toLowerCase().includes(query)
+                  );
+                })
+                .map((row) => (
+                  <label
+                    key={row.id}
+                    className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-900"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pickedIds.includes(row.id)}
+                      onChange={() => {
+                        setPickedIds((current) =>
+                          current.includes(row.id)
+                            ? current.filter((id) => id !== row.id)
+                            : [...current, row.id],
+                        );
+                        setPreview(null);
+                      }}
+                    />
+                    <span className="w-24 font-medium text-slate-700 dark:text-slate-200">
+                      {row.employeeCode}
+                    </span>
+                    <span>{row.fullName}</span>
+                    <span className="text-slate-400">{row.department ?? ''}</span>
+                  </label>
+                ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <StepBadge n="4" tone="green" />
+              <div>
+                <h2 className="font-semibold text-slate-900 dark:text-slate-50">
+                  {mode === 'spreadsheet' ? 'Upload Excel File' : 'Enter the Same Value'}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {mode === 'spreadsheet'
+                    ? 'Upload an Excel file with Staff ID or Employee ID and the new values. Download the template to get the required format.'
+                    : `This value is written to ${selectedField?.label ?? 'the selected field'} for every staff member in the selection.`}
+                </p>
+              </div>
+            </div>
+            {mode === 'spreadsheet' ? (
+              <Button
+                type="button"
+                className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
+                disabled={!activeFieldKey || templateGenerating}
+                onClick={() => void downloadTemplate()}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {templateGenerating ? 'Preparing…' : 'Download Excel Template'}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
+                disabled={!scopeReady || !sameValue.trim() || previewMut.isPending}
+                onClick={() => previewMut.mutate(undefined)}
+              >
+                {previewMut.isPending ? 'Checking…' : 'Preview Changes'}
+              </Button>
+            )}
           </div>
 
-          {message && step !== 'commit' ? (
-            <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700">
-              {message}
+          {mode === 'spreadsheet' ? (
+            <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') fileInputRef.current?.click();
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragActive(true);
+                }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragActive(false);
+                  acceptFile(event.dataTransfer.files?.[0]);
+                }}
+                className={cn(
+                  'flex min-h-[148px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-sky-300 bg-white px-4 text-center dark:bg-slate-950',
+                  dragActive && 'border-[#2563eb] bg-sky-50',
+                )}
+              >
+                <span className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-lg font-bold text-white">
+                  X
+                </span>
+                <p className="font-semibold text-slate-800 dark:text-slate-100">
+                  Drag & drop your Excel file here
+                </p>
+                <p className="text-sm text-[#2563eb]">or click to browse</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Only .xlsx or .xls files are allowed. Maximum size: 5 MB.
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  className="hidden"
+                  onChange={(event) => {
+                    acceptFile(event.target.files?.[0]);
+                    event.target.value = '';
+                  }}
+                />
+              </div>
+              {file ? (
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-950">
+                  <div className="flex items-center gap-3">
+                    <FileSpreadsheet className="h-8 w-8 text-emerald-600" />
+                    <div>
+                      <p className="text-sm font-semibold">{file.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {Math.max(1, Math.round(file.size / 1024)).toLocaleString()} KB · Uploaded
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50"
+                      onClick={() => {
+                        setFile(null);
+                        setPreview(null);
+                      }}
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" />
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/70 px-4 text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-950">
+                  {previewMut.isPending
+                    ? 'Reading the workbook…'
+                    : 'The uploaded file appears here.'}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-emerald-100 bg-white p-4 dark:border-emerald-900/40 dark:bg-slate-950">
+              <label className="mb-1 block text-xs font-medium text-slate-500">
+                New {selectedField?.label ?? 'value'}
+              </label>
+              <SameValueInput
+                field={selectedField}
+                value={sameValue}
+                onChange={(value) => {
+                  setSameValue(value);
+                  setPreview(null);
+                }}
+                departments={(departments.data ?? []).map((department) => ({
+                  id: department.id,
+                  label: department.name,
+                }))}
+                designations={(designations.data ?? []).map((designation) => ({
+                  id: designation.id,
+                  label: designation.label,
+                }))}
+                shifts={(shifts.data ?? []).map((shift) => ({ id: shift.id, label: shift.name }))}
+              />
+            </div>
+          )}
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm dark:border-violet-900/40 dark:bg-slate-950">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-violet-50/80 px-4 py-3 dark:bg-violet-950/30">
+            <div className="flex items-start gap-3">
+              <StepBadge n="5" tone="violet" />
+              <div>
+                <h2 className="font-semibold">Preview and Confirm</h2>
+                <p className="text-sm text-slate-500">
+                  Verify the data before updating. Only valid records will be processed.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs font-semibold">
+              <CountPill label="Total Records" value={visibleRows.length} />
+              <CountPill label="Valid Records" value={validIds.length} tone="ok" />
+              <CountPill label="Invalid Records" value={visibleInvalid} tone="bad" />
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-900">
+                <tr>
+                  <th className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={allValidChecked}
+                      onChange={() => setChecked(allValidChecked ? [] : validIds)}
+                      aria-label="Select valid rows"
+                    />
+                  </th>
+                  <th className="px-3 py-2">#</th>
+                  <th className="px-3 py-2">Staff ID</th>
+                  <th className="px-3 py-2">Staff Name</th>
+                  <th className="px-3 py-2">Department</th>
+                  <th className="px-3 py-2">Designation</th>
+                  <th className="px-3 py-2">Current {selectedField?.label ?? 'Value'}</th>
+                  <th className="px-3 py-2">
+                    New {selectedField?.label ?? 'Value'}{' '}
+                    {mode === 'spreadsheet' ? '(From Excel)' : ''}
+                  </th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.length ? (
+                  visibleRows.map((row, index) => (
+                    <PreviewTableRow
+                      key={row.staffId}
+                      index={index + 1}
+                      row={row}
+                      fieldKey={activeFieldKey}
+                      department={staffByCode.get(row.employeeCode)?.department}
+                      designation={staffByCode.get(row.employeeCode)?.designation}
+                      checked={checked.includes(row.staffId)}
+                      onToggle={() =>
+                        setChecked((current) =>
+                          current.includes(row.staffId)
+                            ? current.filter((id) => id !== row.staffId)
+                            : [...current, row.staffId],
+                        )
+                      }
+                    />
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={10} className="px-4 py-10 text-center text-sm text-slate-400">
+                      {previewMut.isPending
+                        ? 'Checking the records…'
+                        : preview
+                          ? 'None of the selected staff are in this preview.'
+                          : 'Upload a file or preview a same-value update to see the staff list here.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {preview?.rowsTruncated ? (
+            <p className="border-t px-4 py-2 text-xs text-amber-700">
+              Showing the first 250 rows. Correct every invalid row in the file before updating a
+              list this large.
             </p>
           ) : null}
+          {preview?.batchId && visibleInvalid > 0 ? (
+            <div className="border-t px-4 py-2 text-right">
+              <button
+                type="button"
+                className="text-xs font-medium text-[#2563eb]"
+                onClick={() => void downloadStaffBulkUpdateErrorReport(preview.batchId)}
+              >
+                Download error report
+              </button>
+            </div>
+          ) : null}
+        </section>
 
-          <div className="mt-5 flex justify-between">
+        {message ? (
+          <p
+            className={cn(
+              'rounded-xl border px-3 py-2 text-sm',
+              messageTone === 'ok'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-rose-200 bg-rose-50 text-rose-700',
+            )}
+          >
+            {message}
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href="/admin/staff">
+            <Button type="button" variant="outline" className="rounded-xl">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Staff List
+            </Button>
+          </Link>
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              disabled={stepIndex === 0 || previewMut.isPending || applyMut.isPending}
-              onClick={() => setStep(STEPS[Math.max(stepIndex - 1, 0)]!.key)}
+              className="rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50"
+              onClick={clearAll}
             >
-              Back
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear All
             </Button>
-            {step === 'preview' ? (
-              <BulkActionButton
-                type="button"
-                size="sm"
-                elevated
-                disabled={!preview || (preview.invalid > 0 && !forceApply) || applyMut.isPending}
-                loading={applyMut.isPending}
-                loadingText="Committing..."
-                onClick={() => applyMut.mutate()}
-              >
-                {`Commit ${preview?.valid ?? 0} staff updates`}
-              </BulkActionButton>
-            ) : step === 'commit' ? (
-              <Link href="/admin/staff" className={cn(buttonVariants({ size: 'sm' }), 'text-xs')}>
-                Back to Directory
-              </Link>
-            ) : (
-              <BulkActionButton
-                type="button"
-                size="lg"
-                elevated
-                disabled={nextDisabled || previewMut.isPending}
-                loading={previewMut.isPending}
-                loadingText="Validating..."
-                icon={
-                  step === 'data' || step === 'validate' ? (
-                    <Search className="h-4 w-4" />
-                  ) : undefined
-                }
-                onClick={goNext}
-                className={step === 'data' || step === 'validate' ? 'px-5' : undefined}
-              >
-                {step === 'data' || step === 'validate' ? 'Validate & Preview Changes' : 'Next'}
-              </BulkActionButton>
-            )}
+            <Button
+              type="button"
+              className="rounded-xl bg-[#2563eb] px-5 text-white hover:bg-blue-700"
+              disabled={!preview || selectedCount === 0 || applyMut.isPending}
+              onClick={() => applyMut.mutate()}
+            >
+              {applyMut.isPending ? 'Updating…' : `Update ${selectedCount} Staff Records`}
+            </Button>
           </div>
         </div>
 
-        <SummarySidebar
-          mode={mode}
-          matchingKey={matchingKey}
-          selectedFields={selectedFields}
-          preview={preview}
-          batches={batches.data ?? []}
-        />
+        <section className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium"
+            onClick={() => setHistoryOpen((open) => !open)}
+          >
+            Recent updates
+            <span className="text-xs text-slate-400">{historyOpen ? 'Hide' : 'Show'}</span>
+          </button>
+          {historyOpen ? (
+            <div className="space-y-2 border-t px-4 py-3">
+              {(batches.data ?? []).length === 0 ? (
+                <p className="text-sm text-slate-400">No bulk updates yet.</p>
+              ) : (
+                (batches.data ?? []).slice(0, 8).map((batch) => (
+                  <div
+                    key={batch.id}
+                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                  >
+                    <span>
+                      {new Date(batch.createdAt).toLocaleString()} · {batch.status} ·{' '}
+                      {batch.appliedCount} updated
+                    </span>
+                    {perms.canBulkUpdateRollback &&
+                    batch.status === 'APPLIED' &&
+                    !batch.rolledBackAt ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={rollbackMut.isPending}
+                        onClick={() => rollbackMut.mutate(batch.id)}
+                      >
+                        Roll back
+                      </Button>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </div>
+          ) : null}
+        </section>
       </div>
     </DashboardShell>
   );
 }
 
-function ModeStep({ mode, onChange }: { mode: UpdateMode; onChange: (mode: UpdateMode) => void }) {
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {[
-        {
-          id: 'spreadsheet' as const,
-          title: 'Spreadsheet Import',
-          body: 'Upload XLSX, XLS, or CSV. Best for 100+ staff records.',
-        },
-        {
-          id: 'inline' as const,
-          title: 'Inline Table Update',
-          body: 'Edit a spreadsheet-like grid in the browser. Best for small corrections.',
-        },
-      ].map((option) => (
-        <button
-          key={option.id}
-          type="button"
-          className={cn(
-            'rounded-xl border p-4 text-left transition hover:bg-muted/30',
-            mode === option.id ? 'border-primary bg-primary/5' : 'border-border',
-          )}
-          onClick={() => onChange(option.id)}
-        >
-          <FileSpreadsheet className="mb-3 h-5 w-5 text-primary" />
-          <h2 className="text-sm font-semibold">{option.title}</h2>
-          <p className="mt-1 text-xs text-muted-foreground">{option.body}</p>
-        </button>
-      ))}
-    </div>
-  );
+function matchingValue(
+  key: StaffBulkUpdateMatchingKey,
+  row: { id: string; employeeCode: string; shortCode?: string | null; email: string | null },
+) {
+  if (key === 'staffId') return row.id;
+  if (key === 'shortCode') return row.shortCode ?? '';
+  if (key === 'portalEmail') return row.email ?? '';
+  return row.employeeCode;
 }
 
-function FieldStep({
-  groups,
-  selected,
-  search,
-  onSearch,
-  onChange,
+const selectClass =
+  'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100';
+
+function Panel({
+  step,
+  tone,
+  title,
+  subtitle,
+  extra,
+  children,
 }: {
-  groups: { group: string; fields: StaffBulkUpdateFieldDef[] }[];
-  selected: string[];
-  search: string;
-  onSearch: (value: string) => void;
-  onChange: (keys: string[]) => void;
+  step: string;
+  tone: 'blue' | 'green' | 'violet';
+  title: string;
+  subtitle: string;
+  extra?: ReactNode;
+  children: ReactNode;
 }) {
-  const q = search.trim().toLowerCase();
-  const filtered = groups
-    .map((group) => ({
-      ...group,
-      fields: group.fields.filter(
-        (field) =>
-          !q || field.label.toLowerCase().includes(q) || field.fieldKey.toLowerCase().includes(q),
-      ),
-    }))
-    .filter((group) => group.fields.length > 0);
-  const toggle = (fieldKey: string) =>
-    onChange(
-      selected.includes(fieldKey)
-        ? selected.filter((key) => key !== fieldKey)
-        : [...selected, fieldKey],
-    );
-
+  const wash = {
+    blue: 'border-sky-100 bg-sky-50/40 dark:border-sky-900/50 dark:bg-slate-950',
+    green: 'border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-slate-950',
+    violet: 'border-violet-100 bg-violet-50/40 dark:border-violet-900/40 dark:bg-slate-950',
+  }[tone];
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-sm font-semibold">Choose target fields</h2>
-        <p className="text-xs text-muted-foreground">
-          Only selected fields appear in the generated template and editor.
-        </p>
-      </div>
-      <input
-        type="search"
-        placeholder="Search fields..."
-        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs"
-        value={search}
-        onChange={(event) => onSearch(event.target.value)}
-      />
-      <div className="flex flex-wrap gap-2">
-        {[
-          ['Contact', ['mobile', 'email', 'shortCode']],
-          ['Device IDs', ['rfidNo', 'biometricId']],
-          ['Employment', ['departmentId', 'designationId', 'primaryShiftId', 'status']],
-        ].map(([label, keys]) => (
-          <button
-            key={label as string}
-            type="button"
-            className="rounded-full border border-border px-2.5 py-1 text-[11px] hover:bg-muted"
-            onClick={() => onChange([...new Set([...selected, ...(keys as string[])])])}
-          >
-            {label as string}
-          </button>
-        ))}
-      </div>
-      <div className="space-y-3">
-        {filtered.map((group) => (
-          <section key={group.group} className="rounded-lg border border-border p-3">
-            <h3 className="mb-2 text-xs font-semibold">{group.group}</h3>
-            <div className="grid gap-2 md:grid-cols-3">
-              {group.fields.map((field) => (
-                <label
-                  key={field.fieldKey}
-                  className="flex items-start gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted/40"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(field.fieldKey)}
-                    onChange={() => toggle(field.fieldKey)}
-                  />
-                  <span>
-                    <span className="font-medium">{field.label}</span>
-                    {field.supportsAppend ? (
-                      <span className="ml-1 text-[10px] text-muted-foreground">append</span>
-                    ) : null}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DataStep(props: {
-  mode: UpdateMode;
-  matchingKey: StaffBulkUpdateMatchingKey;
-  onMatchingKeyChange: (key: StaffBulkUpdateMatchingKey) => void;
-  fields: StaffBulkUpdateFieldDef[];
-  file: File | null;
-  onFile: (file: File | null) => void;
-  rows: Record<string, string>[];
-  onRows: (rows: Record<string, string>[]) => void;
-  lookupOptions: Record<string, { id: string; label: string }[]>;
-  quickField: string;
-  quickValue: string;
-  findText: string;
-  replaceText: string;
-  onQuickField: (value: string) => void;
-  onQuickValue: (value: string) => void;
-  onFindText: (value: string) => void;
-  onReplaceText: (value: string) => void;
-  templateFilters: {
-    staffType: string;
-    departmentId: string;
-    designationId: string;
-    shiftId: string;
-    status: string;
-  };
-  onTemplateFilters: (value: {
-    staffType: string;
-    departmentId: string;
-    designationId: string;
-    shiftId: string;
-    status: string;
-  }) => void;
-  uploadLoading: boolean;
-}) {
-  const applySameValue = () => {
-    if (!props.quickField) return;
-    props.onRows(props.rows.map((row) => ({ ...row, [props.quickField]: props.quickValue })));
-  };
-  const applyFindReplace = () => {
-    if (!props.quickField || !props.findText) return;
-    props.onRows(
-      props.rows.map((row) => ({
-        ...row,
-        [props.quickField]: String(row[props.quickField] ?? '').replaceAll(
-          props.findText,
-          props.replaceText,
-        ),
-      })),
-    );
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2">
-        <label className="space-y-1 text-xs">
-          <span className="font-medium">Matching method</span>
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs"
-            value={props.matchingKey}
-            onChange={(event) =>
-              props.onMatchingKeyChange(event.target.value as StaffBulkUpdateMatchingKey)
-            }
-          >
-            {MATCHING_KEYS.map((key) => {
-              const conflictsWithUpdate = props.fields.some(
-                (field) => MATCHING_FIELD_CONFLICTS[key.id] === field.fieldKey,
-              );
-              return (
-                <option key={key.id} value={key.id} disabled={conflictsWithUpdate}>
-                  {key.label}
-                  {conflictsWithUpdate ? ' (selected for update)' : ''}
-                </option>
-              );
-            })}
-          </select>
-          {props.fields.some(
-            (field) => MATCHING_FIELD_CONFLICTS[props.matchingKey] === field.fieldKey,
-          ) ? (
-            <span className="text-[11px] text-amber-600">
-              Matching key changed automatically because the same field is selected for update.
-            </span>
-          ) : null}
-        </label>
-      </div>
-
-      <div className="rounded-xl border border-border p-3">
-        <h2 className="text-sm font-semibold">Template staff filter</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Excel templates and the manual edit grid both load staff from the database using these
-          filters.
-        </p>
-        <div className="mt-3 grid gap-2 md:grid-cols-5">
-          <TemplateSelect
-            label="Type"
-            value={props.templateFilters.staffType}
-            options={[
-              { id: 'TEACHING', label: 'Teaching' },
-              { id: 'NON_TEACHING', label: 'Non-Teaching' },
-              { id: 'GUEST', label: 'Guest / Visiting' },
-            ]}
-            onChange={(staffType) =>
-              props.onTemplateFilters({ ...props.templateFilters, staffType })
-            }
-          />
-          <TemplateSelect
-            label="Department"
-            value={props.templateFilters.departmentId}
-            options={props.lookupOptions.departmentId ?? []}
-            onChange={(departmentId) =>
-              props.onTemplateFilters({ ...props.templateFilters, departmentId })
-            }
-          />
-          <TemplateSelect
-            label="Designation"
-            value={props.templateFilters.designationId}
-            options={props.lookupOptions.designationId ?? []}
-            onChange={(designationId) =>
-              props.onTemplateFilters({ ...props.templateFilters, designationId })
-            }
-          />
-          <TemplateSelect
-            label="Shift"
-            value={props.templateFilters.shiftId}
-            options={props.lookupOptions.primaryShiftId ?? []}
-            onChange={(shiftId) => props.onTemplateFilters({ ...props.templateFilters, shiftId })}
-          />
-          <TemplateSelect
-            label="Status"
-            value={props.templateFilters.status}
-            options={[
-              { id: 'ACTIVE', label: 'Active' },
-              { id: 'ON_LEAVE', label: 'On Leave' },
-              { id: 'RETIRED', label: 'Retired' },
-              { id: 'RELIEVED', label: 'Relieved' },
-            ]}
-            onChange={(status) => props.onTemplateFilters({ ...props.templateFilters, status })}
-          />
-        </div>
-      </div>
-
-      {props.mode === 'spreadsheet' ? (
-        <SpreadsheetDropzone
-          file={props.file}
-          loading={props.uploadLoading}
-          title="Drag & Drop Excel / CSV File"
-          subtitle="or click to browse the edited staff template"
-          supportedText="XLSX • XLS • CSV"
-          onFile={props.onFile}
-          onRemove={() => props.onFile(null)}
-        />
-      ) : (
-        <div className="space-y-3">
-          <div className="rounded-lg border border-border p-3">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold">
-              <Wand2 className="h-4 w-4" />
-              Quick operations
-            </div>
-            <div className="grid gap-2 md:grid-cols-5">
-              <select
-                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                value={props.quickField}
-                onChange={(e) => props.onQuickField(e.target.value)}
-              >
-                <option value="">Field</option>
-                {props.fields.map((field) => (
-                  <option key={field.fieldKey} value={field.fieldKey}>
-                    {field.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                placeholder="Same value"
-                value={props.quickValue}
-                onChange={(e) => props.onQuickValue(e.target.value)}
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs"
-                onClick={applySameValue}
-              >
-                Set same value
-              </Button>
-              <input
-                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                placeholder="Find"
-                value={props.findText}
-                onChange={(e) => props.onFindText(e.target.value)}
-              />
-              <div className="flex gap-2">
-                <input
-                  className="h-8 min-w-0 rounded-md border border-input bg-background px-2 text-xs"
-                  placeholder="Replace"
-                  value={props.replaceText}
-                  onChange={(e) => props.onReplaceText(e.target.value)}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 text-xs"
-                  onClick={applyFindReplace}
-                >
-                  Replace
-                </Button>
-              </div>
-            </div>
+    <section className={cn('rounded-2xl border p-4 shadow-sm', wash)}>
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="flex items-start gap-3">
+          <StepBadge n={step} tone={tone} />
+          <div>
+            <h2 className="font-semibold text-slate-900 dark:text-slate-50">{title}</h2>
+            <p className="text-xs text-slate-500">{subtitle}</p>
           </div>
-          <InlineGrid {...props} />
         </div>
-      )}
-    </div>
+        {extra}
+      </div>
+      <div className="space-y-2">{children}</div>
+    </section>
   );
 }
 
-function InlineGrid({
-  fields,
-  rows,
-  onRows,
-  lookupOptions,
-}: {
-  fields: StaffBulkUpdateFieldDef[];
-  rows: Record<string, string>[];
-  onRows: (rows: Record<string, string>[]) => void;
-  lookupOptions: Record<string, { id: string; label: string }[]>;
-}) {
-  const setCell = (index: number, key: string, value: string) => {
-    onRows(rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)));
-  };
+function StepBadge({ n, tone }: { n: string; tone: 'blue' | 'green' | 'violet' }) {
+  const color = {
+    blue: 'bg-[#2563eb]',
+    green: 'bg-emerald-500',
+    violet: 'bg-violet-500',
+  }[tone];
   return (
-    <div className="max-h-[520px] overflow-auto rounded-lg border border-border">
-      <table className="min-w-full text-xs">
-        <thead className="sticky top-0 bg-muted/80 text-left backdrop-blur">
-          <tr>
-            <th className="px-2 py-2">Employee Code</th>
-            <th className="px-2 py-2">Staff</th>
-            {fields.map((field) => (
-              <th key={field.fieldKey} className="px-2 py-2">
-                {field.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={row.staffId ?? row.employeeCode} className="border-t border-border/60">
-              <td className="whitespace-nowrap px-2 py-2 font-mono">{row.employeeCode}</td>
-              <td className="min-w-48 px-2 py-2">{row.fullName}</td>
-              {fields.map((field) => (
-                <td key={field.fieldKey} className="min-w-44 px-2 py-1">
-                  {lookupOptions[field.fieldKey]?.length ? (
-                    <select
-                      className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                      value={row[field.fieldKey] ?? ''}
-                      onChange={(event) => setCell(index, field.fieldKey, event.target.value)}
-                    >
-                      <option value="">Select...</option>
-                      {lookupOptions[field.fieldKey].map((opt) => (
-                        <option key={opt.id} value={opt.id}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                      value={row[field.fieldKey] ?? ''}
-                      onChange={(event) => setCell(index, field.fieldKey, event.target.value)}
-                    />
-                  )}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <span
+      className={cn(
+        'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white',
+        color,
+      )}
+    >
+      {n}
+    </span>
   );
 }
 
-function TemplateSelect({
-  label,
+function FieldSelect({
+  fields,
   value,
-  options,
   onChange,
 }: {
-  label: string;
+  fields: StaffBulkUpdateFieldDef[];
   value: string;
-  options: { id: string; label: string }[];
-  onChange: (value: string) => void;
+  onChange: (fieldKey: string) => void;
+  icon?: boolean;
 }) {
   return (
-    <label className="space-y-1 text-xs">
-      <span className="font-medium">{label}</span>
+    <div className="relative">
       <select
-        className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+        className={cn(selectClass, 'pl-3')}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
-        <option value="">All</option>
+        {fields.map((field) => (
+          <option key={field.fieldKey} value={field.fieldKey}>
+            {field.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function MethodCard({
+  active,
+  title,
+  body,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  body: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-start gap-3 rounded-xl border bg-white px-3 py-3 text-left dark:bg-slate-950',
+        active
+          ? 'border-amber-300 bg-amber-50 shadow-sm dark:bg-amber-950/20'
+          : 'border-slate-200 dark:border-slate-700',
+      )}
+    >
+      <span
+        className={cn(
+          'mt-0.5 h-4 w-4 shrink-0 rounded-full border-2',
+          active
+            ? 'border-[#2563eb] bg-[#2563eb] shadow-[inset_0_0_0_3px_white]'
+            : 'border-slate-300',
+        )}
+      />
+      <span>
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="block text-xs text-slate-500">{body}</span>
+      </span>
+    </button>
+  );
+}
+
+function AudienceOption({
+  checked,
+  label,
+  onChange,
+  children,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <label className="flex items-center gap-2 text-sm">
+        <input type="radio" checked={checked} onChange={onChange} />
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function CountPill({ label, value, tone }: { label: string; value: number; tone?: 'ok' | 'bad' }) {
+  return (
+    <span
+      className={cn(
+        'rounded-lg bg-white px-2.5 py-1 text-slate-600 shadow-sm dark:bg-slate-900',
+        tone === 'ok' && 'text-emerald-600',
+        tone === 'bad' && 'text-rose-600',
+      )}
+    >
+      {label}: {value}
+    </span>
+  );
+}
+
+function PreviewTableRow({
+  index,
+  row,
+  fieldKey,
+  department,
+  designation,
+  checked,
+  onToggle,
+}: {
+  index: number;
+  row: StaffBulkUpdatePreviewRow;
+  fieldKey: string;
+  department?: string | null;
+  designation?: string | null;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  const change = row.changes.find((item) => item.fieldKey === fieldKey) ?? row.changes[0];
+  const invalid = row.errors.length > 0;
+  const unchanged = !invalid && row.changes.length === 0;
+  return (
+    <tr className="border-t border-slate-100 dark:border-slate-800">
+      <td className="px-3 py-2">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={invalid || unchanged}
+          onChange={onToggle}
+          aria-label={`Select ${row.fullName}`}
+        />
+      </td>
+      <td className="px-3 py-2">{index}</td>
+      <td className="px-3 py-2 font-medium">{row.employeeCode}</td>
+      <td className="px-3 py-2">{row.fullName}</td>
+      <td className="px-3 py-2">{department || '—'}</td>
+      <td className="px-3 py-2">{designation || '—'}</td>
+      <td className="px-3 py-2 text-slate-500">{formatStaffBulkValue(change?.before)}</td>
+      <td className={cn('px-3 py-2', invalid && 'text-rose-600')}>
+        {formatStaffBulkValue(change?.after)}
+      </td>
+      <td className="px-3 py-2">
+        <span
+          className={cn(
+            'rounded-full px-2 py-0.5 text-xs font-semibold',
+            invalid
+              ? 'bg-rose-50 text-rose-600'
+              : unchanged
+                ? 'bg-slate-100 text-slate-500'
+                : 'bg-emerald-50 text-emerald-600',
+          )}
+        >
+          {invalid ? 'Invalid' : unchanged ? 'Unchanged' : 'Valid'}
+        </span>
+      </td>
+      <td className={cn('px-3 py-2 text-xs', invalid ? 'text-rose-600' : 'text-slate-400')}>
+        {invalid ? row.errors.join(', ') : row.warnings?.join(', ') || '—'}
+      </td>
+    </tr>
+  );
+}
+
+function SameValueInput({
+  field,
+  value,
+  onChange,
+  departments,
+  designations,
+  shifts,
+}: {
+  field?: StaffBulkUpdateFieldDef;
+  value: string;
+  onChange: (value: string) => void;
+  departments: { id: string; label: string }[];
+  designations: { id: string; label: string }[];
+  shifts: { id: string; label: string }[];
+}) {
+  if (
+    field?.lookupType === 'department' ||
+    field?.lookupType === 'designation' ||
+    field?.lookupType === 'shift'
+  ) {
+    const options =
+      field.lookupType === 'department'
+        ? departments
+        : field.lookupType === 'designation'
+          ? designations
+          : shifts;
+    return (
+      <select
+        className={selectClass}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">Select {field.label}</option>
         {options.map((option) => (
           <option key={option.id} value={option.id}>
             {option.label}
           </option>
         ))}
       </select>
-    </label>
-  );
-}
-
-function PreviewStep({
-  preview,
-  forceApply,
-  onForceApply,
-  onDownloadErrorReport,
-}: {
-  preview: StaffBulkUpdatePreviewResult | null;
-  forceApply: boolean;
-  onForceApply: (value: boolean) => void;
-  onDownloadErrorReport: () => void;
-}) {
-  if (!preview)
-    return <p className="text-sm text-muted-foreground">Run validation to generate preview.</p>;
+    );
+  }
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-4">
-        <Stat label="Rows uploaded" value={preview.total} />
-        <Stat label="Matched / valid" value={preview.valid} tone="ok" />
-        <Stat label="Warnings / skipped" value={preview.skipped} />
-        <Stat label="Errors" value={preview.invalid} tone={preview.invalid ? 'bad' : undefined} />
-      </div>
-      {preview.invalid > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={forceApply}
-              onChange={(event) => onForceApply(event.target.checked)}
-            />
-            Force commit valid changes even when some rows failed
-          </label>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs"
-            onClick={onDownloadErrorReport}
-          >
-            Download Error Report
-          </Button>
-        </div>
-      ) : null}
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-xs">
-          <thead className="bg-muted/40 text-left">
-            <tr>
-              <th className="px-2 py-2">Staff</th>
-              <th className="px-2 py-2">Before {'->'} After</th>
-              <th className="px-2 py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {preview.rows.map((row) => (
-              <tr key={row.staffId} className="border-t border-border/60 align-top">
-                <td className="px-2 py-2">
-                  <div className="font-medium">{row.fullName}</div>
-                  <div className="font-mono text-muted-foreground">{row.employeeCode}</div>
-                </td>
-                <td className="px-2 py-2">
-                  {row.changes.length ? (
-                    <ul className="space-y-1">
-                      {row.changes.map((change) => (
-                        <li key={change.fieldKey}>
-                          <span className="font-medium">{change.label}:</span>{' '}
-                          <span className="text-muted-foreground line-through">
-                            {formatStaffBulkValue(change.before)}
-                          </span>
-                          {' -> '}
-                          <span>{formatStaffBulkValue(change.after)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <span className="text-muted-foreground">No changed values</span>
-                  )}
-                </td>
-                <td className="px-2 py-2">
-                  {row.errors.length ? (
-                    <ul className="space-y-1 text-destructive">
-                      {row.errors.map((error) => (
-                        <li key={error}>{error}</li>
-                      ))}
-                    </ul>
-                  ) : row.warnings?.length ? (
-                    <ul className="space-y-1 text-amber-600">
-                      {row.warnings.map((warning) => (
-                        <li key={warning}>{warning}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <span className="text-emerald-600">Ready</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function CommitStep({
-  message,
-  batches,
-  canRollback,
-  onRollback,
-}: {
-  message: string;
-  batches: {
-    id: string;
-    status: string;
-    staffCount: number;
-    appliedCount: number;
-    errorCount: number;
-    createdAt: string;
-    fieldKeys: string[];
-  }[];
-  canRollback: boolean;
-  onRollback: (batchId: string) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-        <h2 className="text-sm font-semibold">Bulk update completed</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {message || 'The batch has been committed.'}
-        </p>
-      </div>
-      <section className="rounded-lg border border-border p-3">
-        <div className="mb-2 flex items-center gap-2 text-xs font-semibold">
-          <History className="h-4 w-4" />
-          Recent Bulk Update History
-        </div>
-        <div className="space-y-2">
-          {batches.slice(0, 5).map((batch) => (
-            <div
-              key={batch.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/30 px-2 py-2 text-xs"
-            >
-              <span>
-                <span className="font-medium">{batch.status}</span> · {batch.staffCount} staff ·{' '}
-                {batch.fieldKeys.join(', ')}
-              </span>
-              {canRollback && batch.status === 'APPLIED' ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs"
-                  onClick={() => onRollback(batch.id)}
-                >
-                  Rollback 24h
-                </Button>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function SummarySidebar({
-  mode,
-  matchingKey,
-  selectedFields,
-  preview,
-  batches,
-}: {
-  mode: UpdateMode;
-  matchingKey: StaffBulkUpdateMatchingKey;
-  selectedFields: StaffBulkUpdateFieldDef[];
-  preview: StaffBulkUpdatePreviewResult | null;
-  batches: { id: string; status: string }[];
-}) {
-  return (
-    <aside className="glass-card h-fit rounded-xl border border-border/60 p-4 text-xs">
-      <h2 className="text-sm font-semibold">Summary</h2>
-      <dl className="mt-3 space-y-2">
-        <Row label="Mode" value={mode === 'spreadsheet' ? 'Spreadsheet Import' : 'Inline Table'} />
-        <Row
-          label="Matching Key"
-          value={MATCHING_KEYS.find((key) => key.id === matchingKey)?.label ?? matchingKey}
-        />
-        <Row label="Selected Fields" value={String(selectedFields.length)} />
-        <Row label="Rows Validated" value={preview ? String(preview.total) : '-'} />
-        <Row label="Recent Batches" value={String(batches.length)} />
-      </dl>
-      <div className="mt-3 flex flex-wrap gap-1">
-        {selectedFields.map((field) => (
-          <span
-            key={field.fieldKey}
-            className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary"
-          >
-            {field.label}
-          </span>
-        ))}
-      </div>
-    </aside>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-medium">{value}</dd>
-    </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: number; tone?: 'ok' | 'bad' }) {
-  return (
-    <div
-      className={cn(
-        'rounded-lg border px-3 py-2',
-        tone === 'ok' && 'border-emerald-500/30 bg-emerald-500/5',
-        tone === 'bad' && 'border-destructive/30 bg-destructive/5',
-      )}
-    >
-      <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="text-lg font-semibold">{value}</p>
-    </div>
+    <input
+      className={selectClass}
+      type={field?.inputType === 'date' ? 'date' : field?.fieldKey === 'email' ? 'email' : 'text'}
+      value={value}
+      placeholder={`Enter ${field?.label ?? 'value'}`}
+      onChange={(event) => onChange(event.target.value)}
+    />
   );
 }
