@@ -85,4 +85,35 @@ describe('buildNoticeboardRowsFromPapers', () => {
     expect(rows[0].sem3).toBe('MAJOR 1');
     expect(rows[1].sem3).toBe('MAJOR 2');
   });
+
+  it('keeps morning and afternoon on the same date as separate rows', () => {
+    const rows = buildNoticeboardRowsFromPapers(
+      [
+        {
+          id: 'a',
+          paperCode: 'AEC-1',
+          semesterNo: 1,
+          category: 'AEC',
+          examDate: '2026-10-13',
+          startTime: '09:45',
+          endTime: '11:00',
+        },
+        {
+          id: 'b',
+          paperCode: 'SEC-1',
+          semesterNo: 1,
+          category: 'SEC',
+          examDate: '2026-10-13',
+          startTime: '13:00',
+          endTime: '14:15',
+        },
+      ],
+      'DAY',
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows[0].timingLabel).toBe('MORNING 9:45-11:00');
+    expect(rows[0].sem1).toBe('AEC');
+    expect(rows[1].timingLabel).toBe('AFTERNOON 1:00-2:15');
+    expect(rows[1].sem1).toBe('SEC');
+  });
 });

@@ -24,6 +24,8 @@ export type NoticeboardRow = {
   sem1: string;
   sem3: string;
   sem5: string;
+  /** Semester number → printed subject label. Falls back to sem1/sem3/sem5. */
+  cells?: Record<number, string>;
 };
 
 export type IaNoticeboardRoutineInput = {
@@ -32,6 +34,8 @@ export type IaNoticeboardRoutineInput = {
   shiftLabel: string;
   academicYearLabel?: string | null;
   rows: NoticeboardRow[];
+  /** Printed semester columns. Defaults to 1st, 3rd and 5th. */
+  semesterNos?: number[];
   instructions: string[];
   leftSignatory?: { title: string; subtitle?: string };
   rightSignatory?: { title: string; subtitle?: string };
@@ -103,6 +107,24 @@ export function renderIaNoticeboardRoutineHtml(
     .map((line) => `<div>${esc(line)}</div>`)
     .join('');
 
+  const semesterNos = input.semesterNos?.length ? input.semesterNos : [1, 3, 5];
+  const ordinal = (n: number) => {
+    const mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+    const mod10 = n % 10;
+    if (mod10 === 1) return `${n}st`;
+    if (mod10 === 2) return `${n}nd`;
+    if (mod10 === 3) return `${n}rd`;
+    return `${n}th`;
+  };
+  const cellFor = (row: NoticeboardRow, semesterNo: number) => {
+    if (row.cells && row.cells[semesterNo] != null)
+      return row.cells[semesterNo];
+    if (semesterNo === 1) return row.sem1;
+    if (semesterNo === 3) return row.sem3;
+    if (semesterNo === 5) return row.sem5;
+    return '--------';
+  };
   const rowsHtml = input.rows
     .map((r, idx) => {
       const stripe = idx % 2 === 0 ? 'row-even' : 'row-odd';
@@ -118,12 +140,11 @@ export function renderIaNoticeboardRoutineHtml(
         <div class="day">${esc(r.dayLabel)}</div>
       </td>
       <td class="c timing">${timingHtml(r.timingLabel)}</td>
-      ${semCell(r.sem1)}
-      ${semCell(r.sem3)}
-      ${semCell(r.sem5)}
+      ${semesterNos.map((semesterNo) => semCell(cellFor(r, semesterNo))).join('')}
     </tr>`;
     })
     .join('');
+  const semesterWidth = (58 / semesterNos.length).toFixed(1);
 
   const instructionsHtml = input.instructions
     .map(
@@ -345,12 +366,15 @@ export function renderIaNoticeboardRoutineHtml(
           <th rowspan="2" style="width:8%">Sl. No.</th>
           <th rowspan="2" style="width:18%">Date &amp; Day of Examinations</th>
           <th rowspan="2" style="width:16%">Timing</th>
-          <th colspan="3">Examinations for the courses to be held</th>
+          <th colspan="${semesterNos.length}">Examinations for the courses to be held</th>
         </tr>
         <tr>
-          <th style="width:19.3%">1st Semester</th>
-          <th style="width:19.3%">3rd Semester</th>
-          <th style="width:19.3%">5th Semester</th>
+          ${semesterNos
+            .map(
+              (semesterNo) =>
+                `<th style="width:${semesterWidth}%">${ordinal(semesterNo)} Semester</th>`,
+            )
+            .join('')}
         </tr>
       </thead>
       <tbody>

@@ -38,6 +38,7 @@ import {
   CreateIaExamDto,
   GenerateIaTimetableDto,
   PreviewIaExamDto,
+  SaveIaRoutineDto,
   UpdateIaExamDto,
 } from './dto/create-ia-exam.dto';
 import { IaAdmitCardService } from './ia-admit-card.service';
@@ -175,6 +176,38 @@ export class IaController {
     @Body() dto: UpdateIaExamDto,
   ) {
     return this.exams.updateExam(user, sessionId, dto);
+  }
+
+  @Post('exams/:sessionId/routine')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:create')
+  saveRoutine(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Body() dto: SaveIaRoutineDto,
+  ) {
+    return this.sessions.saveRoutine(user, sessionId, dto);
+  }
+
+  @Get('exams/:sessionId/routine.xlsx')
+  @RequireAnyPermission('ia:view', 'ia:manage', 'exam:view', 'exam:admin')
+  async routineXlsx(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Query('routinePattern') routinePattern: 'MORNING' | 'DAY' | undefined,
+    @Query('startDate') startDate: string | undefined,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.noticeboard.renderXlsx(
+      user,
+      sessionId,
+      { routinePattern, startDate },
+    );
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
   }
 
   @Post('exams/generate-timetable')

@@ -59,15 +59,36 @@ export function StudentIaPortal() {
               <th className="py-2">Code</th>
               <th className="py-2">Paper</th>
               <th className="py-2">Date</th>
+              <th className="py-2">Time</th>
             </tr>
           </thead>
           <tbody>
             {(schedule.data?.schedule ?? []).map(
-              (p: { id: string; paperCode: string; paperName: string; examDate: string }) => (
+              (p: {
+                id: string;
+                paperCode: string;
+                paperName: string;
+                sessionName?: string | null;
+                examDate: string;
+                startTime?: string | null;
+                endTime?: string | null;
+                revised?: boolean;
+              }) => (
                 <tr key={p.id} className="border-b border-border/40">
                   <td className="py-2">{p.paperCode}</td>
-                  <td className="py-2">{p.paperName}</td>
+                  <td className="py-2">
+                    {p.paperName}
+                    {p.sessionName ? (
+                      <div className="text-xs text-muted-foreground">{p.sessionName}</div>
+                    ) : null}
+                    {p.revised ? (
+                      <div className="text-xs font-medium text-amber-700">Revised routine</div>
+                    ) : null}
+                  </td>
                   <td className="py-2">{dateOnly(p.examDate)}</td>
+                  <td className="py-2">
+                    {p.startTime && p.endTime ? `${p.startTime}–${p.endTime}` : '—'}
+                  </td>
                 </tr>
               ),
             )}

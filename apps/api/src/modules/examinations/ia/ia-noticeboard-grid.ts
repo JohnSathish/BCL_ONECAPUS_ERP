@@ -79,7 +79,8 @@ function formatTiming(
   if (startPretty && endPretty) {
     // Official Day Shift notice labels morning papers as "MORNING 9:45-10:40"
     // and Friday VAC as plain "1:45-2:10" (12-hour, not 13:45).
-    if (options?.afternoon || (start && start.startsWith('13'))) {
+    const hour = start ? Number(start.slice(0, 2)) : 0;
+    if (options?.afternoon || hour >= 12) {
       return `AFTERNOON ${startPretty}-${endPretty}`;
     }
     if (pattern === 'MORNING' || pattern === 'DAY') {
@@ -186,64 +187,68 @@ export function buildNoticeboardRowsFromPapers(
   if (!dated.length) return [];
 
   const majorIndexById = buildMajorIndexMap(dated);
-  const byDate = new Map<
+  const columns = semesterColumns.length
+    ? semesterColumns
+    : [
+        ...new Set(
+          dated.map((p) => p.semesterNo).filter((n): n is number => n != null),
+        ),
+      ].sort((a, b) => a - b);
+  const bySitting = new Map<
     string,
     {
       date: Date;
-      starts: string[];
-      ends: string[];
+      start: string;
+      end: string;
       labelsBySem: Map<number, Set<string>>;
     }
   >();
 
   for (const p of dated) {
     const d = asDate(p.examDate)!;
-    const key = dateKey(d);
-    if (!byDate.has(key)) {
-      byDate.set(key, {
+    const st = formatClock(p.startTime) ?? '';
+    const et = formatClock(p.endTime) ?? '';
+    const hour = st ? Number(st.slice(0, 2)) : 0;
+    const key = `${dateKey(d)}|${hour < 12 ? 'am' : 'pm'}|${st}|${et}`;
+    if (!bySitting.has(key)) {
+      bySitting.set(key, {
         date: d,
-        starts: [],
-        ends: [],
-        labelsBySem: new Map(
-          semesterColumns.map((s) => [s, new Set<string>()]),
-        ),
+        start: st,
+        end: et,
+        labelsBySem: new Map(columns.map((s) => [s, new Set<string>()])),
       });
     }
-    const bucket = byDate.get(key)!;
-    const st = formatClock(p.startTime);
-    const et = formatClock(p.endTime);
-    if (st) bucket.starts.push(st);
-    if (et) bucket.ends.push(et);
+    const bucket = bySitting.get(key)!;
     const sem = p.semesterNo ?? 0;
-    if (!semesterColumns.includes(sem)) continue;
+    if (!columns.includes(sem)) continue;
     const label = noticeboardSlotLabel(p, majorIndexById);
     if (label) bucket.labelsBySem.get(sem)?.add(label);
   }
 
-  const sorted = [...byDate.values()].sort(
-    (a, b) => a.date.getTime() - b.date.getTime(),
-  );
+  const sorted = [...bySitting.values()].sort((a, b) => {
+    const byDate = a.date.getTime() - b.date.getTime();
+    if (byDate !== 0) return byDate;
+    return a.start.localeCompare(b.start);
+  });
 
   return sorted.map((bucket, index) => {
-    const start =
-      bucket.starts.sort()[0] ?? (pattern === 'MORNING' ? '07:15' : '09:45');
-    const end =
-      bucket.ends.sort().at(-1) ?? (pattern === 'MORNING' ? '08:00' : '10:40');
-    // Prefer afternoon timing when any paper that day starts at 13:xx
-    const afternoon = bucket.starts.find((s) => s.startsWith('13'));
-    const timingStart = afternoon ?? start;
-    const timingEnd = afternoon
-      ? (bucket.ends.find((e) => e.startsWith('14')) ?? '14:10')
-      : end;
-
+    const start = bucket.start || (pattern === 'MORNING' ? '07:15' : '09:45');
+    const end = bucket.end || (pattern === 'MORNING' ? '08:00' : '10:40');
+    const cells: Record<number, string> = {};
+    for (const sem of columns) {
+      cells[sem] = pickLabel(bucket.labelsBySem.get(sem) ?? new Set());
+    }
     return {
       slNo: index + 1,
       dateLabel: formatDisplayDate(bucket.date),
       dayLabel: formatDayName(bucket.date),
-      timingLabel: formatTiming(pattern, timingStart, timingEnd),
-      sem1: pickLabel(bucket.labelsBySem.get(1) ?? new Set()),
-      sem3: pickLabel(bucket.labelsBySem.get(3) ?? new Set()),
-      sem5: pickLabel(bucket.labelsBySem.get(5) ?? new Set()),
+      timingLabel: formatTiming(pattern, start, end, {
+        afternoon: Number(start.slice(0, 2)) >= 12,
+      }),
+      sem1: cells[1] ?? '--------',
+      sem3: cells[3] ?? '--------',
+      sem5: cells[5] ?? '--------',
+      cells,
     };
   });
 }

@@ -3,12 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import ExcelJS from 'exceljs';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { resolvePdfImageSrc } from '../../../common/uploads/pdf-asset.util';
 import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
 import { PrismaService } from '../../../database/prisma.service';
 import { IaAdmitPdfService } from './ia-admit-pdf.service';
 import {
+  buildNoticeboardRowsFromPapers,
   buildNoticeboardRowsFromPlan,
   resolveNoticeboardPattern,
 } from './ia-noticeboard-grid';
@@ -110,6 +112,26 @@ export class IaNoticeboardRoutineService {
     return `${day}${this.ordinal(day)} ${month} ${d.getFullYear()}`;
   }
 
+  private noticeInstructions(
+    stored: string | null,
+    builtByOffice: boolean,
+    isSecondIa: boolean,
+    pattern: 'MORNING' | 'DAY',
+    admitFrom: string,
+  ) {
+    const custom = (stored ?? '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (builtByOffice && custom.length) return custom;
+    if (isSecondIa) {
+      return pattern === 'MORNING'
+        ? [...FYUGP_SECOND_IA_MORNING_INSTRUCTIONS]
+        : [...FYUGP_SECOND_IA_INSTRUCTIONS];
+    }
+    return this.defaultInstructions(pattern, admitFrom);
+  }
+
   private ordinal(n: number) {
     const j = n % 10;
     const k = n % 100;
@@ -176,32 +198,73 @@ export class IaNoticeboardRoutineService {
         '2026-10-12')
       : (requestedStart ??
         this.toIsoDate(session.startDate as Date | string | null));
-    if (!startIso) {
+    const builtByOffice = meta.timetableSource === 'BUILDER';
+    if (!startIso && !builtByOffice) {
       throw new BadRequestException(
         'Set Start date on IA Timetable (e.g. 2026-08-24) before printing the noticeboard routine.',
       );
     }
-
-    const rows = isSecondIa
-      ? pattern === 'MORNING'
-        ? buildFyugpSecondIaMorningNotice(startIso)
-        : buildFyugpSecondIaDayNotice(startIso)
-      : buildNoticeboardRowsFromPlan(startIso, pattern);
+    const papers = builtByOffice
+      ? await (this.prisma as any).examPaperSchedule.findMany({
+          where: {
+            tenantId: user.tid,
+            sessionId,
+            deletedAt: null,
+            status: { not: 'UNSCHEDULED' },
+          },
+          orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }],
+        })
+      : [];
+    const fromPapers = [
+      ...new Set(
+        papers
+          .map((paper: { semesterNo?: number | null }) => paper.semesterNo)
+          .filter((n: number | null | undefined): n is number => n != null),
+      ),
+    ].sort((a, b) => a - b);
+    const semesterNos = (
+      Array.isArray(meta.semesterNos) && meta.semesterNos.length
+        ? meta.semesterNos
+        : fromPapers
+    )
+      .map((n: unknown) => Number(n))
+      .filter((n: number) => Number.isInteger(n) && n > 0);
+    const planStart = startIso ?? '2026-10-12';
+    const rows = builtByOffice
+      ? buildNoticeboardRowsFromPapers(
+          papers,
+          pattern,
+          semesterNos.length ? semesterNos : undefined,
+        )
+      : isSecondIa
+        ? pattern === 'MORNING'
+          ? buildFyugpSecondIaMorningNotice(planStart)
+          : buildFyugpSecondIaDayNotice(planStart)
+        : buildNoticeboardRowsFromPlan(planStart, pattern);
     if (!rows.length) {
       throw new BadRequestException(
-        'No timetable rows available for this examination.',
+        builtByOffice
+          ? 'Add at least one examination date before printing the routine.'
+          : 'No timetable rows available for this examination.',
       );
     }
 
     const academicYearName =
       typeof meta.academicYearName === 'string' ? meta.academicYearName : null;
     const year = this.yearFromSessionName(session.name, academicYearName);
-    const shiftLabel = pattern === 'MORNING' ? 'MORNING SHIFT' : 'DAY SHIFT';
-    const examTitle = isSecondIa
-      ? `FYUGP ROUTINE FOR ODD SEMESTER 2ND INTERNAL ASSESSMENT ${year}`
-      : `FYUGP ROUTINE FOR ODD SEMESTER FIRST INTERNAL ASSESSMENT ${year}`;
+    const shiftLabel =
+      builtByOffice && shiftName
+        ? shiftName.toUpperCase()
+        : pattern === 'MORNING'
+          ? 'MORNING SHIFT'
+          : 'DAY SHIFT';
+    const examTitle = builtByOffice
+      ? String(session.name || 'Examination routine').toUpperCase()
+      : isSecondIa
+        ? `FYUGP ROUTINE FOR ODD SEMESTER 2ND INTERNAL ASSESSMENT ${year}`
+        : `FYUGP ROUTINE FOR ODD SEMESTER FIRST INTERNAL ASSESSMENT ${year}`;
 
-    const [sy, sm, sd] = startIso.split('-').map(Number);
+    const [sy, sm, sd] = planStart.split('-').map(Number);
     const startForAdmit = new Date(sy, sm - 1, sd);
     const admitFrom = this.formatAdmitFrom(startForAdmit);
 
@@ -215,11 +278,15 @@ export class IaNoticeboardRoutineService {
       shiftLabel,
       academicYearLabel: academicYearName,
       rows,
-      instructions: isSecondIa
-        ? pattern === 'MORNING'
-          ? [...FYUGP_SECOND_IA_MORNING_INSTRUCTIONS]
-          : [...FYUGP_SECOND_IA_INSTRUCTIONS]
-        : this.defaultInstructions(pattern, admitFrom),
+      semesterNos:
+        builtByOffice && semesterNos.length ? semesterNos : [1, 3, 5],
+      instructions: this.noticeInstructions(
+        session.instructions as string | null,
+        builtByOffice,
+        isSecondIa,
+        pattern,
+        admitFrom,
+      ),
       leftSignatory: {
         title: 'Coordinator,',
         subtitle: 'Examination cell',
@@ -258,5 +325,59 @@ export class IaNoticeboardRoutineService {
     );
     const pdf = await this.pdf.htmlToPdf(html);
     return { pdf, filename };
+  }
+
+  async renderXlsx(
+    user: JwtUser,
+    sessionId: string,
+    options?: { routinePattern?: 'MORNING' | 'DAY'; startDate?: string },
+  ) {
+    const { input, filename } = await this.buildDocument(
+      user,
+      sessionId,
+      options,
+    );
+    const semesters = input.semesterNos?.length ? input.semesterNos : [1, 3, 5];
+    const book = new ExcelJS.Workbook();
+    const sheet = book.addWorksheet('Routine');
+    sheet.addRow([input.examTitle]);
+    sheet.addRow([input.shiftLabel]);
+    sheet.addRow([]);
+    sheet.addRow([
+      'Sl. No.',
+      'Date',
+      'Day',
+      'Session and timing',
+      ...semesters.map((semesterNo) => `Semester ${semesterNo}`),
+    ]);
+    for (const row of input.rows) {
+      sheet.addRow([
+        row.slNo,
+        row.dateLabel,
+        row.dayLabel,
+        row.timingLabel,
+        ...semesters.map((semesterNo) => {
+          const label = row.cells?.[semesterNo];
+          if (label) return label;
+          if (semesterNo === 1) return row.sem1;
+          if (semesterNo === 3) return row.sem3;
+          if (semesterNo === 5) return row.sem5;
+          return '';
+        }),
+      ]);
+    }
+    sheet.addRow([]);
+    sheet.addRow(['Instructions']);
+    input.instructions.forEach((line, index) => {
+      sheet.addRow([`${index + 1}. ${line}`]);
+    });
+    sheet.columns.forEach((column) => {
+      column.width = 22;
+    });
+    const buffer = await book.xlsx.writeBuffer();
+    return {
+      buffer: Buffer.from(buffer),
+      filename: filename.replace(/\.pdf$/i, '.xlsx'),
+    };
   }
 }

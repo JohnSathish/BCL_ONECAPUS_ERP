@@ -12,6 +12,7 @@ import { normalizeIaSubjectCategory } from './ia-category-policy';
 import { refreshExamPaperNames } from './ia-paper-names';
 import { IA_EXAM_TYPES, isIaExamType } from './ia.constants';
 import { IaAuditService } from './ia-audit.service';
+import type { SaveIaRoutineDto } from './dto/create-ia-exam.dto';
 import type {
   IaPaperDto,
   IaQueryDto,
@@ -582,6 +583,232 @@ export class IaSessionService {
     );
     void this.examCalendar.syncSession(user, dto.sessionId);
     return { updated: rows.length };
+  }
+
+  async saveRoutine(user: JwtUser, sessionId: string, dto: SaveIaRoutineDto) {
+    await this.licenseEnforcement.assertWriteAllowed(
+      user.tid,
+      'examination.write',
+    );
+    const session = await (this.prisma as any).examSession.findFirst({
+      where: { id: sessionId, tenantId: user.tid, deletedAt: null },
+    });
+    if (!session || !isIaExamType(session.examType)) {
+      throw new NotFoundException('IA session not found');
+    }
+    const papers = await (this.prisma as any).examPaperSchedule.findMany({
+      where: { tenantId: user.tid, sessionId, deletedAt: null },
+    });
+    const byId = new Map(
+      papers.map((paper: { id: string }) => [paper.id, paper]),
+    );
+    const seen = new Set<string>();
+    const warnings: string[] = [];
+
+    for (const sitting of dto.sittings) {
+      this.assertClockOrder(sitting.startTime, sitting.endTime);
+      if (!sitting.paperIds.length) {
+        warnings.push(
+          `${sitting.examDate} ${sitting.startTime}–${sitting.endTime} has no subject.`,
+        );
+      }
+      for (const paperId of sitting.paperIds) {
+        if (!byId.has(paperId)) {
+          throw new BadRequestException(
+            'One of the subjects is not on this examination.',
+          );
+        }
+        if (seen.has(paperId)) {
+          throw new BadRequestException(
+            'The same subject is listed on more than one session. Remove the duplicate before saving.',
+          );
+        }
+        seen.add(paperId);
+      }
+    }
+
+    const placed = dto.sittings.flatMap((sitting) =>
+      sitting.paperIds.map((id) => ({ id, sitting })),
+    );
+    const codeSeen = new Map<string, string>();
+    for (const item of placed) {
+      const paper = byId.get(item.id) as {
+        paperCode: string;
+        semesterNo?: number | null;
+        paperName: string;
+      };
+      const key = `${paper.semesterNo ?? 0}|${paper.paperCode.toUpperCase()}`;
+      const slot = `${item.sitting.examDate} ${item.sitting.startTime}`;
+      const previous = codeSeen.get(key);
+      if (previous && previous !== slot) {
+        warnings.push(
+          `${paper.paperCode} (Semester ${paper.semesterNo ?? '—'}) is scheduled on ${previous} and ${slot}.`,
+        );
+      } else if (!previous) {
+        codeSeen.set(key, slot);
+      }
+    }
+
+    const bySemesterDate = new Map<string, typeof dto.sittings>();
+    for (const sitting of dto.sittings) {
+      const semesters = new Set(
+        sitting.paperIds.map(
+          (id) =>
+            (byId.get(id) as { semesterNo?: number | null }).semesterNo ?? 0,
+        ),
+      );
+      for (const semesterNo of semesters) {
+        const key = `${sitting.examDate}|${semesterNo}`;
+        const list = bySemesterDate.get(key) ?? [];
+        list.push(sitting);
+        bySemesterDate.set(key, list);
+      }
+    }
+    for (const [key, sittings] of bySemesterDate) {
+      for (let i = 0; i < sittings.length; i += 1) {
+        for (let j = i + 1; j < sittings.length; j += 1) {
+          const a = sittings[i];
+          const b = sittings[j];
+          if (a.startTime < b.endTime && b.startTime < a.endTime) {
+            warnings.push(
+              `Semester ${key.split('|')[1]} has overlapping sessions on ${a.examDate} (${a.startTime} and ${b.startTime}).`,
+            );
+          }
+        }
+      }
+    }
+
+    const omitted = papers.filter(
+      (paper: { id: string }) => !seen.has(paper.id),
+    );
+    if (dto.publish && omitted.length) {
+      warnings.push(
+        `${omitted.length} subject${omitted.length === 1 ? '' : 's'} are not on the routine.`,
+      );
+    }
+    if (dto.publish && !dto.sittings.length) {
+      warnings.push('The routine has no examination dates.');
+    }
+    if (
+      dto.publish &&
+      !(dto.instructions ?? session.instructions ?? '').trim()
+    ) {
+      warnings.push('Examination instructions are empty.');
+    }
+    const uniqueWarnings = [...new Set(warnings)];
+    if (dto.publish && uniqueWarnings.length && !dto.acknowledgeWarnings) {
+      throw new BadRequestException({
+        message:
+          'This routine still has warnings. Confirm to publish it anyway.',
+        warnings: uniqueWarnings,
+      });
+    }
+
+    const dates = dto.sittings.map((sitting) => sitting.examDate).sort();
+    const meta = {
+      ...((session.metadata ?? {}) as Record<string, unknown>),
+    };
+    const wasPublished = [
+      'SCHEDULED',
+      'ACTIVE',
+      'OPEN',
+      'IN_PROGRESS',
+    ].includes(String(session.status));
+    const revision = Number(meta.routineRevision ?? 0);
+    const nextRevision = dto.publish
+      ? wasPublished
+        ? revision + 1
+        : Math.max(revision, 1)
+      : revision;
+    meta.timetableSource = 'BUILDER';
+    meta.routineRevision = nextRevision;
+    if (dto.publish) {
+      meta.routinePublishedAt = new Date().toISOString();
+      if (wasPublished) meta.routineRevisedAt = new Date().toISOString();
+    }
+    if (dto.durationMinutes != null)
+      meta.examDurationMinutes = dto.durationMinutes;
+    if (dto.passMarks != null) meta.passMarks = dto.passMarks;
+
+    const keepStatus = ['ACTIVE', 'OPEN', 'IN_PROGRESS', 'COMPLETED'].includes(
+      String(session.status),
+    );
+    const status = dto.publish
+      ? keepStatus
+        ? session.status
+        : 'SCHEDULED'
+      : 'DRAFT';
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const sitting of dto.sittings) {
+        if (!sitting.paperIds.length) continue;
+        await (tx as any).examPaperSchedule.updateMany({
+          where: { id: { in: sitting.paperIds }, tenantId: user.tid },
+          data: {
+            examDate: new Date(sitting.examDate),
+            startTime: this.wallClock(sitting.startTime),
+            endTime: this.wallClock(sitting.endTime),
+            status: 'SCHEDULED',
+          },
+        });
+      }
+      if (omitted.length) {
+        await (tx as any).examPaperSchedule.updateMany({
+          where: {
+            id: { in: omitted.map((paper: { id: string }) => paper.id) },
+            tenantId: user.tid,
+          },
+          data: { status: 'UNSCHEDULED' },
+        });
+      }
+      await (tx as any).examSession.update({
+        where: { id: session.id },
+        data: {
+          status,
+          instructions:
+            dto.instructions !== undefined
+              ? dto.instructions.trim() || null
+              : session.instructions,
+          ...(dates[0] ? { startDate: new Date(dates[0]) } : {}),
+          ...(dates.length
+            ? { endDate: new Date(dates[dates.length - 1]) }
+            : {}),
+          metadata: meta,
+        },
+      });
+    });
+
+    await this.audit.log(
+      user,
+      'IA_TIMETABLE',
+      session.id,
+      dto.publish ? 'PUBLISH' : 'DRAFT',
+      {
+        status: session.status,
+        instructions: session.instructions,
+      },
+      {
+        status,
+        sittings: dto.sittings.map((sitting) => ({
+          examDate: sitting.examDate,
+          startTime: sitting.startTime,
+          endTime: sitting.endTime,
+          papers: sitting.paperIds.length,
+        })),
+        unscheduled: omitted.length,
+        revision: nextRevision,
+        warnings: uniqueWarnings,
+      },
+    );
+    void this.examCalendar.syncSession(user, session.id);
+    return {
+      updated: seen.size,
+      unscheduled: omitted.length,
+      warnings: uniqueWarnings,
+      status,
+      revision: nextRevision,
+      revised: dto.publish && wasPublished,
+    };
   }
 
   async getPaper(tenantId: string, paperId: string) {

@@ -269,6 +269,7 @@ export default function StudentExamScheduleScreen() {
                 <Text style={styles.summaryMeta}>
                   {iaRows.length} paper{iaRows.length === 1 ? '' : 's'}
                   {dateSpan ? ` · ${dateSpan}` : ''}
+                  {iaSchedule.some((item) => item.revised) ? ' · Revised routine' : ''}
                 </Text>
               </View>
               {iaRows.map(({ item, when }) => (

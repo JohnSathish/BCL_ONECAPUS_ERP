@@ -188,6 +188,10 @@ export type IaExamSummary = IaSession & {
     streamName?: string;
     shiftName?: string;
     marksEntryDeadline?: string | null;
+    examDurationMinutes?: number;
+    passMarks?: number;
+    routineRevision?: number;
+    timetableSource?: string;
     departmentCount?: number;
     studentsRegistered?: number;
   };
@@ -380,6 +384,52 @@ export async function fetchIaNoticeboardRoutineHtml(
     },
   );
   return data;
+}
+
+export async function saveIaRoutine(
+  sessionId: string,
+  payload: {
+    sittings: Array<{
+      examDate: string;
+      startTime: string;
+      endTime: string;
+      paperIds: string[];
+    }>;
+    instructions?: string;
+    durationMinutes?: number;
+    passMarks?: number;
+    publish?: boolean;
+    acknowledgeWarnings?: boolean;
+  },
+) {
+  const { data } = await api.post(`/v1/examinations/ia/exams/${sessionId}/routine`, payload);
+  return data as {
+    updated: number;
+    unscheduled: number;
+    warnings: string[];
+    status: string;
+    revision: number;
+    revised: boolean;
+  };
+}
+
+export async function downloadIaRoutineExcel(
+  sessionId: string,
+  options?: { routinePattern?: 'MORNING' | 'DAY'; startDate?: string },
+) {
+  const response = await api.get(`/v1/examinations/ia/exams/${sessionId}/routine.xlsx`, {
+    params: {
+      ...(options?.routinePattern ? { routinePattern: options.routinePattern } : {}),
+      ...(options?.startDate ? { startDate: options.startDate } : {}),
+    },
+    responseType: 'blob',
+  });
+  const header = String(response.headers?.['content-disposition'] ?? '');
+  const named = header.match(/filename="([^"]+)"/);
+  return {
+    blob: response.data as Blob,
+    filename: named?.[1] ?? 'examination-routine.xlsx',
+  };
 }
 
 export type IaResultPreviewPaper = {

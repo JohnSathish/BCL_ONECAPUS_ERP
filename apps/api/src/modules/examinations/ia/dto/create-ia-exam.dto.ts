@@ -1,6 +1,7 @@
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
@@ -9,9 +10,11 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   Min,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IA_EXAM_TYPES } from '../ia.constants';
@@ -195,4 +198,52 @@ export class GenerateIaTimetableDto {
   @IsOptional()
   @IsIn(['MORNING', 'DAY'])
   routinePattern?: 'MORNING' | 'DAY';
+}
+
+export class SaveIaRoutineSittingDto {
+  @IsDateString()
+  examDate!: string;
+
+  @Matches(/^\d{2}:\d{2}$/)
+  startTime!: string;
+
+  @Matches(/^\d{2}:\d{2}$/)
+  endTime!: string;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  paperIds!: string[];
+}
+
+export class SaveIaRoutineDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SaveIaRoutineSittingDto)
+  sittings!: SaveIaRoutineSittingDto[];
+
+  @IsOptional()
+  @IsString()
+  instructions?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(480)
+  durationMinutes?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  passMarks?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  publish?: boolean;
+
+  /** Publish even when the routine still has warnings. */
+  @IsOptional()
+  @IsBoolean()
+  acknowledgeWarnings?: boolean;
 }

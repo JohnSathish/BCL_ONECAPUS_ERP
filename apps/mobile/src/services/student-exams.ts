@@ -53,6 +53,7 @@ export type IaExamScheduleItem = {
   examDate?: string;
   startTime?: string;
   endTime?: string;
+  revised?: boolean;
 };
 
 export type IaExamSchedule = {

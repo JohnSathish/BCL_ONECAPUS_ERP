@@ -132,8 +132,13 @@ export class IaPortalService {
         examType: { in: [...IA_EXAM_TYPES] },
         status: { in: ['ACTIVE', 'SCHEDULED', 'OPEN'] },
       },
-      select: { id: true, shiftId: true, name: true },
-    })) as Array<{ id: string; shiftId: string | null; name: string | null }>;
+      select: { id: true, shiftId: true, name: true, metadata: true },
+    })) as Array<{
+      id: string;
+      shiftId: string | null;
+      name: string | null;
+      metadata?: { routineRevision?: number } | null;
+    }>;
     const sessionIds = sessions.map((s) => s.id);
     const sessionNameById = new Map(
       sessions.map((session) => [session.id, session.name?.trim() || null]),
@@ -158,6 +163,7 @@ export class IaPortalService {
             tenantId: user.tid,
             deletedAt: null,
             sessionId: { in: sessionIds },
+            status: { not: 'UNSCHEDULED' },
           },
           orderBy: [{ examDate: 'asc' }, { startTime: 'asc' }],
           take: 2000,
@@ -231,6 +237,11 @@ export class IaPortalService {
         examDate: p.examDate,
         startTime: formatExamWallClock(p.startTime),
         endTime: formatExamWallClock(p.endTime),
+        revised:
+          Number(
+            sessions.find((session) => session.id === p.sessionId)?.metadata
+              ?.routineRevision ?? 0,
+          ) > 1,
       }));
 
     return {

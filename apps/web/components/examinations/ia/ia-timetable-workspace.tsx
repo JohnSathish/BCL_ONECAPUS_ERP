@@ -34,6 +34,7 @@ import {
 } from '@/services/examinations-ia';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+import { IaRoutineBuilder } from './ia-routine-builder';
 
 type RoutineChoice = 'DAY_SECOND' | 'MORNING_SECOND' | 'FIRST' | 'SIMPLE';
 
@@ -113,6 +114,7 @@ export function IaTimetableWorkspace() {
   const [durationMinutes, setDurationMinutes] = useState(75);
   const [advanced, setAdvanced] = useState(false);
   const [message, setMessage] = useState('');
+  const [board, setBoard] = useState<'builder' | 'papers'>('builder');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [semester, setSemester] = useState('all');
@@ -581,354 +583,403 @@ export function IaTimetableWorkspace() {
         ) : null}
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 p-4">
-          <div className="flex gap-2">
-            <CalendarDays className="mt-0.5 h-5 w-5 text-blue-600" />
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">IA Timetable — Table View</h2>
-              <p className="text-xs text-slate-500">
-                Subjects for the selected examination, with the scheduled date and time.
-              </p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setBoard('builder')}
+          className={cn(
+            'rounded-full px-3 py-1.5 text-sm font-semibold',
+            board === 'builder'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-slate-600 ring-1 ring-slate-200',
+          )}
+        >
+          Routine builder
+        </button>
+        <button
+          type="button"
+          onClick={() => setBoard('papers')}
+          className={cn(
+            'rounded-full px-3 py-1.5 text-sm font-semibold',
+            board === 'papers'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-slate-600 ring-1 ring-slate-200',
+          )}
+        >
+          Paper list
+        </button>
+      </div>
+
+      {board === 'builder' ? (
+        <IaRoutineBuilder
+          exam={selectedExam}
+          papers={sessionPapers}
+          papersReady={!papers.isLoading}
+          onChanged={() => {
+            void qc.invalidateQueries({ queryKey: ['ia', 'papers', sessionId] });
+            void qc.invalidateQueries({ queryKey: ['ia', 'exams'] });
+          }}
+        />
+      ) : null}
+
+      {board === 'papers' ? (
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 p-4">
+            <div className="flex gap-2">
+              <CalendarDays className="mt-0.5 h-5 w-5 text-blue-600" />
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">
+                  IA Timetable — Table View
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Subjects for the selected examination, with the scheduled date and time.
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <GhostButton active={editMode} onClick={() => setEditMode((on) => !on)}>
-              <Pencil className="h-4 w-4" /> Edit Mode
-            </GhostButton>
-            <GhostButton
-              onClick={() => {
-                if (!selectedIds.length) {
-                  setMessage('Tick the papers you want to update.');
-                  return;
-                }
-                setBulkOpen(true);
-              }}
-            >
-              Bulk Update
-            </GhostButton>
-            <GhostButton onClick={() => setImportOpen(true)}>Import from Previous</GhostButton>
-            <button
-              type="button"
-              onClick={() => downloadPdf.mutate()}
-              disabled={!sessionId || downloadPdf.isPending}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-rose-50 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-100 disabled:opacity-50"
-            >
-              {downloadPdf.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Download className="h-3.5 w-3.5" />
-              )}
-              Download PDF
-            </button>
-            <GhostButton
-              onClick={() => printHtml.mutate()}
-              disabled={printHtml.isPending || !sessionId}
-            >
-              {printHtml.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Printer className="h-4 w-4" />
-              )}
-              Print Timetable
-            </GhostButton>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3">
-          <label className="relative min-w-[220px] flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Search by subject code or subject name..."
-              className="h-10 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-blue-400"
-            />
-          </label>
-          <MiniSelect
-            label="Semester"
-            value={semester}
-            onChange={(value) => {
-              setSemester(value);
-              setPage(1);
-            }}
-            options={[
-              ['all', 'All Semesters'],
-              ...semesters.map((item) => [String(item), String(item)] as [string, string]),
-            ]}
-          />
-          <MiniSelect
-            label="Department"
-            value={department}
-            onChange={(value) => {
-              setDepartment(value);
-              setPage(1);
-            }}
-            options={[
-              ['all', 'All Departments'],
-              ...departments.map((name) => [name, name] as [string, string]),
-            ]}
-          />
-          <MiniSelect
-            label="Date"
-            value={dateFilter}
-            onChange={(value) => {
-              setDateFilter(value);
-              setPage(1);
-            }}
-            options={[
-              ['all', 'All Dates'],
-              ...dates.map((date) => [date, displayDate(date)] as [string, string]),
-            ]}
-          />
-          <MiniSelect
-            label="Status"
-            value={statusFilter}
-            onChange={(value) => {
-              setStatusFilter(value);
-              setPage(1);
-            }}
-            options={[
-              ['all', 'All Status'],
-              ['scheduled', 'Scheduled'],
-              ['tentative', 'Tentative'],
-            ]}
-          />
-          <button
-            type="button"
-            onClick={() => void papers.refetch()}
-            className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white"
-          >
-            <SlidersHorizontal className="h-4 w-4" /> Filter
-          </button>
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="h-10 px-2 text-sm text-slate-500 hover:text-slate-800"
-          >
-            Reset
-          </button>
-        </div>
-
-        {papers.isError ? (
-          <div className="p-4">
-            <QueryErrorPanel
-              title="Unable to load this timetable"
-              error={papers.error}
-              onRetry={() => void papers.refetch()}
-              isRetrying={papers.isFetching}
-            />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="bg-sky-50 text-[11px] uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="w-10 px-3 py-3">
-                    <input
-                      type="checkbox"
-                      checked={pageRows.length > 0 && pageRows.every((paper) => selected[paper.id])}
-                      onChange={(event) => {
-                        const on = event.target.checked;
-                        setSelected((prev) => {
-                          const next = { ...prev };
-                          for (const paper of pageRows) next[paper.id] = on;
-                          return next;
-                        });
-                      }}
-                      aria-label="Select papers on this page"
-                    />
-                  </th>
-                  <th className="px-2 py-3">#</th>
-                  <th className="px-2 py-3">Subject Code</th>
-                  <th className="px-2 py-3">Subject / Paper</th>
-                  <th className="px-2 py-3">Sem</th>
-                  <SortHeader
-                    label="Date"
-                    active={sortKey === 'date'}
-                    onClick={() => setSortKey('date')}
-                  />
-                  <th className="px-2 py-3">Day</th>
-                  <SortHeader
-                    label="Time"
-                    active={sortKey === 'time'}
-                    onClick={() => setSortKey('time')}
-                  />
-                  <th className="px-2 py-3">Status</th>
-                  <th className="px-2 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((paper, index) => {
-                  const draft = draftFor(paper);
-                  const state = paperState(paper);
-                  return (
-                    <tr key={paper.id} className="border-t border-slate-100">
-                      <td className="px-3 py-2.5">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(selected[paper.id])}
-                          onChange={(event) =>
-                            setSelected((prev) => ({ ...prev, [paper.id]: event.target.checked }))
-                          }
-                          aria-label={`Select ${paper.paperCode}`}
-                        />
-                      </td>
-                      <td className="px-2 py-2.5 text-slate-500">{pageStart + index}</td>
-                      <td className="px-2 py-2.5 font-medium text-slate-800">{paper.paperCode}</td>
-                      <td className="px-2 py-2.5 text-slate-700">{paper.paperName}</td>
-                      <td className="px-2 py-2.5">{paper.semesterNo ?? '—'}</td>
-                      <td className="px-2 py-2">
-                        {editMode ? (
-                          <input
-                            type="date"
-                            value={draft.examDate}
-                            onChange={(event) =>
-                              setDrafts((prev) => ({
-                                ...prev,
-                                [paper.id]: { ...draft, examDate: event.target.value },
-                              }))
-                            }
-                            className="h-9 rounded-lg border border-slate-200 px-2 text-sm"
-                          />
-                        ) : (
-                          displayDate(draft.examDate || paper.examDate)
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5">{weekday(draft.examDate || paper.examDate)}</td>
-                      <td className="px-2 py-2 text-slate-700">
-                        {editMode ? (
-                          <span className="flex items-center gap-1">
-                            <input
-                              type="time"
-                              value={draft.startTime}
-                              onChange={(event) =>
-                                setDrafts((prev) => ({
-                                  ...prev,
-                                  [paper.id]: { ...draft, startTime: event.target.value },
-                                }))
-                              }
-                              className="h-9 rounded-lg border border-slate-200 px-2 text-sm"
-                            />
-                            <input
-                              type="time"
-                              value={draft.endTime}
-                              onChange={(event) =>
-                                setDrafts((prev) => ({
-                                  ...prev,
-                                  [paper.id]: { ...draft, endTime: event.target.value },
-                                }))
-                              }
-                              className="h-9 rounded-lg border border-slate-200 px-2 text-sm"
-                            />
-                          </span>
-                        ) : (
-                          `${clock12(paper.startTime)} – ${clock12(paper.endTime)}`
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5">
-                        {state === 'scheduled' ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Scheduled
-                          </span>
-                        ) : (
-                          <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            Tentative
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5">
-                        <button
-                          type="button"
-                          title="Edit this paper"
-                          onClick={() => setEditing(paper)}
-                          className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {!pageRows.length ? (
-              <p className="px-4 py-8 text-center text-sm text-slate-500">
-                {papers.isLoading
-                  ? 'Loading the timetable…'
-                  : 'No papers match this examination and filter.'}
-              </p>
-            ) : null}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
-          <p className="text-xs text-slate-500">
-            Showing {pageStart} to {pageEnd} of {filtered.length} entries
-          </p>
-          <div className="flex items-center gap-1">
-            <PageButton disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </PageButton>
-            {Array.from({ length: pageCount }, (_, index) => index + 1)
-              .filter((item) => item === 1 || item === pageCount || Math.abs(item - safePage) <= 1)
-              .map((item, index, list) => (
-                <span key={item} className="flex items-center">
-                  {index > 0 && list[index - 1] !== item - 1 ? (
-                    <span className="px-1 text-slate-400">…</span>
-                  ) : null}
-                  <PageButton active={item === safePage} onClick={() => setPage(item)}>
-                    {item}
-                  </PageButton>
-                </span>
-              ))}
-            <PageButton disabled={safePage >= pageCount} onClick={() => setPage(safePage + 1)}>
-              <ChevronRight className="h-4 w-4" />
-            </PageButton>
-          </div>
-          <div className="flex items-center gap-2">
-            {editMode && dirtyRows.length ? (
+            <div className="flex flex-wrap gap-2">
+              <GhostButton active={editMode} onClick={() => setEditMode((on) => !on)}>
+                <Pencil className="h-4 w-4" /> Edit Mode
+              </GhostButton>
+              <GhostButton
+                onClick={() => {
+                  if (!selectedIds.length) {
+                    setMessage('Tick the papers you want to update.');
+                    return;
+                  }
+                  setBulkOpen(true);
+                }}
+              >
+                Bulk Update
+              </GhostButton>
+              <GhostButton onClick={() => setImportOpen(true)}>Import from Previous</GhostButton>
               <button
                 type="button"
-                disabled={saveSchedule.isPending}
-                onClick={() =>
-                  saveSchedule.mutate(
-                    dirtyRows.map(([id, row]) => ({
-                      id,
-                      examDate: row.examDate,
-                      startTime: row.startTime,
-                      endTime: row.endTime,
-                    })),
-                  )
-                }
-                className="inline-flex h-9 items-center rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                onClick={() => downloadPdf.mutate()}
+                disabled={!sessionId || downloadPdf.isPending}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-rose-50 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-100 disabled:opacity-50"
               >
-                Save timetable changes
+                {downloadPdf.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                Download PDF
               </button>
-            ) : null}
-            <label className="flex items-center gap-2 text-xs text-slate-500">
-              Rows per page
-              <select
-                value={pageSize}
+              <GhostButton
+                onClick={() => printHtml.mutate()}
+                disabled={printHtml.isPending || !sessionId}
+              >
+                {printHtml.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Printer className="h-4 w-4" />
+                )}
+                Print Timetable
+              </GhostButton>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3">
+            <label className="relative min-w-[220px] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
                 onChange={(event) => {
-                  setPageSize(Number(event.target.value));
+                  setSearch(event.target.value);
                   setPage(1);
                 }}
-                className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm"
-              >
-                {PAGE_SIZES.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
+                placeholder="Search by subject code or subject name..."
+                className="h-10 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-blue-400"
+              />
             </label>
+            <MiniSelect
+              label="Semester"
+              value={semester}
+              onChange={(value) => {
+                setSemester(value);
+                setPage(1);
+              }}
+              options={[
+                ['all', 'All Semesters'],
+                ...semesters.map((item) => [String(item), String(item)] as [string, string]),
+              ]}
+            />
+            <MiniSelect
+              label="Department"
+              value={department}
+              onChange={(value) => {
+                setDepartment(value);
+                setPage(1);
+              }}
+              options={[
+                ['all', 'All Departments'],
+                ...departments.map((name) => [name, name] as [string, string]),
+              ]}
+            />
+            <MiniSelect
+              label="Date"
+              value={dateFilter}
+              onChange={(value) => {
+                setDateFilter(value);
+                setPage(1);
+              }}
+              options={[
+                ['all', 'All Dates'],
+                ...dates.map((date) => [date, displayDate(date)] as [string, string]),
+              ]}
+            />
+            <MiniSelect
+              label="Status"
+              value={statusFilter}
+              onChange={(value) => {
+                setStatusFilter(value);
+                setPage(1);
+              }}
+              options={[
+                ['all', 'All Status'],
+                ['scheduled', 'Scheduled'],
+                ['tentative', 'Tentative'],
+              ]}
+            />
+            <button
+              type="button"
+              onClick={() => void papers.refetch()}
+              className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white"
+            >
+              <SlidersHorizontal className="h-4 w-4" /> Filter
+            </button>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="h-10 px-2 text-sm text-slate-500 hover:text-slate-800"
+            >
+              Reset
+            </button>
           </div>
-        </div>
-      </section>
+
+          {papers.isError ? (
+            <div className="p-4">
+              <QueryErrorPanel
+                title="Unable to load this timetable"
+                error={papers.error}
+                onRetry={() => void papers.refetch()}
+                isRetrying={papers.isFetching}
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] text-left text-sm">
+                <thead className="bg-sky-50 text-[11px] uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="w-10 px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={
+                          pageRows.length > 0 && pageRows.every((paper) => selected[paper.id])
+                        }
+                        onChange={(event) => {
+                          const on = event.target.checked;
+                          setSelected((prev) => {
+                            const next = { ...prev };
+                            for (const paper of pageRows) next[paper.id] = on;
+                            return next;
+                          });
+                        }}
+                        aria-label="Select papers on this page"
+                      />
+                    </th>
+                    <th className="px-2 py-3">#</th>
+                    <th className="px-2 py-3">Subject Code</th>
+                    <th className="px-2 py-3">Subject / Paper</th>
+                    <th className="px-2 py-3">Sem</th>
+                    <SortHeader
+                      label="Date"
+                      active={sortKey === 'date'}
+                      onClick={() => setSortKey('date')}
+                    />
+                    <th className="px-2 py-3">Day</th>
+                    <SortHeader
+                      label="Time"
+                      active={sortKey === 'time'}
+                      onClick={() => setSortKey('time')}
+                    />
+                    <th className="px-2 py-3">Status</th>
+                    <th className="px-2 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((paper, index) => {
+                    const draft = draftFor(paper);
+                    const state = paperState(paper);
+                    return (
+                      <tr key={paper.id} className="border-t border-slate-100">
+                        <td className="px-3 py-2.5">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selected[paper.id])}
+                            onChange={(event) =>
+                              setSelected((prev) => ({ ...prev, [paper.id]: event.target.checked }))
+                            }
+                            aria-label={`Select ${paper.paperCode}`}
+                          />
+                        </td>
+                        <td className="px-2 py-2.5 text-slate-500">{pageStart + index}</td>
+                        <td className="px-2 py-2.5 font-medium text-slate-800">
+                          {paper.paperCode}
+                        </td>
+                        <td className="px-2 py-2.5 text-slate-700">{paper.paperName}</td>
+                        <td className="px-2 py-2.5">{paper.semesterNo ?? '—'}</td>
+                        <td className="px-2 py-2">
+                          {editMode ? (
+                            <input
+                              type="date"
+                              value={draft.examDate}
+                              onChange={(event) =>
+                                setDrafts((prev) => ({
+                                  ...prev,
+                                  [paper.id]: { ...draft, examDate: event.target.value },
+                                }))
+                              }
+                              className="h-9 rounded-lg border border-slate-200 px-2 text-sm"
+                            />
+                          ) : (
+                            displayDate(draft.examDate || paper.examDate)
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5">{weekday(draft.examDate || paper.examDate)}</td>
+                        <td className="px-2 py-2 text-slate-700">
+                          {editMode ? (
+                            <span className="flex items-center gap-1">
+                              <input
+                                type="time"
+                                value={draft.startTime}
+                                onChange={(event) =>
+                                  setDrafts((prev) => ({
+                                    ...prev,
+                                    [paper.id]: { ...draft, startTime: event.target.value },
+                                  }))
+                                }
+                                className="h-9 rounded-lg border border-slate-200 px-2 text-sm"
+                              />
+                              <input
+                                type="time"
+                                value={draft.endTime}
+                                onChange={(event) =>
+                                  setDrafts((prev) => ({
+                                    ...prev,
+                                    [paper.id]: { ...draft, endTime: event.target.value },
+                                  }))
+                                }
+                                className="h-9 rounded-lg border border-slate-200 px-2 text-sm"
+                              />
+                            </span>
+                          ) : (
+                            `${clock12(paper.startTime)} – ${clock12(paper.endTime)}`
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5">
+                          {state === 'scheduled' ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Scheduled
+                            </span>
+                          ) : (
+                            <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                              Tentative
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5">
+                          <button
+                            type="button"
+                            title="Edit this paper"
+                            onClick={() => setEditing(paper)}
+                            className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {!pageRows.length ? (
+                <p className="px-4 py-8 text-center text-sm text-slate-500">
+                  {papers.isLoading
+                    ? 'Loading the timetable…'
+                    : 'No papers match this examination and filter.'}
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+            <p className="text-xs text-slate-500">
+              Showing {pageStart} to {pageEnd} of {filtered.length} entries
+            </p>
+            <div className="flex items-center gap-1">
+              <PageButton disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </PageButton>
+              {Array.from({ length: pageCount }, (_, index) => index + 1)
+                .filter(
+                  (item) => item === 1 || item === pageCount || Math.abs(item - safePage) <= 1,
+                )
+                .map((item, index, list) => (
+                  <span key={item} className="flex items-center">
+                    {index > 0 && list[index - 1] !== item - 1 ? (
+                      <span className="px-1 text-slate-400">…</span>
+                    ) : null}
+                    <PageButton active={item === safePage} onClick={() => setPage(item)}>
+                      {item}
+                    </PageButton>
+                  </span>
+                ))}
+              <PageButton disabled={safePage >= pageCount} onClick={() => setPage(safePage + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </PageButton>
+            </div>
+            <div className="flex items-center gap-2">
+              {editMode && dirtyRows.length ? (
+                <button
+                  type="button"
+                  disabled={saveSchedule.isPending}
+                  onClick={() =>
+                    saveSchedule.mutate(
+                      dirtyRows.map(([id, row]) => ({
+                        id,
+                        examDate: row.examDate,
+                        startTime: row.startTime,
+                        endTime: row.endTime,
+                      })),
+                    )
+                  }
+                  className="inline-flex h-9 items-center rounded-lg bg-blue-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  Save timetable changes
+                </button>
+              ) : null}
+              <label className="flex items-center gap-2 text-xs text-slate-500">
+                Rows per page
+                <select
+                  value={pageSize}
+                  onChange={(event) => {
+                    setPageSize(Number(event.target.value));
+                    setPage(1);
+                  }}
+                  className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm"
+                >
+                  {PAGE_SIZES.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {editing ? (
         <ScheduleDialog
