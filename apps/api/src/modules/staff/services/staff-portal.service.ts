@@ -404,14 +404,23 @@ export class StaffPortalService {
         ? this.countPendingLessonPlans(user.tid, staff.id)
         : Promise.resolve(0),
       profile.isTeaching
-        ? this.prisma.examInvigilatorAssignment.count({
-            where: {
-              tenantId: user.tid,
-              staffProfileId: staff.id,
-              deletedAt: null,
-              status: { in: ['ASSIGNED', 'CONFIRMED'] },
-            },
-          })
+        ? Promise.all([
+            this.prisma.examInvigilatorAssignment.count({
+              where: {
+                tenantId: user.tid,
+                staffProfileId: staff.id,
+                deletedAt: null,
+                status: { in: ['ASSIGNED', 'CONFIRMED'] },
+              },
+            }),
+            this.prisma.examDutyAssignment.count({
+              where: {
+                tenantId: user.tid,
+                staffProfileId: staff.id,
+                sitting: { roster: { status: 'PUBLISHED', deletedAt: null } },
+              },
+            }),
+          ]).then(([legacy, roster]) => legacy + roster)
         : Promise.resolve(0),
       this.prisma.staffPublicHoliday.findMany({
         where: {

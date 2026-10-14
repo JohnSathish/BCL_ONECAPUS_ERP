@@ -142,6 +142,13 @@ export const FACULTY_QUICK_ACTIONS = [
   { id: 'marks', label: 'Enter Marks', icon: '📝', tone: '#0078D4', href: '/(staff)/marks' },
   { id: 'timetable', label: 'Timetable', icon: '📅', tone: '#2563EB', href: '/(staff)/timetable' },
   {
+    id: 'exam-duties',
+    label: 'Exam Duties',
+    icon: '🛡️',
+    tone: '#0f3c89',
+    href: '/(staff)/exam-duties',
+  },
+  {
     id: 'notifications',
     label: 'Notifications',
     icon: '🔔',

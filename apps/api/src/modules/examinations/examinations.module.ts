@@ -18,6 +18,8 @@ import { IaDefaulterService } from './ia/ia-defaulter.service';
 import { IaExamProvisioningService } from './ia/ia-exam-provisioning.service';
 import { IaMarkEntryService } from './ia/ia-mark-entry.service';
 import { IaNehuExportService } from './ia/ia-nehu-export.service';
+import { IaAttendanceSheetService } from './ia/ia-attendance-sheet.service';
+import { IaDutyRosterService } from './ia/ia-duty-roster.service';
 import { IaNoticeboardRoutineService } from './ia/ia-noticeboard-routine.service';
 import { IaPortalService } from './ia/ia-portal.service';
 import { IaSchemeService } from './ia/ia-scheme.service';
@@ -53,6 +55,8 @@ import { IaWorkflowService } from './ia/ia-workflow.service';
     IaAdmitCardService,
     IaAnalyticsService,
     IaNoticeboardRoutineService,
+    IaDutyRosterService,
+    IaAttendanceSheetService,
   ],
   exports: [ExaminationsService, IaSettingsService, IaDashboardService],
 })

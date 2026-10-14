@@ -6621,6 +6621,126 @@ model ExamInvigilatorAssignment {
   @@schema("academic")
 }
 
+model ExamDutyRoster {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  sessionId     String    @unique @map("session_id") @db.Uuid
+  status        String    @default("DRAFT")
+  instructions  String?
+  revision      Int       @default(0)
+  publishedAt   DateTime? @map("published_at")
+  publishedById String?   @map("published_by_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  sittings ExamDutySitting[]
+  audits   ExamDutyAudit[]
+
+  @@index([tenantId, status])
+  @@map("exam_duty_rosters")
+  @@schema("academic")
+}
+
+model ExamDutySitting {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  rosterId      String   @map("roster_id") @db.Uuid
+  examDate      DateTime @map("exam_date") @db.Date
+  sessionLabel  String   @map("session_label")
+  customLabel   String?  @map("custom_label")
+  startTime     String   @map("start_time")
+  endTime       String   @map("end_time")
+  reportingTime String?  @map("reporting_time")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  roster      ExamDutyRoster       @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  halls       ExamDutyHall[]
+  assignments ExamDutyAssignment[]
+
+  @@index([tenantId, rosterId])
+  @@index([examDate])
+  @@map("exam_duty_sittings")
+  @@schema("academic")
+}
+
+model ExamDutyHall {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  sittingId          String    @map("sitting_id") @db.Uuid
+  classroomId        String?   @map("classroom_id") @db.Uuid
+  hallLabel          String    @map("hall_label")
+  studentCount       Int       @default(0) @map("student_count")
+  capacity           Int?
+  specialRoom        Boolean   @default(false) @map("special_room")
+  calculatedRequired Int       @default(1) @map("calculated_required")
+  approvedRequired   Int       @default(1) @map("approved_required")
+  overrideReason     String?   @map("override_reason")
+  overrideById       String?   @map("override_by_id") @db.Uuid
+  overrideAt         DateTime? @map("override_at")
+  sortOrder          Int       @default(0) @map("sort_order")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  sitting     ExamDutySitting      @relation(fields: [sittingId], references: [id], onDelete: Cascade)
+  assignments ExamDutyAssignment[]
+
+  @@index([tenantId, sittingId])
+  @@map("exam_duty_halls")
+  @@schema("academic")
+}
+
+model ExamDutyAssignment {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  sittingId      String   @map("sitting_id") @db.Uuid
+  hallId         String   @map("hall_id") @db.Uuid
+  staffProfileId String   @map("staff_profile_id") @db.Uuid
+  role           String   @default("INVIGILATOR")
+  status         String   @default("ASSIGNED")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  sitting ExamDutySitting @relation(fields: [sittingId], references: [id], onDelete: Cascade)
+  hall    ExamDutyHall    @relation(fields: [hallId], references: [id], onDelete: Cascade)
+
+  @@unique([sittingId, staffProfileId])
+  @@index([tenantId, hallId])
+  @@index([staffProfileId])
+  @@map("exam_duty_assignments")
+  @@schema("academic")
+}
+
+model ExamDutyRule {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @unique @map("tenant_id") @db.Uuid
+  bands            Json     @default("[]")
+  minimum          Int      @default(1)
+  specialHallExtra Int      @default(1) @map("special_hall_extra")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("exam_duty_rules")
+  @@schema("academic")
+}
+
+model ExamDutyAudit {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  rosterId  String   @map("roster_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  detail    Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  roster ExamDutyRoster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, rosterId])
+  @@map("exam_duty_audits")
+  @@schema("academic")
+}
+
 model ExamMarkEntry {
   id             String    @id @default(uuid()) @db.Uuid
   tenantId       String    @map("tenant_id") @db.Uuid

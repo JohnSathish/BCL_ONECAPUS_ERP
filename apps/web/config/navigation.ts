@@ -1158,6 +1158,16 @@ export const ADMIN_NAV: NavGroup[] = [
             href: '/admin/academics/examinations/timetable',
             permissions: [...P.examinations],
           },
+          {
+            label: 'Duty Roster',
+            href: '/admin/academics/examinations/duty-roster',
+            permissions: [...P.examinations],
+          },
+          {
+            label: 'Attendance Sheets',
+            href: '/admin/academics/examinations/attendance-sheets',
+            permissions: [...P.examinations],
+          },
           ...(IA_ADMIT_CARDS_ADMIN_ENABLED
             ? [
                 {

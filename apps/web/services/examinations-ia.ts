@@ -726,6 +726,190 @@ export async function fetchStudentIaAdmitCard(sessionId?: string) {
   return data;
 }
 
+export type DutyBand = { upTo: number; invigilators: number };
+
+export type DutyRoster = {
+  id: string;
+  sessionId: string;
+  examName: string;
+  college: string;
+  status: string;
+  revision: number;
+  instructions: string | null;
+  summary: {
+    halls: number;
+    students: number;
+    required: number;
+    assigned: number;
+    unfilled: number;
+    teachers: number;
+  };
+  warnings: string[];
+  classrooms: {
+    id: string;
+    name: string;
+    code: string;
+    examCapacity: number | null;
+    capacity: number;
+  }[];
+  sittings: Array<{
+    id: string;
+    date: string;
+    sessionLabel: string;
+    session: string;
+    startTime: string;
+    endTime: string;
+    time: string;
+    reportingTime: string | null;
+    halls: Array<{
+      id: string;
+      classroomId: string | null;
+      hallLabel: string;
+      studentCount: number;
+      capacity: number | null;
+      specialRoom: boolean;
+      calculatedRequired: number;
+      approvedRequired: number;
+      overrideReason: string | null;
+      unfilled: number;
+      assignments: Array<{
+        id: string;
+        staffProfileId: string;
+        fullName: string;
+        employeeCode: string;
+        department: string;
+      }>;
+    }>;
+  }>;
+  staffSummary: Array<{
+    staffProfileId: string;
+    fullName: string;
+    department: string;
+    totalDuties: number;
+    dates: string[];
+    sessions: string[];
+    status: string;
+  }>;
+};
+
+export async function fetchDutyRoster(sessionId: string) {
+  const { data } = await api.get<DutyRoster>(`/v1/examinations/ia/exams/${sessionId}/duty-roster`);
+  return data;
+}
+
+export async function saveDutyRoster(sessionId: string, payload: unknown) {
+  const { data } = await api.post<DutyRoster>(
+    `/v1/examinations/ia/exams/${sessionId}/duty-roster`,
+    payload,
+  );
+  return data;
+}
+
+export async function suggestDutyRoster(sessionId: string, acknowledgeRevision = false) {
+  const { data } = await api.post<DutyRoster & { assigned: number; unfilled: unknown[] }>(
+    `/v1/examinations/ia/exams/${sessionId}/duty-roster/suggest`,
+    { acknowledgeRevision },
+  );
+  return data;
+}
+
+export async function publishDutyRoster(sessionId: string, acknowledgeWarnings = false) {
+  const { data } = await api.post<DutyRoster>(
+    `/v1/examinations/ia/exams/${sessionId}/duty-roster/publish`,
+    { acknowledgeWarnings },
+  );
+  return data;
+}
+
+export async function assignDutyStaff(
+  sessionId: string,
+  payload: {
+    hallId: string;
+    staffProfileId: string;
+    acknowledgeConflict?: boolean;
+    acknowledgeRevision?: boolean;
+  },
+) {
+  const { data } = await api.post<DutyRoster>(
+    `/v1/examinations/ia/exams/${sessionId}/duty-roster/assign`,
+    payload,
+  );
+  return data;
+}
+
+export async function removeDutyStaff(
+  sessionId: string,
+  assignmentId: string,
+  acknowledgeRevision = false,
+) {
+  const { data } = await api.post<DutyRoster>(
+    `/v1/examinations/ia/exams/${sessionId}/duty-roster/assignments/${assignmentId}/remove`,
+    { acknowledgeRevision },
+  );
+  return data;
+}
+
+export async function fetchDutyRules() {
+  const { data } = await api.get<{ bands: DutyBand[]; minimum: number; specialHallExtra: number }>(
+    '/v1/examinations/ia/duty-rules',
+  );
+  return data;
+}
+
+export async function saveDutyRules(payload: {
+  bands: DutyBand[];
+  minimum: number;
+  specialHallExtra: number;
+}) {
+  const { data } = await api.patch('/v1/examinations/ia/duty-rules', payload);
+  return data;
+}
+
+export async function downloadDutyExport(
+  sessionId: string,
+  kind: 'pdf' | 'xlsx',
+  params?: Record<string, string | undefined>,
+) {
+  const { data } = await api.get(`/v1/examinations/ia/exams/${sessionId}/duty-roster.${kind}`, {
+    params,
+    responseType: 'blob',
+  });
+  return data as Blob;
+}
+
+export async function fetchAttendanceSheets(
+  sessionId: string,
+  params?: Record<string, string | undefined>,
+) {
+  const { data } = await api.get(`/v1/examinations/ia/exams/${sessionId}/attendance-sheets`, {
+    params,
+  });
+  return data as {
+    examName: string;
+    studentCount: number;
+    issues: { message: string; collegeRoll: string; name: string }[];
+    sheets: {
+      title: string;
+      hall: string;
+      subjectCode: string;
+      subjectName: string;
+      studentCount: number;
+    }[];
+  };
+}
+
+export async function downloadAttendanceSheets(
+  sessionId: string,
+  kind: 'pdf' | 'xlsx',
+  params?: Record<string, string | undefined>,
+) {
+  const { data } = await api.get(
+    `/v1/examinations/ia/exams/${sessionId}/attendance-sheets.${kind}`,
+    { params, responseType: 'blob' },
+  );
+  return data as Blob;
+}
+
 export async function downloadIaNehuExport(
   sheetId: string,
   format: 'xlsx' | 'csv' | 'pdf' = 'xlsx',

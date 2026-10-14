@@ -49,6 +49,8 @@ import { IaDefaulterService } from './ia-defaulter.service';
 import { IaExamProvisioningService } from './ia-exam-provisioning.service';
 import { IaMarkEntryService } from './ia-mark-entry.service';
 import { IaNehuExportService } from './ia-nehu-export.service';
+import { IaAttendanceSheetService } from './ia-attendance-sheet.service';
+import { IaDutyRosterService } from './ia-duty-roster.service';
 import { IaNoticeboardRoutineService } from './ia-noticeboard-routine.service';
 import { IaPortalService } from './ia-portal.service';
 import { IaSchemeService } from './ia-scheme.service';
@@ -75,6 +77,8 @@ export class IaController {
     private readonly admitCards: IaAdmitCardService,
     private readonly analytics: IaAnalyticsService,
     private readonly noticeboard: IaNoticeboardRoutineService,
+    private readonly duty: IaDutyRosterService,
+    private readonly attendanceSheets: IaAttendanceSheetService,
   ) {}
 
   @Get('settings')
@@ -730,5 +734,285 @@ export class IaController {
   @Public()
   verifyAdmit(@Param('token') token: string) {
     return this.admitCards.verifyToken(token);
+  }
+
+  @Get('duty-rules')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:invigilate', 'ia:view')
+  dutyRules(@CurrentUser() user: JwtUser) {
+    return this.duty.rules(user.tid);
+  }
+
+  @Patch('duty-rules')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:invigilate')
+  saveDutyRules(
+    @CurrentUser() user: JwtUser,
+    @Body()
+    body: {
+      bands: { upTo: number; invigilators: number }[];
+      minimum?: number;
+      specialHallExtra?: number;
+    },
+  ) {
+    return this.duty.saveRules(user.tid, body);
+  }
+
+  @Get('my-duties')
+  @RequireAnyPermission('staff:portal:self', 'ia:view', 'exam:admin')
+  myDuties(@CurrentUser() user: JwtUser) {
+    return this.duty.myDuties(user);
+  }
+
+  @Get('my-duties/slip.pdf')
+  @RequireAnyPermission('staff:portal:self', 'ia:view', 'exam:admin')
+  async myDutySlip(@CurrentUser() user: JwtUser, @Res() res: Response) {
+    const file = await this.duty.renderMySlip(user);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res.send(file.buffer);
+  }
+
+  @Get('exams/:sessionId/duty-roster')
+  @RequireAnyPermission(
+    'ia:manage',
+    'exam:admin',
+    'exam:invigilate',
+    'ia:view',
+    'exam:view',
+  )
+  dutyRoster(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+  ) {
+    return this.duty.getRoster(user, sessionId);
+  }
+
+  @Post('exams/:sessionId/duty-roster')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:invigilate')
+  saveDutyRoster(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Body() body: Parameters<IaDutyRosterService['saveRoster']>[2],
+  ) {
+    return this.duty.saveRoster(user, sessionId, body);
+  }
+
+  @Post('exams/:sessionId/duty-roster/suggest')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:invigilate')
+  suggestDuty(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Body() body: { acknowledgeRevision?: boolean },
+  ) {
+    return this.duty.suggest(user, sessionId, body.acknowledgeRevision);
+  }
+
+  @Post('exams/:sessionId/duty-roster/assign')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:invigilate')
+  assignDuty(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Body()
+    body: {
+      hallId: string;
+      staffProfileId: string;
+      acknowledgeConflict?: boolean;
+      acknowledgeRevision?: boolean;
+    },
+  ) {
+    return this.duty.assign(user, sessionId, body);
+  }
+
+  @Post('exams/:sessionId/duty-roster/move')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:invigilate')
+  moveDuty(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Body()
+    body: {
+      assignmentId: string;
+      hallId: string;
+      acknowledgeConflict?: boolean;
+      acknowledgeRevision?: boolean;
+    },
+  ) {
+    return this.duty.moveAssignment(user, sessionId, body);
+  }
+
+  @Post('exams/:sessionId/duty-roster/assignments/:assignmentId/remove')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:invigilate')
+  removeDuty(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Param('assignmentId') assignmentId: string,
+    @Body() body: { acknowledgeRevision?: boolean },
+  ) {
+    return this.duty.removeAssignment(
+      user,
+      sessionId,
+      assignmentId,
+      body.acknowledgeRevision,
+    );
+  }
+
+  @Post('exams/:sessionId/duty-roster/publish')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:invigilate')
+  publishDuty(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Body() body: { acknowledgeWarnings?: boolean },
+  ) {
+    return this.duty.publish(user, sessionId, body.acknowledgeWarnings);
+  }
+
+  @Post('exams/:sessionId/duty-roster/reopen')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:invigilate')
+  reopenDuty(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+  ) {
+    return this.duty.reopen(user, sessionId);
+  }
+
+  @Get('exams/:sessionId/duty-roster.pdf')
+  @RequireAnyPermission(
+    'ia:manage',
+    'exam:admin',
+    'exam:invigilate',
+    'ia:view',
+    'exam:view',
+  )
+  async dutyPdf(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Query('date') date: string | undefined,
+    @Query('session') session: string | undefined,
+    @Query('staffId') staffId: string | undefined,
+    @Query('scope') scope: string | undefined,
+    @Res() res: Response,
+  ) {
+    const file = await this.duty.renderPdf(user, sessionId, {
+      date,
+      session,
+      staffId,
+      scope,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res.send(file.buffer);
+  }
+
+  @Get('exams/:sessionId/duty-roster.xlsx')
+  @RequireAnyPermission(
+    'ia:manage',
+    'exam:admin',
+    'exam:invigilate',
+    'ia:view',
+    'exam:view',
+  )
+  async dutyXlsx(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Query('date') date: string | undefined,
+    @Query('session') session: string | undefined,
+    @Query('staffId') staffId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const file = await this.duty.renderXlsx(user, sessionId, {
+      date,
+      session,
+      staffId,
+    });
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res.send(file.buffer);
+  }
+
+  @Get('exams/:sessionId/attendance-sheets')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:view', 'ia:view')
+  attendancePreview(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Query('date') date?: string,
+    @Query('session') session?: string,
+    @Query('mode') mode?: 'subject' | 'hall',
+    @Query('paperId') paperId?: string,
+    @Query('hall') hall?: string,
+  ) {
+    return this.attendanceSheets.preview(user, sessionId, {
+      date,
+      session,
+      mode,
+      paperId,
+      hall,
+    });
+  }
+
+  @Get('exams/:sessionId/attendance-sheets.pdf')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:view', 'ia:view')
+  async attendancePdf(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Query('date') date: string | undefined,
+    @Query('session') session: string | undefined,
+    @Query('mode') mode: 'subject' | 'hall' | undefined,
+    @Query('paperId') paperId: string | undefined,
+    @Query('hall') hall: string | undefined,
+    @Res() res: Response,
+  ) {
+    const file = await this.attendanceSheets.renderPdf(user, sessionId, {
+      date,
+      session,
+      mode,
+      paperId,
+      hall,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res.send(file.buffer);
+  }
+
+  @Get('exams/:sessionId/attendance-sheets.xlsx')
+  @RequireAnyPermission('ia:manage', 'exam:admin', 'exam:view', 'ia:view')
+  async attendanceXlsx(
+    @CurrentUser() user: JwtUser,
+    @Param('sessionId') sessionId: string,
+    @Query('date') date: string | undefined,
+    @Query('session') session: string | undefined,
+    @Query('mode') mode: 'subject' | 'hall' | undefined,
+    @Query('paperId') paperId: string | undefined,
+    @Query('hall') hall: string | undefined,
+    @Res() res: Response,
+  ) {
+    const file = await this.attendanceSheets.renderXlsx(user, sessionId, {
+      date,
+      session,
+      mode,
+      paperId,
+      hall,
+    });
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res.send(file.buffer);
   }
 }
