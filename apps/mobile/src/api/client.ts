@@ -77,9 +77,12 @@ async function doFetch<T>(path: string, options: FetchOptions): Promise<T> {
       } catch {
         /* keep url */
       }
+      const loopback = /localhost|127\.0\.0\.1|10\.0\.2\.2|10\.0\.3\.2/i.test(host);
       throw Object.assign(
         new Error(
-          `Could not reach ${host} in time. On an Android emulator use 10.0.2.2 instead of localhost, and confirm the school API is running.`,
+          loopback
+            ? `Could not reach ${host} in time. That address is this computer, and the school API is not running there. Reload the app to use https://erp.stlukestura.in, or start the API on port 3001.`
+            : `Could not reach the school ERP (${host}). Check your internet connection and try again.`,
         ),
         { status: 408 },
       );

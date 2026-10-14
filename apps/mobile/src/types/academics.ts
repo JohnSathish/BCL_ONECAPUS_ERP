@@ -59,9 +59,12 @@ export type StudentAcademicsPayload = {
     totalSessions: number;
   }[];
   todayClasses: TimetableSlot[];
+  todayClosure?: { title: string; dayKind?: string | null } | null;
   weeklyTimetable: {
     day: string;
     dayOfWeek: number;
+    holidayTitle?: string | null;
+    dayKind?: string | null;
     slots: TimetableSlot[];
   }[];
   semesterProgress: {

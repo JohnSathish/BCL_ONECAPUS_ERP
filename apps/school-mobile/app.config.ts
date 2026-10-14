@@ -8,16 +8,30 @@ const isNativeRelease =
   process.env.LOCAL_NATIVE_RELEASE === '1';
 
 const googleServicesLocal = './google-services.json';
-const hasGoogleServices = fs.existsSync(path.join(__dirname, googleServicesLocal));
-const googleServiceInfoLocal =
-  process.env.GOOGLE_SERVICES_INFO_PLIST || './GoogleService-Info.plist';
-const hasGoogleServiceInfo = fs.existsSync(path.join(__dirname, googleServiceInfoLocal));
+const hasGoogleServices =
+  Boolean(process.env.GOOGLE_SERVICES_JSON) ||
+  fs.existsSync(path.join(__dirname, googleServicesLocal));
+const googleServicesFile =
+  process.env.GOOGLE_SERVICES_JSON ||
+  (fs.existsSync(path.join(__dirname, googleServicesLocal)) ? googleServicesLocal : undefined);
+
+const hasGoogleServiceInfo =
+  Boolean(process.env.GOOGLE_SERVICES_PLIST || process.env.GOOGLE_SERVICES_INFO_PLIST) ||
+  fs.existsSync(path.join(__dirname, './GoogleService-Info.plist'));
+const googleServiceInfoFile = (() => {
+  if (process.env.GOOGLE_SERVICES_PLIST) return process.env.GOOGLE_SERVICES_PLIST;
+  if (process.env.GOOGLE_SERVICES_INFO_PLIST) return process.env.GOOGLE_SERVICES_INFO_PLIST;
+  if (fs.existsSync(path.join(__dirname, './GoogleService-Info.plist'))) {
+    return './GoogleService-Info.plist';
+  }
+  return undefined;
+})();
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? "St. Luke's School",
   slug: 'st-lukes-school',
-  version: '1.0.25',
+  version: '1.0.26',
   scheme: 'stlukesschool',
   // Play large-screen guidance: do not lock to portrait in the manifest.
   orientation: 'default',
@@ -42,8 +56,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'in.stlukestura.school',
-    buildNumber: '28',
-    ...(hasGoogleServiceInfo ? { googleServicesFile: googleServiceInfoLocal } : {}),
+    buildNumber: '29',
+    ...(hasGoogleServiceInfo && googleServiceInfoFile
+      ? { googleServicesFile: googleServiceInfoFile }
+      : {}),
     infoPlist: {
       NSFaceIDUsageDescription:
         "St. Luke's School uses Face ID only to unlock your signed-in school account on this device. Face data stays on your phone.",
@@ -54,10 +70,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'in.stlukestura.school',
-    versionCode: 28,
+    versionCode: 29,
     edgeToEdgeEnabled: true,
     allowBackup: false,
-    ...(hasGoogleServices ? { googleServicesFile: googleServicesLocal } : {}),
+    ...(hasGoogleServices && googleServicesFile ? { googleServicesFile: googleServicesFile } : {}),
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#FFFFFF',

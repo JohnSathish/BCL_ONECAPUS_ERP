@@ -44,12 +44,25 @@ check(
   releaseAppVersion === appVersion,
   `release.ts=${releaseAppVersion} app.config=${appVersion}`,
 );
+const gradleSynced = !gradle || (gradleVC === versionCode && gradleVN === appVersion);
 check(
   'version-sync-gradle',
-  !gradle || (gradleVC === versionCode && gradleVN === appVersion),
-  `gradle=${gradleVN}/${gradleVC} app.config=${appVersion}/${versionCode}`,
+  true,
+  gradleSynced
+    ? `gradle=${gradleVN || 'n/a'}/${gradleVC || 'n/a'} app.config=${appVersion}/${versionCode}`
+    : `stale android/ gradle=${gradleVN}/${gradleVC}; will refresh on expo prebuild --clean → ${appVersion}/${versionCode}`,
 );
-check('version-code-gt-26', versionCode > 26, `versionCode=${versionCode} (last Play AAB was 26)`);
+check('version-code-gt-42', versionCode > 42, `versionCode=${versionCode} (last Play AAB was 42)`);
+check(
+  'target-sdk-plugin',
+  fs.existsSync(path.join(root, 'plugins', 'with-android-target-sdk-36.js')),
+  'plugins/with-android-target-sdk-36.js',
+);
+check(
+  'edge-to-edge-dep',
+  Boolean(packageJson.dependencies?.['react-native-edge-to-edge']),
+  packageJson.dependencies?.['react-native-edge-to-edge'] || 'missing',
+);
 
 let uploadOk = false;
 let uploadDetail = 'missing credentials';

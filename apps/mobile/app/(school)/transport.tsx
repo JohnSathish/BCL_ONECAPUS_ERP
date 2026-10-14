@@ -187,8 +187,8 @@ function CrewTransport() {
 }
 
 const styles = StyleSheet.create({
-  h: { fontSize: 16, fontWeight: '700', color: schoolUi.text },
-  m: { marginTop: 4, color: schoolUi.muted },
+  h: { fontSize: 16, fontWeight: '700', color: schoolUi.colors.text },
+  m: { marginTop: 4, color: schoolUi.colors.muted },
   row: { flexDirection: 'row', gap: 8, marginTop: 8 },
   btn: { backgroundColor: '#2563eb', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
   btnT: { color: '#fff', fontWeight: '700' },

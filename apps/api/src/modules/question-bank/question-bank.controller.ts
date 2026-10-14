@@ -56,6 +56,7 @@ const QB_DOWNLOAD = [
   'question-bank:read',
   'question-bank:manage',
   'question-bank:contribute',
+  'student:portal:self',
 ] as const;
 const QB_CONTRIBUTE = [
   'question-bank:contribute',
@@ -301,7 +302,7 @@ export class QuestionBankController {
   }
 
   @Get('me/papers')
-  @RequirePermissions('question-bank:download')
+  @RequireAnyPermission('question-bank:download', 'student:portal:self')
   myPapers(
     @CurrentUser() user: JwtUser,
     @Query() query: QuestionPaperQueryDto,
@@ -310,19 +311,19 @@ export class QuestionBankController {
   }
 
   @Get('me/bookmarks')
-  @RequirePermissions('question-bank:download')
+  @RequireAnyPermission('question-bank:download', 'student:portal:self')
   bookmarks(@CurrentUser() user: JwtUser) {
     return this.papers.listBookmarks(user);
   }
 
   @Post('me/bookmarks/:paperId')
-  @RequirePermissions('question-bank:download')
+  @RequireAnyPermission('question-bank:download', 'student:portal:self')
   addBookmark(@CurrentUser() user: JwtUser, @Param('paperId') paperId: string) {
     return this.papers.addBookmark(user, paperId);
   }
 
   @Delete('me/bookmarks/:paperId')
-  @RequirePermissions('question-bank:download')
+  @RequireAnyPermission('question-bank:download', 'student:portal:self')
   removeBookmark(
     @CurrentUser() user: JwtUser,
     @Param('paperId') paperId: string,

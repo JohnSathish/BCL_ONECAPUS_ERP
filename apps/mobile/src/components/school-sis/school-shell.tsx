@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SchoolCrest } from '@/components/school-sis/school-crest';
 import { schoolUi } from '@/theme/school-ui';
 import { useSchoolSession } from '@/store/school-session';
 import { t } from '@/i18n';
@@ -22,6 +23,7 @@ export function SchoolShell({
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
+        <SchoolCrest size={32} framed={false} />
         <Text style={styles.title}>{title}</Text>
         {offline ? (
           <Text style={styles.offline}>

@@ -76,7 +76,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
   slug: 'onecampus-mobile',
-  version: '1.0.30',
+  version: '1.0.34',
   scheme: ['onecampus', 'schoolerp'],
   // Play large-screen guidance: do not lock to portrait in the manifest.
   orientation: 'default',
@@ -84,9 +84,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   newArchEnabled: true,
   icon: appIcon,
   splash: {
-    image: isStLukesSis ? schoolIcon : './assets/icon.png',
+    image: isStLukesSis ? schoolIcon : './assets/college-crest.png',
     resizeMode: 'contain',
-    backgroundColor: isStLukesSis ? '#0b1640' : '#261265',
+    backgroundColor: isStLukesSis ? '#0b1640' : '#020f2e',
   },
   // Edge-to-edge: avoid solid status/nav bar colors (deprecated on Android 15+).
   androidStatusBar: {
@@ -101,8 +101,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'edu.onecampus.mobile',
-    // In-app update prompts from App Update Management (1.0.30).
-    buildNumber: '12',
+    // In-app update prompts from App Update Management (1.0.34).
+    buildNumber: '16',
     ...(hasGoogleServiceInfo && googleServiceInfoFile
       ? { googleServicesFile: googleServiceInfoFile }
       : {}),
@@ -121,7 +121,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 50,
+    versionCode: 54,
     edgeToEdgeEnabled: true,
     allowBackup: false,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
@@ -149,6 +149,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     './plugins/with-android-r8-keep',
+    './plugins/with-android-pdf-view',
     // Register early so this infoPlist mod runs last and keeps NSCameraUsageDescription.
     './plugins/with-ios-privacy-plist',
     [
@@ -199,8 +200,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        image: './assets/icon.png',
-        backgroundColor: '#261265',
+        image: isStLukesSis ? schoolIcon : './assets/college-crest.png',
+        backgroundColor: isStLukesSis ? '#0b1640' : '#020f2e',
         imageWidth: 220,
         resizeMode: 'contain',
       },

@@ -1,4 +1,6 @@
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 import { getApiBase, mobileHeadersAsync } from '@/api/config';
 import { apiFetch } from '@/api/client';
@@ -90,7 +92,8 @@ export async function downloadQuestionPaper(paper: QuestionPaper) {
 
   await FileSystem.makeDirectoryAsync(PAPER_DIR, { intermediates: true }).catch(() => undefined);
   const headers = await authHeaders();
-  const url = `${getApiBase()}/v1/question-bank/papers/${paper.id}/download`;
+  const apiBase = (await getApiBase()).replace(/\/+$/, '');
+  const url = `${apiBase}/v1/question-bank/papers/${paper.id}/download`;
   const result = await FileSystem.downloadAsync(url, dest, { headers });
   if (result.status < 200 || result.status >= 300) {
     await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => undefined);
@@ -103,8 +106,41 @@ export async function downloadQuestionPaper(paper: QuestionPaper) {
   return result.uri;
 }
 
+function viewFileName(paper: QuestionPaper) {
+  const code = (paper.paperCode || 'question-paper').replace(/[^a-zA-Z0-9._-]/g, '_');
+  return `${code}.pdf`;
+}
+
+/** A readable copy so the viewer title is the paper code, not the storage id. */
+async function readablePdfCopy(sourceUri: string, paper: QuestionPaper) {
+  const dir = `${FileSystem.cacheDirectory}question-paper-view/`;
+  await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
+  const dest = `${dir}${viewFileName(paper)}`;
+  await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => undefined);
+  await FileSystem.copyAsync({ from: sourceUri, to: dest });
+  return dest;
+}
+
 export async function openQuestionPaper(paper: QuestionPaper) {
-  const uri = await downloadQuestionPaper(paper);
+  const downloaded = await downloadQuestionPaper(paper);
+  const uri = await readablePdfCopy(downloaded, paper).catch(() => downloaded);
+
+  if (Platform.OS === 'android') {
+    const contentUri = await FileSystem.getContentUriAsync(uri);
+    try {
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: contentUri,
+        flags: 1,
+        type: 'application/pdf',
+      });
+    } catch {
+      throw new Error(
+        'No PDF viewer is installed on this phone. Install one, then open the paper again.',
+      );
+    }
+    return;
+  }
+
   if (!(await Sharing.isAvailableAsync())) {
     throw new Error('Opening files is not available on this device');
   }

@@ -104,6 +104,8 @@ function buildWeekDays(anchor = new Date()) {
 export type WeeklyDayGroup = {
   day: string;
   dayOfWeek: number;
+  holidayTitle?: string | null;
+  dayKind?: string | null;
   slots: TimetableSlot[];
 };
 
@@ -126,18 +128,23 @@ export function WeeklyTimetablePanel({
   const [expandedDow, setExpandedDow] = useState<number | null>(defaultDow);
 
   const selectedDay = weekDays.find((d) => d.dayOfWeek === selectedDow) ?? weekDays[0];
+  const selectedGroup = weeklyTimetable.find((d) => d.dayOfWeek === selectedDow);
+  const holidayTitle = selectedGroup?.holidayTitle?.trim() || null;
 
   const daySlots = useMemo(() => {
-    const fromWeek = weeklyTimetable.find((d) => d.dayOfWeek === selectedDow)?.slots ?? [];
+    if (holidayTitle) return [];
+    const fromWeek = selectedGroup?.slots ?? [];
     if (fromWeek.length) return fromWeek;
     if (selectedDow === new Date().getDay()) return todayClasses ?? [];
     return [];
-  }, [weeklyTimetable, todayClasses, selectedDow]);
+  }, [holidayTitle, selectedGroup?.slots, todayClasses, selectedDow]);
 
   const timeline = useMemo(() => buildTimeline(daySlots), [daySlots]);
 
   function slotsFor(dow: number) {
-    const fromWeek = weeklyTimetable.find((d) => d.dayOfWeek === dow)?.slots ?? [];
+    const group = weeklyTimetable.find((d) => d.dayOfWeek === dow);
+    if (group?.holidayTitle) return [];
+    const fromWeek = group?.slots ?? [];
     if (fromWeek.length) return fromWeek;
     if (dow === new Date().getDay()) return todayClasses ?? [];
     return [];
@@ -174,14 +181,26 @@ export function WeeklyTimetablePanel({
           <Text style={styles.dayHeaderTitle}>{DAY_FULL[selectedDow]}</Text>
           <Text style={styles.dayHeaderDate}>{selectedDay?.dateLabel}</Text>
         </View>
-        <View style={styles.countBadge}>
-          <Text style={styles.countBadgeText}>
-            {daySlots.length} Class{daySlots.length === 1 ? '' : 'es'}
+        <View style={[styles.countBadge, holidayTitle && styles.holidayBadge]}>
+          <Text style={[styles.countBadgeText, holidayTitle && styles.holidayBadgeText]}>
+            {holidayTitle
+              ? 'Holiday'
+              : `${daySlots.length} Class${daySlots.length === 1 ? '' : 'es'}`}
           </Text>
         </View>
       </View>
 
-      {timeline.length === 0 ? (
+      {holidayTitle ? (
+        <View style={[styles.emptyCard, compactEmpty && styles.emptyCompact]}>
+          <Text style={styles.emptyArt}>🎉</Text>
+          <Text style={styles.emptyTitle}>{holidayTitle}</Text>
+          {!compactEmpty ? (
+            <Text style={styles.emptySub}>
+              No classes today. The academic calendar has marked this day as a holiday.
+            </Text>
+          ) : null}
+        </View>
+      ) : timeline.length === 0 ? (
         <View style={[styles.emptyCard, compactEmpty && styles.emptyCompact]}>
           <Text style={styles.emptyArt}>📅</Text>
           <Text style={styles.emptyTitle}>
@@ -287,6 +306,7 @@ export function WeeklyTimetablePanel({
         {weekDays
           .filter((d) => d.dayOfWeek !== selectedDow)
           .map((d) => {
+            const holiday = weeklyTimetable.find((g) => g.dayOfWeek === d.dayOfWeek)?.holidayTitle;
             const count = slotsFor(d.dayOfWeek).length;
             const open = expandedDow === d.dayOfWeek;
             return (
@@ -305,7 +325,7 @@ export function WeeklyTimetablePanel({
                   <View style={styles.collapsedRight}>
                     <View style={styles.countBadgeMuted}>
                       <Text style={styles.countBadgeMutedText}>
-                        {count} Class{count === 1 ? '' : 'es'}
+                        {holiday ? 'Holiday' : `${count} Class${count === 1 ? '' : 'es'}`}
                       </Text>
                     </View>
                     <Text style={styles.chevron}>{open ? '▴' : '▾'}</Text>
@@ -319,12 +339,18 @@ export function WeeklyTimetablePanel({
   );
 }
 
-export function TodayClassesEmptyCard() {
+export function TodayClassesEmptyCard({ holidayTitle }: { holidayTitle?: string | null }) {
   return (
     <View style={styles.emptyCard}>
-      <Text style={styles.emptyArt}>🌤️</Text>
-      <Text style={styles.emptyTitle}>No classes scheduled for today.</Text>
-      <Text style={styles.emptySub}>Enjoy your day!</Text>
+      <Text style={styles.emptyArt}>{holidayTitle ? '🎉' : '🌤️'}</Text>
+      <Text style={styles.emptyTitle}>
+        {holidayTitle ? holidayTitle : 'No classes scheduled for today.'}
+      </Text>
+      <Text style={styles.emptySub}>
+        {holidayTitle
+          ? 'No classes today. The academic calendar has marked this day as a holiday.'
+          : 'Enjoy your day!'}
+      </Text>
     </View>
   );
 }
@@ -364,6 +390,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   countBadgeText: { fontSize: 11, fontWeight: '800', color: studentTheme.primaryLight },
+  holidayBadge: { backgroundColor: '#ffedd5' },
+  holidayBadgeText: { color: '#c2410c' },
   countBadgeMuted: {
     backgroundColor: '#f1f5f9',
     borderRadius: 999,

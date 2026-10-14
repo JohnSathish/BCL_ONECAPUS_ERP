@@ -167,7 +167,7 @@ export default function StudentAcademicsScreen() {
 
         <SectionTitle>Today's Classes</SectionTitle>
         {(data?.todayClasses ?? []).length === 0 ? (
-          <TodayClassesEmptyCard />
+          <TodayClassesEmptyCard holidayTitle={data?.todayClosure?.title} />
         ) : (
           <View style={styles.widgetCard}>
             {data?.todayClasses.map((slot) => (

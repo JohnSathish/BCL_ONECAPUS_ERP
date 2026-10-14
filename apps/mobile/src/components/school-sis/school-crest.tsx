@@ -1,13 +1,18 @@
 import { Image, StyleSheet, View } from 'react-native';
 import { SCHOOL_LOGO } from '@/constants/school-branding';
 
-export function SchoolCrest({ size = 148 }: { size?: number }) {
-  const plate = size + 16;
+export function SchoolCrest({ size = 148, framed = true }: { size?: number; framed?: boolean }) {
+  const plate = framed ? size + 20 : size;
   return (
-    <View style={[styles.plate, { width: plate, height: plate, borderRadius: plate / 2 }]}>
+    <View
+      style={[
+        framed ? styles.plate : undefined,
+        { width: plate, height: plate, borderRadius: plate / 2 },
+      ]}
+    >
       <Image
         source={SCHOOL_LOGO}
-        style={{ width: size, height: size, borderRadius: size / 2 }}
+        style={{ width: size, height: size }}
         resizeMode="contain"
         accessibilityLabel="St. Luke's Higher Secondary School crest"
       />
@@ -17,11 +22,14 @@ export function SchoolCrest({ size = 148 }: { size?: number }) {
 
 const styles = StyleSheet.create({
   plate: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#0b1640',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0b1640',
-    shadowOpacity: 0.25,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(245,197,24,0.55)',
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,

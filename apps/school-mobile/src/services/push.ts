@@ -55,6 +55,10 @@ const ANDROID_CHANNELS: Array<{
   { id: 'stlukes_emergency', name: 'Emergency', importance: Notifications.AndroidImportance.MAX },
 ];
 
+function isExpoPushToken(raw: string) {
+  return raw.startsWith('ExponentPushToken') || raw.startsWith('ExpoPushToken');
+}
+
 async function registerDevice(extra?: Record<string, unknown>) {
   await apiFetch('/v1/school-mobile/devices/register', {
     method: 'POST',
@@ -75,11 +79,36 @@ async function registerDevice(extra?: Record<string, unknown>) {
 }
 
 async function savePushToken(token: string) {
+  const raw = String(token ?? '').trim();
+  if (!raw || isExpoPushToken(raw)) return;
   await registerDevice({
-    pushToken: token,
+    pushToken: raw,
     deviceLabel: `${Device.modelName || Platform.OS} ${APP_VERSION}`,
   });
 }
+
+/** Native FCM (Android) or APNs (iOS). Server converts APNs → FCM for delivery. */
+async function getNativePushToken(): Promise<string | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const deviceToken = await Notifications.getDevicePushTokenAsync();
+      const raw = deviceToken?.data != null ? String(deviceToken.data).trim() : '';
+      if (raw && !isExpoPushToken(raw)) return raw;
+      if (raw && isExpoPushToken(raw)) {
+        console.warn(
+          '[push] Got Expo token; need a release build with google-services / GoogleService-Info.plist',
+        );
+        return null;
+      }
+    } catch (err) {
+      console.warn('[push] getDevicePushTokenAsync failed', err);
+    }
+    await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+  }
+  return null;
+}
+
+let pushTokenListenerAttached = false;
 
 export async function registerSchoolPush() {
   try {
@@ -105,15 +134,18 @@ export async function registerSchoolPush() {
       }
     }
     try {
-      const token = await Notifications.getDevicePushTokenAsync();
-      if (token?.data) await savePushToken(String(token.data));
+      const token = await getNativePushToken();
+      if (token) await savePushToken(token);
       else await registerDevice({ deviceLabel: `${Platform.OS} ${APP_VERSION}` });
     } catch {
       await registerDevice({ deviceLabel: `${Platform.OS} ${APP_VERSION}` });
     }
-    Notifications.addPushTokenListener((token) => {
-      void savePushToken(String(token.data)).catch(() => undefined);
-    });
+    if (!pushTokenListenerAttached) {
+      pushTokenListenerAttached = true;
+      Notifications.addPushTokenListener((token) => {
+        void savePushToken(String(token.data)).catch(() => undefined);
+      });
+    }
   } catch {
     try {
       await registerDevice();

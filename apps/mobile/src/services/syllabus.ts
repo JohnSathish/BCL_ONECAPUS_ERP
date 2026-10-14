@@ -76,7 +76,8 @@ export async function downloadSyllabusPdfOffline(
   const info = await FileSystem.getInfoAsync(dest);
   if (info.exists) return dest;
 
-  const url = `${getApiBase()}/v1/syllabus-repository/documents/${documentId}/download`;
+  const apiBase = (await getApiBase()).replace(/\/+$/, '');
+  const url = `${apiBase}/v1/syllabus-repository/documents/${documentId}/download`;
   const result = await FileSystem.downloadAsync(url, dest, { headers });
   if (result.status < 200 || result.status >= 300) {
     throw new Error(`Download failed (${result.status})`);

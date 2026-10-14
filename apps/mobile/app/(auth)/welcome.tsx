@@ -15,7 +15,6 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_VERSION } from '@/api/client';
 import { authTheme } from '@/components/auth/auth-theme';
-import { SchoolInstitutionChip } from '@/components/auth/school-institution-chip';
 import {
   DEFAULT_PORTAL_STATS,
   DEFAULT_PORTAL_UPDATES,
@@ -23,7 +22,6 @@ import {
   INSTITUTION_AFFILIATION_LINES,
   INSTITUTION_BADGES,
   NAAC_ACCREDITATION_LABEL,
-  COLLEGE_PORTAL_SUBTITLE,
   POWERED_BY,
   POWERED_BY_TAGLINE,
   PRIVACY_POLICY_URL,
@@ -35,12 +33,28 @@ import {
 import { useBootstrap } from '@/hooks/useBootstrap';
 import { useSchoolConfig } from '@/hooks/use-school-config';
 import { isSchoolSisConfig } from '@/auth/school-product';
-import { InstitutionLogo } from '@/components/auth/institution-logo';
+import { InstitutionLogoRing } from '@/components/auth/institution-logo';
 import { SchoolWelcomeScreen } from '@/components/school-sis/school-welcome-screen';
 import { getInstalledAppVersion, isVersionBelow } from '@/utils/app-version';
 
 const STICKY_BAR_HEIGHT = 72;
 let softUpdatePrompted = false;
+
+const PORTAL_ROLES = [
+  { label: 'Student', icon: '🎓', wash: '#dbeafe', ink: '#1d4ed8' },
+  { label: 'Faculty', icon: '👥', wash: '#d1fae5', ink: '#047857' },
+  { label: 'Parent', icon: '👨‍👩‍👧', wash: '#ede9fe', ink: '#6d28d9' },
+  { label: 'Staff', icon: '⚙️', wash: '#ffedd5', ink: '#c2410c' },
+] as const;
+
+const QUICK_HINTS: Record<string, string> = {
+  admission: 'Check your admission application status',
+  certificate: 'Validate an authentic college certificate',
+  result: 'Look up a published college result',
+  prospectus: 'Open forms and the college prospectus',
+  fees: 'Sign in to pay fees online',
+  website: 'Open the college website',
+};
 
 function formatStat(value: number, fallback: number) {
   const n = value > 0 ? value : fallback;
@@ -51,22 +65,34 @@ function SignInButton({
   onPress,
   pulse,
   compact,
+  light,
 }: {
   onPress: () => void;
   pulse?: Animated.Value;
   compact?: boolean;
+  light?: boolean;
 }) {
   const content = (
     <Pressable onPress={onPress}>
-      <LinearGradient
-        colors={['#1E40AF', '#2563EB', '#1d4ed8']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.signInBtn, compact && styles.signInBtnCompact]}
-      >
-        <Text style={[styles.signInText, compact && styles.signInTextCompact]}>{SIGN_IN_CTA}</Text>
-        <Text style={styles.signInArrow}>→</Text>
-      </LinearGradient>
+      {light ? (
+        <View style={[styles.signInBtn, styles.signInBtnLight]}>
+          <Text style={styles.signInMark}>↪</Text>
+          <Text style={[styles.signInText, styles.signInTextLight]}>{SIGN_IN_CTA}</Text>
+          <Text style={[styles.signInArrow, styles.signInArrowLight]}>→</Text>
+        </View>
+      ) : (
+        <LinearGradient
+          colors={['#1E40AF', '#2563EB', '#1d4ed8']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.signInBtn, compact && styles.signInBtnCompact]}
+        >
+          <Text style={[styles.signInText, compact && styles.signInTextCompact]}>
+            {SIGN_IN_CTA}
+          </Text>
+          <Text style={styles.signInArrow}>→</Text>
+        </LinearGradient>
+      )}
     </Pressable>
   );
 
@@ -204,9 +230,10 @@ export default function WelcomeScreen() {
       >
         <View style={styles.heroSection}>
           <LinearGradient
-            colors={['#1e3a8a', '#2563eb', '#1d4ed8']}
-            style={[styles.heroOverlay, { paddingTop: insets.top + 16 }]}
+            colors={['#082f73', '#0f3c89', '#1d4ed8']}
+            style={[styles.heroOverlay, { paddingTop: insets.top + 18 }]}
           >
+            <View style={styles.heroGlow} />
             <Animated.View
               style={{
                 opacity: heroOpacity,
@@ -214,38 +241,38 @@ export default function WelcomeScreen() {
                 alignItems: 'center',
               }}
             >
-              <SchoolInstitutionChip light />
-              <View style={styles.logoRing}>
-                <InstitutionLogo branding={config?.branding} size={46} style={styles.logoImage} />
+              <View style={styles.logoPlate}>
+                <InstitutionLogoRing branding={config?.branding} size={88} shape="rounded" />
               </View>
               <Text style={styles.collegeLine}>{institutionName.toUpperCase()}</Text>
-              {INSTITUTION_AFFILIATION_LINES.map((line) => (
-                <Text key={line} style={styles.affiliationLine}>
-                  {line}
-                </Text>
-              ))}
-              <View style={styles.roleRow}>
-                {['Student', 'Faculty', 'Parent', 'Staff'].map((role) => (
-                  <View key={role} style={styles.roleChip}>
-                    <Text style={styles.roleChipText}>{role}</Text>
-                  </View>
+              <View style={styles.affiliationBlock}>
+                {INSTITUTION_AFFILIATION_LINES.map((line) => (
+                  <Text key={line} style={styles.affiliationLine}>
+                    {line}
+                  </Text>
                 ))}
               </View>
-              <Text style={styles.tagline}>{COLLEGE_PORTAL_SUBTITLE}</Text>
+              <View style={styles.roleRow}>
+                {PORTAL_ROLES.map((role) => (
+                  <Pressable key={role.label} style={styles.roleCard} onPress={goToLogin}>
+                    <View style={[styles.roleIcon, { backgroundColor: role.wash }]}>
+                      <Text style={styles.roleIconText}>{role.icon}</Text>
+                    </View>
+                    <Text style={[styles.roleChipText, { color: role.ink }]}>{role.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
               <View style={styles.naacBadge}>
                 <Text style={styles.naacStars}>★★★★★</Text>
+                <View style={styles.naacRule} />
                 <Text style={styles.naacText}>{NAAC_ACCREDITATION_LABEL}</Text>
               </View>
+              <View style={styles.heroCta}>
+                <SignInButton onPress={goToLogin} pulse={buttonPulse} light />
+              </View>
+              <Text style={styles.tagline}>ACCESS YOUR ACADEMIC AND CAMPUS SERVICES</Text>
             </Animated.View>
           </LinearGradient>
-        </View>
-
-        {/* Primary CTA — above the fold */}
-        <View style={[styles.primaryCtaWrap, { marginTop: -32 }]}>
-          <SignInButton onPress={goToLogin} pulse={buttonPulse} />
-          <View style={styles.ctaDivider}>
-            <View style={styles.ctaDividerLine} />
-          </View>
         </View>
 
         <Animated.View style={[styles.body, { opacity: bodyOpacity }]}>
@@ -261,8 +288,16 @@ export default function WelcomeScreen() {
                 style={[styles.quickCard, { backgroundColor: cardBg, borderColor: '#e2e8f0' }]}
                 onPress={() => onQuickAccess(item)}
               >
-                <Text style={styles.quickIcon}>{item.icon}</Text>
-                <Text style={[styles.quickLabel, { color: text }]}>{item.label}</Text>
+                <View style={styles.quickIconTile}>
+                  <Text style={styles.quickIcon}>{item.icon}</Text>
+                </View>
+                <View style={styles.quickCopy}>
+                  <Text style={[styles.quickLabel, { color: text }]}>{item.label}</Text>
+                  <Text style={[styles.quickHint, { color: textMuted }]} numberOfLines={2}>
+                    {QUICK_HINTS[item.id] ?? 'Open this campus service'}
+                  </Text>
+                </View>
+                <Text style={styles.quickChevron}>›</Text>
               </Pressable>
             ))}
           </View>
@@ -438,22 +473,30 @@ const styles = StyleSheet.create({
   heroOverlay: {
     flex: 1,
     minHeight: 300,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingHorizontal: 18,
+    paddingBottom: 28,
     justifyContent: 'center',
   },
-  logoRing: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.35)',
+  heroGlow: {
+    position: 'absolute',
+    top: -80,
+    right: -60,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  logoPlate: {
+    backgroundColor: '#ffffff',
+    borderRadius: 28,
+    padding: 8,
     marginBottom: 14,
+    shadowColor: '#020617',
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  logoImage: { width: 72, height: 72, borderRadius: 36 },
   welcomeMessage: {
     color: 'rgba(219,234,254,0.95)',
     fontSize: 14,
@@ -463,65 +506,73 @@ const styles = StyleSheet.create({
   },
   collegeLine: {
     color: '#ffffff',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
     textAlign: 'center',
     marginTop: 2,
-    paddingHorizontal: 12,
-    lineHeight: 26,
+    paddingHorizontal: 8,
+    lineHeight: 28,
   },
+  affiliationBlock: { marginTop: 8, gap: 2, paddingHorizontal: 8 },
   affiliationLine: {
-    color: 'rgba(219,234,254,0.88)',
+    color: 'rgba(219,234,254,0.92)',
     fontSize: 11,
     fontWeight: '500',
     textAlign: 'center',
-    marginTop: 4,
-    lineHeight: 15,
-    paddingHorizontal: 10,
+    lineHeight: 16,
   },
   roleRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
     gap: 8,
-    marginTop: 14,
+    marginTop: 18,
+    width: '100%',
   },
-  roleChip: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+  roleCard: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
   },
+  roleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleIconText: { fontSize: 16 },
   roleChipText: {
-    color: '#ffffff',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   tagline: {
-    color: '#e0e7ff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 14,
+    color: 'rgba(219,234,254,0.85)',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 12,
     textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 8,
-    letterSpacing: 0.2,
+    letterSpacing: 0.8,
   },
+  heroCta: { width: '100%', marginTop: 16 },
   naacBadge: {
-    marginTop: 14,
+    marginTop: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 999,
   },
-  naacStars: { color: authTheme.accent, fontSize: 12, letterSpacing: 1 },
-  naacText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  naacRule: { width: 1, height: 14, backgroundColor: 'rgba(255,255,255,0.35)' },
+  naacStars: { color: '#fbbf24', fontSize: 11, letterSpacing: 1 },
+  naacText: { color: '#fff', fontSize: 11, fontWeight: '700', flexShrink: 1 },
   primaryCtaWrap: {
     paddingHorizontal: 20,
     gap: 12,
@@ -550,18 +601,31 @@ const styles = StyleSheet.create({
   quickCard: {
     width: '47%',
     flexGrow: 1,
-    borderRadius: 14,
-    padding: 14,
-    gap: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    padding: 12,
+    gap: 10,
     borderWidth: 1,
-    shadowColor: '#1e40af',
+    shadowColor: '#0f172a',
     shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
-  quickIcon: { fontSize: 22 },
-  quickLabel: { fontSize: 12, fontWeight: '700', lineHeight: 16 },
+  quickIconTile: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eff6ff',
+  },
+  quickIcon: { fontSize: 18 },
+  quickCopy: { flex: 1, gap: 2 },
+  quickLabel: { fontSize: 13, fontWeight: '800', lineHeight: 16 },
+  quickHint: { fontSize: 11, lineHeight: 14 },
+  quickChevron: { color: '#94a3b8', fontSize: 22, fontWeight: '500' },
   featureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   featureCard: {
     width: '31%',
@@ -649,19 +713,29 @@ const styles = StyleSheet.create({
   quoteText: { fontSize: 15, fontStyle: 'italic', lineHeight: 22 },
   quoteAuthor: { marginTop: 8, fontSize: 13, fontWeight: '600' },
   signInBtn: {
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    shadowColor: '#1E40AF',
-    shadowOpacity: 0.35,
+    shadowColor: '#020617',
+    shadowOpacity: 0.18,
     shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 8 },
     elevation: 6,
   },
+  signInBtnLight: {
+    backgroundColor: '#ffffff',
+  },
+  signInMark: {
+    color: '#0f3c89',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  signInTextLight: { color: '#0f3c89', flex: 1, textAlign: 'center' },
+  signInArrowLight: { color: '#0f3c89' },
   signInBtnCompact: {
     paddingVertical: 14,
     marginHorizontal: 16,

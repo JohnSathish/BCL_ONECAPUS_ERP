@@ -1,8 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { switchInstitution } from '@/auth/switch-institution';
+import { StyleSheet, Text, View } from 'react-native';
 import { isSchoolSisConfig } from '@/auth/school-product';
 import { COLLEGE_NAME, PRODUCT_NAME } from '@/constants/release';
+import { SchoolCrest } from '@/components/school-sis/school-crest';
 import { SCHOOL_BRAND } from '@/constants/school-branding';
 import { useBootstrap } from '@/hooks/useBootstrap';
 import { useSchoolConfig } from '@/hooks/use-school-config';
@@ -30,29 +29,22 @@ export function SchoolInstitutionChip({
   /** Use on dark gradient headers */
   light?: boolean;
 }) {
-  const router = useRouter();
   const { school } = useSchoolConfig();
   const { config } = useBootstrap();
 
   if (!school) return null;
 
-  const label = isSchoolSisConfig(school)
+  const schoolSis = isSchoolSisConfig(school);
+  const label = schoolSis
     ? SCHOOL_BRAND.shortName
     : institutionLabel(config?.branding?.displayName, school.name);
 
   return (
-    <View style={[styles.wrap, light && styles.wrapLight]}>
+    <View style={[styles.wrap, light && styles.wrapLight, !schoolSis && styles.wrapStatic]}>
+      {schoolSis ? <SchoolCrest size={22} framed={false} /> : null}
       <Text style={[styles.label, light && styles.labelLight]} numberOfLines={1}>
         {label}
       </Text>
-      <Pressable
-        hitSlop={8}
-        onPress={() => {
-          void switchInstitution(router);
-        }}
-      >
-        <Text style={[styles.change, light && styles.changeLight]}>Change</Text>
-      </Pressable>
     </View>
   );
 }
@@ -75,6 +67,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderColor: 'rgba(255,255,255,0.25)',
   },
+  wrapStatic: {
+    paddingHorizontal: 14,
+  },
   label: {
     flexShrink: 1,
     fontSize: 12,
@@ -82,10 +77,4 @@ const styles = StyleSheet.create({
     color: '#1e40af',
   },
   labelLight: { color: '#e0e7ff' },
-  change: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#2563eb',
-  },
-  changeLight: { color: '#bfdbfe' },
 });

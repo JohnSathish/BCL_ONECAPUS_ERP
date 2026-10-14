@@ -1,0 +1,36 @@
+# EAS upload ignore — replaces .gitignore for the build archive.
+# Intentionally allows google-services.json + GoogleService-Info.plist for FCM/APNs.
+
+.expo/
+node_modules/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+.env
+.env.local
+.env.production
+*.apk
+*.aab
+
+# Native folders + Gradle locks (Windows EBUSY during Android local builds)
+android
+android/
+android/**
+android.bak
+android.bak/
+android.bak/**
+ios
+ios/
+ios/**
+**/.gradle
+**/.gradle/**
+**/*.lock
+**/checksums.lock
+**/build/
+credentials/
+credentials/**

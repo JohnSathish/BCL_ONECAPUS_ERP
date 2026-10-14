@@ -19,4 +19,4 @@ export const SCHOOL_BRAND = {
   leaf: '#6b9b37',
 } as const;
 
-export const SCHOOL_LOGO = require('../../assets/st-lukes-logo.jpg');
+export const SCHOOL_LOGO = require('../../assets/st-lukes-logo.png');

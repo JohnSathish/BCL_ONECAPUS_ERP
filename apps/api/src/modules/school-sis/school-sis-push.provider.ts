@@ -453,7 +453,9 @@ export class SchoolSisFcmProvider implements NotificationProvider {
             code,
           );
         if (invalid) invalidTokens.push(token);
-        this.logger.warn(`FCM failed (${code})`);
+        this.logger.warn(
+          `FCM failed (${code})${row.error?.message ? `: ${row.error.message}` : ''}`,
+        );
         const classified = classifyPushFailure(code, row.error?.message);
         perToken.push({
           token,

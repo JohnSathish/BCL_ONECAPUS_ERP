@@ -25,6 +25,8 @@ export type FacultyAttendanceSession = {
 export type AttendanceRosterStudent = {
   id: string;
   rollNumber?: string;
+  enrollmentNumber?: string;
+  admissionNumber?: string;
   fullName?: string;
   status?: string;
   remarks?: string;

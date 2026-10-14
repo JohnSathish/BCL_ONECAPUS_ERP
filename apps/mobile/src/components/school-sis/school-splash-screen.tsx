@@ -12,7 +12,7 @@ export function SchoolSplashScreen() {
       style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}
     >
       <View style={styles.center}>
-        <SchoolCrest size={180} />
+        <SchoolCrest size={196} framed={false} />
         <Text style={styles.name}>{SCHOOL_BRAND.legalName}</Text>
         <Text style={styles.motto}>{SCHOOL_BRAND.motto}</Text>
         <Text style={styles.address}>{SCHOOL_BRAND.addressLine}</Text>

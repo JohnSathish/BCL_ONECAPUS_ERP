@@ -88,7 +88,7 @@ export function SchoolLoginScreen() {
           <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
             <Text style={styles.back}>‹ Back</Text>
           </Pressable>
-          <SchoolCrest size={112} />
+          <SchoolCrest size={128} />
           <Text style={styles.title}>{SCHOOL_BRAND.legalName}</Text>
           <Text style={styles.motto}>{SCHOOL_BRAND.motto}</Text>
           <Text style={styles.address}>{SCHOOL_BRAND.fullAddress}</Text>
@@ -96,7 +96,7 @@ export function SchoolLoginScreen() {
 
         <View style={styles.card}>
           <Text style={styles.hello}>Sign in</Text>
-          <Text style={styles.hint}>Admission number or roll number</Text>
+          <Text style={styles.hint}>Admission number, roll number, or staff code</Text>
           <TextInput
             value={identifier}
             onChangeText={setIdentifier}

@@ -65,7 +65,7 @@ export async function fetchSchoolRegistry(): Promise<SchoolRegistryEntry[]> {
     merged.set(row.id, row);
   }
 
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  if (process.env.EXPO_PUBLIC_USE_LOCAL_API === '1') {
     merged.set('st-lukes-local', {
       id: 'st-lukes-local',
       name: "St. Luke's (this computer)",

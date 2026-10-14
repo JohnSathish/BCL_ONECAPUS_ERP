@@ -13,7 +13,7 @@ import {
 } from '@/constants/release';
 import { readCachedBootstrap } from '@/services/mobile-remote-config';
 
-const COLLEGE_APP_ICON = require('../../../assets/icon.png');
+const COLLEGE_CREST = require('../../../assets/college-crest.png');
 
 const RING_SIZES = [260, 320, 380, 440, 500];
 
@@ -211,7 +211,9 @@ export function PremiumSplashScreen() {
           <Animated.View
             style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}
           >
-            <Image source={COLLEGE_APP_ICON} style={styles.logo} resizeMode="contain" />
+            <View style={styles.logoCard}>
+              <Image source={COLLEGE_CREST} style={styles.logo} resizeMode="contain" />
+            </View>
           </Animated.View>
 
           <Animated.View
@@ -310,9 +312,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 4,
   },
-  logo: {
+  logoCard: {
     width: 168,
     height: 168,
+    borderRadius: 36,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
     backgroundColor: 'transparent',
   },
   productName: {

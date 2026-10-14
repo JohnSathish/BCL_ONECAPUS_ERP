@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,10 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  AttendanceIdScanner,
+  type AttendanceScanFeedback,
+} from '@/components/faculty-portal/attendance-id-scanner';
 import { FacultyScreenShell } from '@/components/faculty-portal/faculty-screen-shell';
 import { facultyTheme } from '@/components/faculty-portal/theme';
 import {
@@ -17,6 +21,7 @@ import {
   markAttendanceSession,
   type AttendanceRosterStudent,
 } from '@/services/faculty-attendance';
+import { resolveAttendanceScan } from '@/utils/attendance-scan-resolve';
 
 const STATUS_CYCLE = ['P', 'A', 'L'] as const;
 
@@ -28,6 +33,10 @@ export default function MarkAttendanceScreen() {
   const [saving, setSaving] = useState(false);
   const [sessionTitle, setSessionTitle] = useState('Class');
   const [students, setStudents] = useState<AttendanceRosterStudent[]>([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [lastScanNote, setLastScanNote] = useState<string | null>(null);
+  const studentsRef = useRef(students);
+  studentsRef.current = students;
 
   const load = useCallback(async () => {
     if (!sessionId) return;
@@ -70,6 +79,21 @@ export default function MarkAttendanceScreen() {
     setStudents((rows) => rows.map((row) => ({ ...row, status: 'P' })));
   }
 
+  const onScanId = useCallback((raw: string): AttendanceScanFeedback => {
+    const matched = resolveAttendanceScan(raw, studentsRef.current);
+    if (!matched) {
+      return { kind: 'miss', message: 'Student not in this class.' };
+    }
+    setStudents((rows) =>
+      rows.map((row) => (row.id === matched.id ? { ...row, status: 'P' } : row)),
+    );
+    const note = `Present: ${matched.fullName ?? 'Student'}${
+      matched.rollNumber ? ` · ${matched.rollNumber}` : ''
+    }`;
+    setLastScanNote(note);
+    return { kind: 'hit', message: note };
+  }, []);
+
   async function onSave(mode: 'QUICK_PRESENT' | 'MANUAL') {
     if (!sessionId) return;
     setSaving(true);
@@ -102,11 +126,22 @@ export default function MarkAttendanceScreen() {
   return (
     <FacultyScreenShell title="Take Attendance" subtitle={sessionTitle}>
       <View style={styles.toolbar}>
-        <Pressable style={styles.toolBtn} onPress={markAllPresent}>
-          <Text style={styles.toolBtnText}>Mark all present</Text>
-        </Pressable>
+        <View style={styles.toolRow}>
+          <Pressable style={styles.toolBtn} onPress={markAllPresent}>
+            <Text style={styles.toolBtnText}>Mark all present</Text>
+          </Pressable>
+          <Pressable style={[styles.toolBtn, styles.scanBtn]} onPress={() => setScannerOpen(true)}>
+            <Text style={styles.toolBtnText}>Scan ID</Text>
+          </Pressable>
+        </View>
         <Text style={styles.count}>{students.length} students</Text>
       </View>
+
+      {lastScanNote ? (
+        <View style={styles.scanNote}>
+          <Text style={styles.scanNoteText}>{lastScanNote}</Text>
+        </View>
+      ) : null}
 
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}>
         {students.map((student) => (
@@ -131,6 +166,12 @@ export default function MarkAttendanceScreen() {
           <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Submit Attendance'}</Text>
         </Pressable>
       </View>
+
+      <AttendanceIdScanner
+        visible={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={onScanId}
+      />
     </FacultyScreenShell>
   );
 }
@@ -154,15 +195,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
+    gap: 8,
   },
+  toolRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   toolBtn: {
     backgroundColor: facultyTheme.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
   },
+  scanBtn: { backgroundColor: facultyTheme.primaryDark },
   toolBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   count: { fontSize: 12, color: facultyTheme.textMuted, fontWeight: '600' },
+  scanNote: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: '#DCFCE7',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  scanNoteText: { color: '#166534', fontWeight: '700', fontSize: 13 },
   list: { paddingHorizontal: 16, gap: 8 },
   row: {
     flexDirection: 'row',

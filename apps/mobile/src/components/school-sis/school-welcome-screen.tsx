@@ -18,7 +18,7 @@ export function SchoolWelcomeScreen() {
         style={[styles.hero, { paddingTop: insets.top + 28 }]}
       >
         <Text style={styles.kicker}>School ERP</Text>
-        <SchoolCrest size={168} />
+        <SchoolCrest size={176} />
         <Text style={styles.name}>{SCHOOL_BRAND.legalName.toUpperCase()}</Text>
         <Text style={styles.motto}>{SCHOOL_BRAND.motto}</Text>
         <View style={styles.goldBar} />

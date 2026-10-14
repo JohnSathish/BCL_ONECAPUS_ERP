@@ -36,7 +36,6 @@ import { getUserSnapshot } from '@/auth/session';
 import { refreshAccessToken } from '@/auth/token-refresh';
 import { authColors } from '@/components/auth/auth-theme';
 import { CaptchaWidget, type Challenge } from '@/components/auth/captcha-widget';
-import { SchoolInstitutionChip } from '@/components/auth/school-institution-chip';
 import {
   COLLEGE_NAME,
   COLLEGE_PORTAL_SUBTITLE,
@@ -49,7 +48,7 @@ import {
   WHATSAPP_SUPPORT_URL,
 } from '@/constants/release';
 import { useBootstrap } from '@/hooks/useBootstrap';
-import { InstitutionLogo } from '@/components/auth/institution-logo';
+import { InstitutionLogoRing } from '@/components/auth/institution-logo';
 import { SchoolLoginScreen } from '@/components/school-sis/school-login-screen';
 
 const NEWS_ICONS = ['📢', '🎓', '📅', '💰', '🏆', '📝'] as const;
@@ -337,10 +336,7 @@ export default function LoginScreen() {
           colors={['#1e3a8a', '#2563eb', '#1d4ed8']}
           style={[styles.header, { paddingTop: insets.top + 12 }]}
         >
-          <SchoolInstitutionChip light />
-          <View style={styles.logoRing}>
-            <InstitutionLogo branding={config?.branding} size={40} style={styles.logoImage} />
-          </View>
+          <InstitutionLogoRing branding={config?.branding} size={92} shape="rounded" />
           <Text style={styles.collegeName}>
             {config?.branding?.displayName?.trim() || COLLEGE_NAME}
           </Text>
@@ -653,16 +649,6 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     alignItems: 'center',
   },
-  logoRing: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  logoImage: { width: 46, height: 46, borderRadius: 23 },
   collegeName: { color: '#fff', fontSize: 15, fontWeight: '800', textAlign: 'center' },
   productName: { color: '#dbeafe', fontSize: 13, fontWeight: '600', marginTop: 2 },
   headerDivider: {

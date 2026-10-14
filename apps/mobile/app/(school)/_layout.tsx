@@ -6,6 +6,8 @@ import { fetchSchoolBootstrap } from '@/api/school-mobile';
 import { schoolQueryClient } from '@/api/query-client';
 import { hasSchoolMobileAccess } from '@/auth/role-router';
 import { getAccessToken, getUserSnapshot } from '@/auth/session';
+import { SchoolCrest } from '@/components/school-sis/school-crest';
+import { SCHOOL_BRAND } from '@/constants/school-branding';
 import { useSchoolSession } from '@/store/school-session';
 
 export default function SchoolLayout() {
@@ -40,8 +42,16 @@ export default function SchoolLayout() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator />
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: SCHOOL_BRAND.navyDeep,
+        }}
+      >
+        <SchoolCrest size={120} framed={false} />
+        <ActivityIndicator style={{ marginTop: 20 }} color={SCHOOL_BRAND.gold} />
       </View>
     );
   }
