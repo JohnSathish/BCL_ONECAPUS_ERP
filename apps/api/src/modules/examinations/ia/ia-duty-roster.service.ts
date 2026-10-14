@@ -960,6 +960,21 @@ export class IaDutyRosterService {
     staffProfileId: string,
     acknowledgeConflict?: boolean,
   ) {
+    const person = await this.prisma.staffProfile.findFirst({
+      where: {
+        id: staffProfileId,
+        tenantId: user.tid,
+        deletedAt: null,
+        status: 'ACTIVE',
+        staffType: 'TEACHING',
+      },
+      select: { id: true },
+    });
+    if (!person) {
+      throw new BadRequestException(
+        'Only active teaching staff can be assigned as invigilators.',
+      );
+    }
     const existing = await this.prisma.examDutyAssignment.findFirst({
       where: { sittingId, staffProfileId },
       include: { hall: true },
@@ -1011,7 +1026,12 @@ export class IaDutyRosterService {
 
   private async activeStaff(tenantId: string) {
     return this.prisma.staffProfile.findMany({
-      where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: 'ACTIVE',
+        staffType: 'TEACHING',
+      },
       select: { id: true, fullName: true, portalUserId: true, email: true },
       orderBy: { fullName: 'asc' },
     });

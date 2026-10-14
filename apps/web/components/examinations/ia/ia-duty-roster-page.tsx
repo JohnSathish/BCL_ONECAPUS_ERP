@@ -41,8 +41,8 @@ export function IaDutyRosterPage() {
   });
   const rules = useQuery({ queryKey: ['duty-rules'], queryFn: fetchDutyRules });
   const staff = useQuery({
-    queryKey: ['duty-staff'],
-    queryFn: () => fetchAllStaff({ status: 'ACTIVE' }),
+    queryKey: ['duty-staff', 'teaching'],
+    queryFn: () => fetchAllStaff({ status: 'ACTIVE', activeTeachingOnly: true }),
   });
 
   const refresh = () => void qc.invalidateQueries({ queryKey: ['duty-roster', activeId] });
@@ -222,10 +222,12 @@ export function IaDutyRosterPage() {
         <HallEditor
           key={`${view.id}-${view.revision}`}
           roster={view}
-          staff={(staff.data?.data ?? []).map((row) => ({
-            id: row.id,
-            label: `${row.fullName} · ${row.department ?? ''}`,
-          }))}
+          staff={(staff.data?.data ?? [])
+            .filter((row) => row.staffType === 'TEACHING')
+            .map((row) => ({
+              id: row.id,
+              label: `${row.fullName}${row.department ? ` · ${row.department}` : ''}`,
+            }))}
           busy={run.isPending}
           onSave={(payload) => run.mutate(() => saveDutyRoster(activeId, payload))}
           onAssign={(hallId, staffProfileId) =>
