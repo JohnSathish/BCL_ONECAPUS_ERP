@@ -19,6 +19,7 @@ import { useRequireAuth } from '@/hooks/use-auth';
 import { useStaffPermissions } from '@/hooks/use-staff-permissions';
 import { fetchDepartments } from '@/services/organization';
 import { fetchAllStaff, fetchDesignations } from '@/services/staff';
+import { STAFF_STATUSES, STAFF_TYPES, type StaffDirectoryRow } from '@/types/staff';
 import { fetchShifts } from '@/services/shifts';
 import {
   applyStaffBulkUpdate,
@@ -38,7 +39,7 @@ import {
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
-type UpdateMode = 'spreadsheet' | 'same';
+type UpdateMode = 'spreadsheet' | 'same' | 'portal';
 type Audience = 'all' | 'department' | 'designation' | 'individual';
 
 const MATCHING_FIELD_CONFLICTS: Partial<Record<StaffBulkUpdateMatchingKey, string>> = {
@@ -84,6 +85,8 @@ export function StaffBulkUpdatePage() {
   const [audience, setAudience] = useState<Audience>('all');
   const [pickedIds, setPickedIds] = useState<string[]>([]);
   const [sameValue, setSameValue] = useState('');
+  const [portalValues, setPortalValues] = useState<Record<string, string>>({});
+  const [portalQuery, setPortalQuery] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [filters, setFilters] = useState({ departmentId: '', designationId: '' });
 
@@ -173,6 +176,23 @@ export function StaffBulkUpdatePage() {
         const source = uploaded ?? file;
         if (!source) throw new Error('Upload an Excel file before preview.');
         return uploadStaffBulkUpdatePreview(source, [fieldKey], matchingKey);
+      }
+      if (mode === 'portal') {
+        if (!scopeReady || audiencePeople.length === 0) {
+          throw new Error('Choose the staff members to update.');
+        }
+        const filled = audiencePeople.filter((row) => (portalValues[row.id] ?? '').trim());
+        if (!filled.length) throw new Error('Type a new value for at least one staff member.');
+        return previewStaffBulkUpdate({
+          scope: {},
+          fieldKeys: [fieldKey],
+          updateMode: 'CSV',
+          matchingKey,
+          csvRows: filled.map((row) => ({
+            [matchingKey]: matchingValue(matchingKey, row),
+            [fieldKey]: (portalValues[row.id] ?? '').trim(),
+          })),
+        });
       }
       if (!sameValue.trim()) throw new Error('Enter the value to set for the selected staff.');
       if (!scopeReady || audiencePeople.length === 0) {
@@ -272,6 +292,7 @@ export function StaffBulkUpdatePage() {
     setFieldKeys([fieldKey]);
     setPreview(null);
     setSameValue('');
+    setPortalValues({});
     setMessage('');
   };
 
@@ -309,6 +330,8 @@ export function StaffBulkUpdatePage() {
     setPreview(null);
     setChecked([]);
     setSameValue('');
+    setPortalValues({});
+    setPortalQuery('');
     setMessage('');
     setPickedIds([]);
     setPickerQuery('');
@@ -345,6 +368,27 @@ export function StaffBulkUpdatePage() {
     .map((row) => row.staffId);
   const visibleInvalid = visibleRows.filter((row) => row.errors.length > 0).length;
   const allValidChecked = validIds.length > 0 && validIds.every((id) => checked.includes(id));
+  const portalFilled = audiencePeople.filter((row) => (portalValues[row.id] ?? '').trim()).length;
+  const portalPeople = audiencePeople.filter((row) => {
+    const query = portalQuery.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      row.fullName.toLowerCase().includes(query) ||
+      row.employeeCode.toLowerCase().includes(query) ||
+      (row.department ?? '').toLowerCase().includes(query)
+    );
+  });
+  const valueChoices = {
+    departments: (departments.data ?? []).map((department) => ({
+      id: department.id,
+      label: department.name,
+    })),
+    designations: (designations.data ?? []).map((designation) => ({
+      id: designation.id,
+      label: designation.label,
+    })),
+    shifts: (shifts.data ?? []).map((shift) => ({ id: shift.id, label: shift.name })),
+  };
 
   return (
     <DashboardShell role="admin" pageHeader={false} title="Bulk Update Staff">
@@ -383,8 +427,8 @@ export function StaffBulkUpdatePage() {
                 time.
               </li>
               <li>
-                Upload a filled Excel template, or type one value to set for every selected staff
-                member.
+                Type each new value on this page, set one value for everyone, or upload a filled
+                Excel file.
               </li>
               <li>Limit the list to a department, a designation, or the people you tick.</li>
               <li>Check the preview. Valid rows can be updated. Invalid rows stay unchanged.</li>
@@ -415,9 +459,19 @@ export function StaffBulkUpdatePage() {
             subtitle="Select how you want to update the data."
           >
             <MethodCard
+              active={mode === 'portal'}
+              title="Type in the Portal"
+              body="Enter a different value for each person here. No Excel file."
+              onClick={() => {
+                setMode('portal');
+                setFile(null);
+                setPreview(null);
+              }}
+            />
+            <MethodCard
               active={mode === 'spreadsheet'}
               title="Upload from Excel"
-              body="Use different values for each staff member."
+              body="Use a spreadsheet when the list is long."
               onClick={() => {
                 setMode('spreadsheet');
                 setPreview(null);
@@ -569,12 +623,18 @@ export function StaffBulkUpdatePage() {
               <StepBadge n="4" tone="green" />
               <div>
                 <h2 className="font-semibold text-slate-900 dark:text-slate-50">
-                  {mode === 'spreadsheet' ? 'Upload Excel File' : 'Enter the Same Value'}
+                  {mode === 'spreadsheet'
+                    ? 'Upload Excel File'
+                    : mode === 'portal'
+                      ? 'Type Values in the Portal'
+                      : 'Enter the Same Value'}
                 </h2>
                 <p className="text-sm text-slate-500">
                   {mode === 'spreadsheet'
                     ? 'Upload an Excel file with Staff ID or Employee ID and the new values. Download the template to get the required format.'
-                    : `This value is written to ${selectedField?.label ?? 'the selected field'} for every staff member in the selection.`}
+                    : mode === 'portal'
+                      ? `Type the new ${selectedField?.label ?? 'value'} only for the staff you want to change. Blank rows are left as they are.`
+                      : `This value is written to ${selectedField?.label ?? 'the selected field'} for every staff member in the selection.`}
                 </p>
               </div>
             </div>
@@ -592,10 +652,18 @@ export function StaffBulkUpdatePage() {
               <Button
                 type="button"
                 className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
-                disabled={!scopeReady || !sameValue.trim() || previewMut.isPending}
+                disabled={
+                  !scopeReady ||
+                  previewMut.isPending ||
+                  (mode === 'same' ? !sameValue.trim() : portalFilled === 0)
+                }
                 onClick={() => previewMut.mutate(undefined)}
               >
-                {previewMut.isPending ? 'Checking…' : 'Preview Changes'}
+                {previewMut.isPending
+                  ? 'Checking…'
+                  : mode === 'portal'
+                    ? `Preview ${portalFilled} Change${portalFilled === 1 ? '' : 's'}`
+                    : 'Preview Changes'}
               </Button>
             )}
           </div>
@@ -680,6 +748,73 @@ export function StaffBulkUpdatePage() {
                 </div>
               )}
             </div>
+          ) : mode === 'portal' ? (
+            <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-white dark:border-emerald-900/40 dark:bg-slate-950">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+                <p className="text-xs text-slate-500">
+                  {scopeReady
+                    ? `${audiencePeople.length} staff in this selection. Leave a row blank to skip it.`
+                    : 'Choose the staff members above, then type their new values here.'}
+                </p>
+                <input
+                  value={portalQuery}
+                  onChange={(event) => setPortalQuery(event.target.value)}
+                  placeholder="Search name, staff ID, or department"
+                  className="h-9 w-full max-w-xs rounded-lg border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+                />
+              </div>
+              <div className="max-h-[420px] overflow-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="sticky top-0 bg-slate-50 text-xs text-slate-500 dark:bg-slate-900">
+                    <tr>
+                      <th className="px-3 py-2">Staff ID</th>
+                      <th className="px-3 py-2">Staff Name</th>
+                      <th className="px-3 py-2">Department</th>
+                      <th className="px-3 py-2">Current {selectedField?.label ?? 'Value'}</th>
+                      <th className="px-3 py-2">New {selectedField?.label ?? 'Value'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {portalPeople.length ? (
+                      portalPeople.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="border-t border-slate-100 dark:border-slate-800"
+                        >
+                          <td className="px-3 py-2 font-medium">{row.employeeCode}</td>
+                          <td className="px-3 py-2">{row.fullName}</td>
+                          <td className="px-3 py-2">{row.department || '—'}</td>
+                          <td className="px-3 py-2 text-slate-500">
+                            {displayCurrentValue(row, activeFieldKey)}
+                          </td>
+                          <td className="px-3 py-2">
+                            <SameValueInput
+                              field={selectedField}
+                              value={portalValues[row.id] ?? ''}
+                              onChange={(value) => {
+                                setPortalValues((current) => ({ ...current, [row.id]: value }));
+                                setPreview(null);
+                              }}
+                              departments={valueChoices.departments}
+                              designations={valueChoices.designations}
+                              shifts={valueChoices.shifts}
+                            />
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-8 text-center text-sm text-slate-400">
+                          {staffRows.isLoading
+                            ? 'Loading staff…'
+                            : 'No staff match this selection.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : (
             <div className="rounded-2xl border border-emerald-100 bg-white p-4 dark:border-emerald-900/40 dark:bg-slate-950">
               <label className="mb-1 block text-xs font-medium text-slate-500">
@@ -692,15 +827,9 @@ export function StaffBulkUpdatePage() {
                   setSameValue(value);
                   setPreview(null);
                 }}
-                departments={(departments.data ?? []).map((department) => ({
-                  id: department.id,
-                  label: department.name,
-                }))}
-                designations={(designations.data ?? []).map((designation) => ({
-                  id: designation.id,
-                  label: designation.label,
-                }))}
-                shifts={(shifts.data ?? []).map((shift) => ({ id: shift.id, label: shift.name }))}
+                departments={valueChoices.departments}
+                designations={valueChoices.designations}
+                shifts={valueChoices.shifts}
               />
             </div>
           )}
@@ -888,6 +1017,40 @@ export function StaffBulkUpdatePage() {
       </div>
     </DashboardShell>
   );
+}
+
+function displayCurrentValue(row: StaffDirectoryRow, fieldKey: string) {
+  const shown =
+    fieldKey === 'email' || fieldKey === 'portalEmail'
+      ? row.email
+      : fieldKey === 'mobile'
+        ? row.mobile
+        : fieldKey === 'fullName'
+          ? row.fullName
+          : fieldKey === 'shortCode'
+            ? row.shortCode
+            : fieldKey === 'employeeCode'
+              ? row.employeeCode
+              : fieldKey === 'departmentId'
+                ? row.department
+                : fieldKey === 'designationId'
+                  ? row.designation
+                  : fieldKey === 'primaryShiftId'
+                    ? row.shift
+                    : fieldKey === 'staffType'
+                      ? row.staffType
+                      : fieldKey === 'status'
+                        ? row.status
+                        : fieldKey === 'rfidNo'
+                          ? row.rfidNo
+                          : fieldKey === 'joiningDate'
+                            ? row.joiningDate
+                            : fieldKey === 'portalActive'
+                              ? row.portalActive
+                                ? 'Active'
+                                : 'Inactive'
+                              : '';
+  return shown ? String(shown) : '—';
 }
 
 function matchingValue(
@@ -1154,6 +1317,39 @@ function SameValueInput({
       >
         <option value="">Select {field.label}</option>
         {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  const fixed =
+    field?.fieldKey === 'staffType'
+      ? STAFF_TYPES.map((id) => ({ id, label: id.replace(/_/g, ' ') }))
+      : field?.fieldKey === 'status'
+        ? STAFF_STATUSES.map((id) => ({ id, label: id.replace(/_/g, ' ') }))
+        : field?.fieldKey === 'gender'
+          ? [
+              { id: 'MALE', label: 'Male' },
+              { id: 'FEMALE', label: 'Female' },
+              { id: 'OTHER', label: 'Other' },
+            ]
+          : field?.fieldKey === 'portalActive'
+            ? [
+                { id: 'true', label: 'Active' },
+                { id: 'false', label: 'Inactive' },
+              ]
+            : null;
+  if (fixed) {
+    return (
+      <select
+        className={selectClass}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">Select {field?.label}</option>
+        {fixed.map((option) => (
           <option key={option.id} value={option.id}>
             {option.label}
           </option>
