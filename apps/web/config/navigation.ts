@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { IA_ADMIT_CARDS_ADMIN_ENABLED } from '@/lib/examinations/ia-feature-flags';
+import { STAFF_PORTAL_SALARY_VISIBLE } from '@/lib/staff-portal/salary-feature-flag';
 import { MODULE_PERMISSIONS } from '@/lib/permissions/permission-registry';
 import {
   Award,
@@ -2617,7 +2618,9 @@ export const STAFF_NAV: NavGroup[] = [
           { label: 'Employment Details', href: '/staff/profile?tab=employment' },
           { label: 'Attendance', href: '/staff/attendance' },
           { label: 'Leave Management', href: '/staff/leave' },
-          { label: 'Salary & Payslips', href: '/staff/salary' },
+          ...(STAFF_PORTAL_SALARY_VISIBLE
+            ? [{ label: 'Salary & Payslips', href: '/staff/salary' }]
+            : []),
           { label: 'Documents', href: '/staff/documents' },
           { label: 'Portal Settings', href: '/staff/settings' },
         ],

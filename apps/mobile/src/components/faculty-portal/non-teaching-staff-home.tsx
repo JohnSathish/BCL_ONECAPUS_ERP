@@ -8,6 +8,7 @@ import { useFacultyPortal } from '@/components/faculty-portal/faculty-portal-con
 import { facultyTheme } from '@/components/faculty-portal/theme';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { COLLEGE_NAME } from '@/constants/release';
+import { STAFF_PORTAL_SALARY_VISIBLE } from '@/config/staff-salary-visible';
 import { formatInr } from '@/utils/currency';
 import { downloadAndSharePayslipPdf, fetchStaffPayslips } from '@/services/faculty-payroll';
 import { fetchStaffBirthdaysWidget, type BirthdaysWidget } from '@/services/student-dashboard';
@@ -96,7 +97,9 @@ export function NonTeachingStaffHomeScreen() {
           <View style={styles.summaryRow}>
             <SummaryChip label="Leave Balance" value={String(leaveTotal)} />
             <SummaryChip label="Unread Alerts" value={String(unread)} urgent={unread > 0} />
-            <SummaryChip label="Payslip" value={payslipLabel} />
+            {STAFF_PORTAL_SALARY_VISIBLE ? (
+              <SummaryChip label="Payslip" value={payslipLabel} />
+            ) : null}
             <SummaryChip label="Profile" value={`${profileCompletion}%`} />
           </View>
         </View>
@@ -109,7 +112,9 @@ export function NonTeachingStaffHomeScreen() {
 
         <SectionTitle title="Quick Actions" />
         <View style={styles.quickGrid}>
-          {STAFF_QUICK_ACTIONS.map((action) => (
+          {STAFF_QUICK_ACTIONS.filter(
+            (action) => STAFF_PORTAL_SALARY_VISIBLE || action.id !== 'payroll',
+          ).map((action) => (
             <Pressable
               key={action.id}
               style={styles.quickCard}
@@ -160,14 +165,16 @@ export function NonTeachingStaffHomeScreen() {
             <LeaveLine label="Earned Leave" value={leave?.earned ?? 0} />
             <Text style={styles.payLink}>Apply leave →</Text>
           </Pressable>
-          <View style={[styles.dualCard, styles.flex]}>
-            <Text style={styles.dualTitle}>Payroll</Text>
-            <Text style={styles.payAmount}>{formatInr(payroll?.amount ?? 0)}</Text>
-            <Text style={styles.payStatus}>Status: {payroll?.status ?? '—'}</Text>
-            <Pressable onPress={() => void onDownloadPayslip()}>
-              <Text style={styles.payLink}>Download Payslip →</Text>
-            </Pressable>
-          </View>
+          {STAFF_PORTAL_SALARY_VISIBLE ? (
+            <View style={[styles.dualCard, styles.flex]}>
+              <Text style={styles.dualTitle}>Payroll</Text>
+              <Text style={styles.payAmount}>{formatInr(payroll?.amount ?? 0)}</Text>
+              <Text style={styles.payStatus}>Status: {payroll?.status ?? '—'}</Text>
+              <Pressable onPress={() => void onDownloadPayslip()}>
+                <Text style={styles.payLink}>Download Payslip →</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.dualRow}>
@@ -197,8 +204,8 @@ export function NonTeachingStaffHomeScreen() {
         <View style={styles.helpCard}>
           <Text style={styles.helpTitle}>Staff services</Text>
           <Text style={styles.helpBody}>
-            Use Leave and Payslips for HR requests. College notices and notifications keep you
-            updated on office circulars.
+            Use Leave for HR requests. College notices and notifications keep you updated on office
+            circulars.
           </Text>
         </View>
       </ScrollView>

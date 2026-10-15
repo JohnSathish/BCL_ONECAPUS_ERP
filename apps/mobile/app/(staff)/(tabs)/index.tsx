@@ -13,6 +13,7 @@ import { NonTeachingStaffHomeScreen } from '@/components/faculty-portal/non-teac
 import { facultyTheme } from '@/components/faculty-portal/theme';
 import type { FacultyPendingAction, FacultyTodayClass } from '@/types/faculty-home';
 import { COLLEGE_NAME } from '@/constants/release';
+import { STAFF_PORTAL_SALARY_VISIBLE } from '@/config/staff-salary-visible';
 import { formatInr } from '@/utils/currency';
 import { downloadAndSharePayslipPdf, fetchStaffPayslips } from '@/services/faculty-payroll';
 import { fetchStaffBirthdaysWidget, type BirthdaysWidget } from '@/services/student-dashboard';
@@ -294,7 +295,9 @@ export default function FacultyHomeScreen() {
         {/* Quick actions */}
         <SectionTitle title="Quick Actions" />
         <View style={styles.quickGrid}>
-          {FACULTY_QUICK_ACTIONS.map((action) => (
+          {FACULTY_QUICK_ACTIONS.filter(
+            (action) => STAFF_PORTAL_SALARY_VISIBLE || action.id !== 'payroll',
+          ).map((action) => (
             <Pressable
               key={action.id}
               style={styles.quickCard}
@@ -418,14 +421,16 @@ export default function FacultyHomeScreen() {
             <LeaveLine label="Earned Leave" value={leave?.earned ?? 0} />
             <Text style={styles.payLink}>Apply leave →</Text>
           </Pressable>
-          <View style={[styles.dualCard, styles.flex]}>
-            <Text style={styles.dualTitle}>Payroll</Text>
-            <Text style={styles.payAmount}>{formatInr(payroll?.amount ?? 0)}</Text>
-            <Text style={styles.payStatus}>Status: {payroll?.status ?? '—'}</Text>
-            <Pressable onPress={() => void onDownloadPayslip()}>
-              <Text style={styles.payLink}>Download Payslip →</Text>
-            </Pressable>
-          </View>
+          {STAFF_PORTAL_SALARY_VISIBLE ? (
+            <View style={[styles.dualCard, styles.flex]}>
+              <Text style={styles.dualTitle}>Payroll</Text>
+              <Text style={styles.payAmount}>{formatInr(payroll?.amount ?? 0)}</Text>
+              <Text style={styles.payStatus}>Status: {payroll?.status ?? '—'}</Text>
+              <Pressable onPress={() => void onDownloadPayslip()}>
+                <Text style={styles.payLink}>Download Payslip →</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
 
         {/* Performance */}

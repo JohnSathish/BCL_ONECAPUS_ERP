@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { ADMIN_COMMAND_LINKS, AI_QUICK_PROMPTS } from '@/config/command-palette-items';
 import { askDashboardAi } from '@/services/dashboard-analytics';
 import { fetchStudents } from '@/services/students';
+import { STAFF_PORTAL_SALARY_VISIBLE } from '@/lib/staff-portal/salary-feature-flag';
 import type { DashboardAiResponse } from '@/types/dashboard-analytics';
 
 const STAFF_COMMANDS = [
@@ -21,7 +22,9 @@ const STAFF_COMMANDS = [
   { label: 'Open Timetable', href: '/staff/academic/timetable', keywords: 'schedule' },
   { label: 'Upload Lesson Plan', href: '/staff/academic/lesson-plans', keywords: 'lesson' },
   { label: 'Apply Leave', href: '/staff/leave', keywords: 'leave' },
-  { label: 'Download Payslip', href: '/staff/salary', keywords: 'salary pay' },
+  ...(STAFF_PORTAL_SALARY_VISIBLE
+    ? [{ label: 'Download Payslip', href: '/staff/salary', keywords: 'salary pay' }]
+    : []),
   { label: 'View Subjects', href: '/staff/academic/subjects', keywords: 'subjects' },
   { label: 'My Profile', href: '/staff/profile', keywords: 'profile' },
   { label: 'Portal Settings', href: '/staff/settings', keywords: 'settings' },

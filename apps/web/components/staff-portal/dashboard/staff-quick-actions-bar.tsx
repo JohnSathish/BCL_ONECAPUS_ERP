@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { buttonVariants } from '@/components/ui/button';
+import { STAFF_PORTAL_SALARY_VISIBLE } from '@/lib/staff-portal/salary-feature-flag';
 import { cn } from '@/utils/cn';
 
 const ACTIONS = [
@@ -25,11 +26,13 @@ const ACTIONS = [
 ];
 
 export function StaffQuickActionsBar({ isTeaching }: { isTeaching?: boolean }) {
-  const items = isTeaching
-    ? ACTIONS
-    : ACTIONS.filter(
-        (a) => !['Take Attendance', 'Upload Lesson Plan', 'View Subjects'].includes(a.label),
-      );
+  const items = (
+    isTeaching
+      ? ACTIONS
+      : ACTIONS.filter(
+          (a) => !['Take Attendance', 'Upload Lesson Plan', 'View Subjects'].includes(a.label),
+        )
+  ).filter((a) => STAFF_PORTAL_SALARY_VISIBLE || a.href !== '/staff/salary');
 
   return (
     <div className="sticky top-0 z-20 -mx-1 mb-4 border-b border-border/40 bg-background/80 px-1 py-2 backdrop-blur-xl">

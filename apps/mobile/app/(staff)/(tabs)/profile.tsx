@@ -9,6 +9,7 @@ import { facultyTheme } from '@/components/faculty-portal/theme';
 import { formatInr } from '@/utils/currency';
 import { downloadAndSharePayslipPdf, fetchStaffPayslips } from '@/services/faculty-payroll';
 import { PRIVACY_POLICY_URL, TERMS_URL } from '@/constants/release';
+import { STAFF_PORTAL_SALARY_VISIBLE } from '@/config/staff-salary-visible';
 
 export default function FacultyProfileScreen() {
   const router = useRouter();
@@ -115,12 +116,19 @@ export default function FacultyProfileScreen() {
           <Text style={styles.linkBtnText}>Apply leave →</Text>
         </Pressable>
 
-        <Text style={styles.section}>Payroll</Text>
-        <InfoRow label="Latest Salary" value={formatInr(payroll?.amount ?? 0)} />
-        <InfoRow label="Status" value={payroll?.status ?? '—'} />
-        <Pressable style={styles.linkBtn} onPress={() => router.push('/(staff)/payroll' as never)}>
-          <Text style={styles.linkBtnText}>View payslips →</Text>
-        </Pressable>
+        {STAFF_PORTAL_SALARY_VISIBLE ? (
+          <>
+            <Text style={styles.section}>Payroll</Text>
+            <InfoRow label="Latest Salary" value={formatInr(payroll?.amount ?? 0)} />
+            <InfoRow label="Status" value={payroll?.status ?? '—'} />
+            <Pressable
+              style={styles.linkBtn}
+              onPress={() => router.push('/(staff)/payroll' as never)}
+            >
+              <Text style={styles.linkBtnText}>View payslips →</Text>
+            </Pressable>
+          </>
+        ) : null}
 
         <Text style={styles.section}>Notifications & app</Text>
         <Pressable
@@ -163,26 +171,28 @@ export default function FacultyProfileScreen() {
           mutedColor={facultyTheme.textMuted}
         />
 
-        <Pressable
-          style={styles.payslipBtn}
-          onPress={() => {
-            void (async () => {
-              try {
-                const payslips = await fetchStaffPayslips();
-                const latest = payslips[0];
-                if (!latest?.id) return;
-                await downloadAndSharePayslipPdf(
-                  latest.id,
-                  `Payslip_${latest.year}_${latest.month}`,
-                );
-              } catch {
-                // optional
-              }
-            })();
-          }}
-        >
-          <Text style={styles.payslipBtnText}>Download latest payslip</Text>
-        </Pressable>
+        {STAFF_PORTAL_SALARY_VISIBLE ? (
+          <Pressable
+            style={styles.payslipBtn}
+            onPress={() => {
+              void (async () => {
+                try {
+                  const payslips = await fetchStaffPayslips();
+                  const latest = payslips[0];
+                  if (!latest?.id) return;
+                  await downloadAndSharePayslipPdf(
+                    latest.id,
+                    `Payslip_${latest.year}_${latest.month}`,
+                  );
+                } catch {
+                  // optional
+                }
+              })();
+            }}
+          >
+            <Text style={styles.payslipBtnText}>Download latest payslip</Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           style={styles.logout}

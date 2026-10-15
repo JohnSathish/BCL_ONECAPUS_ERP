@@ -13,6 +13,7 @@ import { FacultyScreenShell } from '@/components/faculty-portal/faculty-screen-s
 import { useFacultyPortal } from '@/components/faculty-portal/faculty-portal-context';
 import { facultyTheme } from '@/components/faculty-portal/theme';
 import { formatInr } from '@/utils/currency';
+import { STAFF_PORTAL_SALARY_VISIBLE } from '@/config/staff-salary-visible';
 import {
   downloadAndSharePayslipPdf,
   fetchStaffPayslips,
@@ -22,6 +23,21 @@ import {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function FacultyPayrollScreen() {
+  if (!STAFF_PORTAL_SALARY_VISIBLE) {
+    return (
+      <FacultyScreenShell title="Payroll & Payslips">
+        <View style={styles.hidden}>
+          <Text style={styles.muted}>
+            Salary and payslips are not shown in the staff app right now.
+          </Text>
+        </View>
+      </FacultyScreenShell>
+    );
+  }
+  return <FacultyPayrollDetails />;
+}
+
+function FacultyPayrollDetails() {
   const { home } = useFacultyPortal();
   const { width } = useWindowDimensions();
   const payroll = home?.payroll;
@@ -119,6 +135,7 @@ export default function FacultyPayrollScreen() {
 }
 
 const styles = StyleSheet.create({
+  hidden: { padding: 16 },
   container: { paddingVertical: 16, gap: 12, paddingBottom: 32 },
   summaryCard: {
     backgroundColor: facultyTheme.primary,

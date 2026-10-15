@@ -32,6 +32,7 @@ import {
   fetchMySalaryHistory,
   fetchMyTaxSummary,
 } from '@/services/payroll';
+import { STAFF_PORTAL_SALARY_VISIBLE } from '@/lib/staff-portal/salary-feature-flag';
 import { cn } from '@/utils/cn';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -43,6 +44,22 @@ function inr(n: number) {
 
 export function StaffPortalSalaryPage() {
   useRequireStaffPortal();
+  if (!STAFF_PORTAL_SALARY_VISIBLE) {
+    return (
+      <DashboardShell role="staff" title="Salary & Payslips">
+        <GlassCard className="p-6">
+          <h2 className="text-lg font-semibold">Salary</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Salary and payslips are not shown in the staff portal right now.
+          </p>
+        </GlassCard>
+      </DashboardShell>
+    );
+  }
+  return <StaffPortalSalaryDetails />;
+}
+
+function StaffPortalSalaryDetails() {
   const now = new Date();
   const [tab, setTab] = useState<(typeof TABS)[number]>('overview');
   const [taxYear, setTaxYear] = useState(now.getFullYear());

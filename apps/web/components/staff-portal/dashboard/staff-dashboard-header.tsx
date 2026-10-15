@@ -8,6 +8,7 @@ import { DirectoryKpiSkeleton } from '@/components/students-module/directory/ui/
 import { staffTypeLabel } from '@/components/staff-module/directory/staff-filter-utils';
 import { resolveUploadAvatarUrl } from '@/lib/branding-asset';
 import type { StaffDashboardData } from '@/types/staff-portal';
+import { STAFF_PORTAL_SALARY_VISIBLE } from '@/lib/staff-portal/salary-feature-flag';
 import { cn } from '@/utils/cn';
 
 type Props = {
@@ -279,19 +280,21 @@ export function StaffSnapshotCards({ data, loading }: Props) {
         <p className="text-muted-foreground">Pending: {kpis.leave.pendingRequests}</p>
       </KpiCard>
 
-      <KpiCard
-        title="Salary Snapshot"
-        icon={Wallet}
-        gradient="from-amber-500/10 via-amber-500/5 to-transparent"
-        delay={0.15}
-      >
-        <p className="text-lg font-bold">
-          ₹<AnimatedCounter value={kpis.salary.currentMonthSalary} />
-        </p>
-        <p className="text-muted-foreground">
-          {kpis.salary.payslipAvailable ? 'Payslip available' : 'Payslip pending'}
-        </p>
-      </KpiCard>
+      {STAFF_PORTAL_SALARY_VISIBLE ? (
+        <KpiCard
+          title="Salary Snapshot"
+          icon={Wallet}
+          gradient="from-amber-500/10 via-amber-500/5 to-transparent"
+          delay={0.15}
+        >
+          <p className="text-lg font-bold">
+            ₹<AnimatedCounter value={kpis.salary.currentMonthSalary} />
+          </p>
+          <p className="text-muted-foreground">
+            {kpis.salary.payslipAvailable ? 'Payslip available' : 'Payslip pending'}
+          </p>
+        </KpiCard>
+      ) : null}
 
       <KpiCard
         title="Tasks"

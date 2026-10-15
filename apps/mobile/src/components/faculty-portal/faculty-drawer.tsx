@@ -19,6 +19,7 @@ import {
   isTeachingStaffProfile,
 } from './drawer-menu';
 import { useFacultyPortal } from './faculty-portal-context';
+import { STAFF_PORTAL_SALARY_VISIBLE } from '@/config/staff-salary-visible';
 import { facultyTheme } from './theme';
 
 export function FacultyDrawer() {
@@ -29,7 +30,13 @@ export function FacultyDrawer() {
   const slide = useRef(new Animated.Value(-facultyTheme.drawerWidth)).current;
   const backdrop = useRef(new Animated.Value(0)).current;
   const teaching = isTeachingStaffProfile(home?.profile?.isTeaching);
-  const menuSections = teaching ? FACULTY_DRAWER_SECTIONS : STAFF_DRAWER_SECTIONS;
+  const menuSections = useMemo(() => {
+    const sections = teaching ? FACULTY_DRAWER_SECTIONS : STAFF_DRAWER_SECTIONS;
+    return sections.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => STAFF_PORTAL_SALARY_VISIBLE || item.id !== 'payroll'),
+    }));
+  }, [teaching]);
 
   useEffect(() => {
     if (drawerOpen) {
