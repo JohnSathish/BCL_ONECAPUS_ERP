@@ -142,6 +142,7 @@ export class ExamCalendarSyncService {
         departmentIds: Array.isArray(meta.departmentIds)
           ? meta.departmentIds.map(String)
           : undefined,
+        shiftId: session.shiftId ?? null,
       });
     } catch (err) {
       this.logger.warn(

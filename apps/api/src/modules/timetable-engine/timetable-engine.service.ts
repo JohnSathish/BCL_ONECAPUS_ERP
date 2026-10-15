@@ -1974,9 +1974,23 @@ export class TimetableEngineService {
         : toDateOnlyIso(dateInput);
     const date = parseDateOnly(dateIso);
     const plan = await this.latestPublishedPlan(user.tid, filters);
+    const shift = filters?.shiftId
+      ? await this.prisma.shift.findFirst({
+          where: { id: filters.shiftId, tenantId: user.tid, deletedAt: null },
+          select: { id: true, name: true },
+        })
+      : null;
     const calendarDay = await this.workingDays.resolveDay(user.tid, dateIso, {
       academicYearId: plan?.academicYearId,
+      shiftId: shift?.id ?? filters?.shiftId,
+      shiftName: shift?.name,
     });
+    const examSitting = await this.examSittingForShiftDate(
+      user.tid,
+      date,
+      shift?.id ?? filters?.shiftId,
+      shift?.name ?? null,
+    );
 
     const forceRun = plan
       ? await this.hasDayAction(user.tid, plan.id, date, [
@@ -2015,6 +2029,7 @@ export class TimetableEngineService {
           : null,
         sessions: [] as Array<Record<string, unknown>>,
         relocated: [] as Array<Record<string, unknown>>,
+        examSitting,
       };
     }
 
@@ -2103,6 +2118,53 @@ export class TimetableEngineService {
       },
       sessions: [...sessions, ...relocatedSessions],
       relocated: relocatedSessions,
+      examSitting,
+    };
+  }
+
+  /**
+   * Papers already scheduled for this shift on this date.
+   * Day Shift 2nd IA is 13:00–14:15; that must not be treated as a full-day block.
+   */
+  private async examSittingForShiftDate(
+    tenantId: string,
+    date: Date,
+    shiftId?: string,
+    shiftName?: string | null,
+  ) {
+    if (!shiftId) return null;
+    const sessions = await this.prisma.examSession.findMany({
+      where: {
+        tenantId,
+        shiftId,
+        deletedAt: null,
+        status: { notIn: ['EXPIRED', 'CANCELLED'] },
+      },
+      select: { id: true },
+    });
+    if (!sessions.length) return null;
+    const papers = await this.prisma.examPaperSchedule.findMany({
+      where: {
+        tenantId,
+        sessionId: { in: sessions.map((row) => row.id) },
+        examDate: date,
+        deletedAt: null,
+      },
+      select: { startTime: true, endTime: true },
+    });
+    if (!papers.length) return null;
+    const starts = papers
+      .map((paper) => formatShiftTime(paper.startTime).slice(0, 5))
+      .sort();
+    const ends = papers
+      .map((paper) => formatShiftTime(paper.endTime).slice(0, 5))
+      .sort();
+    const earliest = starts[0] ?? '';
+    const latest = ends[ends.length - 1] ?? '';
+    return {
+      afternoonOnly: starts.every((time) => Number(time.slice(0, 2)) >= 12),
+      window: earliest && latest ? `${earliest}–${latest}` : null,
+      shiftLabel: shiftName ?? null,
     };
   }
 

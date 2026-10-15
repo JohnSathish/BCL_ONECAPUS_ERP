@@ -4,6 +4,7 @@ import {
   dayKindFromEvents,
   defaultCreatesAttendanceSession,
   defaultIsWorkingDayForType,
+  eventAppliesToShift,
   parseDateOnly,
   toDateOnlyIso,
   type ResolvedDay,
@@ -21,6 +22,9 @@ export type ResolveContext = {
    * while the site is showing the 2026–27 year.
    */
   mergePublishedCalendars?: boolean;
+  /** When set, drop exam events that belong to another shift. */
+  shiftId?: string | null;
+  shiftName?: string | null;
 };
 
 type EventRow = {
@@ -34,6 +38,7 @@ type EventRow = {
   scopeType: string;
   campusId: string | null;
   departmentIds: unknown;
+  shiftId?: string | null;
 };
 
 @Injectable()
@@ -106,7 +111,11 @@ export class WorkingDayEngineService {
   ): ResolvedDay {
     const weekday = date.getUTCDay();
     const isWeekend = weekendDays.includes(weekday);
-    const scoped = events.filter((event) => this.matchesScope(event, ctx));
+    const scoped = events.filter(
+      (event) =>
+        this.matchesScope(event, ctx) &&
+        eventAppliesToShift(event, ctx.shiftId, ctx.shiftName),
+    );
 
     let isWorkingDay = !isWeekend;
     let createsAttendanceSession = false;

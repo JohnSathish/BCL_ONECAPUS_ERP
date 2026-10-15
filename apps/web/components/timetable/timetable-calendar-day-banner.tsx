@@ -59,11 +59,22 @@ export function TimetableCalendarDayBanner({
 
   const kind = payload.calendarDay.dayKind;
   const events = payload.calendarDay.events;
+  const missingPlan = payload.suppressedReason === 'NO_PUBLISHED_PLAN';
+  const afternoonExam = Boolean(payload.examSitting?.afternoonOnly);
   const tone = payload.sessionsRun
     ? payload.calendarDay.createsAttendanceSession
       ? 'border-amber-300 bg-amber-50 text-amber-950'
       : 'border-emerald-200 bg-emerald-50 text-emerald-950'
-    : 'border-rose-200 bg-rose-50 text-rose-950';
+    : missingPlan
+      ? 'border-amber-200 bg-amber-50 text-amber-950'
+      : 'border-rose-200 bg-rose-50 text-rose-950';
+  const statusLine = payload.sessionsRun
+    ? `${date} · ${kind} · ${payload.sessions.length} period(s) run`
+    : missingPlan
+      ? afternoonExam
+        ? `${date} · afternoon exam ${payload.examSitting?.window ?? ''} · weekly timetable is still open`
+        : `${date} · ${kind} · no published timetable yet`
+      : `${date} · ${kind} · periods suppressed (${payload.suppressedReason ?? kind})`;
 
   return (
     <div className={cn('rounded-xl border px-4 py-3 shadow-sm', tone)}>
@@ -72,12 +83,14 @@ export function TimetableCalendarDayBanner({
           <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
             Today · Academic Calendar
           </p>
-          <p className="text-sm font-semibold">
-            {date} · {kind}
-            {payload.sessionsRun
-              ? ` · ${payload.sessions.length} period(s) run`
-              : ` · periods suppressed (${payload.suppressedReason ?? kind})`}
-          </p>
+          <p className="text-sm font-semibold">{statusLine}</p>
+          {missingPlan ? (
+            <p className="text-xs opacity-90">
+              {afternoonExam
+                ? `This shift's exam today is afternoon only (${payload.examSitting?.window}). It does not block New Manual Timetable. Publish a plan and morning classes still run.`
+                : 'Use New Manual Timetable, add the weekly slots, then Publish. This notice does not block that.'}
+            </p>
+          ) : null}
           {events.length ? (
             <p className="text-xs opacity-90">{events.map((e) => e.title).join(' · ')}</p>
           ) : (

@@ -212,6 +212,43 @@ export function defaultCreatesAttendanceSession(type: string): boolean {
   return CLASS_TYPES.has(type);
 }
 
+/** "FYUGP 2nd IA · Morning" belongs to Morning Shift, not every shift on that date. */
+export function eventAppliesToShift(
+  event: { shiftId?: string | null; title: string },
+  shiftId?: string | null,
+  shiftName?: string | null,
+): boolean {
+  if (!shiftId && !shiftName) return true;
+  if (event.shiftId) return Boolean(shiftId && event.shiftId === shiftId);
+  const titleToken = shiftTokenFromTitle(event.title);
+  if (!titleToken) return true;
+  const selected = shiftTokenFromName(shiftName ?? '');
+  if (!selected) return true;
+  return titleToken === selected;
+}
+
+function shiftTokenFromName(
+  name: string,
+): 'morning' | 'day' | 'evening' | null {
+  const n = name.toLowerCase();
+  if (n.includes('morning')) return 'morning';
+  if (n.includes('evening')) return 'evening';
+  if (/\bday\b/.test(n)) return 'day';
+  return null;
+}
+
+function shiftTokenFromTitle(
+  title: string,
+): 'morning' | 'day' | 'evening' | null {
+  const parts = title.split('·').map((part) => part.trim().toLowerCase());
+  const suffix = parts.length > 1 ? parts[parts.length - 1] : '';
+  if (!suffix) return null;
+  if (suffix === 'morning' || suffix.startsWith('morning ')) return 'morning';
+  if (suffix === 'evening' || suffix.startsWith('evening ')) return 'evening';
+  if (suffix === 'day' || suffix.startsWith('day ')) return 'day';
+  return null;
+}
+
 export function dayKindFromEvents(
   isWeekend: boolean,
   events: Array<{ type: string; isWorkingDay: boolean | null }>,

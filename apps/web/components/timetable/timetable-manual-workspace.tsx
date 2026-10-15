@@ -362,6 +362,11 @@ export function TimetableManualWorkspace() {
                   </Button>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-muted-foreground">
+                  {createManualMut.isError ? (
+                    <p className="text-xs text-destructive">
+                      {apiErrorMessage(createManualMut.error, 'Could not create the timetable.')}
+                    </p>
+                  ) : null}
                   <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-5 text-foreground">
                     <p className="font-semibold">One plan = full weekly routine for this cycle</p>
                     <p className="mt-1">

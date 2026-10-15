@@ -851,6 +851,7 @@ export class AcademicCalendarService {
       isWorkingDay?: boolean | null;
       scopeType?: string;
       departmentIds?: string[];
+      shiftId?: string | null;
     },
   ) {
     this.assertEventType(input.type);
@@ -895,6 +896,7 @@ export class AcademicCalendarService {
           : true,
       sourceModule: input.sourceModule,
       sourceRefId: input.sourceRefId,
+      ...(input.shiftId !== undefined ? { shiftId: input.shiftId } : {}),
       active: true,
       updatedById: user.sub,
     };

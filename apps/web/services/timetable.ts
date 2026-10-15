@@ -539,6 +539,11 @@ export type TimetableCalendarDayPayload = {
   };
   sessionsRun: boolean;
   suppressedReason: string | null;
+  examSitting?: {
+    afternoonOnly: boolean;
+    window: string | null;
+    shiftLabel: string | null;
+  } | null;
   plan: { id: string; name: string; academicYearId: string | null } | null;
   sessions: TimetableEntry[];
   relocated: TimetableEntry[];
