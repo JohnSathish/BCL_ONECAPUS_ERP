@@ -183,14 +183,6 @@ export function TimetableSlotModal({
     }
   }, [open, fyugpCategory, entry?.courseId, entry?.teachingSubjectGroupId]);
 
-  useEffect(() => {
-    if (!teachingSubjectGroupId) return;
-    const group = (subjectGroupsQ.data ?? []).find((g) => g.id === teachingSubjectGroupId);
-    if (group?.primaryStaffProfileId && !staffProfileId) {
-      setStaffProfileId(group.primaryStaffProfileId);
-    }
-  }, [teachingSubjectGroupId, subjectGroupsQ.data, staffProfileId]);
-
   if (!open || !context) return null;
 
   const courses = coursesQ.data?.data ?? [];
@@ -403,7 +395,11 @@ export function TimetableSlotModal({
                   <select
                     className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
                     value={teachingSubjectGroupId}
-                    onChange={(e) => setTeachingSubjectGroupId(e.target.value)}
+                    onChange={(e) => {
+                      setTeachingSubjectGroupId(e.target.value);
+                      setStaffProfileId('');
+                      setFacultySearch('');
+                    }}
                     disabled={subjectGroupsQ.isLoading}
                   >
                     <option value="">

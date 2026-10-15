@@ -358,7 +358,12 @@ export class TeachingSubjectGroupService {
         group.offeringSectionId ??
         primaryPaper?.offeringSectionId ??
         null,
-      staffProfileId: staffProfileId ?? group.primaryStaffProfileId ?? null,
+      // A blank faculty choice must stay blank. Do not copy the group's
+      // stored teacher — that made one name appear for every subject.
+      staffProfileId:
+        staffProfileId === undefined
+          ? (group.primaryStaffProfileId ?? null)
+          : staffProfileId,
       teachingSubjectGroupId: group.id,
     };
   }

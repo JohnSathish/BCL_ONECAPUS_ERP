@@ -708,7 +708,7 @@ export class TimetableEngineService {
           optionalUuid(dto.teachingSubjectGroupId),
           optionalUuid(dto.courseId),
           optionalUuid(dto.offeringSectionId),
-          resolvedStaffProfileId ?? undefined,
+          resolvedStaffProfileId,
         );
     const courseOfferingId = categoryOnly
       ? null
@@ -825,7 +825,7 @@ export class TimetableEngineService {
             existing.teachingSubjectGroupId,
           optionalUuid(dto.courseId) ?? existing.courseId,
           optionalUuid(dto.offeringSectionId) ?? existing.offeringSectionId,
-          resolvedStaffProfileId ?? undefined,
+          resolvedStaffProfileId,
         );
     let startTime: Date | undefined;
     let endTime: Date | undefined;
