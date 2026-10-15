@@ -19,6 +19,7 @@ import {
   TimetableSlotModal,
   type SlotModalContext,
 } from '@/components/timetable/timetable-slot-modal';
+import { slotStreamScope } from '@/lib/timetable/slot-paper-scope';
 import { StreamMasterRoutineView } from '@/components/timetable/stream-master-routine';
 import { ErpWorkspaceGrid } from '@/components/erp/erp-workspace-shell';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
@@ -241,6 +242,16 @@ export function TimetableManualWorkspace() {
     copyDayMut.isPending ||
     copySemesterMut.isPending;
 
+  const planStream = selectedPlan?.metadata as
+    | { streamName?: string | null; streamCode?: string | null }
+    | undefined;
+  const streamScope = slotStreamScope({
+    streams: contextData?.streams ?? [],
+    streamId: streamId || undefined,
+    planStreamName: planStream?.streamName,
+    planStreamCode: planStream?.streamCode,
+  });
+
   const openCreateSlot = (args: {
     dayOfWeek: number;
     periodNo?: number | null;
@@ -261,6 +272,7 @@ export function TimetableManualWorkspace() {
       endTime: args.endTime,
       slotTemplateId: args.slotTemplateId,
       defaultSemester: semesterFilter ? Number(semesterFilter) : allowedSemesters[0],
+      ...streamScope,
     });
     setSlotOpen(true);
   };
@@ -277,6 +289,7 @@ export function TimetableManualWorkspace() {
       startTime: entry.startTime,
       endTime: entry.endTime,
       allowedSemesters,
+      ...streamScope,
     });
     setSlotOpen(true);
   };

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { fetchAcademicDepartments } from '@/services/organization';
 import { fetchAllCourses } from '@/services/programs';
 import { fetchInfrastructureRooms } from '@/services/infrastructure';
 import { fetchStaff } from '@/services/staff';
@@ -14,6 +15,12 @@ import { ShiftAssignmentBadges } from '@/components/academics/shift-assignment-b
 import { TimetableFacultySearchSelect } from '@/components/timetable/timetable-faculty-search-select';
 import { fetchTeachingSubjectGroups } from '@/services/teaching-subject-groups';
 import { isPoolFyugpCategory } from '@/lib/timetable/entry-display';
+import {
+  courseMatchesTimetableDepartment,
+  findDepartmentForStream,
+  isDepartmentScopedTimetableCategory,
+  timetableOfferingCategory,
+} from '@/lib/timetable/slot-paper-scope';
 import type { ManualEntryPayload, TimetableEntry } from '@/services/timetable';
 
 const CATEGORIES = ['MAJOR', 'MINOR', 'MDC', 'AEC', 'SEC', 'VAC', 'VTC', 'LAB'];
@@ -56,6 +63,9 @@ export type SlotModalContext = {
   slotTemplateId?: string;
   allowedSemesters: number[];
   defaultSemester?: number;
+  /** Set when the plan is one department, such as Botany. Faculty groups stay unset. */
+  streamName?: string;
+  streamCode?: string;
 };
 
 type Props = {
@@ -108,10 +118,34 @@ export function TimetableSlotModal({
   >({});
   const authReady = useAuthQueryEnabled();
 
+  const departmentScoped = isDepartmentScopedTimetableCategory(fyugpCategory);
+  const offeringCategory = timetableOfferingCategory(fyugpCategory);
+  const departmentsQ = useQuery({
+    queryKey: ['timetable', 'academic-departments'],
+    queryFn: () => fetchAcademicDepartments(),
+    enabled:
+      authReady && open && departmentScoped && Boolean(context?.streamName || context?.streamCode),
+    staleTime: 5 * 60 * 1000,
+  });
+  const streamDepartment = departmentScoped
+    ? findDepartmentForStream(departmentsQ.data ?? [], context?.streamName, context?.streamCode)
+    : undefined;
+  const streamLocked = departmentScoped && Boolean(context?.streamName || context?.streamCode);
+  const departmentLookupPending = streamLocked && departmentsQ.isLoading;
+  const departmentMissing = streamLocked && departmentsQ.isFetched && !streamDepartment;
   const coursesQ = useQuery({
-    queryKey: ['timetable', 'courses'],
-    queryFn: () => fetchAllCourses(),
-    enabled: authReady && open,
+    queryKey: ['timetable', 'courses', semesterSequence, offeringCategory ?? ''],
+    queryFn: () =>
+      fetchAllCourses({
+        semesterSequence: Number(semesterSequence),
+        category: offeringCategory,
+      }),
+    enabled:
+      authReady &&
+      open &&
+      Boolean(semesterSequence) &&
+      !departmentLookupPending &&
+      !departmentMissing,
   });
   const staffQ = useQuery({
     queryKey: ['timetable', 'staff', context?.shiftId],
@@ -185,7 +219,18 @@ export function TimetableSlotModal({
 
   if (!open || !context) return null;
 
-  const courses = coursesQ.data?.data ?? [];
+  const courses = (coursesQ.data?.data ?? []).filter((course) => {
+    if (!streamLocked) return true;
+    if (!streamDepartment) return false;
+    return courseMatchesTimetableDepartment(course, streamDepartment);
+  });
+  const courseOptions =
+    courseId &&
+    entry?.course &&
+    entry.courseId === courseId &&
+    !courses.some((course) => course.id === courseId)
+      ? [{ id: courseId, code: entry.course.code, title: entry.course.title }, ...courses]
+      : courses;
   const mapStaffRows = (rows: unknown[] | undefined) =>
     (rows ?? [])
       .filter((row) => {
@@ -212,6 +257,11 @@ export function TimetableSlotModal({
   const staff = mapStaffRows(staffQ.data as unknown[] | undefined);
   const rooms = roomsQ.data ?? [];
   const subjectGroups = subjectGroupsQ.data ?? [];
+  const subjectGroupsForSlot = subjectGroups.filter((group) => {
+    if (!streamLocked) return true;
+    if (!streamDepartment) return false;
+    return group.departmentId === streamDepartment.id;
+  });
   const selectedFromLists =
     staff.find((m) => m.id === staffProfileId) ?? pickedStaffCache[staffProfileId];
   const selectedStaff =
@@ -314,7 +364,13 @@ export function TimetableSlotModal({
               <select
                 className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
                 value={semesterSequence}
-                onChange={(e) => setSemesterSequence(Number(e.target.value))}
+                onChange={(e) => {
+                  setSemesterSequence(Number(e.target.value));
+                  setCourseId('');
+                  setTeachingSubjectGroupId('');
+                  setStaffProfileId('');
+                  setFacultySearch('');
+                }}
                 required
               >
                 {context.allowedSemesters.map((sem) => (
@@ -341,6 +397,9 @@ export function TimetableSlotModal({
               onChange={(e) => {
                 setFyugpCategory(e.target.value);
                 setTeachingSubjectGroupId('');
+                setCourseId('');
+                setStaffProfileId('');
+                setFacultySearch('');
               }}
             >
               {CATEGORIES.map((cat) => (
@@ -403,13 +462,13 @@ export function TimetableSlotModal({
                     disabled={subjectGroupsQ.isLoading}
                   >
                     <option value="">
-                      {subjectGroupsQ.isLoading
+                      {subjectGroupsQ.isLoading || departmentLookupPending
                         ? 'Loading groups…'
-                        : subjectGroups.length
+                        : subjectGroupsForSlot.length
                           ? 'Select group (e.g. Major Sociology)'
-                          : 'No groups — create in Subject Groups page'}
+                          : 'No groups for this semester and department'}
                     </option>
-                    {subjectGroups.map((group) => (
+                    {subjectGroupsForSlot.map((group) => (
                       <option key={group.id} value={group.id}>
                         {group.code} · {group.title}
                         {(group.papers?.length ?? 0) > 0 ? ` (${group.papers?.length} papers)` : ''}
@@ -427,15 +486,17 @@ export function TimetableSlotModal({
                     disabled={coursesQ.isLoading}
                   >
                     <option value="">
-                      {coursesQ.isLoading
+                      {coursesQ.isLoading || departmentLookupPending
                         ? 'Loading courses…'
                         : coursesQ.isError
                           ? 'Failed to load courses'
-                          : courses.length
-                            ? 'Select course'
-                            : 'No courses found'}
+                          : departmentMissing
+                            ? 'No matching department for this timetable'
+                            : courseOptions.length
+                              ? 'Select course'
+                              : `No Semester ${semesterSequence} papers`}
                     </option>
-                    {courses.map((course) => (
+                    {courseOptions.map((course) => (
                       <option key={course.id} value={course.id}>
                         {course.code} · {course.title}
                       </option>
