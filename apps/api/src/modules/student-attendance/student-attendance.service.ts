@@ -25,6 +25,7 @@ import {
   majorMinorCategory,
   registrationLineCategoryWhere,
   resolveAttendanceDisplayTitle,
+  rosterStudentSelect,
 } from './attendance-display.util';
 import {
   dateKeyToUtcMidnight,
@@ -578,36 +579,47 @@ export class StudentAttendanceService {
         session.timetablePlanEntryId,
       ));
     let students: any[] = [];
-    if (session.teachingSubjectGroupId) {
-      students = await this.subjectGroups.studentsForGroup(
-        tenantId,
-        session.teachingSubjectGroupId,
-        session.semesterNo,
+    try {
+      if (session.teachingSubjectGroupId) {
+        students = await this.subjectGroups.studentsForGroup(
+          tenantId,
+          session.teachingSubjectGroupId,
+          session.semesterNo,
+        );
+      }
+      if (!students.length && session.offeringSectionId) {
+        students = await this.studentsForSection(
+          tenantId,
+          session.offeringSectionId,
+          session.semesterNo,
+          rosterCategory,
+        );
+      }
+      // Manual timetable slots often have courseId but no offeringSectionId.
+      if (!students.length && session.courseId) {
+        students = await this.studentsForCourse(
+          tenantId,
+          session.courseId,
+          session.semesterNo,
+          session.shiftId,
+          rosterCategory,
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        { err, sessionId, tenantId },
+        'Failed to load attendance roster',
       );
-    }
-    if (!students.length && session.offeringSectionId) {
-      students = await this.studentsForSection(
-        tenantId,
-        session.offeringSectionId,
-        session.semesterNo,
-        rosterCategory,
-      );
-    }
-    // Manual timetable slots often have courseId but no offeringSectionId.
-    if (!students.length && session.courseId) {
-      students = await this.studentsForCourse(
-        tenantId,
-        session.courseId,
-        session.semesterNo,
-        session.shiftId,
-        rosterCategory,
-      );
+      const detail =
+        err instanceof Error ? err.message : 'Could not load the class roll';
+      throw new BadRequestException(detail.slice(0, 280));
     }
 
     const entryByStudent = new Map<string, any>(
-      session.entries.map((entry: any) => [entry.studentId, entry]),
+      (session.entries ?? []).map((entry: any) => [entry.studentId, entry]),
     );
     const enriched = await this.enrichSession(session);
+    delete enriched.entries;
     return {
       session: {
         ...enriched,
@@ -618,18 +630,20 @@ export class StudentAttendanceService {
         allowEditAfterSubmit: policy.allowEditAfterSubmit,
         defaultAttendanceStatus: defaultStatus,
       },
-      students: students.map((student: any) => ({
-        id: student.id,
-        rollNumber: student.rollNumber,
-        enrollmentNumber: student.enrollmentNumber,
-        admissionNumber: student.admissionNumber,
-        fullName:
-          student.masterProfile?.fullName ??
-          student.user?.displayName ??
-          student.enrollmentNumber,
-        status: entryByStudent.get(student.id)?.status ?? defaultStatus,
-        remarks: entryByStudent.get(student.id)?.remarks ?? '',
-      })),
+      students: students
+        .filter((student: any) => student?.id)
+        .map((student: any) => ({
+          id: student.id,
+          rollNumber: student.rollNumber,
+          enrollmentNumber: student.enrollmentNumber,
+          admissionNumber: student.admissionNumber,
+          fullName:
+            student.masterProfile?.fullName ??
+            student.user?.displayName ??
+            student.enrollmentNumber,
+          status: entryByStudent.get(student.id)?.status ?? defaultStatus,
+          remarks: entryByStudent.get(student.id)?.remarks ?? '',
+        })),
     };
   }
 
@@ -1174,18 +1188,15 @@ export class StudentAttendanceService {
       include: {
         registration: {
           include: {
-            student: {
-              include: {
-                masterProfile: true,
-                user: { select: { displayName: true } },
-              },
-            },
+            student: { select: rosterStudentSelect },
           },
         },
       },
       take: 500,
     });
-    const students = lines.map((line) => line.registration.student);
+    const students = lines
+      .map((line) => line.registration?.student)
+      .filter((student) => student?.id);
     if (students.length || !majorMinorCategory(fyugpCategory)) return students;
     const categorized = await this.prisma.semesterRegistrationLine.findFirst({
       where: {
@@ -1242,12 +1253,7 @@ export class StudentAttendanceService {
       include: {
         registration: {
           include: {
-            student: {
-              include: {
-                masterProfile: true,
-                user: { select: { displayName: true } },
-              },
-            },
+            student: { select: rosterStudentSelect },
           },
         },
       },
@@ -1280,12 +1286,7 @@ export class StudentAttendanceService {
         include: {
           registration: {
             include: {
-              student: {
-                include: {
-                  masterProfile: true,
-                  user: { select: { displayName: true } },
-                },
-              },
+              student: { select: rosterStudentSelect },
             },
           },
         },

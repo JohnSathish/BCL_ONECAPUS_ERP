@@ -4,7 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { registrationLineCategoryWhere } from '../student-attendance/attendance-display.util';
+import {
+  registrationLineCategoryWhere,
+  rosterStudentSelect,
+} from '../student-attendance/attendance-display.util';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import type {
   CreateTeachingSubjectGroupDto,
@@ -379,7 +382,8 @@ export class TeachingSubjectGroupService {
 
     const addStudents = (rows: any[]) => {
       for (const student of rows) {
-        if (!seen.has(student.id)) seen.set(student.id, student);
+        if (!student?.id || seen.has(student.id)) continue;
+        seen.set(student.id, student);
       }
     };
 
@@ -427,12 +431,7 @@ export class TeachingSubjectGroupService {
             [field]: group.academicSubjectId,
           },
           include: {
-            student: {
-              include: {
-                masterProfile: true,
-                user: { select: { displayName: true } },
-              },
-            },
+            student: { select: rosterStudentSelect },
           },
           take: 500,
         },
@@ -552,18 +551,15 @@ export class TeachingSubjectGroupService {
       include: {
         registration: {
           include: {
-            student: {
-              include: {
-                masterProfile: true,
-                user: { select: { displayName: true } },
-              },
-            },
+            student: { select: rosterStudentSelect },
           },
         },
       },
       take: 500,
     });
-    return lines.map((line) => line.registration.student);
+    return lines
+      .map((line) => line.registration?.student)
+      .filter((student) => student?.id);
   }
 
   private groupTitle(category: string, subjectName: string) {

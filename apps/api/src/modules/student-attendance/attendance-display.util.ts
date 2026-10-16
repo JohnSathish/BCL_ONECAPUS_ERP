@@ -44,6 +44,16 @@ export function majorMinorCategory(
   return null;
 }
 
+/** Fields the attendance roll needs. Do not load the full profile (address JSON can fail the request). */
+export const rosterStudentSelect = {
+  id: true,
+  rollNumber: true,
+  enrollmentNumber: true,
+  admissionNumber: true,
+  masterProfile: { select: { fullName: true } },
+  user: { select: { displayName: true } },
+} as const;
+
 export function registrationLineCategoryWhere(value?: string | null) {
   const category = majorMinorCategory(value);
   if (!category) return {};
