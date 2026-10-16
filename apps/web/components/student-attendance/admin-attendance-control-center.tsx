@@ -16,9 +16,7 @@ import {
   Snowflake,
 } from 'lucide-react';
 
-import { FacultyAttendanceWorkspace } from '@/components/student-attendance/faculty-attendance-workspace';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import {
   fetchAttendancePolicy,
@@ -39,7 +37,6 @@ export function AdminAttendanceControlCenter() {
   const qc = useQueryClient();
   const [date, setDate] = useState(() => institutionDateKey());
   const [departmentId, setDepartmentId] = useState('');
-  const [markSession, setMarkSession] = useState<StudentAttendanceSession | null>(null);
   const [reportType, setReportType] = useState('unmarked');
   const [message, setMessage] = useState('');
 
@@ -195,6 +192,12 @@ export function AdminAttendanceControlCenter() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link href={`/admin/academics/attendance/mark?date=${date}`}>
+                <ClipboardList className="mr-2 h-4 w-4" />
+                Mark Attendance
+              </Link>
+            </Button>
             <input
               type="date"
               value={date}
@@ -273,7 +276,7 @@ export function AdminAttendanceControlCenter() {
             <div>
               <h2 className="text-lg font-semibold">Daily Session Register</h2>
               <p className="text-xs text-muted-foreground">
-                Choose a department, then Mark, to enter the roll from the attendance register.
+                Monitor the day here. Enter the roll on Mark Attendance.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -313,15 +316,26 @@ export function AdminAttendanceControlCenter() {
                     key={session.id}
                     session={session}
                     onDone={refreshAll}
-                    onMark={() => setMarkSession(session)}
+                    markHref={`/admin/academics/attendance/mark?date=${date}&session=${session.id}`}
                   />
                 ))}
                 {!sessions.isLoading && !visibleSessions.length ? (
                   <tr>
                     <td className="px-3 py-8 text-center text-muted-foreground" colSpan={5}>
-                      {sessionRows.length
-                        ? 'No classes for this department on the selected date.'
-                        : 'No sessions for selected date.'}
+                      {sessionRows.length ? (
+                        'No classes for this department on the selected date.'
+                      ) : (
+                        <>
+                          No sessions for this date.{' '}
+                          <Link
+                            href={`/admin/academics/attendance/mark?date=${date}`}
+                            className="font-medium text-primary underline-offset-2 hover:underline"
+                          >
+                            Open Mark Attendance
+                          </Link>{' '}
+                          and generate the classes from the timetable.
+                        </>
+                      )}
                     </td>
                   </tr>
                 ) : null}
@@ -383,28 +397,6 @@ export function AdminAttendanceControlCenter() {
           </pre>
         </section>
       </div>
-      <Dialog
-        open={Boolean(markSession)}
-        onOpenChange={(open) => {
-          if (!open) setMarkSession(null);
-        }}
-      >
-        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {markSession?.department?.name
-                ? `${markSession.department.name} attendance`
-                : 'Attendance entry'}
-            </DialogTitle>
-          </DialogHeader>
-          {markSession ? (
-            <FacultyAttendanceWorkspace
-              sessionId={markSession.id}
-              onMarked={() => void refreshAll()}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -412,11 +404,11 @@ export function AdminAttendanceControlCenter() {
 function SessionAdminRow({
   session,
   onDone,
-  onMark,
+  markHref,
 }: {
   session: StudentAttendanceSession;
   onDone: () => void;
-  onMark: () => void;
+  markHref: string;
 }) {
   const [message, setMessage] = useState('');
   const mut = useMutation({
@@ -450,9 +442,11 @@ function SessionAdminRow({
       </td>
       <td className="px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <Button size="sm" onClick={onMark}>
-            <ClipboardList className="mr-1 h-3 w-3" />
-            Mark
+          <Button size="sm" asChild>
+            <Link href={markHref}>
+              <ClipboardList className="mr-1 h-3 w-3" />
+              Mark
+            </Link>
           </Button>
           <Button
             size="sm"

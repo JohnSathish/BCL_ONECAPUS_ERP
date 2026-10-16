@@ -802,6 +802,11 @@ export const ADMIN_NAV: NavGroup[] = [
             href: '/admin/academics/attendance',
             permissions: [...P.studentAttendance, ...P.academics],
           },
+          {
+            label: 'Mark Attendance',
+            href: '/admin/academics/attendance/mark',
+            permissions: [...P.studentAttendance, ...P.academics],
+          },
         ],
       },
       {
@@ -1074,6 +1079,18 @@ export const ADMIN_NAV: NavGroup[] = [
         module: 'studentAttendance',
         permissions: [...P.studentAttendance],
         activePattern: '^/admin/academics/attendance(?:/.*)?$',
+        children: [
+          {
+            label: 'Control Center',
+            href: '/admin/academics/attendance',
+            permissions: [...P.studentAttendance],
+          },
+          {
+            label: 'Mark Attendance',
+            href: '/admin/academics/attendance/mark',
+            permissions: [...P.studentAttendance],
+          },
+        ],
       },
       {
         label: 'Staff Attendance',

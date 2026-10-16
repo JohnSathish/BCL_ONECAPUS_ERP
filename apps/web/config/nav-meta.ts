@@ -110,11 +110,11 @@ export const QUICK_CREATE_ACTIONS: QuickCreateAction[] = [
   {
     id: 'mark-attendance',
     label: 'Mark Attendance',
-    href: '/admin/academics/attendance',
+    href: '/admin/academics/attendance/mark',
     icon: ClipboardList,
     color: '#14b8a6',
     permissions: ['student-attendance:read', 'student-attendance:manage'],
-    keywords: ['attendance', 'mark attendance'],
+    keywords: ['attendance', 'mark attendance', 'roll'],
   },
   {
     id: 'create-event',
