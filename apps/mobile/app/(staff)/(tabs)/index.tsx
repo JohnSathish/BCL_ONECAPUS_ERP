@@ -255,7 +255,15 @@ export default function FacultyHomeScreen() {
                 </Text>
                 <Pressable
                   style={styles.classAction}
-                  onPress={() => router.push('/(staff)/(tabs)/attendance' as never)}
+                  onPress={() => {
+                    const sessionId =
+                      cls.attendanceSessionId || (showPending || isBacklog ? cls.id : null);
+                    if (sessionId) {
+                      router.push(`/(staff)/mark-attendance/${sessionId}` as never);
+                      return;
+                    }
+                    router.push('/(staff)/(tabs)/attendance' as never);
+                  }}
                 >
                   <Text style={styles.classActionText}>
                     {showPending

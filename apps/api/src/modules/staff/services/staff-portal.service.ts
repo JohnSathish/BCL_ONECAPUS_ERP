@@ -956,6 +956,7 @@ export class StaffPortalService {
       classDateLabel: string;
       isToday: boolean;
       attendancePending: boolean;
+      attendanceSessionId: string | null;
     };
 
     const slotByKey = new Map<string, TodaySlot>();
@@ -1132,6 +1133,7 @@ export class StaffPortalService {
         classDateLabel: formatInstitutionDateLabel(todayKey),
         isToday: true,
         attendancePending: false,
+        attendanceSessionId: null,
       });
     }
 
@@ -1216,6 +1218,7 @@ export class StaffPortalService {
           classDateLabel: formatInstitutionDateLabel(todayKey),
           isToday: true,
           attendancePending: false,
+          attendanceSessionId: null,
         });
       }
     }
@@ -1326,6 +1329,7 @@ export class StaffPortalService {
           classDateLabel: formatInstitutionDateLabel(classDate),
           isToday,
           attendancePending,
+          attendanceSessionId: session.id,
         });
       }
     }

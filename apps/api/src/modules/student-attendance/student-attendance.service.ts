@@ -423,8 +423,19 @@ export class StudentAttendanceService {
       orderBy: [{ sessionDate: 'desc' }, { startTime: 'asc' }],
       take: 200,
     });
+    const academicDepartments = await this.prisma.department.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: 'ACTIVE',
+        departmentType: { not: 'ADMINISTRATIVE' },
+      },
+      select: { id: true, name: true, code: true },
+    });
     return Promise.all(
-      sessions.map((session: any) => this.enrichSession(session)),
+      sessions.map((session: any) =>
+        this.enrichSession(session, academicDepartments),
+      ),
     );
   }
 
@@ -460,9 +471,33 @@ export class StudentAttendanceService {
       ]),
     ];
 
-    const sessions = await this.listSessions(user.tid, {
-      date: getZonedDateKey(),
+    const todayKey = getZonedDateKey();
+    const lookbackKey = getZonedDateKey(
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    );
+    const todaySessions = await this.listSessions(user.tid, {
+      date: todayKey,
     });
+    const backlogSessions = await (
+      this.prisma as any
+    ).studentAttendanceSession.findMany({
+      where: {
+        tenantId: user.tid,
+        deletedAt: null,
+        status: 'OPEN',
+        primaryFacultyId: staff.id,
+        sessionDate: {
+          gte: dateKeyToUtcMidnight(lookbackKey),
+          lt: dateKeyToUtcMidnight(todayKey),
+        },
+      },
+      include: { entries: true },
+      orderBy: [{ sessionDate: 'asc' }, { startTime: 'asc' }],
+    });
+    const backlogEnriched = await Promise.all(
+      backlogSessions.map((session: any) => this.enrichSession(session)),
+    );
+    const sessions = [...backlogEnriched, ...todaySessions];
 
     const authorized = sessions.filter((row: any) => {
       if (row.primaryFacultyId === staff.id) return true;
@@ -603,7 +638,14 @@ export class StudentAttendanceService {
       user.tid,
       'attendance.write',
     );
-    const session = await this.assertOpenSession(user.tid, sessionId);
+    const officeEntry = (user.permissions ?? []).some((permission) =>
+      ['student-attendance:admin', 'student-attendance:manage'].includes(
+        permission,
+      ),
+    );
+    const session = await this.assertOpenSession(user.tid, sessionId, {
+      allowPrivilegedCorrection: officeEntry,
+    });
     await this.assertCanMark(user, session);
     const policy = await this.attendancePolicy.getOrCreate(user.tid);
     const now = new Date();
@@ -991,6 +1033,13 @@ export class StudentAttendanceService {
   }
 
   private async assertCanMark(user: JwtUser, session: any) {
+    const permissions = user.permissions ?? [];
+    if (
+      permissions.includes('student-attendance:admin') ||
+      permissions.includes('student-attendance:manage')
+    ) {
+      return;
+    }
     const staff = await this.prisma.staffProfile.findFirst({
       where: { tenantId: user.tid, portalUserId: user.sub, deletedAt: null },
       select: { id: true },
@@ -1136,7 +1185,26 @@ export class StudentAttendanceService {
       },
       take: 500,
     });
-    return lines.map((line) => line.registration.student);
+    const students = lines.map((line) => line.registration.student);
+    if (students.length || !majorMinorCategory(fyugpCategory)) return students;
+    const categorized = await this.prisma.semesterRegistrationLine.findFirst({
+      where: {
+        tenantId,
+        offeringSectionId,
+        category: { not: null },
+        registration: {
+          ...(semesterNo ? { semesterSequence: semesterNo } : {}),
+        },
+      },
+      select: { id: true },
+    });
+    if (categorized) return students;
+    return this.studentsForSection(
+      tenantId,
+      offeringSectionId,
+      semesterNo,
+      null,
+    );
   }
 
   /**
@@ -1226,6 +1294,29 @@ export class StudentAttendanceService {
       for (const line of loose) {
         const student = line.registration?.student;
         if (student?.id) byId.set(student.id, student);
+      }
+    }
+
+    if (!byId.size && majorMinorCategory(fyugpCategory)) {
+      const categorized = await this.prisma.semesterRegistrationLine.findFirst({
+        where: {
+          tenantId,
+          category: { not: null },
+          offering: { courseId, deletedAt: null },
+          ...(semesterNo != null
+            ? { registration: { semesterSequence: semesterNo } }
+            : {}),
+        },
+        select: { id: true },
+      });
+      if (!categorized) {
+        return this.studentsForCourse(
+          tenantId,
+          courseId,
+          semesterNo,
+          shiftId,
+          null,
+        );
       }
     }
 
@@ -1424,7 +1515,25 @@ export class StudentAttendanceService {
     });
   }
 
-  private async enrichSession(session: any) {
+  private departmentFromPaperCode(
+    departments: Array<{ id: string; name: string; code: string }>,
+    paperCode?: string | null,
+  ) {
+    const paper = String(paperCode ?? '').toUpperCase();
+    if (paper.length < 3) return null;
+    const match = departments.find((department) => {
+      const code = department.code.replace(/[^A-Za-z]/g, '').toUpperCase();
+      if (code.length < 3) return false;
+      if (paper.startsWith(code)) return true;
+      return new RegExp(`^${code.slice(0, 3)}[^A-Z]`).test(paper);
+    });
+    return match ? { id: match.id, name: match.name } : null;
+  }
+
+  private async enrichSession(
+    session: any,
+    departments: Array<{ id: string; name: string; code: string }> = [],
+  ) {
     const sessionMetadata = (session.metadata ?? {}) as Record<string, unknown>;
     const [
       course,
@@ -1438,7 +1547,12 @@ export class StudentAttendanceService {
       session.courseId
         ? this.prisma.course.findFirst({
             where: { id: session.courseId },
-            select: { code: true, title: true, courseType: true },
+            select: {
+              code: true,
+              title: true,
+              courseType: true,
+              department: { select: { id: true, name: true } },
+            },
           })
         : null,
       session.offeringSectionId
@@ -1540,6 +1654,11 @@ export class StudentAttendanceService {
       section,
       faculty,
       classroom,
+      department:
+        subjectGroup?.department ??
+        course?.department ??
+        this.departmentFromPaperCode(departments, course?.code) ??
+        null,
       timetableLinked: Boolean(session.timetablePlanEntryId),
       timetablePlanName,
       collectionUnit:

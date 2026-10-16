@@ -28,6 +28,7 @@ export type StudentAttendanceSession = {
   } | null;
   linkedPapers?: Array<{ id: string; code: string; title: string }>;
   section?: { sectionCode?: string | null } | null;
+  department?: { id: string; name: string } | null;
   faculty?: { fullName?: string; shortCode?: string | null; employeeCode?: string | null } | null;
   classroom?: { code?: string; name?: string; capacity?: number; status?: string } | null;
   location?: {

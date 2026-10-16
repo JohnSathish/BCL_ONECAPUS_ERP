@@ -40,7 +40,14 @@ import { cn } from '@/utils/cn';
 type DraftEntry = { status: string; remarks?: string };
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-export function FacultyAttendanceWorkspace() {
+export function FacultyAttendanceWorkspace({
+  sessionId: fixedSessionId,
+  onMarked,
+}: {
+  /** Office entry for one class. Hides the teacher's own class list. */
+  sessionId?: string;
+  onMarked?: () => void;
+} = {}) {
   const qc = useQueryClient();
   const searchParams = useSearchParams();
   const sectionParam = searchParams.get('section');
@@ -60,9 +67,11 @@ export function FacultyAttendanceWorkspace() {
   const sessions = useQuery({
     queryKey: ['student-attendance', 'faculty-today'],
     queryFn: fetchFacultyTodayAttendance,
+    enabled: !fixedSessionId,
   });
 
   useEffect(() => {
+    if (fixedSessionId) return;
     const list = sessions.data ?? [];
     if (!list.length) return;
 
@@ -80,9 +89,9 @@ export function FacultyAttendanceWorkspace() {
         setSelectedId(match.id);
       }
     }
-  }, [sessions.data, sessionParam, sectionParam]);
+  }, [sessions.data, sessionParam, sectionParam, fixedSessionId]);
 
-  const selected = selectedId ?? sessions.data?.[0]?.id ?? null;
+  const selected = fixedSessionId ?? selectedId ?? sessions.data?.[0]?.id ?? null;
   const roster = useQuery({
     queryKey: ['student-attendance', 'roster', selected],
     queryFn: () => fetchStudentAttendanceRoster(selected as string),
@@ -176,6 +185,7 @@ export function FacultyAttendanceWorkspace() {
         qc.setQueryData(['student-attendance', 'roster', selected], data);
       }
       void qc.invalidateQueries({ queryKey: ['student-attendance', 'faculty-today'] });
+      onMarked?.();
     },
     onError: (error, { studentId }) => {
       setSaveStates((prev) => ({ ...prev, [studentId]: 'error' }));
@@ -239,6 +249,7 @@ export function FacultyAttendanceWorkspace() {
         qc.invalidateQueries({ queryKey: ['student-attendance', 'faculty-today'] }),
         qc.invalidateQueries({ queryKey: ['student-attendance', 'roster', selected] }),
       ]);
+      onMarked?.();
     },
     onError: (error) => setMessage(apiErrorMessage(error, 'Could not save attendance')),
   });
@@ -301,30 +312,32 @@ export function FacultyAttendanceWorkspace() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-background p-5 shadow-xl shadow-primary/5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-              Attendance Entry
-            </p>
-            <h1 className="mt-1 text-2xl font-bold">Today&apos;s Classes</h1>
-            <p className="text-sm text-muted-foreground">
-              Mark all present, then tap only exceptions. Changes save automatically.
-            </p>
-            {modeBanner ? (
-              <p className="mt-2 rounded-xl border border-border/50 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-                {modeBanner}
+      {fixedSessionId ? null : (
+        <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-background p-5 shadow-xl shadow-primary/5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                Attendance Entry
               </p>
-            ) : null}
+              <h1 className="mt-1 text-2xl font-bold">Today&apos;s Classes</h1>
+              <p className="text-sm text-muted-foreground">
+                Mark all present, then tap only exceptions. Changes save automatically.
+              </p>
+              {modeBanner ? (
+                <p className="mt-2 rounded-xl border border-border/50 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                  {modeBanner}
+                </p>
+              ) : null}
+            </div>
+            <Button onClick={() => sessions.refetch()} variant="outline" size="sm">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
           </div>
-          <Button onClick={() => sessions.refetch()} variant="outline" size="sm">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {sessions.isError ? (
+      {sessions.isError && !fixedSessionId ? (
         <QueryErrorPanel
           title="Unable to load today's attendance sessions"
           error={sessions.error}
@@ -333,27 +346,29 @@ export function FacultyAttendanceWorkspace() {
         />
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[300px_1fr]">
-        <aside className="space-y-2">
-          {sessions.isLoading ? <LoadingCard label="Loading today's timetable..." /> : null}
-          {(sessions.data ?? []).map((session) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              active={selected === session.id}
-              onClick={() => {
-                setSelectedId(session.id);
-                resetDraft();
-              }}
-            />
-          ))}
-          {!sessions.isLoading && !(sessions.data ?? []).length ? (
-            <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-              No attendance sessions generated for today. Ask admin to generate sessions from
-              timetable.
-            </div>
-          ) : null}
-        </aside>
+      <div className={fixedSessionId ? '' : 'grid gap-4 xl:grid-cols-[300px_1fr]'}>
+        {fixedSessionId ? null : (
+          <aside className="space-y-2">
+            {sessions.isLoading ? <LoadingCard label="Loading today's timetable..." /> : null}
+            {(sessions.data ?? []).map((session) => (
+              <SessionCard
+                key={session.id}
+                session={session}
+                active={selected === session.id}
+                onClick={() => {
+                  setSelectedId(session.id);
+                  resetDraft();
+                }}
+              />
+            ))}
+            {!sessions.isLoading && !(sessions.data ?? []).length ? (
+              <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                No attendance sessions generated for today. Ask admin to generate sessions from
+                timetable.
+              </div>
+            ) : null}
+          </aside>
+        )}
 
         <main className="min-w-0 rounded-3xl border border-border/60 bg-card shadow-sm">
           {!selected ? (

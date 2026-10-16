@@ -114,6 +114,8 @@ export class StudentAttendanceController {
   @RequireAnyPermission(
     'student-attendance:view',
     'student-attendance:mark',
+    'student-attendance:admin',
+    'student-attendance:manage',
     'staff:portal:self',
   )
   roster(@CurrentUser() user: JwtUser, @Param('id') id: string) {

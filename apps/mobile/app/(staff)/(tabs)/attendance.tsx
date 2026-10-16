@@ -26,6 +26,18 @@ import {
   type AttendanceMarkState,
 } from '@/utils/attendance-session';
 
+function formatSessionDate(value?: string) {
+  if (!value) return '';
+  const key = value.slice(0, 10);
+  const [year, month, day] = key.split('-').map(Number);
+  if (!year || !month || !day) return '';
+  return new Date(year, month - 1, day).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 const MARK_STATE_STYLES: Record<
   AttendanceMarkState,
   { badgeBg: string; badgeText: string; badgeBorder: string; cardBorder: string }
@@ -117,7 +129,7 @@ export default function FacultyAttendanceScreen() {
         {loading ? (
           <ActivityIndicator color={facultyTheme.primaryLight} style={{ marginTop: 24 }} />
         ) : sessions.length === 0 ? (
-          <Text style={styles.empty}>No attendance sessions for today.</Text>
+          <Text style={styles.empty}>No attendance sessions to mark.</Text>
         ) : (
           sessions.map((session) => {
             const markState = getAttendanceMarkState(session);
@@ -150,6 +162,9 @@ export default function FacultyAttendanceScreen() {
                 </View>
 
                 <Text style={styles.title}>{sessionDisplayTitle(session)}</Text>
+                {session.sessionDate ? (
+                  <Text style={styles.date}>{formatSessionDate(session.sessionDate)}</Text>
+                ) : null}
                 <Text style={styles.meta}>{sessionDisplaySubtitle(session)}</Text>
 
                 {countsLine ? <Text style={styles.counts}>{countsLine}</Text> : null}
@@ -234,6 +249,7 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
   time: { flex: 1, fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight },
   title: { fontSize: 15, fontWeight: '800', color: facultyTheme.text },
+  date: { fontSize: 11, fontWeight: '700', color: facultyTheme.primaryLight },
   meta: { fontSize: 12, color: facultyTheme.textMuted },
   counts: { fontSize: 11, color: facultyTheme.textMuted, marginTop: 2 },
   action: { fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight, marginTop: 6 },

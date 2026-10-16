@@ -14,6 +14,7 @@ export type FacultyTodayClass = {
   classDateLabel?: string;
   isToday?: boolean;
   attendancePending?: boolean;
+  attendanceSessionId?: string | null;
 };
 
 export type FacultyPendingAction = {

@@ -144,6 +144,12 @@ export default function MarkAttendanceScreen() {
       ) : null}
 
       <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}>
+        {students.length === 0 ? (
+          <Text style={styles.emptyRoster}>
+            No students are on this class roll yet. Check that the paper is registered for this
+            semester, then pull to refresh from Attendance.
+          </Text>
+        ) : null}
         {students.map((student) => (
           <Pressable key={student.id} style={styles.row} onPress={() => toggleStatus(student.id)}>
             <View style={styles.rowText}>
@@ -217,6 +223,12 @@ const styles = StyleSheet.create({
   },
   scanNoteText: { color: '#166534', fontWeight: '700', fontSize: 13 },
   list: { paddingHorizontal: 16, gap: 8 },
+  emptyRoster: {
+    fontSize: 13,
+    color: facultyTheme.textMuted,
+    lineHeight: 18,
+    paddingVertical: 12,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

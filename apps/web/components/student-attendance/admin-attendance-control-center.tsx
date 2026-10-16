@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3,
   CalendarDays,
+  ClipboardList,
   FileWarning,
   Loader2,
   Lock,
@@ -15,7 +16,9 @@ import {
   Snowflake,
 } from 'lucide-react';
 
+import { FacultyAttendanceWorkspace } from '@/components/student-attendance/faculty-attendance-workspace';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import {
   fetchAttendancePolicy,
@@ -35,6 +38,8 @@ import { institutionDateKey } from '@/lib/institution-date';
 export function AdminAttendanceControlCenter() {
   const qc = useQueryClient();
   const [date, setDate] = useState(() => institutionDateKey());
+  const [departmentId, setDepartmentId] = useState('');
+  const [markSession, setMarkSession] = useState<StudentAttendanceSession | null>(null);
   const [reportType, setReportType] = useState('unmarked');
   const [message, setMessage] = useState('');
 
@@ -110,6 +115,31 @@ export function AdminAttendanceControlCenter() {
 
   const stats = dashboard.data ?? {};
   const sessionRows = sessions.data ?? [];
+  const departmentOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const row of sessionRows) {
+      if (row.department?.id && row.department.name) {
+        byId.set(row.department.id, row.department.name);
+      }
+    }
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [sessionRows]);
+  const visibleSessions = useMemo(() => {
+    const rows = departmentId
+      ? sessionRows.filter((row) => (row.department?.id ?? '') === departmentId)
+      : sessionRows;
+    return [...rows].sort((a, b) => {
+      const department = (a.department?.name ?? 'Other').localeCompare(
+        b.department?.name ?? 'Other',
+      );
+      if (department !== 0) return department;
+      return (a.displayTitle ?? a.course?.title ?? '').localeCompare(
+        b.displayTitle ?? b.course?.title ?? '',
+      );
+    });
+  }, [departmentId, sessionRows]);
   const markedCount = sessionRows.filter((row) =>
     ['MARKED', 'LOCKED', 'FROZEN'].includes(String(row.status ?? '').toUpperCase()),
   ).length;
@@ -243,13 +273,28 @@ export function AdminAttendanceControlCenter() {
             <div>
               <h2 className="text-lg font-semibold">Daily Session Register</h2>
               <p className="text-xs text-muted-foreground">
-                Lock, freeze, reopen, and monitor attendance sessions.
+                Choose a department, then Mark, to enter the roll from the attendance register.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => sessions.refetch()}>
-              <RefreshCcw className="mr-2 h-4 w-4" />
-              Refresh
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={departmentId}
+                onChange={(event) => setDepartmentId(event.target.value)}
+                className="h-9 rounded-lg border border-border bg-background px-2 text-xs"
+                aria-label="Department"
+              >
+                <option value="">All departments</option>
+                {departmentOptions.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+              <Button variant="outline" size="sm" onClick={() => sessions.refetch()}>
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
+            </div>
           </div>
           <div className="overflow-auto rounded-2xl border border-border/60">
             <table className="min-w-full text-sm">
@@ -263,13 +308,20 @@ export function AdminAttendanceControlCenter() {
                 </tr>
               </thead>
               <tbody>
-                {(sessions.data ?? []).map((session) => (
-                  <SessionAdminRow key={session.id} session={session} onDone={refreshAll} />
+                {visibleSessions.map((session) => (
+                  <SessionAdminRow
+                    key={session.id}
+                    session={session}
+                    onDone={refreshAll}
+                    onMark={() => setMarkSession(session)}
+                  />
                 ))}
-                {!sessions.isLoading && !(sessions.data ?? []).length ? (
+                {!sessions.isLoading && !visibleSessions.length ? (
                   <tr>
                     <td className="px-3 py-8 text-center text-muted-foreground" colSpan={5}>
-                      No sessions for selected date.
+                      {sessionRows.length
+                        ? 'No classes for this department on the selected date.'
+                        : 'No sessions for selected date.'}
                     </td>
                   </tr>
                 ) : null}
@@ -331,6 +383,28 @@ export function AdminAttendanceControlCenter() {
           </pre>
         </section>
       </div>
+      <Dialog
+        open={Boolean(markSession)}
+        onOpenChange={(open) => {
+          if (!open) setMarkSession(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {markSession?.department?.name
+                ? `${markSession.department.name} attendance`
+                : 'Attendance entry'}
+            </DialogTitle>
+          </DialogHeader>
+          {markSession ? (
+            <FacultyAttendanceWorkspace
+              sessionId={markSession.id}
+              onMarked={() => void refreshAll()}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -338,9 +412,11 @@ export function AdminAttendanceControlCenter() {
 function SessionAdminRow({
   session,
   onDone,
+  onMark,
 }: {
   session: StudentAttendanceSession;
   onDone: () => void;
+  onMark: () => void;
 }) {
   const [message, setMessage] = useState('');
   const mut = useMutation({
@@ -357,8 +433,8 @@ function SessionAdminRow({
       <td className="px-3 py-2">
         <p className="font-medium">{session.displayTitle ?? session.course?.title ?? 'Class'}</p>
         <p className="text-xs text-muted-foreground">
-          {session.course?.code ?? '—'} · Section {session.section?.sectionCode ?? '—'} ·{' '}
-          {session.sessionType}
+          {session.department?.name ?? 'No department'} · {session.course?.code ?? '—'} · Section{' '}
+          {session.section?.sectionCode ?? '—'} · {session.sessionType}
           {session.location
             ? ` · ${session.location.roomCode ?? ''} ${session.location.roomName ?? ''}`
             : ''}
@@ -374,6 +450,10 @@ function SessionAdminRow({
       </td>
       <td className="px-3 py-2">
         <div className="flex flex-wrap gap-1">
+          <Button size="sm" onClick={onMark}>
+            <ClipboardList className="mr-1 h-3 w-3" />
+            Mark
+          </Button>
           <Button
             size="sm"
             variant="outline"
