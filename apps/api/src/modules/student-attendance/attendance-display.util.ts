@@ -60,6 +60,16 @@ export function registrationLineCategoryWhere(value?: string | null) {
   return { category: { equals: category, mode: 'insensitive' as const } };
 }
 
+/** category is a required string, so `{ not: null }` is an invalid Prisma filter. */
+export function majorMinorCategorySetWhere() {
+  return {
+    OR: [
+      { category: { equals: 'MAJOR', mode: 'insensitive' as const } },
+      { category: { equals: 'MINOR', mode: 'insensitive' as const } },
+    ],
+  };
+}
+
 export function resolveAttendanceDisplayTitle(input: {
   fyugpCategory?: string | null;
   departmentName?: string | null;

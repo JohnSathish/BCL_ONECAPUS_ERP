@@ -1,5 +1,6 @@
 import {
   majorMinorCategory,
+  majorMinorCategorySetWhere,
   registrationLineCategoryWhere,
 } from './attendance-display.util';
 
@@ -12,5 +13,6 @@ describe('attendance roster category', () => {
       category: { equals: 'MAJOR', mode: 'insensitive' },
     });
     expect(registrationLineCategoryWhere('VAC')).toEqual({});
+    expect(majorMinorCategorySetWhere().OR).toHaveLength(2);
   });
 });

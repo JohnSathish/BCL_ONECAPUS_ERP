@@ -23,6 +23,7 @@ import { buildInstitutionalExcelReport } from '../../common/reports';
 import {
   buildAttendanceHeaderMeta,
   majorMinorCategory,
+  majorMinorCategorySetWhere,
   registrationLineCategoryWhere,
   resolveAttendanceDisplayTitle,
   rosterStudentSelect,
@@ -1179,7 +1180,9 @@ export class StudentAttendanceService {
       where: {
         tenantId,
         offeringSectionId,
-        status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
+        status: {
+          in: ['approved', 'confirmed', 'registered', 'pending', 'assigned'],
+        },
         ...registrationLineCategoryWhere(fyugpCategory),
         registration: {
           ...(semesterNo ? { semesterSequence: semesterNo } : {}),
@@ -1202,7 +1205,7 @@ export class StudentAttendanceService {
       where: {
         tenantId,
         offeringSectionId,
-        category: { not: null },
+        ...majorMinorCategorySetWhere(),
         registration: {
           ...(semesterNo ? { semesterSequence: semesterNo } : {}),
         },
@@ -1302,7 +1305,7 @@ export class StudentAttendanceService {
       const categorized = await this.prisma.semesterRegistrationLine.findFirst({
         where: {
           tenantId,
-          category: { not: null },
+          ...majorMinorCategorySetWhere(),
           offering: { courseId, deletedAt: null },
           ...(semesterNo != null
             ? { registration: { semesterSequence: semesterNo } }

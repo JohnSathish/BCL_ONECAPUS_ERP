@@ -542,7 +542,9 @@ export class TeachingSubjectGroupService {
       where: {
         tenantId,
         offeringSectionId,
-        status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
+        status: {
+          in: ['approved', 'confirmed', 'registered', 'pending', 'assigned'],
+        },
         ...registrationLineCategoryWhere(fyugpCategory),
         registration: {
           ...(semesterNo ? { semesterSequence: semesterNo } : {}),
