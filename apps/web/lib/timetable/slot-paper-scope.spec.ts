@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   courseMatchesTimetableDepartment,
+  departmentsForSlotScope,
   findDepartmentForStream,
   isDepartmentScopedTimetableCategory,
   slotStreamScope,
@@ -49,21 +50,52 @@ describe('slot paper scope', () => {
     expect(findDepartmentForStream(departments, 'Chemistry', 'CHE')?.id).toBe('che');
   });
 
-  it('does not lock a faculty group that contains many departments', () => {
+  it('limits a faculty timetable to its own departments', () => {
+    expect(
+      slotStreamScope({
+        streamId: 'commerce',
+        streams: [
+          { id: 'commerce', code: 'COMMERCE', name: 'Commerce', departments: ['COMMERCE'] },
+        ],
+      }),
+    ).toEqual({
+      streamName: 'Commerce',
+      streamCode: 'COMMERCE',
+      departmentNames: ['COMMERCE'],
+    });
     expect(
       slotStreamScope({
         streamId: 'science',
         streams: [
           { id: 'science', code: 'SCIENCE', name: 'Science', departments: ['Botany', 'Chemistry'] },
-          { id: 'bot', code: 'BOT', name: 'Botany', departments: [] },
         ],
-      }),
-    ).toEqual({});
+      }).departmentNames,
+    ).toEqual(['Botany', 'Chemistry']);
     expect(
       slotStreamScope({
         streamId: 'bot',
         streams: [{ id: 'bot', code: 'BOT', name: 'Botany', departments: [] }],
       }),
     ).toEqual({ streamName: 'Botany', streamCode: 'BOT' });
+  });
+
+  it('keeps Commerce major papers and leaves other departments out', () => {
+    const catalog = [...departments, { id: 'com', name: 'Department of Commerce', code: 'COM' }];
+    const matched = departmentsForSlotScope(catalog, {
+      streamName: 'Commerce',
+      streamCode: 'COMMERCE',
+      departmentNames: ['COMMERCE'],
+    });
+    expect(matched.map((department) => department.id)).toEqual(['com']);
+    const commerce = matched[0]!;
+    expect(
+      courseMatchesTimetableDepartment({ code: 'COM-100', departmentId: 'com' }, commerce),
+    ).toBe(true);
+    expect(
+      courseMatchesTimetableDepartment({ code: 'BOT-100', departmentId: 'bot' }, commerce),
+    ).toBe(false);
+    expect(
+      courseMatchesTimetableDepartment({ code: 'ENG-100', departmentId: null }, commerce),
+    ).toBe(false);
   });
 });

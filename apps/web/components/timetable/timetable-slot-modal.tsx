@@ -18,7 +18,7 @@ import { fetchTeachingSubjectGroups } from '@/services/teaching-subject-groups';
 import { isPoolFyugpCategory } from '@/lib/timetable/entry-display';
 import {
   courseMatchesTimetableDepartment,
-  findDepartmentForStream,
+  departmentsForSlotScope,
   isDepartmentScopedTimetableCategory,
   timetableOfferingCategory,
 } from '@/lib/timetable/slot-paper-scope';
@@ -64,9 +64,10 @@ export type SlotModalContext = {
   slotTemplateId?: string;
   allowedSemesters: number[];
   defaultSemester?: number;
-  /** Set when the plan is one department, such as Botany. Faculty groups stay unset. */
   streamName?: string;
   streamCode?: string;
+  /** Faculty timetable departments, such as Commerce. */
+  departmentNames?: string[];
 };
 
 type Props = {
@@ -126,19 +127,25 @@ export function TimetableSlotModal({
 
   const departmentScoped = isDepartmentScopedTimetableCategory(fyugpCategory);
   const offeringCategory = timetableOfferingCategory(fyugpCategory);
+  const scopeNames = context?.departmentNames ?? [];
+  const streamLocked =
+    departmentScoped && Boolean(context?.streamName || context?.streamCode || scopeNames.length);
   const departmentsQ = useQuery({
     queryKey: ['timetable', 'academic-departments'],
     queryFn: () => fetchAcademicDepartments(),
-    enabled:
-      authReady && open && departmentScoped && Boolean(context?.streamName || context?.streamCode),
+    enabled: authReady && open && streamLocked,
     staleTime: 5 * 60 * 1000,
   });
-  const streamDepartment = departmentScoped
-    ? findDepartmentForStream(departmentsQ.data ?? [], context?.streamName, context?.streamCode)
-    : undefined;
-  const streamLocked = departmentScoped && Boolean(context?.streamName || context?.streamCode);
+  const streamDepartments = departmentScoped
+    ? departmentsForSlotScope(departmentsQ.data ?? [], {
+        streamName: context?.streamName,
+        streamCode: context?.streamCode,
+        departmentNames: scopeNames,
+      })
+    : [];
   const departmentLookupPending = streamLocked && departmentsQ.isLoading;
-  const departmentMissing = streamLocked && departmentsQ.isFetched && !streamDepartment;
+  const departmentMissing =
+    streamLocked && departmentsQ.isFetched && streamDepartments.length === 0;
   const coursesQ = useQuery({
     queryKey: ['timetable', 'courses', semesterSequence, offeringCategory ?? ''],
     queryFn: () =>
@@ -227,8 +234,9 @@ export function TimetableSlotModal({
 
   const courses = (coursesQ.data?.data ?? []).filter((course) => {
     if (!streamLocked) return true;
-    if (!streamDepartment) return false;
-    return courseMatchesTimetableDepartment(course, streamDepartment);
+    return streamDepartments.some((department) =>
+      courseMatchesTimetableDepartment(course, department),
+    );
   });
   const courseOptions =
     courseId &&
@@ -263,10 +271,10 @@ export function TimetableSlotModal({
   const staff = mapStaffRows(staffQ.data as unknown[] | undefined);
   const rooms = roomsQ.data ?? [];
   const subjectGroups = subjectGroupsQ.data ?? [];
+  const streamDepartmentIds = new Set(streamDepartments.map((department) => department.id));
   const subjectGroupsForSlot = subjectGroups.filter((group) => {
     if (!streamLocked) return true;
-    if (!streamDepartment) return false;
-    return group.departmentId === streamDepartment.id;
+    return Boolean(group.departmentId && streamDepartmentIds.has(group.departmentId));
   });
   const selectedFromLists =
     staff.find((m) => m.id === staffProfileId) ?? pickedStaffCache[staffProfileId];

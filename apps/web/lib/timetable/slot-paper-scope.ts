@@ -79,16 +79,33 @@ export function findDepartmentForStream<T extends { id: string; name: string; co
   });
 }
 
-/** Faculty groups such as Science list many departments and must stay open. */
+export type SlotPaperScope = {
+  streamName?: string;
+  streamCode?: string;
+  /** Faculty timetable: major papers from these departments only. */
+  departmentNames?: string[];
+};
+
+/**
+ * A faculty timetable such as Commerce lists its departments.
+ * Major papers stay inside that list. A single department timetable locks to itself.
+ */
 export function slotStreamScope(input: {
   streams: { id: string; code: string; name: string; departments?: string[] }[];
   streamId?: string;
   planStreamName?: string | null;
   planStreamCode?: string | null;
-}): { streamName?: string; streamCode?: string } {
+}): SlotPaperScope {
   const selected = input.streams.find((stream) => stream.id === input.streamId);
   if (selected) {
-    if ((selected.departments?.length ?? 0) > 0) return {};
+    const departmentNames = (selected.departments ?? []).map((name) => name.trim()).filter(Boolean);
+    if (departmentNames.length > 0) {
+      return {
+        streamName: selected.name,
+        streamCode: selected.code,
+        departmentNames,
+      };
+    }
     return { streamName: selected.name, streamCode: selected.code };
   }
   if (input.planStreamName) {
@@ -98,4 +115,18 @@ export function slotStreamScope(input: {
     };
   }
   return {};
+}
+
+export function departmentsForSlotScope<T extends { id: string; name: string; code: string }>(
+  departments: T[],
+  scope: SlotPaperScope,
+): T[] {
+  const named = (scope.departmentNames ?? [])
+    .map((name) => findDepartmentForStream(departments, name, name))
+    .filter((department): department is T => Boolean(department));
+  if (named.length) {
+    return [...new Map(named.map((department) => [department.id, department])).values()];
+  }
+  const single = findDepartmentForStream(departments, scope.streamName, scope.streamCode);
+  return single ? [single] : [];
 }
