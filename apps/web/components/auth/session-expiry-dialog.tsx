@@ -14,6 +14,7 @@ type SessionExpiryDialogProps = {
   onContinue: () => void;
   onLogout: () => void;
   busy?: boolean;
+  message?: string;
 };
 
 export function SessionExpiryDialog({
@@ -21,18 +22,21 @@ export function SessionExpiryDialog({
   onContinue,
   onLogout,
   busy,
+  message,
 }: SessionExpiryDialogProps) {
   return (
     <Dialog open={open} onOpenChange={() => undefined}>
       <DialogContent
-        className="sm:max-w-md"
+        data-session-expiry="true"
+        overlayClassName="z-[200]"
+        className="z-[200] sm:max-w-md"
         onPointerDownOutside={(event) => event.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>Session Expiring Soon</DialogTitle>
           <DialogDescription>
-            Your session will expire in about 2 minutes due to inactivity. Choose Continue to stay
-            signed in, or Logout now. If you ignore this, you will be signed out automatically.
+            {message ??
+              'Your session will expire soon because this page has been idle. Choose Continue to stay signed in. Unsaved timetable slots and marks stay on this page until you continue or log out.'}
           </DialogDescription>
         </DialogHeader>
         <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

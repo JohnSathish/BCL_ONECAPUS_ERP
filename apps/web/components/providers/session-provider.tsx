@@ -6,10 +6,11 @@ import { SessionExpiryDialog } from '@/components/auth/session-expiry-dialog';
 import {
   attachGlobalActivityListeners,
   getLastActivityAt,
-  isUserActivelyTyping,
+  isUserEngaged,
   pingActivity,
   subscribeActivity,
 } from '@/lib/auth/session-activity';
+import { hasGlobalUnsavedChanges } from '@/lib/auth/unsaved-changes-registry';
 import { broadcastSessionMessage, subscribeSessionBroadcast } from '@/lib/auth/session-broadcast';
 import { confirmGlobalUnsavedDiscard } from '@/lib/auth/unsaved-changes-registry';
 import { isAuthColdPath } from '@/lib/auth/auth-cold-path';
@@ -34,6 +35,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
   const [warningOpen, setWarningOpen] = useState(false);
+  const [warningMessage, setWarningMessage] = useState<string | undefined>();
   const [continueBusy, setContinueBusy] = useState(false);
   const warningShownRef = useRef(false);
   const forcedLogoutRef = useRef(false);
@@ -208,17 +210,29 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
 
     const interval = setInterval(() => {
-      const idleMs = Date.now() - getLastActivityAt();
+      const current = useAuthStore.getState().session;
+      const expiresAtMs = current?.expiresAt ? new Date(current.expiresAt).getTime() : 0;
+      if (expiresAtMs && expiresAtMs - Date.now() < 3 * 60 * 1000) {
+        void tokenRefreshManager.refreshSession().catch(() => undefined);
+      }
 
-      // Hard idle logout always wins — do not keep offering Continue after expiry.
+      const idleMs = Date.now() - getLastActivityAt();
+      const keepWorking = isUserEngaged() || hasGlobalUnsavedChanges();
+
       if (idleMs >= IDLE_LOGOUT_MS) {
-        if (isUserActivelyTyping()) return;
+        if (keepWorking) {
+          warningShownRef.current = true;
+          setWarningMessage(undefined);
+          setWarningOpen(true);
+          return;
+        }
         performLogout(true, true);
         return;
       }
 
       if (idleMs >= IDLE_WARNING_MS && !warningShownRef.current) {
         warningShownRef.current = true;
+        setWarningMessage(undefined);
         setWarningOpen(true);
       }
     }, TICK_MS);
@@ -235,16 +249,37 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  useEffect(() => {
+    const onRefreshFailed = (event: Event) => {
+      const fatal = Boolean((event as CustomEvent<{ fatal?: boolean }>).detail?.fatal);
+      warningShownRef.current = true;
+      setWarningMessage(
+        fatal
+          ? 'The sign-in could not be renewed. Choose Continue to try again. This page, including unsaved marks or a timetable slot, stays open.'
+          : 'The connection dropped while renewing your sign-in. Choose Continue to try again. Your open work is still on this page.',
+      );
+      setWarningOpen(true);
+    };
+    window.addEventListener('onecampus:session-refresh-failed', onRefreshFailed);
+    return () => window.removeEventListener('onecampus:session-refresh-failed', onRefreshFailed);
+  }, []);
+
   const onContinueSession = async () => {
     setContinueBusy(true);
     try {
-      await tokenRefreshManager.refreshSession({ maxWaitMs: CONTINUE_REFRESH_MAX_WAIT_MS });
+      await tokenRefreshManager.refreshSession({
+        maxWaitMs: CONTINUE_REFRESH_MAX_WAIT_MS,
+        force: true,
+      });
       warningShownRef.current = false;
+      setWarningMessage(undefined);
       setWarningOpen(false);
       pingActivity();
       broadcastSessionMessage({ type: 'IDLE_EXTENDED' });
     } catch {
-      performLogout(true, true);
+      setWarningMessage(
+        'Still unable to renew the sign-in. Check the connection and choose Continue again. Logging out is the only action that leaves this page.',
+      );
     } finally {
       setContinueBusy(false);
     }
@@ -256,8 +291,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       <SessionExpiryDialog
         open={warningOpen && Boolean(session)}
         onContinue={() => void onContinueSession()}
-        onLogout={() => performLogout(true, true)}
+        onLogout={() => performLogout(true, false)}
         busy={continueBusy}
+        message={warningMessage}
       />
     </>
   );

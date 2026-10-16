@@ -49,12 +49,16 @@ class TokenRefreshManager {
     }, delay);
   }
 
-  async refreshSession(options?: { maxWaitMs?: number }): Promise<AuthSession> {
+  async refreshSession(options?: { maxWaitMs?: number; force?: boolean }): Promise<AuthSession> {
     if (isBrowserAuthColdPath()) {
       throw new Error('Session refresh is disabled on login screens.');
     }
     if (this.refreshPromise) return this.refreshPromise;
-    if (this.lastRefreshFailureAt > 0 && Date.now() - this.lastRefreshFailureAt < 30_000) {
+    if (
+      !options?.force &&
+      this.lastRefreshFailureAt > 0 &&
+      Date.now() - this.lastRefreshFailureAt < 30_000
+    ) {
       throw new Error('Refresh temporarily paused after a recent failure.');
     }
 
@@ -70,6 +74,7 @@ class TokenRefreshManager {
           user: data.user,
         };
         useAuthStore.getState().setSession(session);
+        this.lastRefreshFailureAt = 0;
         this.scheduleProactiveRefresh(session);
         broadcastSessionMessage({ type: 'SESSION_UPDATED', session });
         pingActivity();
@@ -83,18 +88,23 @@ class TokenRefreshManager {
         }
         this.lastRefreshFailureAt = Date.now();
         const status = httpStatus(error);
-        if (status === 429) {
-          this.processQueue(error, null);
-          const session = useAuthStore.getState().session;
-          if (session && accessTokenStillValid()) {
-            this.scheduleProactiveRefresh(session);
-          }
-          throw error;
-        }
-        useAuthStore.getState().clear();
-        this.clearSchedule();
-        broadcastSessionMessage({ type: 'LOGOUT' });
+        const transient = status == null || status === 429 || status >= 500;
         this.processQueue(error, null);
+        const session = useAuthStore.getState().session;
+        const tokenValid = accessTokenStillValid();
+        if (transient && session) {
+          if (tokenValid) {
+            this.scheduleProactiveRefresh(session);
+          } else {
+            if (this.refreshTimer) clearTimeout(this.refreshTimer);
+            this.refreshTimer = setTimeout(() => {
+              void this.refreshSession().catch(() => undefined);
+            }, 35_000);
+          }
+        }
+        if (!transient || !tokenValid) {
+          this.notifyRefreshFailed(status, !transient);
+        }
         throw error;
       })
       .finally(() => {
@@ -143,6 +153,15 @@ class TokenRefreshManager {
     } catch (refreshError) {
       return Promise.reject(refreshError);
     }
+  }
+
+  private notifyRefreshFailed(status: number | undefined, fatal: boolean) {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('onecampus:session-refresh-failed', {
+        detail: { status, fatal },
+      }),
+    );
   }
 
   clearSchedule(): void {

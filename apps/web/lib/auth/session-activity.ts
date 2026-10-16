@@ -35,25 +35,42 @@ export function isUserActivelyTyping(): boolean {
   return false;
 }
 
+/** A form or dialog is open, so idle logout must wait. Ignores the session warning itself. */
+export function isUserEngaged(): boolean {
+  if (typeof document === 'undefined') return false;
+  if (isUserActivelyTyping()) return true;
+  const dialogs = document.querySelectorAll('[role="dialog"][data-state="open"]');
+  for (const dialog of dialogs) {
+    if (dialog.getAttribute('data-session-expiry') === 'true') continue;
+    return true;
+  }
+  return false;
+}
+
 export function attachGlobalActivityListeners(): () => void {
   if (typeof window === 'undefined') return () => undefined;
 
   const onActivity = () => pingActivity();
   const events: (keyof WindowEventMap)[] = [
-    'mousedown',
+    'pointerdown',
+    'pointermove',
     'keydown',
+    'input',
+    'change',
+    'focusin',
+    'wheel',
     'scroll',
     'touchstart',
     'click',
   ];
 
   for (const event of events) {
-    window.addEventListener(event, onActivity, { passive: true });
+    window.addEventListener(event, onActivity, { passive: true, capture: true });
   }
 
   return () => {
     for (const event of events) {
-      window.removeEventListener(event, onActivity);
+      window.removeEventListener(event, onActivity, { capture: true });
     }
   };
 }

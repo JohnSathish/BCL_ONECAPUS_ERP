@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import {
   AlertCircle,
   BookOpen,
@@ -706,6 +707,10 @@ export function IaMarkEntryWorkspace({
     ? Math.round((enteredCount / shiftStudents.length) * 1000) / 10
     : 0;
   const dirtyCount = students.filter(isDirty).length;
+  useUnsavedChangesGuard({
+    isDirty: dirtyCount > 0,
+    message: 'Student marks on this page have not been saved.',
+  });
 
   const context = roster.data?.context;
   const maxMarks = Number(

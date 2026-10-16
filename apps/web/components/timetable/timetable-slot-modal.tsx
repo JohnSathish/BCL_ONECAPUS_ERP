@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { fetchAcademicDepartments } from '@/services/organization';
 import { fetchAllCourses } from '@/services/programs';
 import { fetchInfrastructureRooms } from '@/services/infrastructure';
@@ -117,6 +118,11 @@ export function TimetableSlotModal({
     >
   >({});
   const authReady = useAuthQueryEnabled();
+  useUnsavedChangesGuard({
+    isDirty: open,
+    enabled: open,
+    message: 'This timetable slot has not been saved.',
+  });
 
   const departmentScoped = isDepartmentScopedTimetableCategory(fyugpCategory);
   const offeringCategory = timetableOfferingCategory(fyugpCategory);
