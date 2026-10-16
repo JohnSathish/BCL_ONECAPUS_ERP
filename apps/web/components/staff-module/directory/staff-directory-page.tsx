@@ -37,7 +37,11 @@ import { useRequireAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useStaffPermissions } from '@/hooks/use-staff-permissions';
 import { toShiftOptions } from '@/lib/shift-options';
 import { fetchCycleDashboard } from '@/services/academic-lifecycle';
-import { fetchDepartments, fetchCampuses, fetchInstitutions } from '@/services/organization';
+import {
+  fetchAcademicDepartments,
+  fetchCampuses,
+  fetchInstitutions,
+} from '@/services/organization';
 import {
   downloadStaffImportTemplate,
   exportStaffCsv,
@@ -160,8 +164,8 @@ export function StaffDirectoryPage() {
   });
 
   const departments = useQuery({
-    queryKey: ['org', 'departments'],
-    queryFn: () => fetchDepartments(),
+    queryKey: ['org', 'departments', 'academic'],
+    queryFn: () => fetchAcademicDepartments(),
     enabled: authReady,
   });
 
@@ -181,10 +185,12 @@ export function StaffDirectoryPage() {
 
   const departmentOptions = useMemo(
     () =>
-      (departments.data ?? []).map((d) => ({
-        id: d.id,
-        label: d.name,
-      })),
+      (departments.data ?? [])
+        .map((d) => ({
+          id: d.id,
+          label: d.name,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
     [departments.data],
   );
 
@@ -429,7 +435,14 @@ export function StaffDirectoryPage() {
                   href={`/admin/staff/${row.id}`}
                   className="glass-card block rounded-xl border border-border/50 p-3 text-xs"
                 >
-                  <p className="font-medium">{row.fullName}</p>
+                  <p className="font-medium">
+                    {row.shortCode ? (
+                      <span className="mr-1 rounded bg-primary/10 px-1 py-0.5 font-mono text-[9px] font-semibold text-primary">
+                        {row.shortCode}
+                      </span>
+                    ) : null}
+                    {row.fullName}
+                  </p>
                   <p className="text-[10px] text-muted-foreground">
                     {row.employeeCode} · {row.department ?? 'No department'}
                   </p>

@@ -182,9 +182,14 @@ export function StaffDirectoryTable({
                       <div className="min-w-0">
                         <Link
                           href={staffBase(row.id)}
-                          className="block max-w-[180px] truncate font-semibold hover:text-primary hover:underline"
+                          className="flex max-w-[200px] items-center gap-1 truncate font-semibold hover:text-primary hover:underline"
                         >
-                          {row.fullName}
+                          {row.shortCode ? (
+                            <span className="shrink-0 rounded bg-primary/10 px-1 py-0.5 font-mono text-[9px] font-semibold text-primary">
+                              {row.shortCode}
+                            </span>
+                          ) : null}
+                          <span className="truncate">{row.fullName}</span>
                         </Link>
                         <p className="max-w-[180px] truncate text-[10px] text-muted-foreground">
                           {row.email ?? row.mobile ?? '—'}
