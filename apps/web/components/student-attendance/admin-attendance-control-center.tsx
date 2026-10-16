@@ -87,14 +87,18 @@ export function AdminAttendanceControlCenter() {
       deduped?: number;
       countable?: number;
       attendanceMode?: string;
+      skipped?: boolean;
+      reason?: string;
     }) => {
       const removed = result.removedDuplicates ?? 0;
       const created = result.created ?? 0;
       const mode = result.attendanceMode ? ` (${result.attendanceMode})` : '';
       setMessage(
-        removed > 0
-          ? `Opened ${created} sessions from published timetables${mode}. Removed ${removed} duplicate session(s).`
-          : `Generated/opened ${created} sessions from published timetables${mode}.`,
+        result.skipped
+          ? result.reason || 'This date is closed on the academic calendar.'
+          : removed > 0
+            ? `Opened ${created} sessions from published timetables${mode}. Removed ${removed} duplicate session(s).`
+            : `Generated/opened ${created} sessions from published timetables${mode}.`,
       );
       await refreshAll();
     },

@@ -6,6 +6,7 @@ export type StudentAttendanceSession = {
   startTime?: string | null;
   endTime?: string | null;
   periodNo?: number | null;
+  semesterNo?: number | null;
   sessionType: string;
   labBatch?: string | null;
   status: string;
@@ -186,6 +187,31 @@ export async function fetchStudentAttendanceReport(
   return data;
 }
 
+export type AttendanceCalendarDay = {
+  date: string;
+  dayKind: string;
+  isWorkingDay: boolean;
+  createsAttendanceSession: boolean;
+  events: Array<{ id: string; type: string; title: string }>;
+  templateRuns: boolean;
+  relocatedClasses: number;
+  markingAllowed: boolean;
+  reason: string | null;
+  month: {
+    workingDays: number;
+    holidays: number;
+    weekends: number;
+    specialWorkingDays: number;
+  };
+};
+
+export async function fetchAttendanceCalendarDay(date: string) {
+  const { data } = await api.get<AttendanceCalendarDay>('/v1/student-attendance/calendar-day', {
+    params: { date },
+  });
+  return data;
+}
+
 export async function fetchMyStudentAttendance() {
   const { data } = await api.get('/v1/student-attendance/portal/me');
   return data;
@@ -231,7 +257,7 @@ export async function updateAttendancePolicy(payload: Partial<AttendancePolicy>)
 export async function exportStudentAttendanceReport(
   type: string,
   params: Record<string, string | number | undefined>,
-  format: 'xlsx' | 'csv',
+  format: 'xlsx' | 'csv' | 'pdf',
 ) {
   const { data } = await api.get(`/v1/student-attendance/reports/${type}`, {
     params: { ...params, format },

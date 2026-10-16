@@ -69,6 +69,16 @@ export class StudentAttendanceController {
     return this.policy.update(user.tid, dto);
   }
 
+  @Get('calendar-day')
+  @RequireAnyPermission(
+    'student-attendance:view',
+    'student-attendance:mark',
+    'student-attendance:admin',
+  )
+  calendarDay(@CurrentUser() user: JwtUser, @Query('date') date: string) {
+    return this.service.calendarDay(user.tid, date);
+  }
+
   @Get('sessions')
   @RequireAnyPermission(
     'student-attendance:view',
@@ -197,14 +207,17 @@ export class StudentAttendanceController {
   ) {
     const result = await this.service.reports(user.tid, type, query);
     if (
-      query.format === 'xlsx' &&
+      (query.format === 'xlsx' || query.format === 'pdf') &&
       result &&
       typeof result === 'object' &&
       'buffer' in result
     ) {
       const payload = result as { buffer: Buffer; filename: string };
       return new StreamableFile(payload.buffer, {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        type:
+          query.format === 'pdf'
+            ? 'application/pdf'
+            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         disposition: `attachment; filename="${payload.filename}"`,
       });
     }

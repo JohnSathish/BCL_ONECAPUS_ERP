@@ -224,6 +224,14 @@ export class AttendanceReportQueryDto extends AttendanceSessionQueryDto {
   studentId?: string;
 
   @IsOptional()
-  @IsIn(['json', 'xlsx', 'csv'])
-  format?: 'json' | 'xlsx' | 'csv';
+  @IsUUID()
+  academicYearId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsIn(['json', 'xlsx', 'csv', 'pdf'])
+  format?: 'json' | 'xlsx' | 'csv' | 'pdf';
 }

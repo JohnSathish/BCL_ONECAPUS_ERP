@@ -34,6 +34,17 @@ import {
   getZonedWeekday,
 } from '../../common/utils/time-greeting';
 import { AttendancePolicyService } from './attendance-policy.service';
+import {
+  dayTemplateShouldRun,
+  sessionMarkingAllowed,
+} from './attendance-day.util';
+import { buildAttendanceReportPdf } from './attendance-report-pdf';
+import {
+  classifyAttendanceSession,
+  countPlannerDays,
+  foldEntries,
+  percentageFromFold,
+} from './attendance-report.util';
 
 const POOL_FYUGP_CATEGORIES = ['MDC', 'AEC', 'SEC', 'VAC', 'VTC'] as const;
 
@@ -120,39 +131,63 @@ export class StudentAttendanceService {
       tenantId,
       sessionDate,
     );
-    const skipNonWorking =
-      policy.weekendHolidayHandling !== 'ALLOW_IF_GENERATED';
-    if (
-      skipNonWorking &&
-      !dayResolution.isWorkingDay &&
-      !dayResolution.createsAttendanceSession
-    ) {
+    const planFilter = dto.timetablePlanId
+      ? { planId: dto.timetablePlanId }
+      : {};
+    const [forceRunRow, dayCancelledRow, relocateRows] = await Promise.all([
+      this.prisma.timetableSubstitution.findFirst({
+        where: {
+          tenantId,
+          sessionDate,
+          action: { in: ['CALENDAR_FORCE_RUN', 'HOLIDAY_CLASS'] },
+          status: { not: 'REJECTED' },
+          ...planFilter,
+        },
+        select: { id: true },
+      }),
+      this.prisma.timetableSubstitution.findFirst({
+        where: {
+          tenantId,
+          sessionDate,
+          action: { in: ['CALENDAR_CANCEL_DAY', 'CANCEL_DAY'] },
+          status: { not: 'REJECTED' },
+          ...planFilter,
+        },
+        select: { id: true },
+      }),
+      this.prisma.timetableSubstitution.findMany({
+        where: {
+          tenantId,
+          sessionDate,
+          action: 'RELOCATE_TO_DATE',
+          status: { not: 'REJECTED' },
+          originalEntryId: { not: null },
+          ...planFilter,
+        },
+        select: { originalEntryId: true },
+      }),
+    ]);
+    const dayInput = {
+      weekendHolidayHandling: policy.weekendHolidayHandling,
+      isWorkingDay: dayResolution.isWorkingDay,
+      createsAttendanceSession: dayResolution.createsAttendanceSession,
+      dayKind: dayResolution.dayKind,
+      eventTitles: dayResolution.events.map((event) => event.title),
+      forceRun: Boolean(forceRunRow),
+      dayCancelled: Boolean(dayCancelledRow),
+      relocated: relocateRows.length > 0,
+    };
+    const templateRuns = dayTemplateShouldRun(dayInput);
+    if (!templateRuns && relocateRows.length === 0) {
+      const gate = sessionMarkingAllowed(dayInput);
       return {
         created: 0,
         skipped: true,
-        reason: `Non-working day (${dayResolution.dayKind})`,
+        reason:
+          gate.reason ??
+          `Attendance is not generated on ${dayResolution.dayKind} days.`,
         day: dayResolution,
         attendanceMode: policy.attendanceMode,
-        removedDuplicates: 0,
-      };
-    }
-
-    // Honor date-scoped timetable cancellations (Phase 2 calendar cancel/relocate).
-    const dayCancelled = await this.prisma.timetableSubstitution.findFirst({
-      where: {
-        tenantId,
-        sessionDate,
-        action: { in: ['CALENDAR_CANCEL_DAY', 'CANCEL_DAY'] },
-        status: { not: 'REJECTED' },
-        ...(dto.timetablePlanId ? { planId: dto.timetablePlanId } : {}),
-      },
-    });
-    if (dayCancelled && !dayResolution.createsAttendanceSession) {
-      return {
-        created: 0,
-        skipped: true,
-        reason: 'CALENDAR_CANCEL_DAY',
-        day: dayResolution,
         removedDuplicates: 0,
       };
     }
@@ -179,34 +214,59 @@ export class StudentAttendanceService {
       ? { planId: dto.timetablePlanId }
       : await this.publishedPlanScope(tenantId);
 
-    const entries = await this.prisma.timetablePlanEntry.findMany({
-      where: {
-        tenantId,
-        deletedAt: null,
-        status: { not: 'CANCELLED' },
-        dayOfWeek,
-        ...(dto.offeringSectionId
-          ? { offeringSectionId: dto.offeringSectionId }
-          : {}),
-        ...(dto.staffProfileId ? { staffProfileId: dto.staffProfileId } : {}),
-        ...(cancelledEntryIds.length
-          ? { id: { notIn: cancelledEntryIds } }
-          : {}),
-        OR: [
-          planScope,
-          { metadata: { path: ['electiveAllocation'], equals: true } as any },
-          {
-            fyugpCategory: { in: [...POOL_FYUGP_CATEGORIES] },
-            courseId: { not: null },
-            staffProfileId: { not: null },
+    const templateEntries = templateRuns
+      ? await this.prisma.timetablePlanEntry.findMany({
+          where: {
+            tenantId,
+            deletedAt: null,
+            status: { not: 'CANCELLED' },
+            dayOfWeek,
+            ...(dto.offeringSectionId
+              ? { offeringSectionId: dto.offeringSectionId }
+              : {}),
+            ...(dto.staffProfileId
+              ? { staffProfileId: dto.staffProfileId }
+              : {}),
+            ...(cancelledEntryIds.length
+              ? { id: { notIn: cancelledEntryIds } }
+              : {}),
+            OR: [
+              planScope,
+              {
+                metadata: { path: ['electiveAllocation'], equals: true } as any,
+              },
+              {
+                fyugpCategory: { in: [...POOL_FYUGP_CATEGORIES] },
+                courseId: { not: null },
+                staffProfileId: { not: null },
+              },
+            ],
           },
-        ],
-      },
-      include: {
-        plan: true,
-      },
-      orderBy: [{ startTime: 'asc' }],
-    });
+          include: {
+            plan: true,
+          },
+          orderBy: [{ startTime: 'asc' }],
+        })
+      : [];
+    const relocatedIds = relocateRows
+      .map((row) => row.originalEntryId)
+      .filter((id): id is string => Boolean(id));
+    const relocatedEntries = relocatedIds.length
+      ? await this.prisma.timetablePlanEntry.findMany({
+          where: {
+            tenantId,
+            id: { in: relocatedIds },
+            deletedAt: null,
+            status: { not: 'CANCELLED' },
+          },
+          include: { plan: true },
+        })
+      : [];
+    const seenEntryIds = new Set(templateEntries.map((entry) => entry.id));
+    const entries = [
+      ...templateEntries,
+      ...relocatedEntries.filter((entry) => !seenEntryIds.has(entry.id)),
+    ];
 
     const hydratedEntries = await this.hydratePoolSlots(tenantId, entries);
     const realPoolKeys = new Set(
@@ -374,6 +434,10 @@ export class StudentAttendanceService {
     });
     if (!section?.courseOffering)
       throw new NotFoundException('Offering section not found');
+    await this.assertSessionDateOpen(user.tid, {
+      sessionDate: this.startOfDay(dto.sessionDate),
+      timetablePlanEntryId: null,
+    });
     const session = await (this.prisma as any).studentAttendanceSession.create({
       data: {
         tenantId: user.tid,
@@ -398,6 +462,80 @@ export class StudentAttendanceService {
     });
     await this.audit(user, 'CREATE_EXTRA_SESSION', session.id, null, { dto });
     return session;
+  }
+
+  async calendarDay(tenantId: string, dateInput: string) {
+    if (!dateInput || !/^\d{4}-\d{2}-\d{2}/.test(dateInput)) {
+      throw new BadRequestException('A date is required');
+    }
+    const sessionDate = this.startOfDay(dateInput);
+    const dateKey = this.localDateString(sessionDate);
+    const policy = await this.attendancePolicy.getOrCreate(tenantId);
+    const day = await this.workingDays.resolveDay(tenantId, sessionDate);
+    const [forceRunRow, dayCancelledRow, relocateCount] = await Promise.all([
+      this.prisma.timetableSubstitution.findFirst({
+        where: {
+          tenantId,
+          sessionDate,
+          action: { in: ['CALENDAR_FORCE_RUN', 'HOLIDAY_CLASS'] },
+          status: { not: 'REJECTED' },
+        },
+        select: { id: true },
+      }),
+      this.prisma.timetableSubstitution.findFirst({
+        where: {
+          tenantId,
+          sessionDate,
+          action: { in: ['CALENDAR_CANCEL_DAY', 'CANCEL_DAY'] },
+          status: { not: 'REJECTED' },
+        },
+        select: { id: true },
+      }),
+      this.prisma.timetableSubstitution.count({
+        where: {
+          tenantId,
+          sessionDate,
+          action: 'RELOCATE_TO_DATE',
+          status: { not: 'REJECTED' },
+          originalEntryId: { not: null },
+        },
+      }),
+    ]);
+    const input = {
+      weekendHolidayHandling: policy.weekendHolidayHandling,
+      isWorkingDay: day.isWorkingDay,
+      createsAttendanceSession: day.createsAttendanceSession,
+      dayKind: day.dayKind,
+      eventTitles: day.events.map((event) => event.title),
+      forceRun: Boolean(forceRunRow),
+      dayCancelled: Boolean(dayCancelledRow),
+      relocated: relocateCount > 0,
+    };
+    const gate = sessionMarkingAllowed({ ...input, relocated: false });
+    const [yearText, monthText] = dateKey.split('-');
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const from = `${yearText}-${monthText}-01`;
+    const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const to = `${yearText}-${monthText}-${String(last).padStart(2, '0')}`;
+    const monthDays = await this.workingDays.resolveRange(tenantId, from, to);
+    return {
+      date: dateKey,
+      dayKind: day.dayKind,
+      isWorkingDay: day.isWorkingDay,
+      createsAttendanceSession: day.createsAttendanceSession,
+      events: day.events,
+      templateRuns: dayTemplateShouldRun(input),
+      relocatedClasses: relocateCount,
+      markingAllowed: gate.allowed || relocateCount > 0 || Boolean(forceRunRow),
+      reason:
+        gate.allowed || relocateCount > 0 || forceRunRow ? null : gate.reason,
+      month: {
+        from,
+        to,
+        ...countPlannerDays(monthDays),
+      },
+    };
   }
 
   async listSessions(tenantId: string, query: AttendanceSessionQueryDto) {
@@ -661,6 +799,7 @@ export class StudentAttendanceService {
     const session = await this.assertOpenSession(user.tid, sessionId, {
       allowPrivilegedCorrection: officeEntry,
     });
+    await this.assertSessionDateOpen(user.tid, session);
     await this.assertCanMark(user, session);
     const policy = await this.attendancePolicy.getOrCreate(user.tid);
     const now = new Date();
@@ -969,6 +1108,62 @@ export class StudentAttendanceService {
     };
   }
 
+  private async assertSessionDateOpen(
+    tenantId: string,
+    session: { sessionDate: Date; timetablePlanEntryId?: string | null },
+  ) {
+    const policy = await this.attendancePolicy.getOrCreate(tenantId);
+    const sessionDate = this.startOfDay(session.sessionDate);
+    const day = await this.workingDays.resolveDay(tenantId, sessionDate);
+    const [forceRunRow, dayCancelledRow, relocated] = await Promise.all([
+      this.prisma.timetableSubstitution.findFirst({
+        where: {
+          tenantId,
+          sessionDate,
+          action: { in: ['CALENDAR_FORCE_RUN', 'HOLIDAY_CLASS'] },
+          status: { not: 'REJECTED' },
+        },
+        select: { id: true },
+      }),
+      this.prisma.timetableSubstitution.findFirst({
+        where: {
+          tenantId,
+          sessionDate,
+          action: { in: ['CALENDAR_CANCEL_DAY', 'CANCEL_DAY'] },
+          status: { not: 'REJECTED' },
+        },
+        select: { id: true },
+      }),
+      session.timetablePlanEntryId
+        ? this.prisma.timetableSubstitution.findFirst({
+            where: {
+              tenantId,
+              sessionDate,
+              action: 'RELOCATE_TO_DATE',
+              originalEntryId: session.timetablePlanEntryId,
+              status: { not: 'REJECTED' },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
+    const decision = sessionMarkingAllowed({
+      weekendHolidayHandling: policy.weekendHolidayHandling,
+      isWorkingDay: day.isWorkingDay,
+      createsAttendanceSession: day.createsAttendanceSession,
+      dayKind: day.dayKind,
+      eventTitles: day.events.map((event) => event.title),
+      forceRun: Boolean(forceRunRow),
+      dayCancelled: Boolean(dayCancelledRow),
+      relocated: Boolean(relocated),
+    });
+    if (!decision.allowed) {
+      throw new BadRequestException(
+        decision.reason ?? 'Attendance is closed for this date',
+      );
+    }
+  }
+
   private async assertOpenSession(
     tenantId: string,
     sessionId: string,
@@ -1174,7 +1369,7 @@ export class StudentAttendanceService {
     offeringSectionId?: string | null,
     semesterNo?: number | null,
     fyugpCategory?: string | null,
-  ) {
+  ): Promise<any[]> {
     if (!offeringSectionId) return [];
     const lines = await this.prisma.semesterRegistrationLine.findMany({
       where: {
@@ -1231,7 +1426,7 @@ export class StudentAttendanceService {
     semesterNo?: number | null,
     shiftId?: string | null,
     fyugpCategory?: string | null,
-  ) {
+  ): Promise<any[]> {
     const categoryWhere = registrationLineCategoryWhere(fyugpCategory);
     const lines = await this.prisma.semesterRegistrationLine.findMany({
       where: {
@@ -1701,18 +1896,50 @@ export class StudentAttendanceService {
     query: AttendanceReportQueryDto & { scope: 'monthly' | 'cumulative' },
   ) {
     const policy = await this.attendancePolicy.getOrCreate(tenantId);
-    const range = this.resolveReportDateRange(query, query.scope);
+    const range = await this.resolveReportDateRange(
+      tenantId,
+      query,
+      query.scope,
+    );
     const where: Record<string, unknown> = {
       tenantId,
       deletedAt: null,
-      status: { not: 'CANCELLED' },
       sessionDate: { gte: range.from, lte: range.to },
     };
+    if (query.academicYearId) where.academicYearId = query.academicYearId;
     if (query.shiftId) where.shiftId = query.shiftId;
     if (query.semesterNo) where.semesterNo = query.semesterNo;
     if (query.offeringSectionId)
       where.offeringSectionId = query.offeringSectionId;
     if (query.courseId) where.courseId = query.courseId;
+    if (query.departmentId) {
+      const [coursesInDepartment, groupsInDepartment] = await Promise.all([
+        this.prisma.course.findMany({
+          where: {
+            tenantId,
+            departmentId: query.departmentId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        }),
+        this.prisma.teachingSubjectGroup.findMany({
+          where: {
+            tenantId,
+            departmentId: query.departmentId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        }),
+      ]);
+      where.OR = [
+        { courseId: { in: coursesInDepartment.map((row) => row.id) } },
+        {
+          teachingSubjectGroupId: {
+            in: groupsInDepartment.map((row) => row.id),
+          },
+        },
+      ];
+    }
 
     const sessions = await (
       this.prisma as any
@@ -1720,8 +1947,60 @@ export class StudentAttendanceService {
       where,
       include: { entries: true },
       orderBy: [{ sessionDate: 'asc' }, { periodNo: 'asc' }],
-      take: 5000,
+      take: 20000,
     });
+
+    const fromKey = this.localDateString(range.from);
+    const toKey = this.localDateString(range.to);
+    const [calendarDays, substitutions, tenant] = await Promise.all([
+      this.workingDays.resolveRange(tenantId, fromKey, toKey),
+      this.prisma.timetableSubstitution.findMany({
+        where: {
+          tenantId,
+          sessionDate: { gte: range.from, lte: range.to },
+          status: { not: 'REJECTED' },
+          action: {
+            in: [
+              'CALENDAR_FORCE_RUN',
+              'HOLIDAY_CLASS',
+              'RELOCATE_TO_DATE',
+              'CALENDAR_CANCEL_DAY',
+              'CANCEL_DAY',
+            ],
+          },
+        },
+        select: { sessionDate: true, action: true, originalEntryId: true },
+      }),
+      this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { name: true },
+      }),
+    ]);
+    const planner = countPlannerDays(calendarDays);
+    const blockedDates = new Set(
+      calendarDays
+        .filter((day) => !day.isWorkingDay && !day.createsAttendanceSession)
+        .map((day) => day.date),
+    );
+    const forceDates = new Set<string>();
+    const cancelDates = new Set<string>();
+    const relocateKeys = new Set<string>();
+    for (const row of substitutions) {
+      if (!row.sessionDate) continue;
+      const dateKey = this.localDateString(row.sessionDate);
+      if (
+        row.action === 'CALENDAR_FORCE_RUN' ||
+        row.action === 'HOLIDAY_CLASS'
+      ) {
+        forceDates.add(dateKey);
+      }
+      if (row.action === 'CALENDAR_CANCEL_DAY' || row.action === 'CANCEL_DAY') {
+        cancelDates.add(dateKey);
+      }
+      if (row.action === 'RELOCATE_TO_DATE' && row.originalEntryId) {
+        relocateKeys.add(`${dateKey}|${row.originalEntryId}`);
+      }
+    }
 
     const byDate = new Map<string, number[]>();
     for (const session of sessions) {
@@ -1733,23 +2012,89 @@ export class StudentAttendanceService {
       byDate.set(dateKey, bucket);
     }
 
-    let countableSessions = sessions.filter((session: any) =>
-      this.attendancePolicy.isEntryCountable({
+    const dayMode = this.attendancePolicy.isDayAggregationMode(
+      policy.attendanceMode,
+    );
+    let scheduled = 0;
+    let conducted = 0;
+    let cancelled = 0;
+    let unmarked = 0;
+    let excluded = 0;
+    const conductedSessions: any[] = [];
+    for (const session of sessions) {
+      const dateKey = this.localDateString(session.sessionDate);
+      const countable = this.attendancePolicy.isEntryCountable({
         mode: policy.attendanceMode,
         periodNo: session.periodNo,
-        teachingPeriodNos:
-          byDate.get(this.localDateString(session.sessionDate)) ?? [],
+        teachingPeriodNos: byDate.get(dateKey) ?? [],
         collectionUnit: (session.metadata as any)?.collectionUnit ?? null,
-      }),
-    );
-
-    if (this.attendancePolicy.isDayAggregationMode(policy.attendanceMode)) {
-      // One session per cohort-date already expected; also collapse student counts by day.
+      });
+      if (!countable) continue;
+      const role = classifyAttendanceSession({
+        sessionStatus: session.status,
+        blockedCalendarDay:
+          blockedDates.has(dateKey) || cancelDates.has(dateKey),
+        relocatedOrForced:
+          forceDates.has(dateKey) ||
+          (session.timetablePlanEntryId
+            ? relocateKeys.has(`${dateKey}|${session.timetablePlanEntryId}`)
+            : false),
+      });
+      if (role === 'cancelled') {
+        cancelled += 1;
+        scheduled += 1;
+        continue;
+      }
+      if (role === 'excluded') {
+        excluded += 1;
+        continue;
+      }
+      scheduled += 1;
+      if (role === 'conducted') {
+        conducted += 1;
+        conductedSessions.push(session);
+      } else {
+        unmarked += 1;
+      }
     }
+
+    const courseIds = [
+      ...new Set(
+        conductedSessions.map((session) => session.courseId).filter(Boolean),
+      ),
+    ] as string[];
+    const sectionIds = [
+      ...new Set(
+        conductedSessions
+          .map((session) => session.offeringSectionId)
+          .filter(Boolean),
+      ),
+    ] as string[];
+    const [courses, sections] = await Promise.all([
+      courseIds.length
+        ? this.prisma.course.findMany({
+            where: { id: { in: courseIds } },
+            select: {
+              id: true,
+              title: true,
+              code: true,
+              department: { select: { id: true, name: true } },
+            },
+          })
+        : [],
+      sectionIds.length
+        ? this.prisma.offeringSection.findMany({
+            where: { id: { in: sectionIds } },
+            select: { id: true, sectionCode: true },
+          })
+        : [],
+    ]);
+    const courseMap = new Map(courses.map((row) => [row.id, row]));
+    const sectionMap = new Map(sections.map((row) => [row.id, row]));
 
     const studentIds = [
       ...new Set(
-        countableSessions.flatMap((session: any) =>
+        conductedSessions.flatMap((session: any) =>
           (session.entries ?? []).map(
             (entry: any) => entry.studentId as string,
           ),
@@ -1758,7 +2103,6 @@ export class StudentAttendanceService {
     ].filter((id): id is string =>
       query.studentId ? id === query.studentId : Boolean(id),
     );
-
     const students = studentIds.length
       ? await this.prisma.student.findMany({
           where: { tenantId, id: { in: studentIds } },
@@ -1766,110 +2110,187 @@ export class StudentAttendanceService {
             id: true,
             rollNumber: true,
             enrollmentNumber: true,
-            admissionNumber: true,
             masterProfile: { select: { fullName: true } },
             user: { select: { displayName: true } },
           },
         })
       : [];
-    const studentMap = new Map(
-      students.map(
-        (s: {
-          id: string;
-          rollNumber: string | null;
-          enrollmentNumber: string | null;
-          masterProfile?: { fullName?: string | null } | null;
-          user?: { displayName?: string | null } | null;
-        }) => [s.id, s],
-      ),
-    );
+    const studentMap = new Map(students.map((row) => [row.id, row]));
 
-    type Agg = {
-      studentId: string;
-      rollNumber: string | null;
-      enrollmentNumber: string | null;
-      fullName: string;
-      totalSessions: number;
-      presentCount: number;
-      absentCount: number;
-      medicalLeaveCount: number;
-      _dayKeys?: Set<string>;
+    type Group = {
+      key: string;
+      label: string;
+      sessionIds: Set<string>;
+      entries: Array<{ sessionId: string; status: string }>;
+      students: Set<string>;
     };
-    const map = new Map<string, Agg>();
-    const dayMode = this.attendancePolicy.isDayAggregationMode(
-      policy.attendanceMode,
-    );
+    const ensure = (map: Map<string, Group>, key: string, label: string) => {
+      const existing = map.get(key);
+      if (existing) return existing;
+      const created: Group = {
+        key,
+        label,
+        sessionIds: new Set(),
+        entries: [],
+        students: new Set(),
+      };
+      map.set(key, created);
+      return created;
+    };
+    const studentEntries = new Map<
+      string,
+      Array<{ sessionId: string; status: string }>
+    >();
+    const subjectGroups = new Map<string, Group>();
+    const classGroups = new Map<string, Group>();
+    const departmentGroups = new Map<string, Group>();
+    const semesterGroups = new Map<string, Group>();
 
-    for (const session of countableSessions) {
+    for (const session of conductedSessions) {
       const dateKey = this.localDateString(session.sessionDate);
+      const course = session.courseId ? courseMap.get(session.courseId) : null;
+      const section = session.offeringSectionId
+        ? sectionMap.get(session.offeringSectionId)
+        : null;
+      const groups = [
+        ensure(
+          subjectGroups,
+          session.courseId ?? session.teachingSubjectGroupId ?? 'unassigned',
+          course ? `${course.code} ${course.title}` : 'Unassigned subject',
+        ),
+        ensure(
+          classGroups,
+          session.offeringSectionId ?? 'unassigned',
+          section?.sectionCode
+            ? `Section ${section.sectionCode}`
+            : 'Unassigned class',
+        ),
+        ensure(
+          departmentGroups,
+          course?.department?.id ?? 'unassigned',
+          course?.department?.name ?? 'Unassigned department',
+        ),
+        ensure(
+          semesterGroups,
+          String(session.semesterNo ?? 'none'),
+          session.semesterNo
+            ? `Semester ${session.semesterNo}`
+            : 'Semester not set',
+        ),
+      ];
+      for (const group of groups) group.sessionIds.add(session.id);
       for (const entry of session.entries ?? []) {
-        if (NEUTRAL_STATUSES.has(entry.status)) continue;
         if (query.studentId && entry.studentId !== query.studentId) continue;
-        const student = studentMap.get(entry.studentId);
-        const existing = map.get(entry.studentId) ?? {
-          studentId: entry.studentId,
+        const identity = dayMode ? dateKey : session.id;
+        const bucket = studentEntries.get(entry.studentId) ?? [];
+        bucket.push({ sessionId: identity, status: entry.status });
+        studentEntries.set(entry.studentId, bucket);
+        for (const group of groups) {
+          group.entries.push({
+            sessionId: `${identity}:${entry.studentId}`,
+            status: entry.status,
+          });
+          group.students.add(entry.studentId);
+        }
+      }
+    }
+
+    const toSummary = (group: Group) => {
+      const fold = foldEntries(group.entries);
+      return {
+        key: group.key,
+        label: group.label,
+        students: group.students.size,
+        classes: group.sessionIds.size,
+        conducted: fold.conducted - fold.exempted,
+        attended: fold.attended,
+        absent: fold.absent,
+        leave: fold.leave,
+        duty: fold.duty,
+        percentage: percentageFromFold(fold),
+      };
+    };
+
+    const rows = [...studentEntries.entries()]
+      .map(([studentId, entries]) => {
+        const student = studentMap.get(studentId);
+        const fold = foldEntries(entries);
+        const seen = new Set<string>();
+        let medicalLeaveCount = 0;
+        for (const entry of entries) {
+          if (seen.has(entry.sessionId)) continue;
+          seen.add(entry.sessionId);
+          if (entry.status === 'ML') medicalLeaveCount += 1;
+        }
+        return {
+          studentId,
           rollNumber: student?.rollNumber ?? null,
           enrollmentNumber: student?.enrollmentNumber ?? null,
           fullName:
             student?.masterProfile?.fullName ??
             student?.user?.displayName ??
             'Student',
-          totalSessions: 0,
-          presentCount: 0,
-          absentCount: 0,
-          medicalLeaveCount: 0,
-          _dayKeys: new Set<string>(),
-        };
-        if (dayMode) {
-          const dayBucket = `${dateKey}`;
-          if (existing._dayKeys?.has(dayBucket)) {
-            map.set(entry.studentId, existing);
-            continue;
-          }
-          existing._dayKeys?.add(dayBucket);
-        }
-        existing.totalSessions += 1;
-        if (PRESENT_STATUSES.has(entry.status)) existing.presentCount += 1;
-        if (ABSENT_STATUSES.has(entry.status)) existing.absentCount += 1;
-        if (MEDICAL_STATUSES.has(entry.status)) existing.medicalLeaveCount += 1;
-        map.set(entry.studentId, existing);
-      }
-    }
-
-    const rows = Array.from(map.values())
-      .map((row) => {
-        const { _dayKeys, ...rest } = row;
-        return {
-          ...rest,
-          percentage: rest.totalSessions
-            ? Math.round((rest.presentCount / rest.totalSessions) * 10000) / 100
-            : 0,
+          totalSessions: fold.conducted - fold.exempted,
+          presentCount: fold.countedPresent,
+          attendedCount: fold.attended,
+          absentCount: fold.absent,
+          leaveCount: fold.leave,
+          dutyCount: fold.duty,
+          medicalLeaveCount,
+          percentage: percentageFromFold(fold),
         };
       })
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
+    const averagePercentage = rows.length
+      ? Math.round(
+          (rows.reduce((sum, row) => sum + row.percentage, 0) / rows.length) *
+            100,
+        ) / 100
+      : 0;
+
     return {
       type: query.scope,
+      institutionName: tenant?.name?.trim() || 'Don Bosco College, Tura',
+      academicYear: range.academicYearName,
       attendanceMode: policy.attendanceMode,
       aggregationUnit: policy.aggregationUnit,
       unitLabels: policy.unitLabels,
-      from: this.localDateString(range.from),
-      to: this.localDateString(range.to),
+      from: fromKey,
+      to: toKey,
+      generatedAt: new Date().toISOString(),
       shortageThresholdPct: policy.shortageThresholdPct,
       defaulterThresholdPct: policy.defaulterThresholdPct,
+      calculation:
+        'Percentage = (Present + approved leave + on duty) ÷ classes conducted. Holidays, weekends, and cancelled classes are excluded. Medical leave is listed with leave and is not counted as present.',
       summary: {
         students: rows.length,
-        sessions: countableSessions.length,
-        workingUnits: rows.reduce((s, r) => s + r.totalSessions, 0),
-        averagePercentage: rows.length
-          ? Math.round(
-              (rows.reduce((sum, row) => sum + row.percentage, 0) /
-                rows.length) *
-                100,
-            ) / 100
-          : 0,
+        workingDays: planner.workingDays,
+        holidays: planner.holidays,
+        weekends: planner.weekends,
+        specialWorkingDays: planner.specialWorkingDays,
+        scheduledClasses: scheduled,
+        conductedClasses: conducted,
+        unmarkedClasses: unmarked,
+        cancelledClasses: cancelled,
+        excludedClasses: excluded,
+        sessions: conducted,
+        workingUnits: rows.reduce((sum, row) => sum + row.totalSessions, 0),
+        averagePercentage,
       },
       rows,
+      subjectSummaries: [...subjectGroups.values()]
+        .map(toSummary)
+        .sort((a, b) => a.label.localeCompare(b.label)),
+      classSummaries: [...classGroups.values()]
+        .map(toSummary)
+        .sort((a, b) => a.label.localeCompare(b.label)),
+      departmentSummaries: [...departmentGroups.values()]
+        .map(toSummary)
+        .sort((a, b) => a.label.localeCompare(b.label)),
+      semesterSummaries: [...semesterGroups.values()]
+        .map(toSummary)
+        .sort((a, b) => a.label.localeCompare(b.label)),
     };
   }
 
@@ -1916,27 +2337,57 @@ export class StudentAttendanceService {
     };
   }
 
-  private resolveReportDateRange(
+  private async resolveReportDateRange(
+    tenantId: string,
     query: AttendanceReportQueryDto,
     scope: 'monthly' | 'cumulative' = 'monthly',
   ) {
+    const today = this.startOfDay(new Date());
+    const year = query.academicYearId
+      ? await this.prisma.academicYear.findFirst({
+          where: { id: query.academicYearId, tenantId, deletedAt: null },
+        })
+      : scope === 'cumulative'
+        ? await this.prisma.academicYear.findFirst({
+            where: {
+              tenantId,
+              deletedAt: null,
+              startDate: { lte: today },
+              endDate: { gte: today },
+            },
+            orderBy: { startDate: 'desc' },
+          })
+        : null;
+    const academicYearName = year?.name ?? null;
+    const yearStart = year ? this.startOfDay(year.startDate) : null;
+    const yearEnd = year ? this.startOfDay(year.endDate) : null;
+
     if (query.from || query.to) {
-      return {
-        from: this.startOfDay(query.from ?? query.to ?? new Date()),
-        to: this.startOfDay(query.to ?? query.from ?? new Date()),
-      };
+      let from = this.startOfDay(query.from ?? query.to ?? new Date());
+      let to = this.startOfDay(query.to ?? query.from ?? new Date());
+      if (scope === 'cumulative' && !query.from && yearStart) from = yearStart;
+      if (query.academicYearId && yearStart && from < yearStart)
+        from = yearStart;
+      if (query.academicYearId && yearEnd && to > yearEnd) to = yearEnd;
+      return { from, to, academicYearName };
     }
+
+    if (scope === 'cumulative') {
+      const from =
+        yearStart ??
+        this.startOfDay(new Date(Date.UTC(today.getUTCFullYear(), 0, 1)));
+      const to = yearEnd && today > yearEnd ? yearEnd : today;
+      return { from, to, academicYearName };
+    }
+
     const now = new Date();
-    if (scope === 'cumulative' && query.month == null) {
-      // Default cumulative window: current calendar year to date
-      const from = new Date(Date.UTC(now.getFullYear(), 0, 1));
-      return { from: this.startOfDay(from), to: this.startOfDay(now) };
-    }
-    const year = query.year ?? now.getFullYear();
-    const month = (query.month ?? now.getMonth() + 1) - 1;
-    const from = new Date(Date.UTC(year, month, 1));
-    const to = new Date(Date.UTC(year, month + 1, 0));
-    return { from: this.startOfDay(from), to: this.startOfDay(to) };
+    const calendarYear = query.year ?? now.getFullYear();
+    const monthIndex = (query.month ?? now.getMonth() + 1) - 1;
+    return {
+      from: this.startOfDay(new Date(Date.UTC(calendarYear, monthIndex, 1))),
+      to: this.startOfDay(new Date(Date.UTC(calendarYear, monthIndex + 1, 0))),
+      academicYearName,
+    };
   }
 
   private async maybeExportReport(
@@ -1945,11 +2396,17 @@ export class StudentAttendanceService {
       from: string;
       to: string;
       attendanceMode: string;
+      institutionName?: string;
+      academicYear?: string | null;
+      generatedAt?: string;
+      calculation?: string;
       summary: Record<string, number>;
       rows: Array<Record<string, unknown>>;
+      subjectSummaries?: Array<Record<string, unknown>>;
+      classSummaries?: Array<Record<string, unknown>>;
     },
     filenameBase: string,
-    format: 'json' | 'xlsx' | 'csv',
+    format: 'json' | 'xlsx' | 'csv' | 'pdf',
   ) {
     if (format === 'json') return report;
 
@@ -1957,23 +2414,43 @@ export class StudentAttendanceService {
       { key: 'rollNumber', label: 'Roll No' },
       { key: 'enrollmentNumber', label: 'Enrollment' },
       { key: 'fullName', label: 'Student' },
-      { key: 'totalSessions', label: 'Sessions' },
-      { key: 'presentCount', label: 'Present' },
+      { key: 'totalSessions', label: 'Conducted' },
+      { key: 'attendedCount', label: 'Attended' },
       { key: 'absentCount', label: 'Absent' },
-      { key: 'medicalLeaveCount', label: 'Medical' },
+      { key: 'leaveCount', label: 'Leave' },
+      { key: 'dutyCount', label: 'On Duty' },
       { key: 'percentage', label: '%' },
       ...(report.type === 'defaulters'
         ? [{ key: 'eligibilityStatus', label: 'Status' }]
         : []),
     ];
+    const summaryColumns = [
+      { key: 'label', label: 'Group' },
+      { key: 'students', label: 'Students' },
+      { key: 'classes', label: 'Classes' },
+      { key: 'conducted', label: 'Conducted marks' },
+      { key: 'attended', label: 'Attended' },
+      { key: 'absent', label: 'Absent' },
+      { key: 'leave', label: 'Leave' },
+      { key: 'duty', label: 'On Duty' },
+      { key: 'percentage', label: '%' },
+    ];
+    const title =
+      report.type === 'defaulters'
+        ? 'Attendance Defaulters'
+        : report.type === 'monthly'
+          ? 'Monthly Attendance Report'
+          : 'Cumulative Attendance Report';
+    const institutionName =
+      report.institutionName?.trim() || 'Don Bosco College, Tura';
 
     if (format === 'csv') {
-      const headers = columns.map((c) => c.label);
+      const headers = columns.map((column) => column.label);
       const lines = [
         headers.join(','),
         ...report.rows.map((row) =>
           columns
-            .map((col) => this.csvEscape(String(row[col.key] ?? '')))
+            .map((column) => this.csvEscape(String(row[column.key] ?? '')))
             .join(','),
         ),
       ];
@@ -1983,27 +2460,74 @@ export class StudentAttendanceService {
       };
     }
 
+    if (format === 'pdf') {
+      const buffer = await buildAttendanceReportPdf({
+        institutionName,
+        title,
+        periodLabel: `${report.academicYear ? `${report.academicYear} · ` : ''}${report.from} to ${report.to}`,
+        generatedAt: report.generatedAt
+          ? new Date(report.generatedAt)
+          : new Date(),
+        summaryLines: [
+          `Working days ${report.summary.workingDays ?? '—'} · Scheduled ${report.summary.scheduledClasses ?? '—'} · Conducted ${report.summary.conductedClasses ?? report.summary.sessions ?? '—'} · Cancelled ${report.summary.cancelledClasses ?? 0}`,
+          report.calculation ?? '',
+        ].filter(Boolean),
+        columns: [
+          { key: 'rollNumber', label: 'Roll', width: 70 },
+          { key: 'fullName', label: 'Student', width: 180 },
+          { key: 'totalSessions', label: 'Conducted', width: 70 },
+          { key: 'attendedCount', label: 'Attended', width: 70 },
+          { key: 'absentCount', label: 'Absent', width: 60 },
+          { key: 'leaveCount', label: 'Leave', width: 55 },
+          { key: 'dutyCount', label: 'OD', width: 50 },
+          { key: 'percentage', label: '%', width: 55 },
+        ],
+        rows: report.rows,
+      });
+      return {
+        buffer,
+        filename: `${filenameBase}-${report.from}-to-${report.to}.pdf`,
+      };
+    }
+
     const built = await buildInstitutionalExcelReport({
       meta: {
-        reportTitle:
-          report.type === 'defaulters'
-            ? 'Attendance Defaulters'
-            : report.type === 'monthly'
-              ? 'Monthly Attendance Report'
-              : 'Cumulative Attendance Report',
+        institutionName,
+        reportTitle: title,
+        academicYear: report.academicYear ?? undefined,
+        generatedAt: report.generatedAt
+          ? new Date(report.generatedAt)
+          : new Date(),
         filterLines: [
           { label: 'From', value: report.from },
           { label: 'To', value: report.to },
           { label: 'Mode', value: report.attendanceMode },
+          ...(report.calculation
+            ? [{ label: 'Rule', value: report.calculation }]
+            : []),
         ],
         summary: report.summary,
       },
       sheets: [
-        {
-          name: 'Attendance',
-          columns,
-          rows: report.rows,
-        },
+        { name: 'Students', columns, rows: report.rows },
+        ...(report.subjectSummaries?.length
+          ? [
+              {
+                name: 'Subjects',
+                columns: summaryColumns,
+                rows: report.subjectSummaries,
+              },
+            ]
+          : []),
+        ...(report.classSummaries?.length
+          ? [
+              {
+                name: 'Classes',
+                columns: summaryColumns,
+                rows: report.classSummaries,
+              },
+            ]
+          : []),
       ],
       filenameBase,
     });

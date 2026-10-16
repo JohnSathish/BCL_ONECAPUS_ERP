@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import { AttendanceStatusButtonBar } from '@/components/student-attendance/attendance-status-buttons';
+import { OfficeAttendanceRegister } from '@/components/student-attendance/office-attendance-register';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,10 +44,13 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 export function FacultyAttendanceWorkspace({
   sessionId: fixedSessionId,
   onMarked,
+  layout = 'cards',
 }: {
   /** Office entry for one class. Hides the teacher's own class list. */
   sessionId?: string;
   onMarked?: () => void;
+  /** Register is the office roll table. Cards is the faculty class list. */
+  layout?: 'cards' | 'register';
 } = {}) {
   const qc = useQueryClient();
   const searchParams = useSearchParams();
@@ -57,6 +61,7 @@ export function FacultyAttendanceWorkspace({
   const [draft, setDraft] = useState<Record<string, DraftEntry>>({});
   const [message, setMessage] = useState('');
   const [saveStates, setSaveStates] = useState<Record<string, SaveState>>({});
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const policyQ = useQuery({
@@ -176,6 +181,7 @@ export function FacultyAttendanceWorkspace({
         return next;
       });
       setSaveStates((prev) => ({ ...prev, [studentId]: 'saved' }));
+      setLastSavedAt(new Date());
       window.setTimeout(() => {
         setSaveStates((prev) =>
           prev[studentId] === 'saved' ? { ...prev, [studentId]: 'idle' } : prev,
@@ -244,6 +250,7 @@ export function FacultyAttendanceWorkspace({
     },
     onSuccess: async () => {
       setMessage('Attendance saved successfully.');
+      setLastSavedAt(new Date());
       setDraft({});
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['student-attendance', 'faculty-today'] }),
@@ -309,6 +316,62 @@ export function FacultyAttendanceWorkspace({
     }
     return null;
   })();
+
+  if (layout === 'register') {
+    return (
+      <div className="space-y-4">
+        {roster.isError ? (
+          <QueryErrorPanel
+            title="Unable to load class roster"
+            error={roster.error}
+            onRetry={() => void roster.refetch()}
+            isRetrying={roster.isFetching}
+          />
+        ) : null}
+        {roster.isLoading ? <LoadingCard label="Loading class roster..." /> : null}
+        {roster.data ? (
+          <OfficeAttendanceRegister
+            session={roster.data.session}
+            students={students}
+            summary={summary}
+            isLocked={isLocked}
+            saving={bulkSaveMut.isPending}
+            message={message}
+            modeBanner={modeBanner}
+            lastSavedAt={lastSavedAt}
+            effectiveStatus={effectiveStatus}
+            effectiveRemarks={effectiveRemarks}
+            saveStateFor={(studentId) => saveStates[studentId] ?? 'idle'}
+            onStatusChange={(studentId, status) => {
+              const student = students.find((row) => row.id === studentId);
+              updateStudent(
+                studentId,
+                status,
+                student ? effectiveRemarks(student) || undefined : undefined,
+              );
+            }}
+            onRemarksChange={(studentId, remarks) => {
+              const student = students.find((row) => row.id === studentId);
+              updateRemarks(studentId, student ? effectiveStatus(student) : 'P', remarks);
+            }}
+            onMarkAllPresent={markAllPresent}
+            onMarkAllAbsent={markAllAbsent}
+            onReset={resetDraft}
+            onLock={() =>
+              bulkSaveMut.mutate({
+                entries: students.map((student) => ({
+                  studentId: student.id,
+                  status: effectiveStatus(student),
+                  remarks: effectiveRemarks(student) || undefined,
+                })),
+                lockAfterSave: true,
+              })
+            }
+          />
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
