@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { registrationLineCategoryWhere } from '../student-attendance/attendance-display.util';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import type {
   CreateTeachingSubjectGroupDto,
@@ -382,12 +383,19 @@ export class TeachingSubjectGroupService {
       }
     };
 
+    const rosterCategory = ['MAJOR', 'MINOR'].includes(
+      String(group.fyugpCategory ?? '').toUpperCase(),
+    )
+      ? String(group.fyugpCategory).toUpperCase()
+      : null;
+
     if (group.offeringSectionId) {
       addStudents(
         await this.studentsForSection(
           tenantId,
           group.offeringSectionId,
           semesterNo,
+          rosterCategory,
         ),
       );
     }
@@ -399,6 +407,7 @@ export class TeachingSubjectGroupService {
             tenantId,
             paper.offeringSectionId,
             semesterNo,
+            rosterCategory,
           ),
         );
       }
@@ -528,12 +537,14 @@ export class TeachingSubjectGroupService {
     tenantId: string,
     offeringSectionId: string,
     semesterNo?: number | null,
+    fyugpCategory?: string | null,
   ) {
     const lines = await this.prisma.semesterRegistrationLine.findMany({
       where: {
         tenantId,
         offeringSectionId,
         status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
+        ...registrationLineCategoryWhere(fyugpCategory),
         registration: {
           ...(semesterNo ? { semesterSequence: semesterNo } : {}),
         },

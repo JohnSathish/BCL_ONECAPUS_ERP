@@ -35,6 +35,21 @@ export function normalizeFyugpCategory(value?: string | null) {
     .replace(/\s+/g, '_');
 }
 
+/** Major and minor classes must not share one attendance list. */
+export function majorMinorCategory(
+  value?: string | null,
+): 'MAJOR' | 'MINOR' | null {
+  const category = normalizeFyugpCategory(value);
+  if (category === 'MAJOR' || category === 'MINOR') return category;
+  return null;
+}
+
+export function registrationLineCategoryWhere(value?: string | null) {
+  const category = majorMinorCategory(value);
+  if (!category) return {};
+  return { category: { equals: category, mode: 'insensitive' as const } };
+}
+
 export function resolveAttendanceDisplayTitle(input: {
   fyugpCategory?: string | null;
   departmentName?: string | null;

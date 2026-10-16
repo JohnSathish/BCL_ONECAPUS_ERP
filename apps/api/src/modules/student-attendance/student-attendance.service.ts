@@ -22,6 +22,8 @@ import { WorkingDayEngineService } from '../academic-calendar/working-day-engine
 import { buildInstitutionalExcelReport } from '../../common/reports';
 import {
   buildAttendanceHeaderMeta,
+  majorMinorCategory,
+  registrationLineCategoryWhere,
   resolveAttendanceDisplayTitle,
 } from './attendance-display.util';
 import {
@@ -480,8 +482,9 @@ export class StudentAttendanceService {
       deduped.map(async (session: any) => {
         const enriched = await this.enrichSession(session);
         let rosterSize: number | null = null;
+        const rosterCategory = this.sessionRosterCategory(session);
         if (session.teachingSubjectGroupId) {
-          const cacheKey = `g:${session.teachingSubjectGroupId}:${session.semesterNo ?? ''}`;
+          const cacheKey = `g:${session.teachingSubjectGroupId}:${session.semesterNo ?? ''}:${rosterCategory ?? ''}`;
           if (!rosterSizeCache.has(cacheKey)) {
             const students = await this.subjectGroups.studentsForGroup(
               user.tid,
@@ -492,24 +495,26 @@ export class StudentAttendanceService {
           }
           rosterSize = rosterSizeCache.get(cacheKey) ?? null;
         } else if (session.offeringSectionId) {
-          const cacheKey = `s:${session.offeringSectionId}:${session.semesterNo ?? ''}`;
+          const cacheKey = `s:${session.offeringSectionId}:${session.semesterNo ?? ''}:${rosterCategory ?? ''}`;
           if (!rosterSizeCache.has(cacheKey)) {
             const students = await this.studentsForSection(
               user.tid,
               session.offeringSectionId,
               session.semesterNo,
+              rosterCategory,
             );
             rosterSizeCache.set(cacheKey, students.length);
           }
           rosterSize = rosterSizeCache.get(cacheKey) ?? null;
         } else if (session.courseId) {
-          const cacheKey = `c:${session.courseId}:${session.semesterNo ?? ''}:${session.shiftId ?? ''}`;
+          const cacheKey = `c:${session.courseId}:${session.semesterNo ?? ''}:${session.shiftId ?? ''}:${rosterCategory ?? ''}`;
           if (!rosterSizeCache.has(cacheKey)) {
             const students = await this.studentsForCourse(
               user.tid,
               session.courseId,
               session.semesterNo,
               session.shiftId,
+              rosterCategory,
             );
             rosterSizeCache.set(cacheKey, students.length);
           }
@@ -531,6 +536,12 @@ export class StudentAttendanceService {
     const policy = await this.attendancePolicy.getOrCreate(tenantId);
     const defaultStatus = policy.defaultAttendanceStatus;
 
+    const rosterCategory =
+      this.sessionRosterCategory(session) ??
+      (await this.categoryFromTimetableEntry(
+        tenantId,
+        session.timetablePlanEntryId,
+      ));
     let students: any[] = [];
     if (session.teachingSubjectGroupId) {
       students = await this.subjectGroups.studentsForGroup(
@@ -544,6 +555,7 @@ export class StudentAttendanceService {
         tenantId,
         session.offeringSectionId,
         session.semesterNo,
+        rosterCategory,
       );
     }
     // Manual timetable slots often have courseId but no offeringSectionId.
@@ -553,6 +565,7 @@ export class StudentAttendanceService {
         session.courseId,
         session.semesterNo,
         session.shiftId,
+        rosterCategory,
       );
     }
 
@@ -1075,10 +1088,28 @@ export class StudentAttendanceService {
       );
   }
 
+  private sessionRosterCategory(session: { metadata?: unknown }) {
+    const meta = (session.metadata ?? {}) as { fyugpCategory?: string | null };
+    return majorMinorCategory(meta.fyugpCategory);
+  }
+
+  private async categoryFromTimetableEntry(
+    tenantId: string,
+    entryId?: string | null,
+  ) {
+    if (!entryId) return null;
+    const entry = await this.prisma.timetablePlanEntry.findFirst({
+      where: { tenantId, id: entryId, deletedAt: null },
+      select: { fyugpCategory: true },
+    });
+    return majorMinorCategory(entry?.fyugpCategory);
+  }
+
   private async studentsForSection(
     tenantId: string,
     offeringSectionId?: string | null,
     semesterNo?: number | null,
+    fyugpCategory?: string | null,
   ) {
     if (!offeringSectionId) return [];
     const lines = await this.prisma.semesterRegistrationLine.findMany({
@@ -1086,6 +1117,7 @@ export class StudentAttendanceService {
         tenantId,
         offeringSectionId,
         status: { in: ['approved', 'confirmed', 'registered', 'pending'] },
+        ...registrationLineCategoryWhere(fyugpCategory),
         registration: {
           ...(semesterNo ? { semesterSequence: semesterNo } : {}),
         },
@@ -1116,13 +1148,16 @@ export class StudentAttendanceService {
     courseId: string,
     semesterNo?: number | null,
     shiftId?: string | null,
+    fyugpCategory?: string | null,
   ) {
+    const categoryWhere = registrationLineCategoryWhere(fyugpCategory);
     const lines = await this.prisma.semesterRegistrationLine.findMany({
       where: {
         tenantId,
         status: {
           in: ['approved', 'confirmed', 'registered', 'pending', 'assigned'],
         },
+        ...categoryWhere,
         offering: {
           courseId,
           deletedAt: null,
@@ -1170,6 +1205,7 @@ export class StudentAttendanceService {
           status: {
             in: ['approved', 'confirmed', 'registered', 'pending', 'assigned'],
           },
+          ...categoryWhere,
           offering: { courseId, deletedAt: null },
           registration: { semesterSequence: semesterNo },
         },
