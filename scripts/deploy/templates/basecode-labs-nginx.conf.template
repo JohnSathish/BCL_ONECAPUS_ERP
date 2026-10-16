@@ -19,7 +19,6 @@ server {
 # ── HTTPS: www → apex ──
 server {
   listen 443 ssl;
-  http2 on;
   server_name www.basecodelabs.com;
 
   ssl_certificate     /etc/letsencrypt/live/basecodelabs.com/fullchain.pem;
@@ -34,7 +33,6 @@ server {
 # ── HTTPS: company site + Central ──
 server {
   listen 443 ssl;
-  http2 on;
   server_name basecodelabs.com;
 
   ssl_certificate     /etc/letsencrypt/live/basecodelabs.com/fullchain.pem;

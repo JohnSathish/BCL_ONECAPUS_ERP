@@ -170,8 +170,8 @@ python3 - <<'PY'
 from pathlib import Path
 path = Path("nginx/nginx.conf")
 text = path.read_text(encoding="utf-8")
-old = "  # ── HTTPS: ERP subdomains (portals + journals) ──\n  server {\n    listen 443 ssl;\n    http2 on;"
-new = "  # ── HTTPS: ERP subdomains (portals + journals) ──\n  server {\n    listen 443 ssl default_server;\n    http2 on;"
+old = "  # ── HTTPS: ERP subdomains (portals + journals) ──\n  server {\n    listen 443 ssl;"
+new = "  # ── HTTPS: ERP subdomains (portals + journals) ──\n  server {\n    listen 443 ssl default_server;"
 if old in text:
     path.write_text(text.replace(old, new, 1), encoding="utf-8")
     print("Patched ERP HTTPS block as default_server")

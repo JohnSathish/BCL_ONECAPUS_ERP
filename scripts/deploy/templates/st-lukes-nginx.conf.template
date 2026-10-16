@@ -21,7 +21,6 @@ server {
 # ── HTTPS: www → apex ──
 server {
   listen 443 ssl;
-  http2 on;
   server_name www.stlukestura.in;
 
   ssl_certificate     /etc/letsencrypt/live/stlukestura.in/fullchain.pem;
@@ -36,7 +35,6 @@ server {
 # ── HTTPS: public school website ──
 server {
   listen 443 ssl;
-  http2 on;
   server_name stlukestura.in;
 
   ssl_certificate     /etc/letsencrypt/live/stlukestura.in/fullchain.pem;
@@ -92,7 +90,6 @@ server {
 # ── HTTPS: school ERP / office ──
 server {
   listen 443 ssl;
-  http2 on;
   server_name erp.stlukestura.in;
 
   ssl_certificate     /etc/letsencrypt/live/stlukestura.in/fullchain.pem;
