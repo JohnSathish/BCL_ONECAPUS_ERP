@@ -71,7 +71,13 @@ fi
 ERP_NET="$(resolve_erp_net)"
 attach_college "${ERP_NET}"
 
-# Keep combined nginx if college is (or was) working — never switch to ERP-only mid-deploy.
+echo "Pulling latest code…"
+bash scripts/deploy/vps-pull.sh
+echo "Deploying commit: $(git log -1 --oneline)"
+
+# vps-pull.sh checks out the HTTP-only nginx.conf from git. Put the SSL
+# config back afterwards, or the recreated nginx only listens on port 80
+# while Docker still publishes 443.
 if [[ -f /etc/letsencrypt/live/erp.donboscocollege.ac.in/fullchain.pem ]] \
   && [[ -f /etc/letsencrypt/live/donboscocollege.ac.in/fullchain.pem ]] \
   && [[ -f nginx/nginx.combined-dbc.ssl.conf ]] \
@@ -83,16 +89,11 @@ if [[ -f /etc/letsencrypt/live/erp.donboscocollege.ac.in/fullchain.pem ]] \
     echo "WARN: college upstream weak — still keeping current nginx.conf to avoid flipping configs."
   fi
 elif [[ -f /etc/letsencrypt/live/erp.donboscocollege.ac.in/fullchain.pem ]]; then
-  # College not available: only then use ERP-only (does not break an already-working college).
   if [[ ! "$COLLEGE_BEFORE" =~ ^(200|301|302|303|307|308)$ ]]; then
     echo "College not healthy before deploy — using ERP-only nginx."
     cp nginx/nginx.ssl.conf nginx/nginx.conf
   fi
 fi
-
-echo "Pulling latest code…"
-bash scripts/deploy/vps-pull.sh
-echo "Deploying commit: $(git log -1 --oneline)"
 
 echo "Validating nginx config…"
 "${COMPOSE[@]}" run --rm --no-deps nginx nginx -t
