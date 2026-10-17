@@ -31,6 +31,7 @@ import {
 } from '@/services/student-attendance';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
+import { useShiftScope } from '@/hooks/use-shift-scope';
 import { institutionDateKey } from '@/lib/institution-date';
 
 export function AdminAttendanceControlCenter() {
@@ -39,35 +40,38 @@ export function AdminAttendanceControlCenter() {
   const [departmentId, setDepartmentId] = useState('');
   const [reportType, setReportType] = useState('unmarked');
   const [message, setMessage] = useState('');
+  const shiftScope = useShiftScope();
+  const shiftId = shiftScope.workspaceKind === 'institution' ? undefined : shiftScope.activeShiftId;
 
   const dashboard = useQuery({
     queryKey: ['student-attendance', 'dashboard'],
     queryFn: fetchStudentAttendanceDashboard,
   });
   const sessions = useQuery({
-    queryKey: ['student-attendance', 'sessions', date],
-    queryFn: () => fetchStudentAttendanceSessions({ date }),
+    queryKey: ['student-attendance', 'sessions', date, shiftId ?? 'all'],
+    queryFn: () => fetchStudentAttendanceSessions({ date, shiftId }),
   });
   const summaries = useQuery({
     queryKey: ['student-attendance', 'summaries'],
     queryFn: () => fetchStudentAttendanceSummaries(),
   });
   const report = useQuery({
-    queryKey: ['student-attendance', 'report', reportType, date],
+    queryKey: ['student-attendance', 'report', reportType, date, shiftId ?? 'all'],
     queryFn: () => {
       if (reportType === 'monthly') {
         const d = new Date(date);
         return fetchStudentAttendanceReport('monthly', {
           month: d.getMonth() + 1,
           year: d.getFullYear(),
+          shiftId,
         });
       }
       if (reportType === 'cumulative' || reportType === 'defaulters' || reportType === 'shortage') {
         const d = new Date(date);
         const from = `${d.getFullYear()}-01-01`;
-        return fetchStudentAttendanceReport(reportType, { from, to: date });
+        return fetchStudentAttendanceReport(reportType, { from, to: date, shiftId });
       }
-      return fetchStudentAttendanceReport(reportType, { date });
+      return fetchStudentAttendanceReport(reportType, { date, shiftId });
     },
   });
   const policyQ = useQuery({
@@ -80,7 +84,7 @@ export function AdminAttendanceControlCenter() {
   };
 
   const generateMut = useMutation({
-    mutationFn: () => generateStudentAttendanceSessions({ date }),
+    mutationFn: () => generateStudentAttendanceSessions({ date, shiftId }),
     onSuccess: async (result: {
       created?: number;
       removedDuplicates?: number;

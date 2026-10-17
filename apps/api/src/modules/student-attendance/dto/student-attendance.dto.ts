@@ -67,6 +67,10 @@ export class GenerateAttendanceSessionsDto {
   @IsOptional()
   @IsUUID()
   staffProfileId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  shiftId?: string;
 }
 
 export class AttendanceEntryDto {

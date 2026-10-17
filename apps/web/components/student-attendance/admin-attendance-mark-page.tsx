@@ -9,6 +9,7 @@ import { CalendarDays, Loader2 } from 'lucide-react';
 import { FacultyAttendanceWorkspace } from '@/components/student-attendance/faculty-attendance-workspace';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
+import { useShiftScope } from '@/hooks/use-shift-scope';
 import { institutionDateKey } from '@/lib/institution-date';
 import { fetchAcademicDepartments } from '@/services/organization';
 import {
@@ -28,14 +29,17 @@ export function AdminAttendanceMarkPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('session'));
   const [message, setMessage] = useState('');
+  const shiftScope = useShiftScope();
+  const shiftId = shiftScope.workspaceKind === 'institution' ? undefined : shiftScope.activeShiftId;
+  const shiftName = shiftScope.activeShiftName ?? 'this shift';
 
   const departments = useQuery({
     queryKey: ['org', 'departments', 'academic'],
     queryFn: () => fetchAcademicDepartments(),
   });
   const sessions = useQuery({
-    queryKey: ['student-attendance', 'sessions', date],
-    queryFn: () => fetchStudentAttendanceSessions({ date }),
+    queryKey: ['student-attendance', 'sessions', date, shiftId ?? 'all'],
+    queryFn: () => fetchStudentAttendanceSessions({ date, shiftId }),
   });
   const calendarDay = useQuery({
     queryKey: ['student-attendance', 'calendar-day', date],
@@ -44,7 +48,7 @@ export function AdminAttendanceMarkPage() {
   const dayClosed = Boolean(calendarDay.data && !calendarDay.data.markingAllowed);
 
   const generateMut = useMutation({
-    mutationFn: () => generateStudentAttendanceSessions({ date }),
+    mutationFn: () => generateStudentAttendanceSessions({ date, shiftId }),
     onSuccess: async (result: {
       created?: number;
       attendanceMode?: string;
@@ -300,7 +304,9 @@ export function AdminAttendanceMarkPage() {
         <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
           {(sessions.data ?? []).length
             ? 'No classes match this semester, department, period, or class type.'
-            : 'No classes for this date yet. Generate them from the published timetable.'}
+            : shiftId
+              ? `No ${shiftName} classes for this date yet. Generate them from the published ${shiftName} timetable.`
+              : 'No classes for this date yet. Generate them from the published timetable.'}
         </div>
       ) : null}
 

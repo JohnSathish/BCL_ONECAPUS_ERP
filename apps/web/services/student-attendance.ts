@@ -107,6 +107,7 @@ export async function generateStudentAttendanceSessions(payload: {
   date: string;
   timetablePlanId?: string;
   offeringSectionId?: string;
+  shiftId?: string;
 }) {
   const { data } = await api.post('/v1/student-attendance/sessions/generate', payload);
   return data;

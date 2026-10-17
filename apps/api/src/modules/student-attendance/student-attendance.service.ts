@@ -265,10 +265,16 @@ export class StudentAttendanceService {
         })
       : [];
     const seenEntryIds = new Set(templateEntries.map((entry) => entry.id));
-    const entries = [
+    const mergedEntries = [
       ...templateEntries,
       ...relocatedEntries.filter((entry) => !seenEntryIds.has(entry.id)),
     ];
+    const entries = dto.shiftId
+      ? mergedEntries.filter(
+          (entry) =>
+            (entry.shiftId ?? entry.plan?.shiftId ?? null) === dto.shiftId,
+        )
+      : mergedEntries;
 
     const hydratedEntries = await this.hydratePoolSlots(tenantId, entries);
     const realPoolKeys = new Set(
@@ -361,7 +367,7 @@ export class StudentAttendanceService {
           offeringSectionId: entry.offeringSectionId,
           courseId: entry.courseId,
           teachingSubjectGroupId: entry.teachingSubjectGroupId,
-          shiftId: entry.shiftId,
+          shiftId: entry.shiftId ?? entry.plan?.shiftId ?? null,
           classroomId: entry.classroomId,
           timetablePlanEntryId: entry.id,
           sessionDate,
@@ -382,6 +388,7 @@ export class StudentAttendanceService {
           semesterNo:
             entry.semesterSequence ?? entry.plan?.semesterSequence ?? null,
           periodNo: entry.periodNo,
+          shiftId: entry.shiftId ?? entry.plan?.shiftId ?? null,
           primaryFacultyId: entry.staffProfileId,
           metadata: sessionMeta,
         },
@@ -569,11 +576,10 @@ export class StudentAttendanceService {
       where.offeringSectionId = query.offeringSectionId;
     if (query.courseId) where.courseId = query.courseId;
     if (query.staffProfileId) where.primaryFacultyId = query.staffProfileId;
-    if (query.shiftId) where.shiftId = query.shiftId;
     if (query.semesterNo) where.semesterNo = query.semesterNo;
     if (query.status) where.status = query.status;
 
-    const sessions = await (
+    const loadedSessions = await (
       this.prisma as any
     ).studentAttendanceSession.findMany({
       where,
@@ -581,6 +587,9 @@ export class StudentAttendanceService {
       orderBy: [{ sessionDate: 'desc' }, { startTime: 'asc' }],
       take: 2000,
     });
+    const sessions = query.shiftId
+      ? await this.sessionsOnShift(tenantId, loadedSessions, query.shiftId)
+      : loadedSessions;
     const academicDepartments = await this.prisma.department.findMany({
       where: {
         tenantId,
@@ -864,6 +873,8 @@ export class StudentAttendanceService {
         tenantId,
         session.timetablePlanEntryId,
       ));
+    const shiftId = await this.resolveSessionShiftId(tenantId, session);
+    if (shiftId) session.shiftId = shiftId;
     let students: any[] = [];
     try {
       if (session.teachingSubjectGroupId) {
@@ -881,33 +892,22 @@ export class StudentAttendanceService {
           rosterCategory,
         );
       }
-      // Manual timetable slots often have courseId but no offeringSectionId.
+      // Manual timetable slots often have courseId but no offering section.
       if (!students.length && session.courseId) {
         students = await this.studentsForCourse(
           tenantId,
           session.courseId,
           session.semesterNo,
-          session.shiftId,
+          shiftId,
           rosterCategory,
         );
       }
-      if (!students.length && session.offeringSectionId) {
-        students = await this.studentsForSection(
-          tenantId,
-          session.offeringSectionId,
-          null,
-          null,
-        );
-      }
-      if (!students.length && session.courseId) {
-        students = await this.studentsForCourse(
-          tenantId,
-          session.courseId,
-          null,
-          null,
-          null,
-        );
-      }
+      students = await this.keepStudentsOnShift(
+        tenantId,
+        students,
+        shiftId,
+        session.semesterNo,
+      );
     } catch (err) {
       this.logger.error(
         { err, sessionId, tenantId },
@@ -1533,6 +1533,159 @@ export class StudentAttendanceService {
     return majorMinorCategory(entry?.fyugpCategory);
   }
 
+  private async resolveSessionShiftId(
+    tenantId: string,
+    session: {
+      shiftId?: string | null;
+      timetablePlanEntryId?: string | null;
+      offeringSectionId?: string | null;
+    },
+  ) {
+    if (session.shiftId) return session.shiftId;
+    if (session.timetablePlanEntryId) {
+      const entry = await this.prisma.timetablePlanEntry.findFirst({
+        where: { tenantId, id: session.timetablePlanEntryId },
+        select: { shiftId: true, plan: { select: { shiftId: true } } },
+      });
+      const planShift = entry?.shiftId ?? entry?.plan?.shiftId ?? null;
+      if (planShift) return planShift;
+    }
+    if (session.offeringSectionId) {
+      const section = await this.prisma.offeringSection.findFirst({
+        where: { tenantId, id: session.offeringSectionId },
+        select: { shiftId: true },
+      });
+      if (section?.shiftId) return section.shiftId;
+    }
+    return null;
+  }
+
+  private async sessionsOnShift(
+    tenantId: string,
+    sessions: any[],
+    shiftId: string,
+  ) {
+    const entryIds = [
+      ...new Set(
+        sessions
+          .map((session) => session.timetablePlanEntryId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const sectionIds = [
+      ...new Set(
+        sessions
+          .map((session) => session.offeringSectionId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const [entries, sections] = await Promise.all([
+      entryIds.length
+        ? this.prisma.timetablePlanEntry.findMany({
+            where: { tenantId, id: { in: entryIds } },
+            select: {
+              id: true,
+              shiftId: true,
+              plan: { select: { shiftId: true } },
+            },
+          })
+        : [],
+      sectionIds.length
+        ? this.prisma.offeringSection.findMany({
+            where: { tenantId, id: { in: sectionIds } },
+            select: { id: true, shiftId: true },
+          })
+        : [],
+    ]);
+    const entryShift = new Map(
+      entries.map((entry) => [
+        entry.id,
+        entry.shiftId ?? entry.plan?.shiftId ?? null,
+      ]),
+    );
+    const sectionShift = new Map(
+      sections.map((section) => [section.id, section.shiftId]),
+    );
+    return sessions.filter((session) => {
+      const resolved =
+        session.shiftId ??
+        entryShift.get(session.timetablePlanEntryId) ??
+        sectionShift.get(session.offeringSectionId) ??
+        null;
+      if (resolved) session.shiftId = resolved;
+      return resolved === shiftId;
+    });
+  }
+
+  private async keepStudentsOnShift(
+    tenantId: string,
+    students: any[],
+    shiftId: string | null,
+    semesterNo?: number | null,
+  ) {
+    if (!shiftId || !students.length) return students;
+    const ids = students
+      .map((student) => student?.id)
+      .filter((id): id is string => Boolean(id));
+    if (!ids.length) return students;
+    const [profiles, registrations, sectionLines] = await Promise.all([
+      this.prisma.student.findMany({
+        where: { tenantId, id: { in: ids } },
+        select: { id: true, primaryShiftId: true },
+      }),
+      this.prisma.semesterRegistration.findMany({
+        where: {
+          tenantId,
+          studentId: { in: ids },
+          ...(semesterNo != null ? { semesterSequence: semesterNo } : {}),
+        },
+        select: { studentId: true, shiftId: true },
+      }),
+      this.prisma.semesterRegistrationLine.findMany({
+        where: {
+          tenantId,
+          offeringSectionId: { not: null },
+          registration: {
+            studentId: { in: ids },
+            ...(semesterNo != null ? { semesterSequence: semesterNo } : {}),
+          },
+        },
+        select: {
+          registration: { select: { studentId: true } },
+          offeringSection: { select: { shiftId: true } },
+        },
+      }),
+    ]);
+    const primaryShift = new Map(
+      profiles.map((row) => [row.id, row.primaryShiftId]),
+    );
+    const registrationShift = new Map<string, string | null>();
+    for (const row of registrations) {
+      const current = registrationShift.get(row.studentId);
+      if (current == null || row.shiftId) {
+        registrationShift.set(row.studentId, row.shiftId);
+      }
+    }
+    const sectionShifts = new Map<string, Set<string>>();
+    for (const line of sectionLines) {
+      const studentId = line.registration?.studentId;
+      const lineShift = line.offeringSection?.shiftId;
+      if (!studentId || !lineShift) continue;
+      const set = sectionShifts.get(studentId) ?? new Set<string>();
+      set.add(lineShift);
+      sectionShifts.set(studentId, set);
+    }
+    return students.filter((student) => {
+      const studentShift = primaryShift.get(student.id) ?? null;
+      const registeredShift = registrationShift.get(student.id) ?? null;
+      const sections = sectionShifts.get(student.id);
+      if (studentShift && studentShift !== shiftId) return false;
+      if (registeredShift && registeredShift !== shiftId) return false;
+      if (sections?.size && !sections.has(shiftId)) return false;
+      return true;
+    });
+  }
+
   private async studentsForSection(
     tenantId: string,
     offeringSectionId?: string | null,
@@ -1635,36 +1788,6 @@ export class StudentAttendanceService {
       const student = line.registration?.student;
       if (student?.id) byId.set(student.id, student);
     }
-    if (byId.size) return [...byId.values()];
-
-    // Fallback: students with Sem progress / standing in this semester who
-    // have the course in any registration line (ignore shift mismatch).
-    if (semesterNo != null && shiftId) {
-      const loose = await this.prisma.semesterRegistrationLine.findMany({
-        where: {
-          tenantId,
-          status: {
-            in: ['approved', 'confirmed', 'registered', 'pending', 'assigned'],
-          },
-          ...categoryWhere,
-          offering: { courseId, deletedAt: null },
-          registration: { semesterSequence: semesterNo },
-        },
-        include: {
-          registration: {
-            include: {
-              student: { select: rosterStudentSelect },
-            },
-          },
-        },
-        take: 500,
-      });
-      for (const line of loose) {
-        const student = line.registration?.student;
-        if (student?.id) byId.set(student.id, student);
-      }
-    }
-
     if (!byId.size && majorMinorCategory(fyugpCategory)) {
       const categorized = await this.prisma.semesterRegistrationLine.findFirst({
         where: {
