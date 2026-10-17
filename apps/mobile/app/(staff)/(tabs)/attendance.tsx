@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FacultyScreenShell } from '@/components/faculty-portal/faculty-screen-shell';
 import { facultyTheme } from '@/components/faculty-portal/theme';
 import {
@@ -64,6 +64,8 @@ const MARK_STATE_STYLES: Record<
 
 export default function FacultyAttendanceScreen() {
   const router = useRouter();
+  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
+  const filterDate = typeof dateParam === 'string' ? dateParam.slice(0, 10) : '';
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sessions, setSessions] = useState<FacultyAttendanceSession[]>([]);
@@ -89,6 +91,9 @@ export default function FacultyAttendanceScreen() {
   const pending = sessions.filter((s) => getAttendanceMarkState(s) === 'pending').length;
   const marked = sessions.filter((s) => getAttendanceMarkState(s) === 'marked').length;
   const locked = sessions.filter((s) => getAttendanceMarkState(s) === 'locked').length;
+  const visibleSessions = filterDate
+    ? sessions.filter((session) => session.sessionDate?.slice(0, 10) === filterDate)
+    : sessions;
 
   return (
     <FacultyScreenShell title="Attendance" subtitle="Mark & review class attendance">
@@ -128,13 +133,14 @@ export default function FacultyAttendanceScreen() {
 
         {loading ? (
           <ActivityIndicator color={facultyTheme.primaryLight} style={{ marginTop: 24 }} />
-        ) : sessions.length === 0 ? (
+        ) : visibleSessions.length === 0 ? (
           <Text style={styles.empty}>
-            No classes to mark. Holiday dates stay closed. Pending classes from earlier working days
-            are listed here.
+            {filterDate
+              ? 'No classes to mark on this date.'
+              : 'No classes to mark. Holiday dates stay closed. Pending classes from earlier working days are listed here.'}
           </Text>
         ) : (
-          sessions.map((session) => {
+          visibleSessions.map((session) => {
             const markState = getAttendanceMarkState(session);
             const palette = MARK_STATE_STYLES[markState];
             const countsLine = sessionCountsLine(session);
@@ -170,7 +176,16 @@ export default function FacultyAttendanceScreen() {
                 </View>
 
                 <Text style={styles.title}>{sessionDisplayTitle(session)}</Text>
+                {session.semesterNo != null ? (
+                  <Text style={styles.semester}>Semester {session.semesterNo}</Text>
+                ) : null}
+                {session.academicYear?.name ? (
+                  <Text style={styles.year}>{session.academicYear.name}</Text>
+                ) : null}
                 <Text style={styles.meta}>{sessionDisplaySubtitle(session)}</Text>
+                {session.timetableWarning ? (
+                  <Text style={styles.warning}>{session.timetableWarning}</Text>
+                ) : null}
 
                 {countsLine ? <Text style={styles.counts}>{countsLine}</Text> : null}
 
@@ -255,8 +270,11 @@ const styles = StyleSheet.create({
   time: { fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight },
   timeBlock: { flex: 1, gap: 2 },
   title: { fontSize: 15, fontWeight: '800', color: facultyTheme.text },
+  semester: { fontSize: 13, fontWeight: '800', color: '#1D4ED8' },
+  year: { fontSize: 12, fontWeight: '600', color: facultyTheme.textMuted },
   date: { fontSize: 13, fontWeight: '800', color: '#92400E' },
   meta: { fontSize: 12, color: facultyTheme.textMuted },
+  warning: { fontSize: 12, color: '#9A3412', marginTop: 2 },
   counts: { fontSize: 11, color: facultyTheme.textMuted, marginTop: 2 },
   action: { fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight, marginTop: 6 },
   actionMarked: { color: '#047857' },

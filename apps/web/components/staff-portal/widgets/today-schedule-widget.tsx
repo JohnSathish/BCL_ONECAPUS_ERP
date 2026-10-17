@@ -126,9 +126,13 @@ export function TodayScheduleWidget({
                           </p>
                         ) : null}
                       </div>
-                      {slot.offeringSectionId ? (
+                      {slot.attendanceSessionId || slot.offeringSectionId ? (
                         <Link
-                          href={`/staff/academic/attendance-entry?section=${slot.offeringSectionId}`}
+                          href={
+                            slot.attendanceSessionId
+                              ? `/staff/academic/attendance-entry?sessionId=${slot.attendanceSessionId}`
+                              : `/staff/academic/attendance-entry?section=${slot.offeringSectionId}`
+                          }
                           className={cn(
                             buttonVariants({ size: 'sm' }),
                             'shrink-0 rounded-xl text-xs',

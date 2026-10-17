@@ -48,11 +48,13 @@ export function sessionDisplayTitle(session: FacultyAttendanceSession) {
 }
 
 export function sessionDisplaySubtitle(session: FacultyAttendanceSession) {
-  const paper = session.paperCourse?.code;
+  const semester = session.semesterNo != null ? `Semester ${session.semesterNo}` : null;
+  const department = session.department?.name;
+  const paper = session.subjectCode ?? session.paperCourse?.code ?? session.subjectGroup?.code;
   const period = session.periodNo != null ? `Period ${session.periodNo}` : null;
   const section = session.section?.sectionCode ? `Section ${session.section.sectionCode}` : null;
   const room = formatSessionRoom(session);
-  return [paper, period, section, room].filter(Boolean).join(' · ');
+  return [semester, department, paper, period, section, room].filter(Boolean).join(' · ');
 }
 
 export function sessionCountsLine(session: FacultyAttendanceSession) {

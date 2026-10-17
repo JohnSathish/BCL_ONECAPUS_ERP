@@ -97,7 +97,7 @@ export function FacultyAttendanceWorkspace({
     }
   }, [sessions.data, sessionParam, sectionParam, fixedSessionId]);
 
-  const selected = fixedSessionId ?? selectedId ?? sessions.data?.[0]?.id ?? null;
+  const selected = fixedSessionId ?? selectedId ?? sessionParam ?? sessions.data?.[0]?.id ?? null;
   const roster = useQuery({
     queryKey: ['student-attendance', 'roster', selected],
     queryFn: () => fetchStudentAttendanceRoster(selected as string),
@@ -458,11 +458,40 @@ export function FacultyAttendanceWorkspace({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="text-lg font-semibold">
-                      {roster.data.session.displayTitle ??
+                      {roster.data.session.subjectTitle ??
+                        roster.data.session.displayTitle ??
                         roster.data.session.subjectGroup?.title ??
                         roster.data.session.course?.title ??
                         'Class roster'}
                     </h2>
+                    <p className="mt-1 text-sm font-semibold text-sky-800">
+                      {[
+                        roster.data.session.academicYear?.name,
+                        roster.data.session.semesterNo != null
+                          ? `Semester ${roster.data.session.semesterNo}`
+                          : null,
+                        roster.data.session.department?.name,
+                        roster.data.session.subjectCode ??
+                          roster.data.session.paperCourse?.code ??
+                          roster.data.session.course?.code,
+                        roster.data.session.section?.sectionCode
+                          ? `Section ${roster.data.session.section.sectionCode}`
+                          : null,
+                        roster.data.session.sessionDate
+                          ? roster.data.session.sessionDate.slice(0, 10)
+                          : null,
+                        roster.data.session.periodNo != null
+                          ? `Period ${roster.data.session.periodNo}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                    {roster.data.session.timetableWarning ? (
+                      <p className="mt-1 text-xs font-medium text-amber-800">
+                        {roster.data.session.timetableWarning}
+                      </p>
+                    ) : null}
                     <p className="text-xs text-muted-foreground">
                       {roster.data.session.displayHeader?.subtitle
                         ? `${roster.data.session.displayHeader.subtitle}${

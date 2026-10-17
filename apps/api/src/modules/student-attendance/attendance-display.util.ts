@@ -121,7 +121,7 @@ export function buildAttendanceHeaderMeta(input: {
 }) {
   const lines: string[] = [input.displayTitle];
   const semester =
-    input.semesterNo != null ? `Semester ${toRoman(input.semesterNo)}` : null;
+    input.semesterNo != null ? `Semester ${input.semesterNo}` : null;
   const section = input.sectionCode ? `Section ${input.sectionCode}` : null;
   const period =
     input.periodNo != null && input.periodNo > 0
@@ -140,23 +140,4 @@ export function buildAttendanceHeaderMeta(input: {
       [period, type, room].filter(Boolean).join(' · '),
     ].filter(Boolean),
   };
-}
-
-function toRoman(n: number) {
-  const map: Array<[number, string]> = [
-    [10, 'X'],
-    [9, 'IX'],
-    [5, 'V'],
-    [4, 'IV'],
-    [1, 'I'],
-  ];
-  let value = Math.max(1, Math.floor(n));
-  let out = '';
-  for (const [num, roman] of map) {
-    while (value >= num) {
-      out += roman;
-      value -= num;
-    }
-  }
-  return out || String(n);
 }

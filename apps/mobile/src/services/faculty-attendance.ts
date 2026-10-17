@@ -13,6 +13,11 @@ export type FacultyAttendanceSession = {
   subjectGroup?: { code?: string; title?: string };
   displayTitle?: string;
   subjectTitle?: string;
+  semesterNo?: number | null;
+  subjectCode?: string | null;
+  department?: { id?: string; name?: string } | null;
+  academicYear?: { id?: string; name?: string } | null;
+  timetableWarning?: string | null;
   displayHeader?: { title?: string; subtitle?: string; details?: string };
   section?: { sectionCode?: string };
   location?: { roomCode?: string; roomName?: string; campus?: string };

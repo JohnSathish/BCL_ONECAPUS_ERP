@@ -28,10 +28,18 @@ const STATUS_CYCLE = ['P', 'A', 'L'] as const;
 export default function MarkAttendanceScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { sessionId, date, semester, subject, section } = useLocalSearchParams<{
+    sessionId: string;
+    date?: string;
+    semester?: string;
+    subject?: string;
+    section?: string;
+  }>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [sessionTitle, setSessionTitle] = useState('Class');
+  const [sessionTitle, setSessionTitle] = useState(subject || 'Class');
+  const [contextLines, setContextLines] = useState<string[]>([]);
+  const [warning, setWarning] = useState<string | null>(null);
   const [students, setStudents] = useState<AttendanceRosterStudent[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [lastScanNote, setLastScanNote] = useState<string | null>(null);
@@ -43,9 +51,30 @@ export default function MarkAttendanceScreen() {
     setLoading(true);
     try {
       const roster = await fetchAttendanceRoster(sessionId);
-      const course = roster.session.course?.title ?? roster.session.course?.code ?? 'Class';
-      const section = roster.session.section?.sectionCode;
-      setSessionTitle(section ? `${course} · ${section}` : course);
+      const session = roster.session;
+      const course =
+        session.subjectTitle ?? session.course?.title ?? subject ?? session.course?.code ?? 'Class';
+      const sectionCode = session.section?.sectionCode ?? section;
+      setSessionTitle(sectionCode ? `${course} · Section ${sectionCode}` : course);
+      const lines = [
+        session.academicYear?.name,
+        session.semesterNo != null
+          ? `Semester ${session.semesterNo}`
+          : semester
+            ? `Semester ${semester}`
+            : null,
+        session.department?.name,
+        session.subjectCode ?? session.paperCourse?.code ?? session.subjectGroup?.code,
+        session.sessionDate
+          ? `Date ${session.sessionDate.slice(0, 10)}`
+          : date
+            ? `Date ${date}`
+            : null,
+        session.periodNo != null ? `Period ${session.periodNo}` : null,
+        sectionCode ? `Section ${sectionCode}` : null,
+      ].filter((line): line is string => Boolean(line));
+      setContextLines(lines);
+      setWarning(session.timetableWarning ?? null);
       setStudents(
         roster.students.map((s) => ({
           ...s,
@@ -58,7 +87,7 @@ export default function MarkAttendanceScreen() {
     } finally {
       setLoading(false);
     }
-  }, [router, sessionId]);
+  }, [date, router, section, semester, sessionId, subject]);
 
   useEffect(() => {
     void load();
@@ -125,6 +154,16 @@ export default function MarkAttendanceScreen() {
 
   return (
     <FacultyScreenShell title="Take Attendance" subtitle={sessionTitle}>
+      {contextLines.length ? (
+        <View style={styles.context}>
+          <Text style={styles.contextText}>{contextLines.join(' · ')}</Text>
+        </View>
+      ) : null}
+      {warning ? (
+        <View style={styles.warningBox}>
+          <Text style={styles.warningText}>{warning}</Text>
+        </View>
+      ) : null}
       <View style={styles.toolbar}>
         <View style={styles.toolRow}>
           <Pressable style={styles.toolBtn} onPress={markAllPresent}>
@@ -195,6 +234,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: facultyTheme.background,
   },
+  context: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  contextText: { fontSize: 13, fontWeight: '700', color: '#1E3A8A' },
+  warningBox: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  warningText: { fontSize: 12, color: '#9A3412' },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',

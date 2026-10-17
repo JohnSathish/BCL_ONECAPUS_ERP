@@ -256,13 +256,27 @@ export default function FacultyHomeScreen() {
                 <Pressable
                   style={styles.classAction}
                   onPress={() => {
-                    const sessionId =
-                      cls.attendanceSessionId || (showPending || isBacklog ? cls.id : null);
+                    const sessionId = cls.attendanceSessionId || null;
                     if (sessionId) {
-                      router.push(`/(staff)/mark-attendance/${sessionId}` as never);
+                      router.push({
+                        pathname: '/(staff)/mark-attendance/[sessionId]',
+                        params: {
+                          sessionId,
+                          date: cls.classDate ?? '',
+                          semester: cls.semesterNo != null ? String(cls.semesterNo) : '',
+                          subject: cls.subject,
+                          section: cls.sectionCode ?? '',
+                        },
+                      } as never);
                       return;
                     }
-                    router.push('/(staff)/(tabs)/attendance' as never);
+                    router.push({
+                      pathname: '/(staff)/(tabs)/attendance',
+                      params: {
+                        date: cls.classDate ?? '',
+                        subject: cls.subject,
+                      },
+                    } as never);
                   }}
                 >
                   <Text style={styles.classActionText}>

@@ -830,16 +830,18 @@ export class StudentAttendanceService {
         const dateLabel = this.attendanceDateLabel(dateKey);
         const subjectTitle =
           enriched.displayTitle ?? enriched.course?.title ?? 'Class';
+        const semesterLabel =
+          enriched.semesterNo != null ? `Semester ${enriched.semesterNo}` : '';
         return {
           ...enriched,
           rosterSize,
           sessionDate: dateKey,
           subjectTitle,
-          // Installed phone builds read displayTitle only, so the pending
-          // date has to live in that line until the next app update.
-          displayTitle: dateLabel
-            ? `${dateLabel} · ${subjectTitle}`
-            : subjectTitle,
+          // Installed phone builds read displayTitle only, so the date and
+          // semester have to live in that line until the next app update.
+          displayTitle: [dateLabel, semesterLabel, subjectTitle]
+            .filter(Boolean)
+            .join(' · '),
         };
       }),
     );
@@ -1966,7 +1968,18 @@ export class StudentAttendanceService {
         ? this.prisma.timetablePlanEntry.findFirst({
             where: { id: session.timetablePlanEntryId },
             select: {
-              plan: { select: { id: true, name: true, status: true } },
+              semesterSequence: true,
+              staffProfileId: true,
+              courseId: true,
+              teachingSubjectGroupId: true,
+              plan: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                  academicYearId: true,
+                },
+              },
             },
           })
         : null,
@@ -1991,6 +2004,37 @@ export class StudentAttendanceService {
       section?.courseOffering?.semesterSequence ??
       session.semesterNo ??
       null;
+    const academicYear = planEntry?.plan?.academicYearId
+      ? await this.prisma.academicYear.findFirst({
+          where: { id: planEntry.plan.academicYearId, deletedAt: null },
+          select: { id: true, name: true },
+        })
+      : null;
+    const timetableWarnings: string[] = [];
+    if (!session.timetablePlanEntryId) {
+      timetableWarnings.push('This class is not linked to a timetable period.');
+    }
+    if (semesterNo == null) {
+      timetableWarnings.push('Semester is not set for this class.');
+    }
+    if (
+      planEntry?.semesterSequence != null &&
+      semesterNo != null &&
+      planEntry.semesterSequence !== semesterNo
+    ) {
+      timetableWarnings.push(
+        `The timetable slot is semester ${planEntry.semesterSequence}. This class uses semester ${semesterNo} from the subject group.`,
+      );
+    }
+    if (
+      planEntry?.staffProfileId &&
+      session.primaryFacultyId &&
+      planEntry.staffProfileId !== session.primaryFacultyId
+    ) {
+      timetableWarnings.push(
+        'The timetable faculty for this period does not match this attendance class.',
+      );
+    }
     const displayHeader = buildAttendanceHeaderMeta({
       displayTitle,
       semesterNo,
@@ -2035,6 +2079,11 @@ export class StudentAttendanceService {
         course?.department ??
         this.departmentFromPaperCode(departments, course?.code) ??
         null,
+      academicYear,
+      subjectCode: course?.code ?? subjectGroup?.code ?? null,
+      timetableWarning: timetableWarnings.length
+        ? timetableWarnings.join(' ')
+        : null,
       timetableLinked: Boolean(session.timetablePlanEntryId),
       timetablePlanName,
       collectionUnit:

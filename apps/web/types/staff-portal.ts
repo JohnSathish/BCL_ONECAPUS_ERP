@@ -124,6 +124,7 @@ export type StaffTimetableSlot = {
   classDateLabel?: string;
   isToday?: boolean;
   attendancePending?: boolean;
+  attendanceSessionId?: string | null;
 };
 
 export type StaffSubjectCard = {

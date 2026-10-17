@@ -7,6 +7,9 @@ export type StudentAttendanceSession = {
   endTime?: string | null;
   periodNo?: number | null;
   semesterNo?: number | null;
+  subjectCode?: string | null;
+  academicYear?: { id?: string; name?: string } | null;
+  timetableWarning?: string | null;
   sessionType: string;
   labBatch?: string | null;
   status: string;
