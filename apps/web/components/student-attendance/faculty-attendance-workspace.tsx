@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 
+import { compareAttendanceRoll } from '@/components/student-attendance/attendance-roll-order';
 import { AttendanceStatusButtonBar } from '@/components/student-attendance/attendance-status-buttons';
 import { OfficeAttendanceRegister } from '@/components/student-attendance/office-attendance-register';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
@@ -107,17 +108,19 @@ export function FacultyAttendanceWorkspace({
 
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return students.filter((student) => {
-      if (!needle) return true;
-      return [
-        student.fullName,
-        student.rollNumber,
-        student.enrollmentNumber,
-        student.admissionNumber,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle));
-    });
+    return students
+      .filter((student) => {
+        if (!needle) return true;
+        return [
+          student.fullName,
+          student.rollNumber,
+          student.enrollmentNumber,
+          student.admissionNumber,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(needle));
+      })
+      .sort(compareAttendanceRoll);
   }, [students, search]);
 
   const summary = useMemo(() => summarizeAttendanceStatuses(students, draft), [students, draft]);

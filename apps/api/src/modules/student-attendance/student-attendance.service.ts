@@ -28,6 +28,7 @@ import {
   resolveAttendanceDisplayTitle,
   rosterStudentSelect,
 } from './attendance-display.util';
+import { compareAttendanceRoll } from './attendance-roll-order.util';
 import {
   dateKeyToUtcMidnight,
   getZonedDateKey,
@@ -903,7 +904,8 @@ export class StudentAttendanceService {
             student.enrollmentNumber,
           status: entryByStudent.get(student.id)?.status ?? defaultStatus,
           remarks: entryByStudent.get(student.id)?.remarks ?? '',
-        })),
+        }))
+        .sort(compareAttendanceRoll),
     };
   }
 

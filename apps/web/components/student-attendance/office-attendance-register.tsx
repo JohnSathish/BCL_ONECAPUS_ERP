@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { BookOpen, CheckCircle2, Loader2, Lock, RotateCcw, Search, UserX } from 'lucide-react';
 
+import { compareAttendanceRoll } from '@/components/student-attendance/attendance-roll-order';
 import { AttendanceStatusButtonBar } from '@/components/student-attendance/attendance-status-buttons';
 import {
   ATTENDANCE_STATUS_MAP,
@@ -82,28 +83,30 @@ export function OfficeAttendanceRegister({
 
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return students.filter((student) => {
-      const status = effectiveStatus(student);
-      const group = ATTENDANCE_STATUS_MAP[status as keyof typeof ATTENDANCE_STATUS_MAP]?.group;
-      if (statusFilter === 'other') {
-        if (group !== 'other') return false;
-      } else if (statusFilter === 'L') {
-        if (group !== 'leave') return false;
-      } else if (statusFilter === 'OD') {
-        if (group !== 'od') return false;
-      } else if (statusFilter !== 'all' && status !== statusFilter) {
-        return false;
-      }
-      if (!needle) return true;
-      return [
-        student.fullName,
-        student.rollNumber,
-        student.enrollmentNumber,
-        student.admissionNumber,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle));
-    });
+    return students
+      .filter((student) => {
+        const status = effectiveStatus(student);
+        const group = ATTENDANCE_STATUS_MAP[status as keyof typeof ATTENDANCE_STATUS_MAP]?.group;
+        if (statusFilter === 'other') {
+          if (group !== 'other') return false;
+        } else if (statusFilter === 'L') {
+          if (group !== 'leave') return false;
+        } else if (statusFilter === 'OD') {
+          if (group !== 'od') return false;
+        } else if (statusFilter !== 'all' && status !== statusFilter) {
+          return false;
+        }
+        if (!needle) return true;
+        return [
+          student.fullName,
+          student.rollNumber,
+          student.enrollmentNumber,
+          student.admissionNumber,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(needle));
+      })
+      .sort(compareAttendanceRoll);
   }, [effectiveStatus, search, statusFilter, students]);
 
   return (
