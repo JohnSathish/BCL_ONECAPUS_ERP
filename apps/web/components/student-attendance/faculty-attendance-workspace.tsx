@@ -708,6 +708,9 @@ function SessionCard({
           {label.dateLabel ? (
             <p className="text-xs font-semibold text-amber-800">{label.dateLabel}</p>
           ) : null}
+          {session.semesterNo != null ? (
+            <p className="text-xs font-semibold text-sky-800">Semester {session.semesterNo}</p>
+          ) : null}
           <p className="truncate text-[11px] font-medium text-primary">
             {label.paperCode ? `${label.paperCode} · ` : ''}
             Period {session.periodNo ?? '—'}
