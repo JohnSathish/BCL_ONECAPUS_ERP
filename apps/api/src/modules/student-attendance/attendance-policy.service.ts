@@ -50,6 +50,7 @@ export type CountableTimetableEntry = {
   shiftId?: string | null;
   offeringSectionId?: string | null;
   sectionCode?: string | null;
+  semesterSequence?: number | null;
   startTime?: Date | string | null;
   isBreak?: boolean;
   slotType?: string | null;
@@ -251,11 +252,17 @@ export class AttendancePolicyService {
   cohortKey(entry: CountableTimetableEntry) {
     const planId = entry.planId ?? 'no-plan';
     const shiftId = entry.shiftId ?? 'no-shift';
+    const semester =
+      entry.semesterSequence != null
+        ? String(entry.semesterSequence)
+        : 'no-sem';
+    // Section letter "A" is reused by semester 1, 3, and 5. The offering
+    // section is the real class; the semester keeps those rolls apart.
     const section =
-      (entry.sectionCode && String(entry.sectionCode).trim()) ||
       entry.offeringSectionId ||
+      (entry.sectionCode && String(entry.sectionCode).trim()) ||
       'no-section';
-    return `${planId}|${shiftId}|${section}`;
+    return `${planId}|${shiftId}|${semester}|${section}`;
   }
 
   /**

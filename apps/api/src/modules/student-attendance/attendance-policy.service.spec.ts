@@ -129,6 +129,47 @@ describe('AttendancePolicyService collection modes', () => {
     expect(resolved.map((r) => r.entry.id).sort()).toEqual(['b-first', 'e1']);
   });
 
+  it('ONCE_PER_DAY keeps semester 1, 3, and 5 even when each is section A', () => {
+    const s = service();
+    const resolved = s.resolveCountableEntries('ONCE_PER_DAY', [
+      {
+        id: 'sem1',
+        periodNo: 1,
+        planId: 'plan-pol',
+        shiftId: 'shift-day',
+        sectionCode: 'A',
+        offeringSectionId: 'sec-sem1',
+        semesterSequence: 1,
+        startTime: '09:00',
+      },
+      {
+        id: 'sem3',
+        periodNo: 1,
+        planId: 'plan-pol',
+        shiftId: 'shift-day',
+        sectionCode: 'A',
+        offeringSectionId: 'sec-sem3',
+        semesterSequence: 3,
+        startTime: '09:00',
+      },
+      {
+        id: 'sem5',
+        periodNo: 2,
+        planId: 'plan-pol',
+        shiftId: 'shift-day',
+        sectionCode: 'A',
+        offeringSectionId: 'sec-sem5',
+        semesterSequence: 5,
+        startTime: '09:45',
+      },
+    ]);
+    expect(resolved.map((row) => row.entry.id).sort()).toEqual([
+      'sem1',
+      'sem3',
+      'sem5',
+    ]);
+  });
+
   it('MORNING_AFTERNOON picks earliest AM and PM around lunch gap', () => {
     const s = service();
     const resolved = s.resolveCountableEntries('MORNING_AFTERNOON', entries);

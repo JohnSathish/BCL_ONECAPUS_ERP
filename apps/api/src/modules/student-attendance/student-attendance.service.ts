@@ -349,7 +349,8 @@ export class StudentAttendanceService {
           tenantId,
           academicYearId: entry.plan?.academicYearId,
           semesterId: entry.plan?.semesterId,
-          semesterNo: entry.semesterSequence,
+          semesterNo:
+            entry.semesterSequence ?? entry.plan?.semesterSequence ?? null,
           programVersionId: entry.plan?.programVersionId,
           offeringSectionId: entry.offeringSectionId,
           courseId: entry.courseId,
@@ -372,6 +373,8 @@ export class StudentAttendanceService {
         update: {
           teachingSubjectGroupId: entry.teachingSubjectGroupId,
           courseId: entry.courseId,
+          semesterNo:
+            entry.semesterSequence ?? entry.plan?.semesterSequence ?? null,
           periodNo: entry.periodNo,
           primaryFacultyId: entry.staffProfileId,
           metadata: sessionMeta,
@@ -561,7 +564,7 @@ export class StudentAttendanceService {
       where,
       include: { entries: true },
       orderBy: [{ sessionDate: 'desc' }, { startTime: 'asc' }],
-      take: 200,
+      take: 2000,
     });
     const academicDepartments = await this.prisma.department.findMany({
       where: {
@@ -1897,6 +1900,7 @@ export class StudentAttendanceService {
               id: true,
               code: true,
               title: true,
+              semesterNo: true,
               fyugpCategory: true,
               academicSubject: { select: { id: true, name: true } },
               department: { select: { id: true, name: true } },
@@ -1933,9 +1937,10 @@ export class StudentAttendanceService {
       courseTitle: course?.title,
       courseCode: course?.code,
     });
+    const semesterNo = session.semesterNo ?? subjectGroup?.semesterNo ?? null;
     const displayHeader = buildAttendanceHeaderMeta({
       displayTitle,
-      semesterNo: session.semesterNo,
+      semesterNo,
       sectionCode: section?.sectionCode,
       periodNo: session.periodNo,
       sessionType: session.sessionType,
@@ -1960,6 +1965,7 @@ export class StudentAttendanceService {
         : null);
     return {
       ...session,
+      semesterNo,
       paperCourse: course,
       course: displayCourse,
       subjectGroup: subjectGroup
@@ -2977,6 +2983,7 @@ export class StudentAttendanceService {
       session.periodNo ?? '',
       session.teachingSubjectGroupId ?? session.courseId ?? '',
       session.offeringSectionId ?? '',
+      session.semesterNo ?? '',
       session.sessionType ?? 'THEORY',
     ].join('|');
   }
