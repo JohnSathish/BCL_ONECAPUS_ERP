@@ -51,6 +51,7 @@ export type CountableTimetableEntry = {
   offeringSectionId?: string | null;
   sectionCode?: string | null;
   semesterSequence?: number | null;
+  teachingSubjectGroupId?: string | null;
   startTime?: Date | string | null;
   isBreak?: boolean;
   slotType?: string | null;
@@ -262,7 +263,8 @@ export class AttendancePolicyService {
       entry.offeringSectionId ||
       (entry.sectionCode && String(entry.sectionCode).trim()) ||
       'no-section';
-    return `${planId}|${shiftId}|${semester}|${section}`;
+    const group = entry.teachingSubjectGroupId ?? '';
+    return `${planId}|${shiftId}|${semester}|${section}|${group}`;
   }
 
   /**

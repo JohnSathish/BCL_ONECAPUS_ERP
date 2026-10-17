@@ -146,9 +146,14 @@ export default function FacultyAttendanceScreen() {
                 onPress={() => router.push(`/(staff)/mark-attendance/${session.id}` as never)}
               >
                 <View style={styles.cardHeader}>
-                  <Text style={styles.time}>
-                    {formatSessionTimeRange(session.startTime, session.endTime)}
-                  </Text>
+                  <View style={styles.timeBlock}>
+                    {session.sessionDate ? (
+                      <Text style={styles.date}>{formatSessionDate(session.sessionDate)}</Text>
+                    ) : null}
+                    <Text style={styles.time}>
+                      {formatSessionTimeRange(session.startTime, session.endTime)}
+                    </Text>
+                  </View>
                   <View
                     style={[
                       styles.badge,
@@ -165,9 +170,6 @@ export default function FacultyAttendanceScreen() {
                 </View>
 
                 <Text style={styles.title}>{sessionDisplayTitle(session)}</Text>
-                {session.sessionDate ? (
-                  <Text style={styles.date}>{formatSessionDate(session.sessionDate)}</Text>
-                ) : null}
                 <Text style={styles.meta}>{sessionDisplaySubtitle(session)}</Text>
 
                 {countsLine ? <Text style={styles.counts}>{countsLine}</Text> : null}
@@ -250,9 +252,10 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   badgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
-  time: { flex: 1, fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight },
+  time: { fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight },
+  timeBlock: { flex: 1, gap: 2 },
   title: { fontSize: 15, fontWeight: '800', color: facultyTheme.text },
-  date: { fontSize: 11, fontWeight: '700', color: facultyTheme.primaryLight },
+  date: { fontSize: 13, fontWeight: '800', color: '#92400E' },
   meta: { fontSize: 12, color: facultyTheme.textMuted },
   counts: { fontSize: 11, color: facultyTheme.textMuted, marginTop: 2 },
   action: { fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight, marginTop: 6 },

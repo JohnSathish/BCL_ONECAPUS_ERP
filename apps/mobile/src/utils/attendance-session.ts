@@ -37,6 +37,7 @@ export function formatSessionRoom(session: FacultyAttendanceSession) {
 
 export function sessionDisplayTitle(session: FacultyAttendanceSession) {
   return (
+    session.subjectTitle ??
     session.displayTitle ??
     session.subjectGroup?.title ??
     session.course?.title ??

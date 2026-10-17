@@ -170,6 +170,46 @@ describe('AttendancePolicyService collection modes', () => {
     ]);
   });
 
+  it('ONCE_PER_DAY keeps different subject groups even when the slot semester is 1', () => {
+    const s = service();
+    const resolved = s.resolveCountableEntries('ONCE_PER_DAY', [
+      {
+        id: 'chem-1',
+        periodNo: 1,
+        planId: 'plan-chem',
+        shiftId: 'shift-day',
+        sectionCode: 'A',
+        semesterSequence: 1,
+        teachingSubjectGroupId: 'group-sem1',
+        startTime: '09:00',
+      },
+      {
+        id: 'chem-3',
+        periodNo: 1,
+        planId: 'plan-chem',
+        shiftId: 'shift-day',
+        sectionCode: 'A',
+        semesterSequence: 3,
+        teachingSubjectGroupId: 'group-sem3',
+        startTime: '09:00',
+      },
+      {
+        id: 'chem-1-later',
+        periodNo: 2,
+        planId: 'plan-chem',
+        shiftId: 'shift-day',
+        sectionCode: 'A',
+        semesterSequence: 1,
+        teachingSubjectGroupId: 'group-sem1',
+        startTime: '09:45',
+      },
+    ]);
+    expect(resolved.map((row) => row.entry.id).sort()).toEqual([
+      'chem-1',
+      'chem-3',
+    ]);
+  });
+
   it('MORNING_AFTERNOON picks earliest AM and PM around lunch gap', () => {
     const s = service();
     const resolved = s.resolveCountableEntries('MORNING_AFTERNOON', entries);

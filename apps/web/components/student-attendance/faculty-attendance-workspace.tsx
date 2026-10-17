@@ -653,13 +653,28 @@ function SummaryChip({
 
 function sessionDisplay(session: StudentAttendanceSession) {
   const title =
+    session.subjectTitle ??
     session.displayTitle ??
     session.subjectGroup?.title ??
     session.course?.title ??
     'Attendance session';
   const groupCode = session.subjectGroup?.code ?? session.course?.code ?? 'Class';
   const paperCode = session.paperCourse?.code;
-  return { title, groupCode, paperCode };
+  const dateLabel = formatAttendanceDate(session.sessionDate);
+  return { title, groupCode, paperCode, dateLabel };
+}
+
+function formatAttendanceDate(value?: string | null) {
+  if (!value) return '';
+  const key = value.slice(0, 10);
+  const [year, month, day] = key.split('-').map(Number);
+  if (!year || !month || !day) return '';
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 }
 
 function SessionCard({
@@ -690,6 +705,9 @@ function SessionCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{label.title}</p>
+          {label.dateLabel ? (
+            <p className="text-xs font-semibold text-amber-800">{label.dateLabel}</p>
+          ) : null}
           <p className="truncate text-[11px] font-medium text-primary">
             {label.paperCode ? `${label.paperCode} · ` : ''}
             Period {session.periodNo ?? '—'}

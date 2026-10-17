@@ -12,6 +12,7 @@ export type FacultyAttendanceSession = {
   paperCourse?: { code?: string; title?: string };
   subjectGroup?: { code?: string; title?: string };
   displayTitle?: string;
+  subjectTitle?: string;
   displayHeader?: { title?: string; subtitle?: string; details?: string };
   section?: { sectionCode?: string };
   location?: { roomCode?: string; roomName?: string; campus?: string };

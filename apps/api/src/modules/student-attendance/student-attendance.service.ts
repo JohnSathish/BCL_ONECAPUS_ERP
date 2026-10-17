@@ -131,6 +131,7 @@ export class StudentAttendanceService {
     const dayResolution = await this.workingDays.resolveDay(
       tenantId,
       sessionDate,
+      this.attendanceCalendar(),
     );
     const planFilter = dto.timetablePlanId
       ? { planId: dto.timetablePlanId }
@@ -293,7 +294,11 @@ export class StudentAttendanceService {
       const key = `${String(entry.fyugpCategory).toUpperCase()}|${entry.dayOfWeek}|${entry.periodNo ?? ''}|${entry.courseId}`;
       return !realPoolKeys.has(key);
     });
-    const dedupedEntries = this.deduplicateTimetableEntries(countableEntries);
+    const semesterEntries = await this.withResolvedSemesters(
+      tenantId,
+      countableEntries,
+    );
+    const dedupedEntries = this.deduplicateTimetableEntries(semesterEntries);
     const enrichedForPolicy = dedupedEntries.map((entry: any) => {
       const slot = String(entry.slotType ?? '').toUpperCase();
       const inferredPeriod =
@@ -475,7 +480,11 @@ export class StudentAttendanceService {
     const sessionDate = this.startOfDay(dateInput);
     const dateKey = this.localDateString(sessionDate);
     const policy = await this.attendancePolicy.getOrCreate(tenantId);
-    const day = await this.workingDays.resolveDay(tenantId, sessionDate);
+    const day = await this.workingDays.resolveDay(
+      tenantId,
+      sessionDate,
+      this.attendanceCalendar(),
+    );
     const [forceRunRow, dayCancelledRow, relocateCount] = await Promise.all([
       this.prisma.timetableSubstitution.findFirst({
         where: {
@@ -522,7 +531,12 @@ export class StudentAttendanceService {
     const from = `${yearText}-${monthText}-01`;
     const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const to = `${yearText}-${monthText}-${String(last).padStart(2, '0')}`;
-    const monthDays = await this.workingDays.resolveRange(tenantId, from, to);
+    const monthDays = await this.workingDays.resolveRange(
+      tenantId,
+      from,
+      to,
+      this.attendanceCalendar(),
+    );
     return {
       date: dateKey,
       dayKind: day.dayKind,
@@ -592,10 +606,22 @@ export class StudentAttendanceService {
     if (policy.weekendHolidayHandling === 'ALLOW_IF_GENERATED') {
       return new Set<string>();
     }
-    const days = await this.workingDays.resolveRange(tenantId, fromKey, toKey);
+    const days = await this.workingDays.resolveRange(
+      tenantId,
+      fromKey,
+      toKey,
+      this.attendanceCalendar(),
+    );
     const closed = new Set(
       days
-        .filter((day) => !day.isWorkingDay && !day.createsAttendanceSession)
+        .filter((day) => {
+          if (day.createsAttendanceSession) return false;
+          if (day.dayKind === 'HOLIDAY') return true;
+          if (policy.weekendHolidayHandling === 'ALLOW_IF_GENERATED') {
+            return false;
+          }
+          return !day.isWorkingDay;
+        })
         .map((day) => day.date),
     );
     const substitutions = await this.prisma.timetableSubstitution.findMany({
@@ -800,7 +826,21 @@ export class StudentAttendanceService {
           }
           rosterSize = rosterSizeCache.get(cacheKey) ?? null;
         }
-        return { ...enriched, rosterSize };
+        const dateKey = this.localDateString(session.sessionDate);
+        const dateLabel = this.attendanceDateLabel(dateKey);
+        const subjectTitle =
+          enriched.displayTitle ?? enriched.course?.title ?? 'Class';
+        return {
+          ...enriched,
+          rosterSize,
+          sessionDate: dateKey,
+          subjectTitle,
+          // Installed phone builds read displayTitle only, so the pending
+          // date has to live in that line until the next app update.
+          displayTitle: dateLabel
+            ? `${dateLabel} · ${subjectTitle}`
+            : subjectTitle,
+        };
       }),
     );
   }
@@ -1237,7 +1277,11 @@ export class StudentAttendanceService {
   ) {
     const policy = await this.attendancePolicy.getOrCreate(tenantId);
     const sessionDate = this.startOfDay(session.sessionDate);
-    const day = await this.workingDays.resolveDay(tenantId, sessionDate);
+    const day = await this.workingDays.resolveDay(
+      tenantId,
+      sessionDate,
+      this.attendanceCalendar(),
+    );
     const [forceRunRow, dayCancelledRow, relocated] = await Promise.all([
       this.prisma.timetableSubstitution.findFirst({
         where: {
@@ -1880,7 +1924,10 @@ export class StudentAttendanceService {
       session.offeringSectionId
         ? this.prisma.offeringSection.findFirst({
             where: { id: session.offeringSectionId },
-            select: { sectionCode: true },
+            select: {
+              sectionCode: true,
+              courseOffering: { select: { semesterSequence: true } },
+            },
           })
         : null,
       session.primaryFacultyId
@@ -1939,7 +1986,11 @@ export class StudentAttendanceService {
       courseTitle: course?.title,
       courseCode: course?.code,
     });
-    const semesterNo = session.semesterNo ?? subjectGroup?.semesterNo ?? null;
+    const semesterNo =
+      subjectGroup?.semesterNo ??
+      section?.courseOffering?.semesterSequence ??
+      session.semesterNo ??
+      null;
     const displayHeader = buildAttendanceHeaderMeta({
       displayTitle,
       semesterNo,
@@ -2079,7 +2130,12 @@ export class StudentAttendanceService {
     const fromKey = this.localDateString(range.from);
     const toKey = this.localDateString(range.to);
     const [calendarDays, substitutions, tenant] = await Promise.all([
-      this.workingDays.resolveRange(tenantId, fromKey, toKey),
+      this.workingDays.resolveRange(
+        tenantId,
+        fromKey,
+        toKey,
+        this.attendanceCalendar(),
+      ),
       this.prisma.timetableSubstitution.findMany({
         where: {
           tenantId,
@@ -2908,6 +2964,97 @@ export class StudentAttendanceService {
     return 0;
   }
 
+  /**
+   * Timetable rows often keep semester 1 while the subject group or the
+   * course offering has the real semester (3 or 5). Daily attendance uses
+   * that semester to keep each class.
+   */
+  private async withResolvedSemesters<
+    T extends {
+      semesterSequence?: number | null;
+      teachingSubjectGroupId?: string | null;
+      offeringSectionId?: string | null;
+      courseOfferingId?: string | null;
+      plan?: { semesterSequence?: number | null } | null;
+    },
+  >(tenantId: string, entries: T[]): Promise<T[]> {
+    const groupIds = [
+      ...new Set(
+        entries
+          .map((entry) => entry.teachingSubjectGroupId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const sectionIds = [
+      ...new Set(
+        entries
+          .map((entry) => entry.offeringSectionId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const offeringIds = [
+      ...new Set(
+        entries
+          .map((entry) => entry.courseOfferingId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const [groups, sections, offerings] = await Promise.all([
+      groupIds.length
+        ? (this.prisma as any).teachingSubjectGroup.findMany({
+            where: { tenantId, id: { in: groupIds }, deletedAt: null },
+            select: { id: true, semesterNo: true },
+          })
+        : Promise.resolve([]),
+      sectionIds.length
+        ? this.prisma.offeringSection.findMany({
+            where: { tenantId, id: { in: sectionIds }, deletedAt: null },
+            select: {
+              id: true,
+              courseOffering: { select: { semesterSequence: true } },
+            },
+          })
+        : Promise.resolve([]),
+      offeringIds.length
+        ? this.prisma.courseOffering.findMany({
+            where: { tenantId, id: { in: offeringIds } },
+            select: { id: true, semesterSequence: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const groupSemester = new Map<string, number>(
+      groups.map((row: { id: string; semesterNo: number }) => [
+        row.id,
+        row.semesterNo,
+      ]),
+    );
+    const sectionSemester = new Map<string, number | null>(
+      sections.map((row) => [
+        row.id,
+        row.courseOffering?.semesterSequence ?? null,
+      ]),
+    );
+    const offeringSemester = new Map<string, number | null>(
+      offerings.map((row) => [row.id, row.semesterSequence]),
+    );
+    return entries.map((entry) => ({
+      ...entry,
+      semesterSequence:
+        (entry.teachingSubjectGroupId
+          ? groupSemester.get(entry.teachingSubjectGroupId)
+          : null) ??
+        (entry.offeringSectionId
+          ? sectionSemester.get(entry.offeringSectionId)
+          : null) ??
+        (entry.courseOfferingId
+          ? offeringSemester.get(entry.courseOfferingId)
+          : null) ??
+        entry.semesterSequence ??
+        entry.plan?.semesterSequence ??
+        null,
+    }));
+  }
+
   private async publishedPlanScope(tenantId: string) {
     const publishedPlans = await this.prisma.timetablePlan.findMany({
       where: { tenantId, status: 'PUBLISHED', deletedAt: null },
@@ -3035,6 +3182,25 @@ export class StudentAttendanceService {
       data: { deletedAt: new Date() },
     });
     return removeIds.length;
+  }
+
+  /** Holidays filed on any published calendar close attendance for that date. */
+  private attendanceCalendar() {
+    return { mergePublishedCalendars: true };
+  }
+
+  private attendanceDateLabel(dateKey: string) {
+    const [year, month, day] = dateKey.split('-').map(Number);
+    if (!year || !month || !day) return dateKey;
+    return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(
+      'en-GB',
+      {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+      },
+    );
   }
 
   private localDateString(value = new Date()) {

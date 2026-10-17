@@ -21,6 +21,7 @@ export type StudentAttendanceSession = {
     fyugpCategory?: string;
   } | null;
   displayTitle?: string | null;
+  subjectTitle?: string | null;
   displayHeader?: {
     title?: string;
     subtitle?: string;
