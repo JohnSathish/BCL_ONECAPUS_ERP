@@ -11,6 +11,30 @@ import { downloadAndSharePayslipPdf, fetchStaffPayslips } from '@/services/facul
 import { PRIVACY_POLICY_URL, TERMS_URL } from '@/constants/release';
 import { STAFF_PORTAL_SALARY_VISIBLE } from '@/config/staff-salary-visible';
 
+function serviceExperience(joiningDate?: string | null, storedYears?: number | null) {
+  if (joiningDate) {
+    const start = new Date(joiningDate);
+    const now = new Date();
+    if (!Number.isNaN(start.getTime()) && start <= now) {
+      let years = now.getFullYear() - start.getFullYear();
+      let months = now.getMonth() - start.getMonth();
+      if (now.getDate() < start.getDate()) months -= 1;
+      if (months < 0) {
+        years -= 1;
+        months += 12;
+      }
+      if (years > 0 && months > 0) {
+        return `${years} year${years === 1 ? '' : 's'} ${months} month${months === 1 ? '' : 's'}`;
+      }
+      if (years > 0) return `${years} year${years === 1 ? '' : 's'}`;
+      if (months > 0) return `${months} month${months === 1 ? '' : 's'}`;
+      return 'Less than a month';
+    }
+  }
+  if (storedYears != null && storedYears > 0) return `${storedYears} years`;
+  return '—';
+}
+
 export default function FacultyProfileScreen() {
   const router = useRouter();
   const { home } = useFacultyPortal();
@@ -99,7 +123,7 @@ export default function FacultyProfileScreen() {
         <InfoRow label="Email" value={profile?.email ?? '—'} />
         <InfoRow
           label="Experience"
-          value={profile?.experienceYears != null ? `${profile.experienceYears} years` : '—'}
+          value={serviceExperience(profile?.joiningDate, profile?.experienceYears)}
         />
         <InfoRow
           label="Joining Date"
