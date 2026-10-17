@@ -579,12 +579,104 @@ export class StudentAttendanceService {
     );
   }
 
+  async closedAttendanceDates(
+    tenantId: string,
+    fromKey: string,
+    toKey: string,
+  ) {
+    const policy = await this.attendancePolicy.getOrCreate(tenantId);
+    if (policy.weekendHolidayHandling === 'ALLOW_IF_GENERATED') {
+      return new Set<string>();
+    }
+    const days = await this.workingDays.resolveRange(tenantId, fromKey, toKey);
+    const closed = new Set(
+      days
+        .filter((day) => !day.isWorkingDay && !day.createsAttendanceSession)
+        .map((day) => day.date),
+    );
+    const substitutions = await this.prisma.timetableSubstitution.findMany({
+      where: {
+        tenantId,
+        sessionDate: {
+          gte: dateKeyToUtcMidnight(fromKey),
+          lte: dateKeyToUtcMidnight(toKey),
+        },
+        status: { not: 'REJECTED' },
+        action: {
+          in: [
+            'CALENDAR_FORCE_RUN',
+            'HOLIDAY_CLASS',
+            'RELOCATE_TO_DATE',
+            'CALENDAR_CANCEL_DAY',
+            'CANCEL_DAY',
+          ],
+        },
+      },
+      select: { sessionDate: true, action: true },
+    });
+    for (const row of substitutions) {
+      if (!row.sessionDate) continue;
+      const dateKey = row.sessionDate.toISOString().slice(0, 10);
+      if (row.action === 'CALENDAR_CANCEL_DAY' || row.action === 'CANCEL_DAY') {
+        closed.add(dateKey);
+      } else {
+        closed.delete(dateKey);
+      }
+    }
+    return closed;
+  }
+
+  /** Open attendance for recent working days the faculty has not marked yet. */
+  async ensureRecentFacultySessions(tenantId: string, staffProfileId: string) {
+    const closed = await this.closedAttendanceDates(
+      tenantId,
+      getZonedDateKey(new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)),
+      getZonedDateKey(),
+    );
+    for (let offset = 1; offset <= 10; offset += 1) {
+      const key = getZonedDateKey(
+        new Date(Date.now() - offset * 24 * 60 * 60 * 1000),
+      );
+      if (closed.has(key)) continue;
+      const sessionDate = dateKeyToUtcMidnight(key);
+      const existing = await (
+        this.prisma as any
+      ).studentAttendanceSession.count({
+        where: {
+          tenantId,
+          primaryFacultyId: staffProfileId,
+          sessionDate,
+          deletedAt: null,
+        },
+      });
+      if (existing > 0) continue;
+      const weekday = getZonedWeekday(sessionDate);
+      const slot = await this.prisma.timetablePlanEntry.findFirst({
+        where: {
+          tenantId,
+          staffProfileId,
+          dayOfWeek: weekday,
+          deletedAt: null,
+          status: { not: 'CANCELLED' },
+          plan: { status: 'PUBLISHED', deletedAt: null },
+        },
+        select: { id: true },
+      });
+      if (!slot) continue;
+      await this.generateSessionsForTenant(tenantId, {
+        date: key,
+        staffProfileId,
+      });
+    }
+  }
+
   async facultyToday(user: JwtUser) {
     const staff = await this.prisma.staffProfile.findFirst({
       where: { tenantId: user.tid, portalUserId: user.sub, deletedAt: null },
       select: { id: true },
     });
     if (!staff) return [];
+    await this.ensureRecentFacultySessions(user.tid, staff.id);
     const authorizedSections = await (
       this.prisma as any
     ).subjectTeachingAssignment.findMany({
@@ -651,10 +743,19 @@ export class StudentAttendanceService {
     });
 
     const deduped = this.deduplicateSessions(authorized);
+    const closedDates = await this.closedAttendanceDates(
+      user.tid,
+      lookbackKey,
+      todayKey,
+    );
+    const visible = deduped.filter(
+      (session: any) =>
+        !closedDates.has(this.localDateString(session.sessionDate)),
+    );
     const rosterSizeCache = new Map<string, number>();
 
     return Promise.all(
-      deduped.map(async (session: any) => {
+      visible.map(async (session: any) => {
         const enriched = await this.enrichSession(session);
         let rosterSize: number | null = null;
         const rosterCategory = this.sessionRosterCategory(session);
@@ -742,6 +843,23 @@ export class StudentAttendanceService {
           session.semesterNo,
           session.shiftId,
           rosterCategory,
+        );
+      }
+      if (!students.length && session.offeringSectionId) {
+        students = await this.studentsForSection(
+          tenantId,
+          session.offeringSectionId,
+          null,
+          null,
+        );
+      }
+      if (!students.length && session.courseId) {
+        students = await this.studentsForCourse(
+          tenantId,
+          session.courseId,
+          null,
+          null,
+          null,
         );
       }
     } catch (err) {

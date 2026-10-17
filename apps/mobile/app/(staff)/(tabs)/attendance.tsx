@@ -129,7 +129,10 @@ export default function FacultyAttendanceScreen() {
         {loading ? (
           <ActivityIndicator color={facultyTheme.primaryLight} style={{ marginTop: 24 }} />
         ) : sessions.length === 0 ? (
-          <Text style={styles.empty}>No attendance sessions to mark.</Text>
+          <Text style={styles.empty}>
+            No classes to mark. Holiday dates stay closed. Pending classes from earlier working days
+            are listed here.
+          </Text>
         ) : (
           sessions.map((session) => {
             const markState = getAttendanceMarkState(session);

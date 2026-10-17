@@ -10,6 +10,7 @@ import { UserNotificationsService } from '../../communication/services/user-noti
 import { BirthdayQueryService } from '../../communication/services/birthday-query.service';
 import { LmsDashboardService } from '../../lms/services/lms-dashboard.service';
 import { AcademicCalendarService } from '../../academic-calendar/academic-calendar.service';
+import { StudentAttendanceService } from '../../student-attendance/student-attendance.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import {
   dateKeyToUtcMidnight,
@@ -67,6 +68,7 @@ export class StaffPortalService {
     private readonly lms: LmsDashboardService,
     private readonly birthdays: BirthdayQueryService,
     private readonly academicCalendar: AcademicCalendarService,
+    private readonly studentAttendance: StudentAttendanceService,
   ) {}
 
   async resolveStaffProfile(tenantId: string, userId: string) {
@@ -351,7 +353,6 @@ export class StaffPortalService {
       unreadCount,
       attendanceRecords,
       todayAttendance,
-      attendancePending,
       lmsDashboard,
       pendingLessonPlans,
       examDutyAssigned,
@@ -378,25 +379,6 @@ export class StaffPortalService {
           attendanceDate: today,
         },
       }),
-      profile.isTeaching
-        ? (this.prisma as any).studentAttendanceSession.count({
-            where: {
-              tenantId: user.tid,
-              // Include backlog OPEN sessions (prior days), not only "today".
-              sessionDate: {
-                gte: dateKeyToUtcMidnight(
-                  getZonedDateKey(
-                    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-                  ),
-                ),
-                lte: dateKeyToUtcMidnight(getZonedDateKey()),
-              },
-              deletedAt: null,
-              status: 'OPEN',
-              primaryFacultyId: staff.id,
-            },
-          })
-        : Promise.resolve(0),
       profile.isTeaching
         ? this.lms.facultyDashboard(user).catch(() => null)
         : Promise.resolve(null),
@@ -527,9 +509,13 @@ export class StaffPortalService {
         0,
     );
 
+    const visibleAttendancePending = todaySchedule.filter(
+      (slot) => slot.attendancePending,
+    ).length;
+
     const tasksKpi = {
       pendingLessonPlans,
-      attendancePending,
+      attendancePending: visibleAttendancePending,
       examDutyAssigned,
       approvalRequests: 0,
       lmsPendingEvaluations,
@@ -566,11 +552,12 @@ export class StaffPortalService {
     const attendanceSubmittedPercent =
       todayClassCount > 0
         ? Math.round(
-            ((todayClassCount - Math.min(attendancePending, todayClassCount)) /
+            ((todayClassCount -
+              Math.min(visibleAttendancePending, todayClassCount)) /
               todayClassCount) *
               100,
           )
-        : attendancePending > 0
+        : visibleAttendancePending > 0
           ? 0
           : 100;
 
@@ -937,6 +924,16 @@ export class StaffPortalService {
       new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
     );
     const lookback = dateKeyToUtcMidnight(lookbackKey);
+    await this.studentAttendance.ensureRecentFacultySessions(
+      tenantId,
+      staffProfileId,
+    );
+    const closedDates = await this.studentAttendance.closedAttendanceDates(
+      tenantId,
+      lookbackKey,
+      todayKey,
+    );
+    const todayOpen = !closedDates.has(todayKey);
 
     type TodaySlot = {
       id: string;
@@ -1095,50 +1092,54 @@ export class StaffPortalService {
     const roomMap = new Map(classrooms.map((r) => [r.id, r]));
     const sectionMap = new Map(sections.map((s) => [s.id, s]));
 
-    for (const entry of planEntries) {
-      const shiftId = entry.shiftId ?? entry.plan.shiftId ?? null;
-      const shift = shiftId ? shiftMap.get(shiftId) : undefined;
-      const section = entry.offeringSectionId
-        ? sectionMap.get(entry.offeringSectionId)
-        : undefined;
-      const course = entry.courseId ? courseMap.get(entry.courseId) : undefined;
-      const room = entry.classroomId
-        ? roomMap.get(entry.classroomId)
-        : undefined;
+    if (todayOpen) {
+      for (const entry of planEntries) {
+        const shiftId = entry.shiftId ?? entry.plan.shiftId ?? null;
+        const shift = shiftId ? shiftMap.get(shiftId) : undefined;
+        const section = entry.offeringSectionId
+          ? sectionMap.get(entry.offeringSectionId)
+          : undefined;
+        const course = entry.courseId
+          ? courseMap.get(entry.courseId)
+          : undefined;
+        const room = entry.classroomId
+          ? roomMap.get(entry.classroomId)
+          : undefined;
 
-      const subject =
-        course?.title ??
-        course?.code ??
-        section?.courseOffering?.course?.title ??
-        section?.courseOffering?.course?.code ??
-        'Class';
+        const subject =
+          course?.title ??
+          course?.code ??
+          section?.courseOffering?.course?.title ??
+          section?.courseOffering?.course?.code ??
+          'Class';
 
-      pushSlot({
-        id: entry.id,
-        startTime: formatTime(entry.startTime),
-        endTime: formatTime(entry.endTime),
-        subject,
-        semesterNo:
-          entry.semesterSequence ??
-          section?.courseOffering?.semesterSequence ??
-          null,
-        sectionCode: entry.sectionCode ?? section?.sectionCode ?? null,
-        classroom: room?.name ?? room?.code ?? null,
-        offeringSectionId: entry.offeringSectionId,
-        status: entry.status,
-        shiftId,
-        shiftCode: shift?.code ?? null,
-        shiftName: shift?.name ?? null,
-        classDate: todayKey,
-        classDateLabel: formatInstitutionDateLabel(todayKey),
-        isToday: true,
-        attendancePending: false,
-        attendanceSessionId: null,
-      });
+        pushSlot({
+          id: entry.id,
+          startTime: formatTime(entry.startTime),
+          endTime: formatTime(entry.endTime),
+          subject,
+          semesterNo:
+            entry.semesterSequence ??
+            section?.courseOffering?.semesterSequence ??
+            null,
+          sectionCode: entry.sectionCode ?? section?.sectionCode ?? null,
+          classroom: room?.name ?? room?.code ?? null,
+          offeringSectionId: entry.offeringSectionId,
+          status: entry.status,
+          shiftId,
+          shiftCode: shift?.code ?? null,
+          shiftName: shift?.name ?? null,
+          classDate: todayKey,
+          classDateLabel: formatInstitutionDateLabel(todayKey),
+          isToday: true,
+          attendancePending: false,
+          attendanceSessionId: null,
+        });
+      }
     }
 
     // Fallback: legacy TimetableEntry rows (pre-plan system) without N+1.
-    if (!planEntries.length) {
+    if (todayOpen && !planEntries.length) {
       const legacy = await this.prisma.timetableEntry.findMany({
         where: { tenantId, staffProfileId, dayOfWeek },
         orderBy: { startTime: 'asc' },
@@ -1310,6 +1311,7 @@ export class StaffPortalService {
             ? session.sessionDate.toISOString().slice(0, 10)
             : String(session.sessionDate).slice(0, 10);
         const isToday = classDate === todayKey;
+        if (closedDates.has(classDate)) continue;
         const attendancePending =
           String(session.status ?? '').toUpperCase() === 'OPEN';
         pushSlot({

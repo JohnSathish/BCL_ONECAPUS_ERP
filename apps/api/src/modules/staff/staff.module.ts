@@ -9,6 +9,7 @@ import { GovernanceModule } from '../governance/governance.module';
 import { LmsModule } from '../lms/lms.module';
 import { MoodleModule } from '../moodle/moodle.module';
 import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
+import { StudentAttendanceModule } from '../student-attendance/student-attendance.module';
 import { AdministrationModule } from '../administration/administration.module';
 import { ShiftsModule } from '../shifts/shifts.module';
 import { StaffImportCommitService } from './import/staff-import-commit.service';
@@ -49,6 +50,7 @@ import { StaffProfileReviewService } from './services/staff-profile-review.servi
     LmsModule,
     MoodleModule,
     AcademicCalendarModule,
+    StudentAttendanceModule,
     ImportModule,
     QueueModule,
     LicensingModule,
