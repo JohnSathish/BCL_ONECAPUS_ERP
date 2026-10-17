@@ -9,6 +9,7 @@ type FacultyScreenHeaderProps = {
   subtitle?: string;
   rightSlot?: ReactNode;
   showMenu?: boolean;
+  tone?: 'default' | 'brand';
 };
 
 export function FacultyScreenHeader({
@@ -16,26 +17,33 @@ export function FacultyScreenHeader({
   subtitle,
   rightSlot,
   showMenu = true,
+  tone = 'default',
 }: FacultyScreenHeaderProps) {
   const insets = useSafeAreaInsets();
   const { openDrawer } = useFacultyPortal();
 
+  const brand = tone === 'brand';
+
   return (
-    <View style={[styles.wrap, { paddingTop: insets.top + 8 }]}>
+    <View style={[styles.wrap, brand && styles.wrapBrand, { paddingTop: insets.top + 8 }]}>
       <View style={styles.row}>
         {showMenu ? (
-          <Pressable style={styles.menuBtn} onPress={openDrawer} hitSlop={8}>
-            <Text style={styles.menuIcon}>☰</Text>
+          <Pressable
+            style={[styles.menuBtn, brand && styles.menuBtnBrand]}
+            onPress={openDrawer}
+            hitSlop={8}
+          >
+            <Text style={[styles.menuIcon, brand && styles.menuIconBrand]}>☰</Text>
           </Pressable>
         ) : (
           <View style={styles.menuSpacer} />
         )}
         <View style={styles.titles}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[styles.title, brand && styles.titleBrand]} numberOfLines={1}>
             {title}
           </Text>
           {subtitle ? (
-            <Text style={styles.subtitle} numberOfLines={1}>
+            <Text style={[styles.subtitle, brand && styles.subtitleBrand]} numberOfLines={1}>
               {subtitle}
             </Text>
           ) : null}
@@ -68,5 +76,14 @@ const styles = StyleSheet.create({
   titles: { flex: 1, gap: 2 },
   title: { fontSize: 17, fontWeight: '800', color: facultyTheme.text },
   subtitle: { fontSize: 12, color: facultyTheme.textMuted, fontWeight: '500' },
+  wrapBrand: {
+    backgroundColor: '#0F3C89',
+    borderBottomWidth: 0,
+    paddingBottom: 18,
+  },
+  menuBtnBrand: { backgroundColor: '#FFFFFF' },
+  menuIconBrand: { color: '#0F3C89' },
+  titleBrand: { color: '#FFFFFF', fontSize: 18 },
+  subtitleBrand: { color: 'rgba(255,255,255,0.82)' },
   right: { minWidth: 36, alignItems: 'flex-end' },
 });

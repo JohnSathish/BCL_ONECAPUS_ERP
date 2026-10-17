@@ -49,6 +49,7 @@ export type FacultyHomeSnapshot = {
     emergencyContactJson?: Record<string, string> | null;
     bloodGroup?: string | null;
     profileCompletion?: number;
+    online?: boolean;
     isTeaching?: boolean;
     isHod?: boolean;
     staffType?: string | null;

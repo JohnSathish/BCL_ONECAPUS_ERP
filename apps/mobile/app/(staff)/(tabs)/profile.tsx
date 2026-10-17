@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { logout } from '@/auth/logout';
@@ -32,7 +33,14 @@ function serviceExperience(joiningDate?: string | null, storedYears?: number | n
     }
   }
   if (storedYears != null && storedYears > 0) return `${storedYears} years`;
-  return '—';
+  return null;
+}
+
+function formatJoinDate(value?: string | null) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
 }
 
 export default function FacultyProfileScreen() {
@@ -41,182 +49,216 @@ export default function FacultyProfileScreen() {
   const profile = home?.profile;
   const payroll = home?.payroll;
   const leave = home?.leaveBalance;
+  const [showDevices, setShowDevices] = useState(false);
+  const completion = profile?.profileCompletion ?? 0;
+  const experience = serviceExperience(profile?.joiningDate, profile?.experienceYears);
+  const completionHint =
+    completion >= 100
+      ? null
+      : experience
+        ? 'Add the remaining details and documents to complete your profile.'
+        : 'Add your experience and documents to complete your profile.';
 
   return (
-    <FacultyScreenShell title="Profile" subtitle="Account & security" showMenu={false}>
+    <FacultyScreenShell title="My Profile" subtitle="Account & Security" showMenu={false}>
       <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.hero}>
-          <StudentAvatar
-            name={profile?.fullName ?? 'Faculty'}
-            photoUrl={profile?.photoUrl}
-            size={72}
-          />
-          <Text style={styles.name}>{profile?.fullName ?? 'Faculty'}</Text>
-          <Text style={styles.meta}>{profile?.designation ?? '—'}</Text>
-          <Text style={styles.meta}>{profile?.department ?? '—'}</Text>
-
-          {/* Additional roles */}
-          {(profile?.additionalRoles?.length ?? 0) > 0 && (
-            <View style={styles.rolesRow}>
-              {profile?.isHod && (
-                <View style={[styles.roleChip, styles.roleChipHod]}>
-                  <Text style={[styles.roleChipText, styles.roleChipTextHod]}>HoD</Text>
-                </View>
-              )}
-              {profile?.additionalRoles?.map((r) => (
-                <View key={r.code} style={styles.roleChip}>
-                  <Text style={styles.roleChipText}>{r.label}</Text>
-                </View>
-              ))}
+        <View style={styles.card}>
+          <View style={styles.identity}>
+            <View style={styles.avatarWrap}>
+              <StudentAvatar
+                name={profile?.fullName ?? 'Faculty'}
+                photoUrl={profile?.photoUrl}
+                size={72}
+              />
+              {profile?.online ? <View style={styles.onlineDot} /> : null}
             </View>
-          )}
-
-          {/* Profile completion bar */}
-          {(profile?.profileCompletion ?? 0) < 100 && (
-            <View style={styles.completionWrap}>
-              <View style={styles.completionRow}>
-                <Text style={styles.completionLabel}>Profile Completion</Text>
-                <Text
-                  style={[
-                    styles.completionPct,
-                    {
-                      color:
-                        (profile?.profileCompletion ?? 0) >= 80
-                          ? '#16a34a'
-                          : (profile?.profileCompletion ?? 0) >= 50
-                            ? '#d97706'
-                            : '#dc2626',
-                    },
-                  ]}
-                >
-                  {profile?.profileCompletion ?? 0}%
-                </Text>
-              </View>
-              <View style={styles.completionTrack}>
-                <View
-                  style={[
-                    styles.completionFill,
-                    {
-                      width: `${profile?.profileCompletion ?? 0}%` as `${number}%`,
-                      backgroundColor:
-                        (profile?.profileCompletion ?? 0) >= 80
-                          ? '#16a34a'
-                          : (profile?.profileCompletion ?? 0) >= 50
-                            ? '#d97706'
-                            : '#dc2626',
-                    },
-                  ]}
-                />
-              </View>
+            <View style={styles.identityText}>
+              <Text style={styles.name}>{profile?.fullName ?? 'Faculty'}</Text>
+              <Text style={styles.designation}>{profile?.designation ?? 'Staff'}</Text>
+              <Text style={styles.metaLine}>{profile?.department ?? 'Department'}</Text>
+              <Text style={styles.metaLine}>Employee ID: {profile?.employeeCode ?? '—'}</Text>
+              {(profile?.additionalRoles?.length ?? 0) > 0 ? (
+                <View style={styles.rolesRow}>
+                  {profile?.isHod ? (
+                    <View style={[styles.roleChip, styles.roleChipHod]}>
+                      <Text style={[styles.roleChipText, styles.roleChipTextHod]}>HoD</Text>
+                    </View>
+                  ) : null}
+                  {profile?.additionalRoles?.map((role) => (
+                    <View key={role.code} style={styles.roleChip}>
+                      <Text style={styles.roleChipText}>{role.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
-          )}
-
-          <Pressable
-            style={styles.editProfileBtn}
-            onPress={() => router.push('/(staff)/edit-profile' as never)}
-          >
-            <Text style={styles.editProfileBtnText}>Edit Profile</Text>
-          </Pressable>
+            <Pressable
+              style={styles.editBtn}
+              onPress={() => router.push('/(staff)/edit-profile' as never)}
+            >
+              <Text style={styles.editBtnText}>Edit Profile</Text>
+            </Pressable>
+          </View>
         </View>
 
-        <InfoRow label="Employee ID" value={profile?.employeeCode ?? '—'} />
-        <InfoRow label="Email" value={profile?.email ?? '—'} />
-        <InfoRow
-          label="Experience"
-          value={serviceExperience(profile?.joiningDate, profile?.experienceYears)}
-        />
-        <InfoRow
-          label="Joining Date"
-          value={
-            profile?.joiningDate ? new Date(profile.joiningDate).toLocaleDateString('en-IN') : '—'
-          }
-        />
+        <View style={styles.card}>
+          <View style={styles.completionRow}>
+            <Text style={styles.completionLabel}>Profile Completion</Text>
+            <Text style={styles.completionPct}>{completion}%</Text>
+          </View>
+          <View style={styles.completionTrack}>
+            <View style={[styles.completionFill, { width: `${Math.min(completion, 100)}%` }]} />
+          </View>
+          {completionHint ? <Text style={styles.completionHint}>{completionHint}</Text> : null}
+        </View>
 
-        <Text style={styles.section}>Leave Balance</Text>
-        <InfoRow label="Casual" value={`${leave?.casual ?? 0} days`} />
-        <InfoRow label="Medical" value={`${leave?.sick ?? 0} days`} />
-        <InfoRow label="Earned" value={`${leave?.earned ?? 0} days`} />
-        <Pressable style={styles.linkBtn} onPress={() => router.push('/(staff)/leave' as never)}>
-          <Text style={styles.linkBtnText}>Apply leave →</Text>
-        </Pressable>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Basic Information</Text>
+          <View style={styles.infoGrid}>
+            <InfoCell icon="✉️" tint="#DBEAFE" label="Email" value={profile?.email ?? '—'} />
+            <InfoCell
+              icon="📅"
+              tint="#DCFCE7"
+              label="Joining Date"
+              value={formatJoinDate(profile?.joiningDate)}
+            />
+            <InfoCell
+              icon="🪪"
+              tint="#EDE9FE"
+              label="Employee ID"
+              value={profile?.employeeCode ?? '—'}
+            />
+            <InfoCell
+              icon="💼"
+              tint="#FFEDD5"
+              label="Experience"
+              value={experience ?? 'Not added'}
+              muted={!experience}
+            />
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Leave Balance</Text>
+          <View style={styles.leaveRow}>
+            <LeaveCard
+              tint="#ECFDF5"
+              valueColor="#047857"
+              label="Casual Leave"
+              value={`${leave?.casual ?? 0} days`}
+              onPress={() => router.push('/(staff)/leave' as never)}
+            />
+            <LeaveCard
+              tint="#FEF2F2"
+              valueColor="#BE123C"
+              label="Medical Leave"
+              value={`${leave?.sick ?? 0} days`}
+              onPress={() => router.push('/(staff)/leave' as never)}
+            />
+            <LeaveCard
+              tint="#EFF6FF"
+              valueColor="#1D4ED8"
+              label="Earned Leave"
+              value={`${leave?.earned ?? 0} days`}
+              onPress={() => router.push('/(staff)/leave' as never)}
+            />
+          </View>
+        </View>
 
         {STAFF_PORTAL_SALARY_VISIBLE ? (
-          <>
-            <Text style={styles.section}>Payroll</Text>
-            <InfoRow label="Latest Salary" value={formatInr(payroll?.amount ?? 0)} />
-            <InfoRow label="Status" value={payroll?.status ?? '—'} />
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Payroll</Text>
+            <Text style={styles.payrollValue}>{formatInr(payroll?.amount ?? 0)}</Text>
+            <Text style={styles.payrollStatus}>{payroll?.status ?? '—'}</Text>
             <Pressable
-              style={styles.linkBtn}
+              style={styles.textLink}
               onPress={() => router.push('/(staff)/payroll' as never)}
             >
-              <Text style={styles.linkBtnText}>View payslips →</Text>
+              <Text style={styles.textLinkLabel}>View payslips</Text>
             </Pressable>
-          </>
+            <Pressable
+              style={styles.textLink}
+              onPress={() => {
+                void (async () => {
+                  try {
+                    const payslips = await fetchStaffPayslips();
+                    const latest = payslips[0];
+                    if (!latest?.id) return;
+                    await downloadAndSharePayslipPdf(
+                      latest.id,
+                      `Payslip_${latest.year}_${latest.month}`,
+                    );
+                  } catch {
+                    // optional
+                  }
+                })();
+              }}
+            >
+              <Text style={styles.textLinkLabel}>Download latest payslip</Text>
+            </Pressable>
+          </View>
         ) : null}
 
-        <Text style={styles.section}>Notifications & app</Text>
-        <Pressable
-          style={styles.row}
-          onPress={() => router.push('/(staff)/notification-preferences' as never)}
-        >
-          <Text style={styles.rowLabel}>Notification preferences</Text>
-          <Text style={styles.rowValue}>→</Text>
-        </Pressable>
-        <Pressable style={styles.row} onPress={() => router.push('/(staff)/about' as never)}>
-          <Text style={styles.rowLabel}>About app</Text>
-          <Text style={styles.rowValue}>→</Text>
-        </Pressable>
-        <Pressable
-          style={styles.row}
-          onPress={() => router.push('/(staff)/account-deletion' as never)}
-        >
-          <Text style={styles.rowLabel}>Delete account</Text>
-          <Text style={styles.rowValue}>→</Text>
-        </Pressable>
-        <Pressable style={styles.row} onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}>
-          <Text style={styles.rowLabel}>Privacy policy</Text>
-          <Text style={styles.rowValue}>→</Text>
-        </Pressable>
-        <Pressable style={styles.row} onPress={() => void Linking.openURL(TERMS_URL)}>
-          <Text style={styles.rowLabel}>Terms & conditions</Text>
-          <Text style={styles.rowValue}>→</Text>
-        </Pressable>
-
-        <Text style={styles.section}>Security</Text>
-        <Pressable style={styles.row} onPress={() => router.push('/(staff)/security' as never)}>
-          <Text style={styles.rowLabel}>Password & Security</Text>
-          <Text style={styles.rowValue}>→</Text>
-        </Pressable>
-
-        <DeviceSessionsPanel
-          surfaceColor={facultyTheme.surface}
-          borderColor={facultyTheme.border}
-          textColor={facultyTheme.text}
-          mutedColor={facultyTheme.textMuted}
-        />
-
-        {STAFF_PORTAL_SALARY_VISIBLE ? (
-          <Pressable
-            style={styles.payslipBtn}
-            onPress={() => {
-              void (async () => {
-                try {
-                  const payslips = await fetchStaffPayslips();
-                  const latest = payslips[0];
-                  if (!latest?.id) return;
-                  await downloadAndSharePayslipPdf(
-                    latest.id,
-                    `Payslip_${latest.year}_${latest.month}`,
-                  );
-                } catch {
-                  // optional
-                }
-              })();
-            }}
-          >
-            <Text style={styles.payslipBtnText}>Download latest payslip</Text>
-          </Pressable>
-        ) : null}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Account & Security</Text>
+          <ActionRow
+            icon="🔧"
+            tint="#DBEAFE"
+            title="Change Password"
+            subtitle="Update your account password"
+            onPress={() => router.push('/(staff)/security' as never)}
+          />
+          <ActionRow
+            icon="💻"
+            tint="#EDE9FE"
+            title="Login & Devices"
+            subtitle="Manage your active sessions"
+            onPress={() => setShowDevices((open) => !open)}
+          />
+          {showDevices ? (
+            <DeviceSessionsPanel
+              surfaceColor="#F8FAFC"
+              borderColor={facultyTheme.border}
+              textColor={facultyTheme.text}
+              mutedColor={facultyTheme.textMuted}
+            />
+          ) : null}
+          <ActionRow
+            icon="🔒"
+            tint="#FEF3C7"
+            title="Privacy Settings"
+            subtitle="Manage your privacy preferences"
+            onPress={() => router.push('/(staff)/notification-preferences' as never)}
+          />
+          <ActionRow
+            icon="📄"
+            tint="#E0F2FE"
+            title="Privacy Policy"
+            subtitle="How the campus app uses your data"
+            onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
+          />
+          <ActionRow
+            icon="📘"
+            tint="#E0E7FF"
+            title="Terms & Conditions"
+            subtitle="Read the app terms"
+            onPress={() => void Linking.openURL(TERMS_URL)}
+          />
+          <ActionRow
+            icon="ℹ️"
+            tint="#F1F5F9"
+            title="About App"
+            subtitle="Version and support"
+            onPress={() => router.push('/(staff)/about' as never)}
+          />
+          <ActionRow
+            icon="🗑️"
+            tint="#FEE2E2"
+            title="Delete Account"
+            subtitle="Request account deletion"
+            onPress={() => router.push('/(staff)/account-deletion' as never)}
+          />
+        </View>
 
         <Pressable
           style={styles.logout}
@@ -234,107 +276,171 @@ export default function FacultyProfileScreen() {
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoCell({
+  icon,
+  tint,
+  label,
+  value,
+  muted,
+}: {
+  icon: string;
+  tint: string;
+  label: string;
+  value: string;
+  muted?: boolean;
+}) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
+    <View style={styles.infoCell}>
+      <View style={[styles.iconBubble, { backgroundColor: tint }]}>
+        <Text style={styles.iconText}>{icon}</Text>
+      </View>
+      <View style={styles.infoCopy}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={[styles.infoValue, muted && styles.infoMuted]} numberOfLines={2}>
+          {value}
+        </Text>
+      </View>
     </View>
   );
 }
 
+function LeaveCard({
+  tint,
+  valueColor,
+  label,
+  value,
+  onPress,
+}: {
+  tint: string;
+  valueColor: string;
+  label: string;
+  value: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={[styles.leaveCard, { backgroundColor: tint }]} onPress={onPress}>
+      <Text style={[styles.leaveValue, { color: valueColor }]}>{value}</Text>
+      <Text style={styles.leaveLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function ActionRow({
+  icon,
+  tint,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: string;
+  tint: string;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.actionRow} onPress={onPress}>
+      <View style={[styles.iconBubble, { backgroundColor: tint }]}>
+        <Text style={styles.iconText}>{icon}</Text>
+      </View>
+      <View style={styles.actionCopy}>
+        <Text style={styles.actionTitle}>{title}</Text>
+        <Text style={styles.actionSubtitle}>{subtitle}</Text>
+      </View>
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { padding: 16, gap: 8, paddingBottom: 32 },
-  hero: { alignItems: 'center', gap: 6, marginBottom: 8 },
-  editProfileBtn: {
-    marginTop: 4,
-    borderRadius: 20,
-    backgroundColor: facultyTheme.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 7,
+  container: { padding: 16, gap: 12, paddingBottom: 36 },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E8EEF5',
+    gap: 10,
   },
-  editProfileBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  rolesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    justifyContent: 'center',
-    marginTop: 4,
+  identity: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  avatarWrap: { position: 'relative' },
+  identityText: { flex: 1, gap: 2, paddingTop: 2 },
+  onlineDot: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#22C55E',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
+  name: { fontSize: 16, fontWeight: '800', color: facultyTheme.text },
+  designation: { fontSize: 12, color: facultyTheme.textMuted, fontWeight: '600' },
+  metaLine: { fontSize: 12, color: '#374151', fontWeight: '600' },
+  editBtn: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#fff',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  editBtnText: { color: '#2563EB', fontSize: 12, fontWeight: '700' },
+  rolesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   roleChip: {
     backgroundColor: '#EFF6FF',
     borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderWidth: 1,
     borderColor: '#BFDBFE',
   },
   roleChipHod: { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' },
-  roleChipText: { fontSize: 11, fontWeight: '700', color: facultyTheme.primaryLight },
+  roleChipText: { fontSize: 10, fontWeight: '700', color: facultyTheme.primaryLight },
   roleChipTextHod: { color: '#92400E' },
-  completionWrap: {
-    width: '90%',
-    marginTop: 8,
-    backgroundColor: facultyTheme.surface,
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: facultyTheme.border,
+  completionRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  completionLabel: { fontSize: 13, fontWeight: '700', color: facultyTheme.text },
+  completionPct: { fontSize: 13, fontWeight: '800', color: '#2563EB' },
+  completionTrack: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 99,
+    overflow: 'hidden',
   },
-  completionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  completionLabel: { fontSize: 11, color: facultyTheme.textMuted, fontWeight: '600' },
-  completionPct: { fontSize: 11, fontWeight: '800' },
-  completionTrack: { height: 6, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' },
-  completionFill: { height: 6, borderRadius: 4 },
-  name: { fontSize: 18, fontWeight: '800', color: facultyTheme.text },
-  meta: { fontSize: 13, color: facultyTheme.textMuted, fontWeight: '600' },
-  section: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: facultyTheme.text,
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  row: {
-    backgroundColor: facultyTheme.surface,
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: facultyTheme.border,
-  },
-  rowLabel: { fontSize: 12, color: facultyTheme.textMuted, fontWeight: '600' },
-  rowValue: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: facultyTheme.text,
-    flexShrink: 1,
-    textAlign: 'right',
-  },
-  payslipBtn: {
-    marginTop: 8,
-    borderRadius: 12,
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    paddingVertical: 12,
+  completionFill: { height: 8, borderRadius: 99, backgroundColor: '#2563EB' },
+  completionHint: { fontSize: 12, color: facultyTheme.textMuted },
+  cardTitle: { fontSize: 15, fontWeight: '800', color: facultyTheme.text },
+  infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  infoCell: { width: '47%', flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  infoCopy: { flex: 1, gap: 2 },
+  infoLabel: { fontSize: 11, color: facultyTheme.textMuted, fontWeight: '600' },
+  infoValue: { fontSize: 12, fontWeight: '800', color: facultyTheme.text },
+  infoMuted: { color: '#9CA3AF', fontWeight: '700' },
+  iconBubble: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  payslipBtnText: { color: facultyTheme.primaryLight, fontWeight: '700', fontSize: 13 },
-  linkBtn: {
-    borderRadius: 12,
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  linkBtnText: { color: facultyTheme.primaryLight, fontWeight: '700', fontSize: 13 },
+  iconText: { fontSize: 14 },
+  leaveRow: { flexDirection: 'row', gap: 8 },
+  leaveCard: { flex: 1, borderRadius: 14, padding: 10, gap: 4, minHeight: 78 },
+  leaveValue: { fontSize: 16, fontWeight: '800' },
+  leaveLabel: { fontSize: 11, color: '#4B5563', fontWeight: '600' },
+  payrollValue: { fontSize: 18, fontWeight: '800', color: facultyTheme.text },
+  payrollStatus: { fontSize: 12, color: facultyTheme.textMuted, fontWeight: '600' },
+  textLink: { paddingVertical: 4 },
+  textLinkLabel: { color: '#2563EB', fontWeight: '700', fontSize: 13 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  actionCopy: { flex: 1, gap: 1 },
+  actionTitle: { fontSize: 14, fontWeight: '700', color: facultyTheme.text },
+  actionSubtitle: { fontSize: 11, color: facultyTheme.textMuted },
+  chevron: { fontSize: 22, color: '#9CA3AF', fontWeight: '400' },
   logout: {
-    marginTop: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FECACA',
