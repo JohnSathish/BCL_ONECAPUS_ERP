@@ -26,6 +26,14 @@ export type UserSummary = {
   pending: number;
   suspended: number;
   blocked: number;
+  audiences?: {
+    students: number;
+    faculty: number;
+    staff: number;
+    parents: number;
+    alumni: number;
+    others: number;
+  };
 };
 
 export type PortalUsersListResponse = {
@@ -140,6 +148,8 @@ export type PortalUserFilters = {
   shiftId?: string;
   campusId?: string;
   status?: string;
+  /** students | faculty | staff | parents | alumni | others */
+  audience?: string;
   page?: number;
   limit?: number;
 };

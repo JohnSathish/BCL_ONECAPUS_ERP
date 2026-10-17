@@ -26,35 +26,68 @@ export class UsersService {
   ) {}
 
   async getSummary(tenantId: string) {
-    const [total, active, inactive, pending, suspended, blocked] =
-      await Promise.all([
-        this.prisma.user.count({ where: { tenantId, deletedAt: null } }),
-        this.prisma.user.count({
-          where: {
-            tenantId,
-            deletedAt: null,
-            accountStatus: 'active',
-            isActive: true,
-          },
-        }),
-        this.prisma.user.count({
-          where: {
-            tenantId,
-            deletedAt: null,
-            OR: [{ isActive: false }, { accountStatus: 'inactive' }],
-          },
-        }),
-        this.prisma.user.count({
-          where: { tenantId, deletedAt: null, accountStatus: 'pending' },
-        }),
-        this.prisma.user.count({
-          where: { tenantId, deletedAt: null, accountStatus: 'suspended' },
-        }),
-        this.prisma.user.count({
-          where: { tenantId, deletedAt: null, accountStatus: 'blocked' },
-        }),
-      ]);
-    return { total, active, inactive, pending, suspended, blocked };
+    const base = { tenantId, deletedAt: null };
+    const [
+      total,
+      active,
+      inactive,
+      pending,
+      suspended,
+      blocked,
+      students,
+      faculty,
+      staff,
+      parents,
+      alumni,
+      others,
+    ] = await Promise.all([
+      this.prisma.user.count({ where: base }),
+      this.prisma.user.count({
+        where: { ...base, accountStatus: 'active', isActive: true },
+      }),
+      this.prisma.user.count({
+        where: {
+          ...base,
+          OR: [{ isActive: false }, { accountStatus: 'inactive' }],
+        },
+      }),
+      this.prisma.user.count({
+        where: { ...base, accountStatus: 'pending' },
+      }),
+      this.prisma.user.count({
+        where: { ...base, accountStatus: 'suspended' },
+      }),
+      this.prisma.user.count({
+        where: { ...base, accountStatus: 'blocked' },
+      }),
+      this.prisma.user.count({
+        where: { AND: [base, this.audienceWhere('students')!] },
+      }),
+      this.prisma.user.count({
+        where: { AND: [base, this.audienceWhere('faculty')!] },
+      }),
+      this.prisma.user.count({
+        where: { AND: [base, this.audienceWhere('staff')!] },
+      }),
+      this.prisma.user.count({
+        where: { AND: [base, this.audienceWhere('parents')!] },
+      }),
+      this.prisma.user.count({
+        where: { AND: [base, this.audienceWhere('alumni')!] },
+      }),
+      this.prisma.user.count({
+        where: { AND: [base, this.audienceWhere('others')!] },
+      }),
+    ]);
+    return {
+      total,
+      active,
+      inactive,
+      pending,
+      suspended,
+      blocked,
+      audiences: { students, faculty, staff, parents, alumni, others },
+    };
   }
 
   async list(tenantId: string, query: ListUsersQueryDto) {
@@ -68,54 +101,56 @@ export class UsersService {
     const sortDir = query.sortDir === 'asc' ? 'asc' : 'desc';
 
     const where: Prisma.UserWhereInput = {
-      tenantId,
-      deletedAt: null,
+      AND: [
+        { tenantId, deletedAt: null },
+        ...(query.status ? [{ accountStatus: query.status }] : []),
+        ...(query.role
+          ? [
+              {
+                roles: {
+                  some: { deletedAt: null, role: { slug: query.role } },
+                },
+              },
+            ]
+          : []),
+        ...(query.shiftId
+          ? [{ shiftAssignments: { some: { shiftId: query.shiftId } } }]
+          : []),
+        ...(query.search?.trim()
+          ? [{ OR: this.searchWhere(query.search.trim()) }]
+          : []),
+        ...(query.campusId
+          ? [
+              {
+                OR: [
+                  { student: { campusId: query.campusId } },
+                  {
+                    roles: {
+                      some: { campusId: query.campusId, deletedAt: null },
+                    },
+                  },
+                ],
+              },
+            ]
+          : []),
+        ...(query.departmentId
+          ? [
+              {
+                OR: [
+                  { student: { departmentId: query.departmentId } },
+                  { staffProfile: { departmentId: query.departmentId } },
+                ],
+              },
+            ]
+          : []),
+        ...(query.programVersionId
+          ? [{ student: { programVersionId: query.programVersionId } }]
+          : []),
+        ...(this.audienceWhere(query.audience)
+          ? [this.audienceWhere(query.audience)!]
+          : []),
+      ],
     };
-
-    if (query.status) {
-      where.accountStatus = query.status;
-    }
-    if (query.search?.trim()) {
-      const term = query.search.trim();
-      where.OR = [
-        { email: { contains: term, mode: 'insensitive' } },
-        { username: { contains: term, mode: 'insensitive' } },
-        { displayName: { contains: term, mode: 'insensitive' } },
-        { phone: { contains: term, mode: 'insensitive' } },
-        {
-          student: {
-            masterProfile: {
-              fullName: { contains: term, mode: 'insensitive' },
-            },
-          },
-        },
-      ];
-    }
-    if (query.role) {
-      where.roles = {
-        some: { deletedAt: null, role: { slug: query.role } },
-      };
-    }
-    if (query.shiftId) {
-      where.shiftAssignments = { some: { shiftId: query.shiftId } };
-    }
-    if (query.campusId) {
-      where.OR = [
-        ...(where.OR ?? []),
-        { student: { campusId: query.campusId } },
-        { roles: { some: { campusId: query.campusId, deletedAt: null } } },
-      ];
-    }
-    if (query.departmentId) {
-      where.OR = [
-        ...(where.OR ?? []),
-        { student: { departmentId: query.departmentId } },
-        { staffProfile: { departmentId: query.departmentId } },
-      ];
-    }
-    if (query.programVersionId) {
-      where.student = { programVersionId: query.programVersionId };
-    }
 
     const orderBy: Prisma.UserOrderByWithRelationInput =
       sortBy === 'email'
@@ -145,6 +180,7 @@ export class UsersService {
             include: {
               masterProfile: { select: { fullName: true, mobileNumber: true } },
               department: { select: { id: true, name: true, code: true } },
+              primaryShift: { select: { id: true, name: true, code: true } },
               programVersion: {
                 select: {
                   id: true,
@@ -156,6 +192,7 @@ export class UsersService {
           staffProfile: {
             include: {
               department: { select: { id: true, name: true, code: true } },
+              primaryShift: { select: { id: true, name: true, code: true } },
             },
           },
         },
@@ -186,12 +223,14 @@ export class UsersService {
     student: {
       masterProfile: { fullName: string; mobileNumber: string | null } | null;
       department: { id: string; name: string; code: string } | null;
+      primaryShift?: { id: string; name: string; code: string } | null;
       programVersion: {
         program: { name: string; code: string };
       } | null;
     } | null;
     staffProfile: {
       department: { id: string; name: string; code: string } | null;
+      primaryShift?: { id: string; name: string; code: string } | null;
     } | null;
   }) {
     const name =
@@ -204,6 +243,8 @@ export class UsersService {
     const primaryShift =
       u.shiftAssignments.find((s) => s.isPrimary)?.shift ??
       u.shiftAssignments[0]?.shift ??
+      u.staffProfile?.primaryShift ??
+      u.student?.primaryShift ??
       null;
     const programme = u.student?.programVersion?.program ?? null;
 
@@ -227,6 +268,105 @@ export class UsersService {
       hasStaffProfile: !!u.staffProfile,
       createdAt: u.createdAt,
     };
+  }
+
+  private searchWhere(term: string): Prisma.UserWhereInput[] {
+    return [
+      { email: { contains: term, mode: 'insensitive' } },
+      { username: { contains: term, mode: 'insensitive' } },
+      { displayName: { contains: term, mode: 'insensitive' } },
+      { phone: { contains: term, mode: 'insensitive' } },
+      {
+        student: {
+          masterProfile: {
+            fullName: { contains: term, mode: 'insensitive' },
+          },
+        },
+      },
+      {
+        staffProfile: {
+          fullName: { contains: term, mode: 'insensitive' },
+        },
+      },
+      {
+        roles: {
+          some: {
+            deletedAt: null,
+            role: { name: { contains: term, mode: 'insensitive' } },
+          },
+        },
+      },
+      {
+        student: {
+          department: { name: { contains: term, mode: 'insensitive' } },
+        },
+      },
+      {
+        staffProfile: {
+          department: { name: { contains: term, mode: 'insensitive' } },
+        },
+      },
+    ];
+  }
+
+  private audienceWhere(audience?: string): Prisma.UserWhereInput | null {
+    const roleSlugs = (slugs: string[]): Prisma.UserWhereInput => ({
+      roles: {
+        some: { deletedAt: null, role: { slug: { in: slugs } } },
+      },
+    });
+    switch (String(audience ?? '').toLowerCase()) {
+      case 'students':
+        return { student: { is: { deletedAt: null } } };
+      case 'faculty':
+        return {
+          OR: [
+            {
+              staffProfile: {
+                is: { deletedAt: null, staffType: 'TEACHING' },
+              },
+            },
+            roleSlugs(['faculty']),
+          ],
+        };
+      case 'staff':
+        return {
+          staffProfile: {
+            is: { deletedAt: null, staffType: { not: 'TEACHING' } },
+          },
+        };
+      case 'parents':
+        return roleSlugs(['parent', 'guardian', 'parents']);
+      case 'alumni':
+        return roleSlugs(['alumni']);
+      case 'others':
+        return {
+          student: { is: null },
+          OR: [
+            { staffProfile: { is: null } },
+            { staffProfile: { is: { deletedAt: { not: null } } } },
+          ],
+          roles: {
+            none: {
+              deletedAt: null,
+              role: {
+                slug: {
+                  in: [
+                    'parent',
+                    'guardian',
+                    'parents',
+                    'alumni',
+                    'faculty',
+                    'student',
+                  ],
+                },
+              },
+            },
+          },
+        };
+      default:
+        return null;
+    }
   }
 
   async getById(tenantId: string, id: string) {

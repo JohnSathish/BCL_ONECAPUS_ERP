@@ -1,11 +1,9 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Upload } from 'lucide-react';
+import { Plus, Search, Upload, Download, Users, UserCheck, UserX, Clock3, Ban } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { AdminKpiStrip } from '@/components/administration-module/admin-kpi-strip';
-import { AdminPageHeader } from '@/components/administration-module/admin-page-header';
 import { PasswordResetSuccessDialog } from '@/components/administration-module/password-reset-success-dialog';
 import { PortalUserDrawer } from '@/components/administration-module/portal-user-drawer';
 import { PortalUsersBulkBar } from '@/components/administration-module/portal-users-bulk-bar';
@@ -18,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { useAdminPermissions } from '@/hooks/use-admin-permissions';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { fetchDepartments } from '@/services/organization';
+import { fetchShifts } from '@/services/shifts';
 import {
   activatePortalUser,
   bulkActivateUsers,
@@ -38,6 +38,26 @@ import { storeAdminSessionBackup } from '@/components/administration-module/impe
 import { useAuthStore } from '@/store/auth-store';
 import type { PortalUserFilters, PortalUserRow } from '@/types/administration';
 import { apiErrorMessage } from '@/utils/api-error';
+import { cn } from '@/utils/cn';
+
+const AUDIENCE_TABS = [
+  { id: '', label: 'All Users', countKey: 'total' as const },
+  { id: 'students', label: 'Students', countKey: 'students' as const },
+  { id: 'faculty', label: 'Faculty', countKey: 'faculty' as const },
+  { id: 'staff', label: 'Staff', countKey: 'staff' as const },
+  { id: 'parents', label: 'Parents', countKey: 'parents' as const },
+  { id: 'alumni', label: 'Alumni', countKey: 'alumni' as const },
+  { id: 'others', label: 'Others', countKey: 'others' as const },
+];
+
+function percentOf(part: number, total: number) {
+  if (!total) return '0%';
+  return `${((part / total) * 100).toFixed(1)}%`;
+}
+
+function csvCell(value: string) {
+  return `"${value.replace(/"/g, '""')}"`;
+}
 
 export function PortalUsersPage() {
   useRequireAuth();
@@ -46,7 +66,8 @@ export function PortalUsersPage() {
   const session = useAuthStore((s) => s.session);
   const setSession = useAuthStore((s) => s.setSession);
 
-  const [filters, setFilters] = useState<PortalUserFilters>({ page: 1, limit: 25 });
+  const [filters, setFilters] = useState<PortalUserFilters>({ page: 1, limit: 10 });
+  const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [passwordDialog, setPasswordDialog] = useState<{
@@ -77,6 +98,14 @@ export function PortalUsersPage() {
   const rolesQ = useQuery({
     queryKey: ['admin', 'roles'],
     queryFn: fetchRoles,
+  });
+  const departmentsQ = useQuery({
+    queryKey: ['organization', 'departments', 'portal-users'],
+    queryFn: () => fetchDepartments({ status: 'ACTIVE' }),
+  });
+  const shiftsQ = useQuery({
+    queryKey: ['shifts', 'portal-users'],
+    queryFn: () => fetchShifts({ status: 'ACTIVE' }),
   });
 
   const invalidate = () => {
@@ -119,78 +148,265 @@ export function PortalUsersPage() {
     },
   });
 
+  const summary = summaryQ.data;
+  const audiences = summary?.audiences;
+  const page = filters.page ?? 1;
+  const limit = filters.limit ?? 10;
+  const total = usersQ.data?.total ?? 0;
+  const totalPages = usersQ.data?.totalPages ?? 1;
+  const from = total === 0 ? 0 : (page - 1) * limit + 1;
+  const to = Math.min(page * limit, total);
+  const pageButtons = useMemo(() => {
+    const items: Array<number | 'gap'> = [];
+    const start = Math.max(1, page - 2);
+    const end = Math.min(totalPages, start + 4);
+    if (start > 1) items.push(1);
+    if (start > 2) items.push('gap');
+    for (let number = Math.max(start, 1); number <= end; number += 1) {
+      if (!items.includes(number)) items.push(number);
+    }
+    if (end < totalPages - 1) items.push('gap');
+    if (end < totalPages) items.push(totalPages);
+    return items;
+  }, [page, totalPages]);
+
+  const exportUsers = async () => {
+    setExporting(true);
+    try {
+      const collected: PortalUserRow[] = [];
+      let nextPage = 1;
+      let pages = 1;
+      while (nextPage <= pages && nextPage <= 40) {
+        const batch = await fetchPortalUsers({ ...queryFilters, page: nextPage, limit: 100 });
+        collected.push(...batch.items);
+        pages = batch.totalPages;
+        nextPage += 1;
+      }
+      const header = [
+        'Name',
+        'Email',
+        'Username',
+        'Role',
+        'Department',
+        'Shift',
+        'Status',
+        'Last login',
+      ];
+      const lines = [
+        header.map(csvCell).join(','),
+        ...collected.map((row) =>
+          [
+            row.name,
+            row.email,
+            row.username ?? '',
+            row.roles.map((role) => role.name).join('; '),
+            row.department?.name ?? '',
+            row.shift?.name ?? '',
+            row.accountStatus,
+            row.lastLoginAt ?? '',
+          ]
+            .map(csvCell)
+            .join(','),
+        ),
+      ];
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'portal-users.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const statCards = summary
+    ? [
+        {
+          label: 'Total Users',
+          value: summary.total,
+          hint: 'All registered users',
+          icon: Users,
+          iconClass: 'bg-sky-100 text-sky-600',
+          onClick: () => setFilters((current) => ({ ...current, status: undefined, page: 1 })),
+        },
+        {
+          label: 'Active',
+          value: summary.active,
+          hint: percentOf(summary.active, summary.total),
+          icon: UserCheck,
+          iconClass: 'bg-emerald-100 text-emerald-600',
+          onClick: () => setFilters((current) => ({ ...current, status: 'active', page: 1 })),
+        },
+        {
+          label: 'Inactive',
+          value: summary.inactive,
+          hint: percentOf(summary.inactive, summary.total),
+          icon: UserX,
+          iconClass: 'bg-slate-100 text-slate-500',
+          onClick: () => setFilters((current) => ({ ...current, status: 'inactive', page: 1 })),
+        },
+        {
+          label: 'Pending',
+          value: summary.pending,
+          hint: percentOf(summary.pending, summary.total),
+          icon: Clock3,
+          iconClass: 'bg-amber-100 text-amber-600',
+          onClick: () => setFilters((current) => ({ ...current, status: 'pending', page: 1 })),
+        },
+        {
+          label: 'Suspended',
+          value: summary.suspended,
+          hint: percentOf(summary.suspended, summary.total),
+          icon: Ban,
+          iconClass: 'bg-rose-100 text-rose-600',
+          onClick: () => setFilters((current) => ({ ...current, status: 'suspended', page: 1 })),
+        },
+      ]
+    : [];
+
   return (
-    <DashboardShell role="admin" title="Portal Users">
+    <DashboardShell role="admin" title="Portal Users" pageHeader={false}>
       <AdminShell>
-        <AdminPageHeader
-          title="Portal Users"
-          subtitle="Centralized ERP login account management"
-          actions={
-            canManageUsers ? (
-              <>
-                <Link
-                  href="/admin/administration/import-export"
-                  className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-muted"
-                >
-                  <Upload className="mr-1 h-4 w-4" /> Bulk import
-                </Link>
-                <Button
-                  size="sm"
-                  onClick={() => setDrawer({ open: true, mode: 'create', user: null })}
-                >
-                  <Plus className="mr-1 h-4 w-4" /> Add user
-                </Button>
-              </>
-            ) : null
-          }
-        />
-
-        {summaryQ.data ? (
-          <AdminKpiStrip
-            items={[
-              { label: 'Total', value: summaryQ.data.total },
-              { label: 'Active', value: summaryQ.data.active, tone: 'text-emerald-600' },
-              { label: 'Inactive', value: summaryQ.data.inactive },
-              {
-                label: 'Pending',
-                value: summaryQ.data.pending,
-                tone: 'text-amber-600',
-                onClick: () => setFilters((f) => ({ ...f, status: 'pending', page: 1 })),
-              },
-              { label: 'Suspended', value: summaryQ.data.suspended, tone: 'text-orange-600' },
-            ]}
-          />
-        ) : null}
-
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative max-w-md flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-9"
-              placeholder="Search name, email, username…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Portal Users</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage ERP login accounts for students, staff, parents and other users.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {canManageUsers ? (
+              <Link
+                href="/admin/administration/import-export"
+                className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700"
+              >
+                <Upload className="mr-2 h-4 w-4" /> Bulk Import
+              </Link>
+            ) : null}
+            <Button
+              variant="outline"
+              className="h-10"
+              onClick={() => void exportUsers()}
+              disabled={exporting}
+            >
+              <Download className="mr-2 h-4 w-4" /> {exporting ? 'Exporting…' : 'Export'}
+            </Button>
+            {canManageUsers ? (
+              <Button
+                className="h-10 bg-[#1d4ed8] hover:bg-[#1e40af]"
+                onClick={() => setDrawer({ open: true, mode: 'create', user: null })}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add User
+              </Button>
+            ) : null}
           </div>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {statCards.map((card) => (
+            <button
+              key={card.label}
+              type="button"
+              onClick={card.onClick}
+              className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-sky-200"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm text-slate-500">{card.label}</p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
+                    {card.value.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">{card.hint}</p>
+                </div>
+                <span
+                  className={cn(
+                    'flex h-10 w-10 items-center justify-center rounded-xl',
+                    card.iconClass,
+                  )}
+                >
+                  <card.icon className="h-5 w-5" />
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="relative min-w-[240px] flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              className="h-10 rounded-lg border-slate-200 pl-9"
+              placeholder="Search by name, email, username, role, department…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
           <PortalUsersFilterRail
             filters={filters}
             roles={roles}
+            departments={(departmentsQ.data ?? []).map((department) => ({
+              id: department.id,
+              name: department.name,
+            }))}
+            shifts={(shiftsQ.data ?? []).map((shift) => ({ id: shift.id, name: shift.name }))}
             onChange={(next) => {
               setFilters(next);
+              setSelectedIds(new Set());
+            }}
+            onReset={() => {
+              setSearch('');
+              setFilters({ page: 1, limit });
               setSelectedIds(new Set());
             }}
           />
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex gap-2 overflow-x-auto border-b border-slate-100 px-3 py-3">
+            {AUDIENCE_TABS.map((tab) => {
+              const active = (filters.audience ?? '') === tab.id;
+              const count = tab.countKey === 'total' ? summary?.total : audiences?.[tab.countKey];
+              return (
+                <button
+                  key={tab.id || 'all'}
+                  type="button"
+                  onClick={() => {
+                    setFilters((current) => ({
+                      ...current,
+                      audience: tab.id || undefined,
+                      page: 1,
+                    }));
+                    setSelectedIds(new Set());
+                  }}
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium',
+                    active ? 'bg-[#1d4ed8] text-white' : 'text-slate-600 hover:bg-slate-50',
+                  )}
+                >
+                  {tab.label}
+                  {count != null ? (
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 text-xs',
+                        active ? 'bg-white/20' : 'bg-slate-100 text-slate-500',
+                      )}
+                    >
+                      {count.toLocaleString()}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+
           {usersQ.isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading users…</p>
+            <p className="px-4 py-10 text-sm text-muted-foreground">Loading users…</p>
           ) : (
             <PortalUsersTable
               rows={rows}
+              rowOffset={(page - 1) * limit}
               selectedIds={selectedIds}
               onToggle={(id) => {
                 const next = new Set(selectedIds);
@@ -254,33 +470,68 @@ export function PortalUsersPage() {
               canImpersonate={canImpersonate}
             />
           )}
-        </div>
 
-        {usersQ.data && usersQ.data.totalPages > 1 ? (
-          <div className="mt-4 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              Page {usersQ.data.page} of {usersQ.data.totalPages} · {usersQ.data.total} users
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm text-slate-500">
+            <span>
+              Showing {from} to {to} of {total.toLocaleString()} users
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm"
+                value={limit}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    limit: Number(event.target.value),
+                    page: 1,
+                  }))
+                }
+                aria-label="Rows per page"
+              >
+                {[10, 25, 50].map((size) => (
+                  <option key={size} value={size}>
+                    {size} per page
+                  </option>
+                ))}
+              </select>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={(filters.page ?? 1) <= 1}
-                onClick={() => setFilters((f) => ({ ...f, page: (f.page ?? 1) - 1 }))}
+                disabled={page <= 1}
+                onClick={() => setFilters((current) => ({ ...current, page: page - 1 }))}
               >
                 Previous
               </Button>
+              {pageButtons.map((item, index) =>
+                item === 'gap' ? (
+                  <span key={`gap-${index}`} className="px-1">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setFilters((current) => ({ ...current, page: item }))}
+                    className={cn(
+                      'h-8 min-w-8 rounded-md px-2 text-sm',
+                      item === page ? 'bg-[#1d4ed8] text-white' : 'hover:bg-slate-100',
+                    )}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
               <Button
                 variant="outline"
                 size="sm"
-                disabled={(filters.page ?? 1) >= usersQ.data.totalPages}
-                onClick={() => setFilters((f) => ({ ...f, page: (f.page ?? 1) + 1 }))}
+                disabled={page >= totalPages}
+                onClick={() => setFilters((current) => ({ ...current, page: page + 1 }))}
               >
                 Next
               </Button>
             </div>
           </div>
-        ) : null}
+        </div>
 
         <PortalUsersBulkBar
           count={selectedIds.size}

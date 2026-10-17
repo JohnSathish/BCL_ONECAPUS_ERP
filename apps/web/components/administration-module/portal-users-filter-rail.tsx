@@ -1,58 +1,109 @@
 'use client';
 
 import type { PortalUserFilters } from '@/types/administration';
-import { cn } from '@/utils/cn';
-import { AdminGlassCard } from './ui/admin-shell';
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'All statuses' },
+  { value: '', label: 'All Statuses' },
   { value: 'active', label: 'Active' },
   { value: 'pending', label: 'Pending' },
   { value: 'suspended', label: 'Suspended' },
   { value: 'blocked', label: 'Blocked' },
+  { value: 'inactive', label: 'Inactive' },
 ];
+
+const selectClass =
+  'h-10 min-w-[140px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700';
 
 export function PortalUsersFilterRail({
   filters,
   roles,
+  departments,
+  shifts,
   onChange,
+  onReset,
 }: {
   filters: PortalUserFilters;
   roles: { slug: string; name: string }[];
+  departments: { id: string; name: string }[];
+  shifts: { id: string; name: string }[];
   onChange: (next: PortalUserFilters) => void;
+  onReset: () => void;
 }) {
-  const chip = (active: boolean) =>
-    cn(
-      'rounded-full px-3 py-1.5 text-xs font-medium transition',
-      active
-        ? 'bg-primary text-primary-foreground shadow-sm'
-        : 'bg-muted/60 text-muted-foreground hover:bg-muted',
-    );
-
   return (
-    <AdminGlassCard className="flex flex-wrap items-center gap-2 p-3">
+    <div className="flex flex-wrap items-center gap-2">
       <select
-        className="h-8 rounded-full border-0 bg-muted/60 px-3 text-xs"
+        className={selectClass}
         value={filters.role ?? ''}
-        onChange={(e) => onChange({ ...filters, role: e.target.value || undefined, page: 1 })}
+        onChange={(event) =>
+          onChange({ ...filters, role: event.target.value || undefined, page: 1 })
+        }
+        aria-label="Role"
       >
-        <option value="">All roles</option>
-        {roles.map((r) => (
-          <option key={r.slug} value={r.slug}>
-            {r.name}
+        <option value="">All Roles</option>
+        {roles.map((role) => (
+          <option key={role.slug} value={role.slug}>
+            {role.name}
           </option>
         ))}
       </select>
-      {STATUS_OPTIONS.map((s) => (
-        <button
-          key={s.value || 'all'}
-          type="button"
-          className={chip(filters.status === s.value || (!filters.status && !s.value))}
-          onClick={() => onChange({ ...filters, status: s.value || undefined, page: 1 })}
-        >
-          {s.label}
-        </button>
-      ))}
-    </AdminGlassCard>
+      <select
+        className={selectClass}
+        value={filters.departmentId ?? ''}
+        onChange={(event) =>
+          onChange({ ...filters, departmentId: event.target.value || undefined, page: 1 })
+        }
+        aria-label="Department"
+      >
+        <option value="">All Departments</option>
+        {departments.map((department) => (
+          <option key={department.id} value={department.id}>
+            {department.name}
+          </option>
+        ))}
+      </select>
+      <select
+        className={selectClass}
+        value={filters.shiftId ?? ''}
+        onChange={(event) =>
+          onChange({ ...filters, shiftId: event.target.value || undefined, page: 1 })
+        }
+        aria-label="Shift"
+      >
+        <option value="">All Shifts</option>
+        {shifts.map((shift) => (
+          <option key={shift.id} value={shift.id}>
+            {shift.name}
+          </option>
+        ))}
+      </select>
+      <select
+        className={selectClass}
+        value={filters.status ?? ''}
+        onChange={(event) =>
+          onChange({ ...filters, status: event.target.value || undefined, page: 1 })
+        }
+        aria-label="Status"
+      >
+        {STATUS_OPTIONS.map((status) => (
+          <option key={status.value || 'all'} value={status.value}>
+            {status.label}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="inline-flex h-10 items-center rounded-lg bg-[#1d4ed8] px-4 text-sm font-semibold text-white"
+        onClick={() => onChange({ ...filters, page: 1 })}
+      >
+        Filter
+      </button>
+      <button
+        type="button"
+        className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600"
+        onClick={onReset}
+      >
+        Reset
+      </button>
+    </div>
   );
 }

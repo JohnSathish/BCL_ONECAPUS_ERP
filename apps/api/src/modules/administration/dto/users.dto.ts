@@ -33,6 +33,11 @@ export class ListUsersQueryDto {
   @IsString()
   status?: string;
 
+  /** students | faculty | staff | parents | alumni | others */
+  @IsOptional()
+  @IsString()
+  audience?: string;
+
   @IsOptional()
   @IsUUID()
   programVersionId?: string;
