@@ -1414,6 +1414,17 @@ export class TimetableEngineService {
           select: { id: true, code: true, name: true },
         })
       : null;
+    const meta = (plan.metadata ?? {}) as {
+      streamName?: string;
+      semesterMode?: string;
+    };
+    const streamName =
+      meta.streamName?.trim() || plan.name.split('·')[0]?.trim() || null;
+    const semesterMode = meta.semesterMode
+      ? String(meta.semesterMode)
+          .replace(/semester/gi, '')
+          .trim()
+      : null;
     const rows = await this.withSectionSubjects(
       user.tid,
       (matrix.rows ?? []).map(
@@ -1424,6 +1435,8 @@ export class TimetableEngineService {
             shiftId: shift?.id ?? plan.shiftId ?? null,
             shiftCode: shift?.code ?? null,
             shiftName: shift?.name ?? null,
+            streamName,
+            semesterMode,
           })),
         }),
       ),

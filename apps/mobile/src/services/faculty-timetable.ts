@@ -14,6 +14,8 @@ export type FacultyTimetableEntry = {
   sectionCode?: string | null;
   semesterSequence?: number | null;
   shiftName?: string | null;
+  streamName?: string | null;
+  semesterMode?: string | null;
   slotType?: string;
   fyugpCategory?: string | null;
 };
@@ -100,6 +102,8 @@ export function groupTimetableByDay(timetable: FacultyWeekTimetable) {
         semesterNo: entry.semesterSequence,
         classroom: entry.classroom?.name ?? entry.classroom?.code ?? null,
         shiftName: entry.shiftName ?? null,
+        streamName: entry.streamName ?? null,
+        semesterMode: entry.semesterMode ?? null,
         slotType: entry.slotType,
       });
     }
@@ -123,5 +127,7 @@ export type FacultyTimetableSlot = {
   semesterNo?: number | null;
   classroom?: string | null;
   shiftName?: string | null;
+  streamName?: string | null;
+  semesterMode?: string | null;
   slotType?: string;
 };
