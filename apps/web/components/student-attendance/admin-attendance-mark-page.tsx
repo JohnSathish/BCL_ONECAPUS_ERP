@@ -23,6 +23,7 @@ export function AdminAttendanceMarkPage() {
   const searchParams = useSearchParams();
   const [date, setDate] = useState(() => searchParams.get('date') || institutionDateKey());
   const [departmentId, setDepartmentId] = useState('');
+  const [semesterFilter, setSemesterFilter] = useState('');
   const [periodFilter, setPeriodFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('session'));
@@ -80,14 +81,22 @@ export function AdminAttendanceMarkPage() {
       );
     });
   }, [departmentId, sessions.data]);
+  const semesterOptions = useMemo(() => {
+    const values = new Set<number>();
+    for (const row of visibleSessions) {
+      if (row.semesterNo != null) values.add(row.semesterNo);
+    }
+    return [...values].sort((a, b) => a - b);
+  }, [visibleSessions]);
   const periodOptions = useMemo(() => {
     const values = new Set<string>();
     for (const row of visibleSessions) {
+      if (semesterFilter && String(row.semesterNo ?? '') !== semesterFilter) continue;
       if (typeFilter && row.sessionType !== typeFilter) continue;
       if (row.periodNo != null) values.add(String(row.periodNo));
     }
     return [...values].sort((a, b) => Number(a) - Number(b));
-  }, [typeFilter, visibleSessions]);
+  }, [semesterFilter, typeFilter, visibleSessions]);
   const typeOptions = useMemo(() => {
     const values = new Set<string>();
     for (const row of visibleSessions) {
@@ -98,11 +107,12 @@ export function AdminAttendanceMarkPage() {
   const filteredSessions = useMemo(
     () =>
       visibleSessions.filter((row) => {
+        if (semesterFilter && String(row.semesterNo ?? '') !== semesterFilter) return false;
         if (typeFilter && row.sessionType !== typeFilter) return false;
         if (periodFilter && String(row.periodNo ?? '') !== periodFilter) return false;
         return true;
       }),
-    [periodFilter, typeFilter, visibleSessions],
+    [periodFilter, semesterFilter, typeFilter, visibleSessions],
   );
 
   useEffect(() => {
@@ -122,22 +132,20 @@ export function AdminAttendanceMarkPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Mark Attendance</h1>
-          <p className="text-sm text-muted-foreground">
-            Choose the date, department, and class to mark student attendance.
-            {calendarDay.data
-              ? ` This month has ${calendarDay.data.month.workingDays} working days on the academic calendar.`
-              : ''}
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Choose the semester, then the class. Semester 1, 3, and 5 are listed when that day’s
+          timetable has those classes.
+          {calendarDay.data
+            ? ` This month has ${calendarDay.data.month.workingDays} working days on the academic calendar.`
+            : ''}
+        </p>
         <Button asChild variant="outline" size="sm">
           <Link href="/admin/academics/attendance">Control Center</Link>
         </Button>
       </div>
 
       <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
           <Field label="Date">
             <input
               type="date"
@@ -168,6 +176,24 @@ export function AdminAttendanceMarkPage() {
               ))}
             </select>
           </Field>
+          <Field label="Semester">
+            <select
+              value={semesterFilter}
+              onChange={(event) => {
+                setSemesterFilter(event.target.value);
+                setSelectedId(null);
+              }}
+              className={fieldClass}
+              aria-label="Semester"
+            >
+              <option value="">All semesters</option>
+              {semesterOptions.map((semester) => (
+                <option key={semester} value={String(semester)}>
+                  Semester {semester}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Class / Subject">
             <select
               value={selectedId ?? ''}
@@ -178,6 +204,7 @@ export function AdminAttendanceMarkPage() {
               <option value="">Select a class</option>
               {filteredSessions.map((session) => (
                 <option key={session.id} value={session.id}>
+                  {session.semesterNo ? `Sem ${session.semesterNo} · ` : ''}
                   {session.displayTitle ?? session.course?.title ?? 'Class'}
                 </option>
               ))}
@@ -272,7 +299,7 @@ export function AdminAttendanceMarkPage() {
       {!sessions.isLoading && !filteredSessions.length ? (
         <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
           {(sessions.data ?? []).length
-            ? 'No classes match this department, period, or class type.'
+            ? 'No classes match this semester, department, period, or class type.'
             : 'No classes for this date yet. Generate them from the published timetable.'}
         </div>
       ) : null}
