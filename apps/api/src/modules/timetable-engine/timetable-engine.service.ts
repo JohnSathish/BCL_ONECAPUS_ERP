@@ -1338,92 +1338,152 @@ export class TimetableEngineService {
     const resolvedStaffId = staffProfileId ?? (await this.staffIdForUser(user));
     if (!resolvedStaffId) return { entries: [], rows: [], days: [] };
 
-    if (!filters?.shiftId) {
-      const assignments = await this.prisma.staffShiftAssignment.findMany({
-        where: {
-          tenantId: user.tid,
-          staffProfileId: resolvedStaffId,
-          active: true,
-        },
-        include: {
-          shift: { select: { id: true, code: true, name: true } },
-        },
-      });
-      if (assignments.length > 1) {
-        const matrices = await Promise.all(
-          assignments.map((assignment) =>
-            this.facultyWeekSingle(
-              user,
-              resolvedStaffId,
-              {
-                ...filters,
-                shiftId: assignment.shiftId,
-              },
-              assignment.shift,
-            ),
-          ),
-        );
-        return this.mergeFacultyWeekResults(matrices);
-      }
+    const taughtSections = await this.prisma.offeringSection.findMany({
+      where: {
+        tenantId: user.tid,
+        staffProfileId: resolvedStaffId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    const sectionIds = taughtSections.map((row) => row.id);
+    const planWhere = {
+      tenantId: user.tid,
+      status: 'PUBLISHED' as const,
+      deletedAt: null,
+      ...(filters?.shiftId ? { shiftId: filters.shiftId } : {}),
+      ...(filters?.streamId
+        ? {
+            metadata: {
+              path: ['streamId'],
+              equals: filters.streamId,
+            } as any,
+          }
+        : {}),
+    };
+    const matches = await this.prisma.timetablePlanEntry.findMany({
+      where: {
+        tenantId: user.tid,
+        deletedAt: null,
+        status: { not: 'CANCELLED' },
+        plan: planWhere,
+        OR: [
+          { staffProfileId: resolvedStaffId },
+          ...(sectionIds.length
+            ? [{ offeringSectionId: { in: sectionIds } }]
+            : []),
+          { metadata: { string_contains: resolvedStaffId } },
+        ],
+      },
+      select: { id: true, planId: true },
+    });
+    const entryIdsByPlan = new Map<string, string[]>();
+    for (const row of matches) {
+      const list = entryIdsByPlan.get(row.planId) ?? [];
+      if (!list.includes(row.id)) list.push(row.id);
+      entryIdsByPlan.set(row.planId, list);
     }
+    if (!entryIdsByPlan.size) return { entries: [], rows: [], days: [] };
 
-    return this.facultyWeekSingle(user, resolvedStaffId, filters);
+    const matrices = await Promise.all(
+      [...entryIdsByPlan.entries()].map(([planId, entryIds]) =>
+        this.facultyWeekForPlan(user, planId, entryIds),
+      ),
+    );
+    const populated = matrices.filter(
+      (matrix) => (matrix.rows?.length ?? 0) > 0,
+    );
+    if (!populated.length) return { entries: [], rows: [], days: [] };
+    if (populated.length === 1) return populated[0];
+    return this.mergeFacultyWeekResults(populated);
   }
 
-  private async facultyWeekSingle(
+  private async facultyWeekForPlan(
     user: JwtUser,
-    resolvedStaffId: string,
-    filters?: { shiftId?: string; streamId?: string },
-    shiftMeta?: { id: string; code: string; name: string } | null,
+    planId: string,
+    entryIds: string[],
   ) {
-    const staff = await this.prisma.staffProfile.findFirst({
-      where: { tenantId: user.tid, id: resolvedStaffId, deletedAt: null },
-      select: { primaryShiftId: true, teachingShiftCategory: true },
+    const plan = await this.prisma.timetablePlan.findFirst({
+      where: { tenantId: user.tid, id: planId, deletedAt: null },
     });
-
-    const planFilters = { ...filters };
-    if (!planFilters.shiftId) {
-      if (staff?.primaryShiftId) {
-        planFilters.shiftId = staff.primaryShiftId;
-      } else if (staff?.teachingShiftCategory === 'SHIFT_II') {
-        const shiftIi = await this.prisma.shift.findFirst({
-          where: {
-            tenantId: user.tid,
-            code: 'SHIFT_II',
-            deletedAt: null,
-            status: 'ACTIVE',
-          },
-          select: { id: true },
-        });
-        if (shiftIi) planFilters.shiftId = shiftIi.id;
-      }
-    }
-
-    const plan = await this.latestPublishedPlan(user.tid, planFilters);
     if (!plan) return { entries: [], rows: [], days: [] };
-    const matrix = await this.print.matrix(user.tid, plan.id, {
-      staffProfileId: resolvedStaffId,
-    });
-    const shift =
-      shiftMeta ??
-      (plan.shiftId
-        ? await this.prisma.shift.findFirst({
-            where: { tenantId: user.tid, id: plan.shiftId },
-            select: { id: true, code: true, name: true },
-          })
-        : null);
-    const rows = (matrix.rows ?? []).map(
-      (row: { entries?: Record<string, unknown>[] }) => ({
-        ...row,
-        entries: (row.entries ?? []).map((entry) => ({
-          ...entry,
-          shiftId: shift?.id ?? plan.shiftId ?? null,
-          shiftCode: shift?.code ?? null,
-          shiftName: shift?.name ?? null,
-        })),
-      }),
+    const matrix = await this.print.matrix(user.tid, plan.id, { entryIds });
+    const shift = plan.shiftId
+      ? await this.prisma.shift.findFirst({
+          where: { tenantId: user.tid, id: plan.shiftId },
+          select: { id: true, code: true, name: true },
+        })
+      : null;
+    const rows = await this.withSectionSubjects(
+      user.tid,
+      (matrix.rows ?? []).map(
+        (row: { entries?: Record<string, unknown>[] }) => ({
+          ...row,
+          entries: (row.entries ?? []).map((entry) => ({
+            ...entry,
+            shiftId: shift?.id ?? plan.shiftId ?? null,
+            shiftCode: shift?.code ?? null,
+            shiftName: shift?.name ?? null,
+          })),
+        }),
+      ),
     );
     return { plan, ...matrix, rows };
+  }
+
+  private async withSectionSubjects(
+    tenantId: string,
+    rows: Array<{ entries?: Record<string, unknown>[] }>,
+  ) {
+    const sectionIds = [
+      ...new Set(
+        rows.flatMap((row) =>
+          (row.entries ?? [])
+            .filter((entry) => !entry.course && !entry.teachingSubjectGroup)
+            .map((entry) => entry.offeringSectionId)
+            .filter((id): id is string => typeof id === 'string'),
+        ),
+      ),
+    ];
+    if (!sectionIds.length) return rows;
+    const sections = await this.prisma.offeringSection.findMany({
+      where: { tenantId, id: { in: sectionIds } },
+      select: {
+        id: true,
+        sectionCode: true,
+        courseOffering: {
+          select: {
+            semesterSequence: true,
+            course: { select: { code: true, title: true } },
+          },
+        },
+      },
+    });
+    const byId = new Map(sections.map((row) => [row.id, row]));
+    return rows.map((row) => ({
+      ...row,
+      entries: (row.entries ?? []).map((entry) => {
+        if (entry.course || entry.teachingSubjectGroup) return entry;
+        const section =
+          typeof entry.offeringSectionId === 'string'
+            ? byId.get(entry.offeringSectionId)
+            : undefined;
+        const course = section?.courseOffering?.course;
+        if (!course && !entry.fyugpCategory) return entry;
+        return {
+          ...entry,
+          sectionCode: entry.sectionCode ?? section?.sectionCode ?? null,
+          semesterSequence:
+            entry.semesterSequence ??
+            section?.courseOffering?.semesterSequence ??
+            null,
+          course: course ?? {
+            code: String(entry.fyugpCategory ?? ''),
+            title: String(entry.fyugpCategory ?? 'Class'),
+          },
+        };
+      }),
+    }));
   }
 
   private mergeFacultyWeekResults(
@@ -1452,8 +1512,20 @@ export class TimetableEngineService {
       }
     }
     const populated = matrices.find((matrix) => (matrix.rows?.length ?? 0) > 0);
+    const names = [
+      ...new Set(
+        matrices
+          .map((matrix) => (matrix.plan as { name?: string } | undefined)?.name)
+          .filter((name): name is string => Boolean(name)),
+      ),
+    ];
+    const firstPlan = matrices.find((matrix) => matrix.plan)?.plan as
+      | { name?: string }
+      | undefined;
     return {
-      plan: matrices.find((matrix) => matrix.plan)?.plan,
+      plan: firstPlan
+        ? { ...firstPlan, name: names.join(' · ') || firstPlan.name }
+        : undefined,
       days: populated?.days ?? [],
       rows: Array.from(rowMap.values()),
       mergedShifts: true,

@@ -15,6 +15,7 @@ export type FacultyTimetableEntry = {
   semesterSequence?: number | null;
   shiftName?: string | null;
   slotType?: string;
+  fyugpCategory?: string | null;
 };
 
 export type FacultyTimetableRow = {
@@ -83,7 +84,8 @@ export function groupTimetableByDay(timetable: FacultyWeekTimetable) {
         entry.course?.title ??
         entry.teachingSubjectGroup?.title ??
         entry.course?.code ??
-        entry.teachingSubjectGroup?.code;
+        entry.teachingSubjectGroup?.code ??
+        entry.fyugpCategory;
       if (!subject) continue;
 
       const bucket = grouped.get(row.dayOfWeek);

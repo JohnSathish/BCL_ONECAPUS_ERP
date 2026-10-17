@@ -54,6 +54,8 @@ export class TimetablePrintService {
       offeringSectionId?: string;
       semesterSequence?: number;
       sectionCode?: string;
+      /** When set, the grid contains only these classes, even if slot times differ. */
+      entryIds?: string[];
     },
   ) {
     const plan = await this.prisma.timetablePlan.findFirst({
@@ -68,7 +70,8 @@ export class TimetablePrintService {
         tenantId,
         planId,
         deletedAt: null,
-        ...(filters?.staffProfileId
+        ...(filters?.entryIds?.length ? { id: { in: filters.entryIds } } : {}),
+        ...(filters?.staffProfileId && !filters?.entryIds?.length
           ? { staffProfileId: filters.staffProfileId }
           : {}),
         ...(filters?.classroomId ? { classroomId: filters.classroomId } : {}),
@@ -186,6 +189,24 @@ export class TimetablePrintService {
       ]);
     }
 
+    const days = [1, 2, 3, 4, 5, 6].map((value) => ({
+      value,
+      label:
+        value === 6 &&
+        slotRows.some((slot) => slot.dayOfWeek === 6 && slot.isSaturdayHalfDay)
+          ? `${dayLabels[value]} (Half Day)`
+          : dayLabels[value],
+    }));
+    const templateRows = slotRows.map((slot) => ({
+      ...slot,
+      entries:
+        grouped.get(`${slot.dayOfWeek}:${slot.startTime}:${slot.endTime}`) ??
+        [],
+    }));
+    const rows = filters?.entryIds?.length
+      ? this.rowsForSelectedEntries(grouped, slotRows)
+      : templateRows;
+
     return {
       summary: {
         title: this.printTitle(plan),
@@ -195,24 +216,51 @@ export class TimetablePrintService {
         academicYearId: plan?.academicYearId ?? null,
         effectiveFrom: plan?.effectiveFrom ?? null,
       },
-      days: [1, 2, 3, 4, 5, 6].map((value) => ({
-        value,
-        label:
-          value === 6 &&
-          slotRows.some(
-            (slot) => slot.dayOfWeek === 6 && slot.isSaturdayHalfDay,
-          )
-            ? `${dayLabels[value]} (Half Day)`
-            : dayLabels[value],
-      })),
+      days,
       slots: slotRows,
-      rows: slotRows.map((slot) => ({
-        ...slot,
-        entries:
-          grouped.get(`${slot.dayOfWeek}:${slot.startTime}:${slot.endTime}`) ??
-          [],
-      })),
+      rows,
     };
+  }
+
+  /** Keep a faculty class even when its clock time is not on the slot template. */
+  private rowsForSelectedEntries(
+    grouped: Map<string, any[]>,
+    slotRows: Array<{
+      id: string;
+      dayOfWeek: number;
+      periodNo?: number | null;
+      label?: string | null;
+      startTime: string;
+      endTime: string;
+    }>,
+  ) {
+    const rows: Array<Record<string, unknown>> = [];
+    for (const entries of grouped.values()) {
+      const first = entries[0];
+      if (!first) continue;
+      const slot = slotRows.find(
+        (row) =>
+          row.dayOfWeek === first.dayOfWeek &&
+          row.startTime === first.startTime &&
+          row.endTime === first.endTime,
+      );
+      rows.push({
+        id: slot?.id ?? `class-${first.id}`,
+        dayOfWeek: first.dayOfWeek,
+        periodNo: first.periodNo ?? slot?.periodNo ?? null,
+        label: slot?.label ?? (first.periodNo ? `P${first.periodNo}` : 'Class'),
+        startTime: first.startTime,
+        endTime: first.endTime,
+        isBreak: false,
+        isLunch: false,
+        entries,
+      });
+    }
+    return rows.sort((a, b) => {
+      const day = Number(a.dayOfWeek) - Number(b.dayOfWeek);
+      if (day !== 0) return day;
+      return String(a.startTime).localeCompare(String(b.startTime));
+    });
   }
 
   private isPoolPlaceholder(entry: {
