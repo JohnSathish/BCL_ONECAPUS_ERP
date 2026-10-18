@@ -45,6 +45,23 @@ function monthOptionsFromRange(startDate: string, endDate: string) {
   return options;
 }
 
+function plannerCoversToday(startDate: string, endDate: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  return startDate.slice(0, 10) <= today && endDate.slice(0, 10) >= today;
+}
+
+function orderedPlannerYears<
+  T extends { id: string; startDate: string; endDate: string; status: string },
+>(rows: T[]) {
+  return [...rows].sort((a, b) => {
+    const aCurrent = plannerCoversToday(a.startDate, a.endDate) ? 1 : 0;
+    const bCurrent = plannerCoversToday(b.startDate, b.endDate) ? 1 : 0;
+    if (aCurrent !== bCurrent) return bCurrent - aCurrent;
+    if (a.status !== b.status) return a.status === 'PUBLISHED' ? -1 : 1;
+    return b.startDate.localeCompare(a.startDate);
+  });
+}
+
 export function AcademicYearPlannerView({ onMessage }: Props) {
   const queryClient = useQueryClient();
   const years = useQuery({
@@ -60,7 +77,9 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
 
   useEffect(() => {
     if (!yearId && years.data?.length) {
-      setYearId(years.data[0].id);
+      const ordered = orderedPlannerYears(years.data);
+      const current = ordered.find((row) => plannerCoversToday(row.startDate, row.endDate));
+      setYearId((current ?? ordered[0]).id);
     }
   }, [years.data, yearId]);
 
@@ -70,7 +89,14 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
     enabled: Boolean(yearId),
   });
 
-  const selectedYear = years.data?.find((row) => row.id === yearId);
+  const plannerYears = orderedPlannerYears(years.data ?? []);
+  const selectedYear = plannerYears.find((row) => row.id === yearId);
+  const currentPlannerYear = plannerYears.find((row) =>
+    plannerCoversToday(row.startDate, row.endDate),
+  );
+  const editingInactivePlanner = Boolean(
+    selectedYear && currentPlannerYear && selectedYear.id !== currentPlannerYear.id,
+  );
   const monthChoices = useMemo(
     () => (selectedYear ? monthOptionsFromRange(selectedYear.startDate, selectedYear.endDate) : []),
     [selectedYear],
@@ -235,7 +261,9 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
         <CompactCardHeader title="Select year" />
         <CompactCardBody className="flex flex-wrap items-center gap-2">
           <select
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className={`rounded-md border bg-background px-3 py-2 text-sm ${
+              editingInactivePlanner ? 'border-amber-400 bg-amber-50' : 'border-input'
+            }`}
             value={yearId}
             onChange={(event) => {
               setYearId(event.target.value);
@@ -243,9 +271,12 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
             }}
           >
             <option value="">Select planner year</option>
-            {(years.data ?? []).map((row) => (
+            {plannerYears.map((row) => (
               <option key={row.id} value={row.id}>
-                {row.title} · {row.status}
+                {plannerCoversToday(row.startDate, row.endDate)
+                  ? `${row.title} · Current`
+                  : row.title}{' '}
+                · {row.status}
               </option>
             ))}
           </select>
@@ -287,6 +318,13 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
         </CompactCardBody>
       </CompactCard>
 
+      {editingInactivePlanner ? (
+        <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          You are editing <strong>{selectedYear?.title}</strong>. The planner year that covers today
+          is <strong>{currentPlannerYear?.title}</strong>. Saving asks for confirmation.
+        </p>
+      ) : null}
+
       {yearId && monthKey ? (
         <WorkingCalendarEditor
           monthChoices={monthChoices}
@@ -296,7 +334,19 @@ export function AcademicYearPlannerView({ onMessage }: Props) {
           saving={saveMonth.isPending}
           onSelectMonth={setMonthKey}
           onPatchDay={patchDay}
-          onSave={() => saveMonth.mutate()}
+          onSave={() => {
+            if (
+              editingInactivePlanner &&
+              !window.confirm(
+                `Save this month on ${selectedYear?.title}? That planner year is not the one that covers today${
+                  currentPlannerYear ? ` (${currentPlannerYear.title})` : ''
+                }.`,
+              )
+            ) {
+              return;
+            }
+            saveMonth.mutate();
+          }}
         />
       ) : null}
     </div>

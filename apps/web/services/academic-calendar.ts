@@ -16,6 +16,9 @@ export type AcademicCalendarYearRow = {
   institutionId: string;
   startDate: string;
   endDate: string;
+  status: string;
+  isPrimarySession: boolean;
+  isActive: boolean;
   calendar: {
     id: string;
     title: string;

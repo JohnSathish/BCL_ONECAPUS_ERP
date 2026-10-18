@@ -42,6 +42,7 @@ import {
   updateAcademicCalendarEvent,
   uploadAcademicCalendarAttachment,
   type AcademicCalendarEvent,
+  type AcademicCalendarYearRow,
 } from '@/services/academic-calendar';
 import { apiErrorMessage } from '@/utils/api-error';
 import {
@@ -64,6 +65,19 @@ import { cn } from '@/utils/cn';
 
 function todayUtcIso() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function activeCalendarYears(years: AcademicCalendarYearRow[]) {
+  const today = todayUtcIso();
+  const covering = years.filter((year) => year.startDate <= today && year.endDate >= today);
+  const pool = covering.length ? covering : years;
+  const primary = pool.filter((year) => year.isPrimarySession);
+  if (primary.length) return primary.slice(0, 1);
+  const marked = pool
+    .filter((year) => year.isActive || year.status === 'ACTIVE')
+    .sort((a, b) => b.startDate.localeCompare(a.startDate));
+  if (marked.length) return marked.slice(0, 1);
+  return [...pool].sort((a, b) => b.startDate.localeCompare(a.startDate)).slice(0, 1);
 }
 
 export function AcademicCalendarWorkspace() {
@@ -244,12 +258,15 @@ export function AcademicCalendarWorkspace() {
     onError: (e) => setMessage(apiErrorMessage(e)),
   });
 
+  const visibleYears = useMemo(() => activeCalendarYears(years.data ?? []), [years.data]);
+
   useEffect(() => {
-    if (!years.data?.length || academicYearId) return;
-    const first = years.data[0];
-    setAcademicYearId(first.id);
-    if (first.calendar?.id) setCalendarId(first.calendar.id);
-  }, [years.data, academicYearId]);
+    const active = visibleYears[0];
+    if (!active) return;
+    if (academicYearId === active.id) return;
+    setAcademicYearId(active.id);
+    setCalendarId(active.calendar?.id ?? '');
+  }, [visibleYears, academicYearId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -310,6 +327,12 @@ export function AcademicCalendarWorkspace() {
   };
 
   const selectedYear = years.data?.find((y) => y.id === academicYearId);
+  const activeYear =
+    years.data?.find((year) => year.isPrimarySession) ??
+    years.data?.find((year) => year.isActive || year.status === 'ACTIVE');
+  const editingInactiveYear = Boolean(
+    selectedYear && activeYear && selectedYear.id !== activeYear.id,
+  );
   const monthLabel = new Date(Date.UTC(viewYear, viewMonth - 1, 1)).toLocaleString(undefined, {
     month: 'long',
     year: 'numeric',
@@ -390,12 +413,30 @@ export function AcademicCalendarWorkspace() {
                   selectedYear?.name ??
                   'Institutional working days, holidays & events'}
               </p>
+              {selectedYear ? (
+                <p
+                  className={cn(
+                    'mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                    editingInactiveYear
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-emerald-100 text-emerald-800',
+                  )}
+                >
+                  {editingInactiveYear
+                    ? `${selectedYear.name} is not the active year`
+                    : `${selectedYear.name} · active year`}
+                </p>
+              ) : null}
             </div>
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <select
-              className="h-10 min-w-[180px] rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm shadow-sm"
+              className={cn(
+                'h-10 min-w-[220px] rounded-xl border bg-white px-3 text-sm shadow-sm',
+                editingInactiveYear ? 'border-amber-400 bg-amber-50' : 'border-[#E5E7EB]',
+              )}
+              disabled={visibleYears.length <= 1}
               value={academicYearId}
               onChange={(e) => {
                 const id = e.target.value;
@@ -405,11 +446,10 @@ export function AcademicCalendarWorkspace() {
               }}
               aria-label="Academic year"
             >
-              <option value="">Select year</option>
-              {(years.data ?? []).map((y) => (
+              {visibleYears.map((y) => (
                 <option key={y.id} value={y.id}>
-                  {y.name}
-                  {y.calendar ? ` · ${y.calendar.status}` : ' · no calendar'}
+                  {`${y.name} · Active`}
+                  {y.calendar ? ` · ${y.calendar.status}` : ''}
                 </option>
               ))}
             </select>
@@ -514,6 +554,13 @@ export function AcademicCalendarWorkspace() {
           </motion.p>
         ) : null}
       </AnimatePresence>
+
+      {editingInactiveYear ? (
+        <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          You are viewing <strong>{selectedYear?.name}</strong>. The active academic year is{' '}
+          <strong>{activeYear?.name}</strong>. New events on this year need confirmation.
+        </p>
+      ) : null}
 
       {!calendarId ? (
         <div className="rounded-2xl border border-dashed border-[#E5E7EB] bg-white px-6 py-16 text-center shadow-sm">
@@ -845,6 +892,17 @@ export function AcademicCalendarWorkspace() {
         editing={editing}
         saving={saveMut.isPending}
         onSubmit={async (values, addAnother) => {
+          if (
+            !editing &&
+            editingInactiveYear &&
+            !window.confirm(
+              `Save this event on ${selectedYear?.name}? That is not the active academic year${
+                activeYear ? ` (${activeYear.name})` : ''
+              }.`,
+            )
+          ) {
+            return;
+          }
           await saveMut.mutateAsync({ values, addAnother });
         }}
       />

@@ -62,7 +62,7 @@ export class AcademicCalendarService {
         deletedAt: null,
         ...(institutionId ? { institutionId } : {}),
       },
-      orderBy: [{ startDate: 'desc' }],
+      orderBy: [{ isPrimarySession: 'desc' }, { startDate: 'desc' }],
       include: {
         academicCalendar: {
           where: { deletedAt: null },
@@ -70,12 +70,15 @@ export class AcademicCalendarService {
         },
       },
     });
-    return years.map((year) => ({
+    const mapped = years.map((year) => ({
       id: year.id,
       name: year.name,
       institutionId: year.institutionId,
       startDate: toDateOnlyIso(year.startDate),
       endDate: toDateOnlyIso(year.endDate),
+      status: year.status,
+      isPrimarySession: year.isPrimarySession,
+      isActive: year.isPrimarySession || year.status === 'ACTIVE',
       calendar: year.academicCalendar
         ? {
             id: year.academicCalendar.id,
@@ -87,6 +90,10 @@ export class AcademicCalendarService {
           }
         : null,
     }));
+    return mapped.sort((a, b) => {
+      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+      return b.startDate.localeCompare(a.startDate);
+    });
   }
 
   async getOrCreateForYear(
@@ -902,6 +909,16 @@ export class AcademicCalendarService {
     };
 
     if (existing) {
+      await this.prisma.academicCalendarEvent.updateMany({
+        where: {
+          tenantId: user.tid,
+          sourceModule: input.sourceModule,
+          sourceRefId: input.sourceRefId,
+          id: { not: existing.id },
+          deletedAt: null,
+        },
+        data: { deletedAt: new Date(), active: false, updatedById: user.sub },
+      });
       const row = await this.prisma.academicCalendarEvent.update({
         where: { id: existing.id },
         data: {
