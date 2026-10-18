@@ -16,48 +16,87 @@ export function ProfileCompletionCard() {
 
   if (!completion || completion.percent >= 100) return null;
 
+  const pending = completion.missing?.map((item) => item.label).join(', ');
+
   return (
-    <Pressable
-      style={styles.card}
-      onPress={() => router.push('/(student)/complete-profile' as never)}
-    >
-      <Text style={styles.title}>Complete Your Profile</Text>
-      <Text style={styles.body}>
-        Your profile is {completion.percent}% complete. Please complete your profile to keep records
-        accurate.
-      </Text>
-      <View style={styles.barTrack}>
-        <View style={[styles.barFill, { width: `${completion.percent}%` }]} />
+    <View style={styles.card}>
+      <View style={styles.top}>
+        <View style={styles.iconBubble}>
+          <Text style={styles.icon}>👤</Text>
+        </View>
+        <View style={styles.copy}>
+          <Text style={styles.title}>Complete Your Profile</Text>
+          <Text style={styles.body}>
+            Your profile is {completion.percent}% complete. Please complete your profile to keep
+            records accurate.
+          </Text>
+        </View>
+        <Text style={styles.percent}>{completion.percent}%</Text>
       </View>
-      {completion.missing?.length ? (
-        <Text style={styles.missing} numberOfLines={2}>
-          Pending: {completion.missing.map((m) => m.label).join(', ')}
-        </Text>
+      <View style={styles.barTrack}>
+        <View style={[styles.barFill, { width: `${Math.min(completion.percent, 100)}%` }]} />
+      </View>
+      {pending ? (
+        <View style={styles.pendingBox}>
+          <Text style={styles.pendingIcon}>📋</Text>
+          <Text style={styles.pending}>Pending: {pending}</Text>
+        </View>
       ) : null}
-      <Text style={styles.cta}>Complete Now →</Text>
-    </Pressable>
+      <Pressable
+        style={styles.button}
+        onPress={() => router.push('/(student)/complete-profile' as never)}
+      >
+        <Text style={styles.buttonText}>Complete Now →</Text>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: studentTheme.surface,
-    borderColor: studentTheme.border,
+    borderColor: '#E8EEF7',
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
-    marginBottom: 12,
+    gap: 12,
   },
-  title: { color: studentTheme.text, fontSize: 16, fontWeight: '700' },
-  body: { color: studentTheme.textMuted, fontSize: 13, marginTop: 6, lineHeight: 18 },
+  top: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  iconBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: { fontSize: 16 },
+  copy: { flex: 1, gap: 4 },
+  title: { color: studentTheme.text, fontSize: 16, fontWeight: '800' },
+  body: { color: studentTheme.textMuted, fontSize: 13, lineHeight: 18 },
+  percent: { color: '#1D4ED8', fontSize: 18, fontWeight: '800' },
   barTrack: {
     height: 8,
     borderRadius: 999,
     backgroundColor: '#E5E7EB',
-    marginTop: 12,
     overflow: 'hidden',
   },
-  barFill: { height: '100%', backgroundColor: studentTheme.primary ?? '#1D4ED8' },
-  missing: { color: studentTheme.textMuted, fontSize: 12, marginTop: 8 },
-  cta: { color: studentTheme.primary ?? '#1D4ED8', fontWeight: '700', marginTop: 10 },
+  barFill: { height: '100%', backgroundColor: '#1D4ED8' },
+  pendingBox: {
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'flex-start',
+  },
+  pendingIcon: { fontSize: 14, marginTop: 1 },
+  pending: { flex: 1, color: studentTheme.textMuted, fontSize: 12, lineHeight: 17 },
+  button: {
+    backgroundColor: '#123A7A',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  buttonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
 });

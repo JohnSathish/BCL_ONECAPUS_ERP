@@ -4,7 +4,7 @@ import { studentTheme } from '@/components/student-portal/theme';
 
 export default function StudentNotificationPreferencesScreen() {
   return (
-    <StudentScreenShell title="Notification preferences" subtitle="Push categories">
+    <StudentScreenShell title="Notification Preferences" subtitle="Push categories">
       <NotificationPreferencesPanel role="student" theme={studentTheme} />
     </StudentScreenShell>
   );

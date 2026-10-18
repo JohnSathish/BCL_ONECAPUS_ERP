@@ -4,7 +4,7 @@ import { facultyTheme } from '@/components/faculty-portal/theme';
 
 export default function StaffNotificationPreferencesScreen() {
   return (
-    <FacultyScreenShell title="Notification preferences" subtitle="Push categories">
+    <FacultyScreenShell title="Notification Preferences" subtitle="Push categories">
       <NotificationPreferencesPanel role="staff" theme={facultyTheme} />
     </FacultyScreenShell>
   );

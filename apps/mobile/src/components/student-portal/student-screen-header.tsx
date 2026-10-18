@@ -7,6 +7,7 @@ import { studentTheme } from './theme';
 type StudentScreenHeaderProps = {
   title: string;
   subtitle?: string;
+  motto?: string;
   rightSlot?: ReactNode;
   showMenu?: boolean;
 };
@@ -14,6 +15,7 @@ type StudentScreenHeaderProps = {
 export function StudentScreenHeader({
   title,
   subtitle,
+  motto,
   rightSlot,
   showMenu = true,
 }: StudentScreenHeaderProps) {
@@ -33,6 +35,7 @@ export function StudentScreenHeader({
         <View style={styles.titleBlock}>
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          {motto ? <Text style={styles.motto}>“{motto}”</Text> : null}
         </View>
         <View style={styles.rightSlot}>{rightSlot}</View>
       </View>
@@ -67,5 +70,6 @@ const styles = StyleSheet.create({
   titleBlock: { flex: 1 },
   title: { color: '#fff', fontSize: 20, fontWeight: '700' },
   subtitle: { color: '#dbeafe', fontSize: 12, marginTop: 2 },
+  motto: { color: 'rgba(255,255,255,0.86)', fontSize: 12, marginTop: 6, fontStyle: 'italic' },
   rightSlot: { minWidth: 40, alignItems: 'flex-end' },
 });

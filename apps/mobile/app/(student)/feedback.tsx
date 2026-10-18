@@ -133,6 +133,20 @@ function answerToPayload(questionId: string, value: FeedbackAnswerValue): Record
   };
 }
 
+const FORM_ICONS = [{ bg: '#EFF6FF' }, { bg: '#F5F3FF' }, { bg: '#FFF7ED' }, { bg: '#DBEAFE' }];
+
+function yearLabel(value?: string | null) {
+  const text = value?.trim();
+  if (!text) return 'Academic year';
+  return /^academic year/i.test(text) ? text : `Academic Year ${text}`;
+}
+
+function formStatus(item: FeedbackCampaignItem) {
+  if (item.canSubmit) return { label: 'Open', bg: '#D1FAE5', fg: '#059669' };
+  if (item.alreadySubmitted) return { label: 'Submitted', bg: '#DBEAFE', fg: '#1D4ED8' };
+  return { label: 'Closed', bg: '#F3F4F6', fg: '#6B7280' };
+}
+
 function hasAnswer(value: FeedbackAnswerValue | undefined): boolean {
   if (!value) return false;
   if (value.rating != null) return true;
@@ -179,10 +193,12 @@ function QuestionControl({
               : value?.valueText === opt.value ||
                 (value?.valueBool === true && (opt.value === 'yes' || opt.value === 'true')) ||
                 (value?.valueBool === false && (opt.value === 'no' || opt.value === 'false'));
+          const label =
+            type === 'rating' ? '★'.repeat(Number(opt.value) || 0) || opt.label : opt.label;
           return (
             <Pressable
               key={opt.value}
-              style={[styles.chip, selected && styles.chipOn]}
+              style={[styles.choice, selected && styles.choiceOn]}
               onPress={() => {
                 if (type === 'LIKERT_5' || type === 'rating') {
                   onChange({ rating: Number(opt.value), valueText: opt.label });
@@ -194,9 +210,10 @@ function QuestionControl({
                 }
               }}
             >
-              <Text style={[styles.chipText, selected && styles.chipTextOn]}>
-                {type === 'rating' ? '★'.repeat(Number(opt.value) || 0) || opt.label : opt.label}
-              </Text>
+              <View style={[styles.radio, selected && styles.radioOn]}>
+                {selected ? <View style={styles.radioDot} /> : null}
+              </View>
+              <Text style={[styles.choiceText, selected && styles.choiceTextOn]}>{label}</Text>
             </Pressable>
           );
         })}
@@ -442,70 +459,108 @@ export default function StudentFeedbackScreen() {
         {loading && !items.length ? (
           <ActivityIndicator />
         ) : (
-          items.map((item) => (
-            <View key={item.id} style={styles.card}>
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.meta}>
-                {item.academicYear}
-                {item.canSubmit ? ' · Open' : item.alreadySubmitted ? ' · Submitted' : ' · Closed'}
-              </Text>
-              {item.closedReason && !item.canSubmit ? (
-                <Text style={styles.hint}>{item.closedReason}</Text>
-              ) : null}
-              {item.canSubmit ? (
-                <Pressable
-                  style={styles.btn}
-                  onPress={() => {
-                    setActive(item);
-                    setAnswers({});
-                    setMessage('');
-                  }}
-                >
-                  <Text style={styles.btnText}>
-                    {active?.id === item.id ? 'Filling…' : 'Give feedback'}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ))
-        )}
-
-        {active?.canSubmit && visibleQuestions.length ? (
-          <View style={styles.form}>
-            <Text style={styles.formTitle}>{active.title}</Text>
-            <Text style={styles.hint}>
-              {active.instructions ||
-                'Kindly select the appropriate option as per the following criteria.'}
-            </Text>
-            {visibleQuestions.map((q, idx) => (
-              <View key={q.id} style={styles.q}>
-                <Text style={styles.qPrompt}>
-                  {idx + 1}. {q.prompt}
-                  {q.required ? ' *' : ''}
-                </Text>
-                {q.description ? <Text style={styles.hint}>{q.description}</Text> : null}
-                {q.helpText ? <Text style={styles.hint}>{q.helpText}</Text> : null}
-                <QuestionControl
-                  question={q}
-                  value={answers[q.id]}
-                  scale={scale}
-                  onChange={(next) => setAnswers((prev) => ({ ...prev, [q.id]: next }))}
-                />
+          items.map((item, index) => {
+            const open = active?.id === item.id;
+            const status = formStatus(item);
+            const icon = FORM_ICONS[index % FORM_ICONS.length];
+            return (
+              <View key={item.id} style={[styles.card, open && styles.cardOpen]}>
+                <View style={styles.cardTop}>
+                  <View
+                    style={[styles.iconBubble, { backgroundColor: open ? '#123A7A' : icon.bg }]}
+                  >
+                    <Text style={styles.icon}>📋</Text>
+                  </View>
+                  <View style={styles.cardCopy}>
+                    <Text style={styles.title}>{item.title}</Text>
+                    <Text style={styles.meta}>{yearLabel(item.academicYear)}</Text>
+                  </View>
+                  {open ? (
+                    <View style={[styles.statusPill, { backgroundColor: status.bg }]}>
+                      <View style={[styles.statusDot, { backgroundColor: status.fg }]} />
+                      <Text style={[styles.statusText, { color: status.fg }]}>{status.label}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.chevron}>›</Text>
+                  )}
+                </View>
+                {item.closedReason && !item.canSubmit ? (
+                  <Text style={styles.hint}>{item.closedReason}</Text>
+                ) : null}
+                {!open ? (
+                  <View style={styles.cardFooter}>
+                    <View style={[styles.statusPill, { backgroundColor: status.bg }]}>
+                      <View style={[styles.statusDot, { backgroundColor: status.fg }]} />
+                      <Text style={[styles.statusText, { color: status.fg }]}>{status.label}</Text>
+                    </View>
+                    {item.canSubmit ? (
+                      <Pressable
+                        style={styles.btn}
+                        onPress={() => {
+                          setActive(item);
+                          setAnswers({});
+                          setMessage('');
+                        }}
+                      >
+                        <Text style={styles.btnText}>Give feedback</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : item.canSubmit ? (
+                  <Pressable
+                    style={[styles.btn, styles.btnQuiet]}
+                    onPress={() => {
+                      setActive(null);
+                      setAnswers({});
+                    }}
+                  >
+                    <Text style={styles.btnQuietText}>Filling…</Text>
+                  </Pressable>
+                ) : null}
+                {open && visibleQuestions.length ? (
+                  <View style={styles.form}>
+                    <Text style={styles.instructions}>
+                      {item.instructions ||
+                        'Kindly select the appropriate option as per the following criteria.'}
+                    </Text>
+                    {visibleQuestions.map((q, idx) => (
+                      <View key={q.id} style={styles.q}>
+                        <View style={styles.qHead}>
+                          <View style={styles.qNum}>
+                            <Text style={styles.qNumText}>{idx + 1}</Text>
+                          </View>
+                          <Text style={styles.qPrompt}>
+                            {q.prompt}
+                            {q.required ? ' *' : ''}
+                          </Text>
+                        </View>
+                        {q.description ? <Text style={styles.hint}>{q.description}</Text> : null}
+                        {q.helpText ? <Text style={styles.hint}>{q.helpText}</Text> : null}
+                        <QuestionControl
+                          question={q}
+                          value={answers[q.id]}
+                          scale={scale}
+                          onChange={(next) => setAnswers((prev) => ({ ...prev, [q.id]: next }))}
+                        />
+                      </View>
+                    ))}
+                    <Pressable
+                      style={styles.submit}
+                      disabled={submitting}
+                      onPress={() => void onSubmit()}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.submitText}>Submit Feedback →</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                ) : null}
               </View>
-            ))}
-            <Pressable
-              style={[styles.btn, styles.submit]}
-              disabled={submitting}
-              onPress={() => void onSubmit()}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.btnText}>Submit feedback</Text>
-              )}
-            </Pressable>
-          </View>
-        ) : null}
+            );
+          })
+        )}
 
         {!loading && !items.length ? (
           <Text style={styles.hint}>No feedback forms are available right now.</Text>
@@ -519,36 +574,105 @@ const styles = StyleSheet.create({
   container: { padding: 16, gap: 12, paddingBottom: 40 },
   card: {
     borderWidth: 1,
-    borderColor: studentTheme.border,
-    borderRadius: 12,
+    borderColor: '#E8EEF7',
+    borderRadius: 18,
     padding: 14,
     backgroundColor: '#fff',
-    gap: 6,
+    gap: 10,
   },
-  title: { fontSize: 16, fontWeight: '700', color: studentTheme.text },
-  meta: { fontSize: 12, color: studentTheme.textMuted },
+  cardOpen: { borderColor: '#BFDBFE' },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  iconBubble: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: { fontSize: 18 },
+  cardCopy: { flex: 1, gap: 2 },
+  title: { fontSize: 16, fontWeight: '800', color: studentTheme.text },
+  meta: { fontSize: 12, color: studentTheme.textMuted, fontWeight: '600' },
+  chevron: { fontSize: 22, color: '#9CA3AF', fontWeight: '600' },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { fontSize: 12, fontWeight: '800' },
   hint: { fontSize: 12, color: studentTheme.textMuted, lineHeight: 17 },
   btn: {
-    marginTop: 6,
-    alignSelf: 'flex-start',
-    backgroundColor: studentTheme.primary,
+    backgroundColor: '#123A7A',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 10,
   },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  form: {
+  btnQuiet: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#bfdbfe',
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 14,
-    gap: 12,
+    borderColor: '#BFDBFE',
   },
-  formTitle: { fontSize: 16, fontWeight: '700' },
-  q: { gap: 8, backgroundColor: '#fff', borderRadius: 10, padding: 10 },
-  qPrompt: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
-  scaleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  btnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  btnQuietText: { color: '#1D4ED8', fontWeight: '800', fontSize: 13 },
+  form: { gap: 12, marginTop: 4 },
+  instructions: { fontSize: 13, color: '#4B5563', lineHeight: 18 },
+  q: {
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E8EEF7',
+  },
+  qHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  qNum: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qNumText: { color: '#1D4ED8', fontSize: 12, fontWeight: '800' },
+  qPrompt: { flex: 1, fontSize: 14, fontWeight: '800', lineHeight: 20, color: studentTheme.text },
+  scaleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  choice: {
+    minWidth: 72,
+    flexGrow: 1,
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    backgroundColor: '#fff',
+  },
+  choiceOn: { borderColor: '#1D4ED8', backgroundColor: '#EFF6FF' },
+  radio: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioOn: { borderColor: '#1D4ED8' },
+  radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#1D4ED8' },
+  choiceText: { fontSize: 11, fontWeight: '700', color: '#334155', textAlign: 'center' },
+  choiceTextOn: { color: '#1D4ED8' },
   multiCol: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     borderWidth: 1,
@@ -563,8 +687,8 @@ const styles = StyleSheet.create({
   chipTextOn: { color: '#fff' },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 8,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
@@ -572,7 +696,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   textarea: { minHeight: 96 },
-  submit: { alignSelf: 'stretch', alignItems: 'center' },
+  submit: {
+    backgroundColor: '#123A7A',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  submitText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   ok: {
     backgroundColor: '#ecfdf5',
     borderColor: '#a7f3d0',

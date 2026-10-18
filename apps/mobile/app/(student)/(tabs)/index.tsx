@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { QUICK_ACTIONS } from '@/components/student-portal/drawer-menu';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
 import { useStudentPortal } from '@/components/student-portal/student-portal-context';
 import { studentTheme } from '@/components/student-portal/theme';
-import { DeviceSessionsPanel } from '@/components/auth/device-sessions-panel';
-import { COLLEGE_NAME, isMvpStudentCard } from '@/constants/release';
+import { COLLEGE_MOTTO, COLLEGE_NAME, isMvpStudentCard } from '@/constants/release';
 import { useMobileConfig } from '@/hooks/useMobileConfig';
 import { ProfileCompletionCard } from '@/components/student-portal/profile-completion-card';
 import { AcademicCalendarCard } from '@/components/student-portal/academic-calendar-card';
@@ -22,7 +20,7 @@ import { formatInr } from '@/utils/currency';
 export default function StudentHomeScreen() {
   const router = useRouter();
   const { cards } = useMobileConfig();
-  const { home, refreshHome } = useStudentPortal();
+  const { home, refreshHome, openDrawer } = useStudentPortal();
   const [widgets, setWidgets] = useState<StudentDashboardWidgets | null>(null);
 
   useEffect(() => {
@@ -55,6 +53,7 @@ export default function StudentHomeScreen() {
   const feeProgressPercent =
     feeTotal > 0 ? Math.min(Math.round((feePaid / feeTotal) * 100), 100) : feeDue > 0 ? 8 : 100;
   const feeStatus = home?.fees?.status ?? (feeDue > 0 ? 'PENDING' : 'PAID');
+  const accountStatus = statusCard(feeStatus);
   const timetableSlots = widgets?.timetable ?? [];
   const pendingAssignments = widgets?.lms?.pendingAssignments ?? 0;
   const issuedBooks = widgets?.library?.issuedBooks ?? 0;
@@ -82,24 +81,99 @@ export default function StudentHomeScreen() {
   }
 
   return (
-    <StudentScreenShell title={greeting} subtitle={COLLEGE_NAME}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.heroCard}>
-          <View style={styles.headerRow}>
-            <View style={styles.headerText}>
-              <Text style={styles.heroName}>{studentName}</Text>
-              <Text style={styles.heroMeta}>
-                {program} • {semester}
-              </Text>
-              <Text style={styles.heroMeta}>Roll No: {roll}</Text>
+    <StudentScreenShell
+      title={`${greeting} ${greetingIcon(greeting)}`}
+      subtitle={COLLEGE_NAME}
+      motto={COLLEGE_MOTTO}
+      rightSlot={
+        <Pressable
+          style={styles.bell}
+          onPress={() => router.push('/(student)/(tabs)/notifications' as never)}
+        >
+          <Text style={styles.bellIcon}>🔔</Text>
+          {unread > 0 ? (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>{unread > 9 ? '9+' : unread}</Text>
             </View>
-            <StudentAvatar name={studentName} photoUrl={home?.profile?.photoUrl} size={52} />
+          ) : null}
+        </Pressable>
+      }
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={false}
+            onRefresh={() => {
+              void refreshHome();
+              void fetchStudentHomeWidgets()
+                .then(setWidgets)
+                .catch(() => setWidgets(null));
+            }}
+          />
+        }
+      >
+        <View style={styles.identityCard}>
+          <View style={styles.identityText}>
+            <Text style={styles.heroName}>{studentName}</Text>
+            <Text style={styles.heroMeta}>
+              🎓 {program} • {semester}
+            </Text>
+            <Text style={styles.heroMeta}>Roll No: {roll}</Text>
+            <Pressable
+              style={styles.profileBtn}
+              onPress={() => router.push('/(student)/(tabs)/profile' as never)}
+            >
+              <Text style={styles.profileBtnText}>View Profile →</Text>
+            </Pressable>
           </View>
-          <View style={styles.badgeRow}>
-            <Badge label="Attendance" value={attendanceLabel} />
-            <Badge label="Fees Due" value={formatInr(feeDue)} />
-            <Badge label="Status" value={feeStatus} />
-          </View>
+          <StudentAvatar name={studentName} photoUrl={home?.profile?.photoUrl} size={64} />
+        </View>
+
+        <View style={styles.kpiRow}>
+          <KpiCard
+            tint="#ECFDF5"
+            value={attendanceLabel}
+            label="Attendance"
+            hint="Overall"
+            onPress={() => router.push('/(student)/attendance' as never)}
+          />
+          <KpiCard
+            tint="#FEF9C3"
+            value={formatInr(feeDue)}
+            label="Fees Due"
+            hint={feeDue > 0 ? 'Pending' : 'No Pending Fees'}
+            onPress={() => router.push('/(student)/(tabs)/fees' as never)}
+          />
+          <KpiCard
+            tint={accountStatus.tint}
+            value={accountStatus.value}
+            label="Status"
+            hint={accountStatus.hint}
+            valueColor={accountStatus.color}
+            onPress={() => router.push('/(student)/(tabs)/fees' as never)}
+          />
+        </View>
+
+        <View style={styles.quickCard}>
+          {HOME_ACTIONS.map((action) => (
+            <Pressable
+              key={action.id}
+              style={styles.quickAction}
+              onPress={() => {
+                if (action.id === 'more') {
+                  openDrawer();
+                  return;
+                }
+                router.push(action.href as never);
+              }}
+            >
+              <View style={[styles.quickIconWrap, { backgroundColor: action.tint }]}>
+                <Text style={styles.quickIcon}>{action.icon}</Text>
+              </View>
+              <Text style={styles.quickLabel}>{action.label}</Text>
+            </Pressable>
+          ))}
         </View>
 
         <ProfileCompletionCard />
@@ -119,20 +193,6 @@ export default function StudentHomeScreen() {
           chips={academicChips}
           onOpen={() => router.push('/(student)/(tabs)/academics' as never)}
         />
-
-        <Text style={styles.sectionHeading}>Quick Actions</Text>
-        <View style={styles.quickGrid}>
-          {QUICK_ACTIONS.map((action) => (
-            <Pressable
-              key={action.id}
-              style={styles.quickAction}
-              onPress={() => router.push(action.href as never)}
-            >
-              <Text style={styles.quickIcon}>{action.icon}</Text>
-              <Text style={styles.quickLabel}>{action.label}</Text>
-            </Pressable>
-          ))}
-        </View>
 
         <Pressable
           style={styles.feeCard}
@@ -284,12 +344,78 @@ export default function StudentHomeScreen() {
   );
 }
 
-function Badge({ label, value }: { label: string; value: string }) {
+const HOME_ACTIONS = [
+  {
+    id: 'academics',
+    label: 'My Academics',
+    icon: '📘',
+    tint: '#DBEAFE',
+    href: '/(student)/(tabs)/academics',
+  },
+  {
+    id: 'exams',
+    label: 'Examination',
+    icon: '📋',
+    tint: '#EDE9FE',
+    href: '/(student)/exam-schedule',
+  },
+  {
+    id: 'fees',
+    label: 'Fees & Payments',
+    icon: '₹',
+    tint: '#D1FAE5',
+    href: '/(student)/(tabs)/fees',
+  },
+  {
+    id: 'attendance',
+    label: 'Attendance',
+    icon: '📊',
+    tint: '#FFEDD5',
+    href: '/(student)/attendance',
+  },
+  { id: 'more', label: 'More', icon: '▦', tint: '#F3F4F6', href: '' },
+] as const;
+
+function statusCard(status: string) {
+  const key = status.toUpperCase();
+  if (key === 'LOCKED')
+    return { value: 'LOCKED', hint: 'Contact Office', tint: '#FEE2E2', color: '#DC2626' };
+  if (key === 'PENDING')
+    return { value: 'DUE', hint: 'Fees pending', tint: '#FFEDD5', color: '#C2410C' };
+  return { value: 'CLEAR', hint: 'No hold', tint: '#ECFDF5', color: '#059669' };
+}
+
+function greetingIcon(greeting: string) {
+  if (greeting.includes('Morning')) return '☀️';
+  if (greeting.includes('Afternoon')) return '🌤️';
+  return '🌙';
+}
+
+function KpiCard({
+  tint,
+  value,
+  label,
+  hint,
+  valueColor,
+  onPress,
+}: {
+  tint: string;
+  value: string;
+  label: string;
+  hint: string;
+  valueColor?: string;
+  onPress: () => void;
+}) {
   return (
-    <View style={styles.badgePill}>
-      <Text style={styles.badgeLabel}>{label}</Text>
-      <Text style={styles.badgeValue}>{value}</Text>
-    </View>
+    <Pressable style={[styles.kpiCard, { backgroundColor: tint }]} onPress={onPress}>
+      <Text style={styles.kpiLabel}>{label}</Text>
+      <Text style={[styles.kpiValue, valueColor ? { color: valueColor } : null]} numberOfLines={1}>
+        {value}
+      </Text>
+      <Text style={styles.kpiHint} numberOfLines={2}>
+        {hint}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -311,45 +437,79 @@ function getGreeting() {
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 12, paddingBottom: 24 },
-  heroCard: {
-    backgroundColor: studentTheme.primary,
+  bell: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bellIcon: { fontSize: 16 },
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  bellBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  identityCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 16,
-    gap: 12,
-  },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  headerText: { flex: 1 },
-  heroName: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  heroMeta: { color: '#dbeafe', fontSize: 13, marginTop: 2 },
-  badgeRow: { flexDirection: 'row', gap: 8 },
-  badgePill: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-  },
-  badgeLabel: { color: '#bfdbfe', fontSize: 10, textTransform: 'uppercase' },
-  badgeValue: { color: '#fff', fontSize: 12, fontWeight: '700', marginTop: 2 },
-  sectionHeading: { fontSize: 16, fontWeight: '700', color: studentTheme.text, marginTop: 4 },
-  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  quickAction: {
-    width: '23%',
-    minWidth: 74,
-    flexGrow: 1,
-    backgroundColor: studentTheme.surface,
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    alignItems: 'center',
+    marginTop: -6,
     borderWidth: 1,
-    borderColor: studentTheme.border,
+    borderColor: '#E8EEF7',
   },
-  quickIcon: { fontSize: 20 },
+  identityText: { flex: 1, gap: 3 },
+  heroName: { color: studentTheme.text, fontSize: 20, fontWeight: '800', lineHeight: 26 },
+  heroMeta: { color: studentTheme.textMuted, fontSize: 13, fontWeight: '600' },
+  profileBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  profileBtnText: { color: '#1D4ED8', fontSize: 12, fontWeight: '800' },
+  kpiRow: { flexDirection: 'row', gap: 8 },
+  kpiCard: { flex: 1, borderRadius: 16, padding: 10, minHeight: 96, gap: 2 },
+  kpiLabel: { fontSize: 10, fontWeight: '800', color: '#6B7280', textTransform: 'uppercase' },
+  kpiValue: { fontSize: 16, fontWeight: '800', color: studentTheme.text },
+  kpiHint: { fontSize: 11, fontWeight: '600', color: '#4B5563' },
+  quickCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderWidth: 1,
+    borderColor: '#E8EEF7',
+  },
+  quickAction: { flex: 1, alignItems: 'center', gap: 6 },
+  quickIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickIcon: { fontSize: 18 },
   quickLabel: {
-    marginTop: 4,
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
     color: studentTheme.text,
     textAlign: 'center',
   },

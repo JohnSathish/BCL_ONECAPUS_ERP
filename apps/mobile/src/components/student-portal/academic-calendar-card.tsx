@@ -38,10 +38,13 @@ export function AcademicCalendarCard({
           <View style={styles.iconBubble}>
             <Text style={styles.iconBubbleText}>📅</Text>
           </View>
-          <Text style={styles.title}>Academic Calendar</Text>
+          <View>
+            <Text style={styles.title}>Academic Calendar</Text>
+            <Text style={styles.subtitle}>Upcoming events, holidays and important dates</Text>
+          </View>
         </View>
         <Pressable onPress={onViewAll} hitSlop={8}>
-          <Text style={styles.viewAll}>View All</Text>
+          <Text style={styles.viewAll}>View All →</Text>
         </Pressable>
       </View>
 
@@ -127,6 +130,7 @@ const styles = StyleSheet.create({
   },
   iconBubbleText: { fontSize: 14 },
   title: { fontSize: 16, fontWeight: '800', color: studentTheme.text },
+  subtitle: { fontSize: 11, color: studentTheme.textMuted, marginTop: 2, maxWidth: 210 },
   viewAll: { fontSize: 13, fontWeight: '700', color: studentTheme.primaryLight },
   empty: { fontSize: 13, color: studentTheme.textMuted, lineHeight: 19 },
   timeline: { gap: 0 },

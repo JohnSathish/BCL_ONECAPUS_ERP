@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -14,10 +15,12 @@ import {
 import { useRouter } from 'expo-router';
 import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
 import { studentTheme } from '@/components/student-portal/theme';
+import { PRIVACY_POLICY_URL, TERMS_URL } from '@/constants/release';
 import {
   SUPPORT_CATEGORIES,
   createStudentTicket,
   fetchStudentChats,
+  fetchStudentSupportFaq,
   fetchStudentSupportMeta,
   fetchStudentTickets,
   formatSupportCategory,
@@ -29,7 +32,44 @@ import {
   type SupportTicket,
 } from '@/services/support-centre';
 
-type Tab = 'chat' | 'tickets';
+const QUICK_ICONS: Record<string, string> = {
+  ADMISSIONS: '🎓',
+  FEES: '₹',
+  SCHOLARSHIPS: '🏅',
+  EXAMINATION: '📝',
+  RESULTS: '📊',
+  CERTIFICATES: '📄',
+  HOSTEL: '🏠',
+  LIBRARY: '📚',
+  TRANSPORT: '🚌',
+  ERP_LOGIN: '🔐',
+  TECHNICAL: '🛠️',
+  GENERAL: '💬',
+};
+
+function ContactRow({
+  icon,
+  label,
+  value,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  onPress?: () => void;
+}) {
+  const body = (
+    <View style={styles.contactRow}>
+      <Text style={styles.contactIcon}>{icon}</Text>
+      <View style={styles.listInfo}>
+        <Text style={styles.contactLabel}>{label}</Text>
+        <Text style={styles.contactValue}>{value}</Text>
+      </View>
+    </View>
+  );
+  if (!onPress) return body;
+  return <Pressable onPress={onPress}>{body}</Pressable>;
+}
 
 function formatWhen(iso?: string | null) {
   if (!iso) return '';
@@ -47,7 +87,6 @@ function formatWhen(iso?: string | null) {
 
 export default function StudentSupportScreen() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('chat');
   const [loading, setLoading] = useState(true);
   const [meta, setMeta] = useState<SupportMeta | null>(null);
   const [chats, setChats] = useState<SupportChatThread[]>([]);
@@ -59,6 +98,15 @@ export default function StudentSupportScreen() {
   const [category, setCategory] = useState<string>('GENERAL');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [query, setQuery] = useState('');
+  const [faqOpen, setFaqOpen] = useState(false);
+  const [faq, setFaq] = useState<
+    Array<{
+      id: string;
+      name: string;
+      articles: Array<{ id: string; question: string; answer: string }>;
+    }>
+  >([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,9 +116,11 @@ export default function StudentSupportScreen() {
         fetchStudentChats(),
         fetchStudentTickets(),
       ]);
+      const topics = await fetchStudentSupportFaq().catch(() => []);
       setMeta(m);
       setChats(c);
       setTickets(t);
+      setFaq(topics ?? []);
       setCategory((prev) =>
         m.categories?.length && !m.categories.includes(prev) ? m.categories[0] : prev,
       );
@@ -87,11 +137,11 @@ export default function StudentSupportScreen() {
     void load();
   }, [load]);
 
-  function openCompose(mode: 'chat' | 'ticket') {
+  function openCompose(mode: 'chat' | 'ticket', presetCategory?: string) {
     setComposeMode(mode);
     setSubject('');
     setBody('');
-    setCategory(meta?.categories?.[0] ?? SUPPORT_CATEGORIES[0]);
+    setCategory(presetCategory ?? meta?.categories?.[0] ?? SUPPORT_CATEGORIES[0]);
     setComposeOpen(true);
   }
 
@@ -139,155 +189,168 @@ export default function StudentSupportScreen() {
   }
 
   const categories = meta?.categories?.length ? meta.categories : [...SUPPORT_CATEGORIES];
-  const openChats = chats.filter((c) => !['CLOSED', 'RESOLVED'].includes(c.status?.toUpperCase()));
-  const openTickets = tickets.filter(
-    (t) => !['CLOSED', 'RESOLVED', 'DONE'].includes(t.status?.toUpperCase()),
-  );
+  const needle = query.trim().toLowerCase();
+  const faqHits = needle
+    ? faq.flatMap((group) =>
+        group.articles
+          .filter(
+            (article) =>
+              article.question.toLowerCase().includes(needle) ||
+              article.answer.toLowerCase().includes(needle),
+          )
+          .map((article) => ({ ...article, group: group.name })),
+      )
+    : [];
+  const requests = [
+    ...chats.map((chat) => ({
+      id: `chat-${chat.id}`,
+      title: chat.subject?.trim() || formatSupportCategory(chat.category) || 'Support chat',
+      detail: chat.lastMessagePreview || 'Live chat',
+      status: chat.status,
+      when: chat.lastMessageAt ?? '',
+      href: `/(student)/support-chat/${chat.id}`,
+    })),
+    ...tickets.map((ticket) => ({
+      id: `ticket-${ticket.id}`,
+      title: `${ticket.ticketNo} · ${ticket.subject}`,
+      detail: formatSupportCategory(ticket.category),
+      status: ticket.status,
+      when: ticket.updatedAt,
+      href: `/(student)/support-ticket/${ticket.id}`,
+    })),
+  ].sort((a, b) => String(b.when).localeCompare(String(a.when)));
+  const officeName = meta?.offices?.[0]?.name || 'College Office';
+  const contactEmail = meta?.settings?.contactEmail;
+  const contactPhone = meta?.settings?.contactPhone;
+  const supportHours = meta?.settings?.supportHours;
 
   return (
-    <StudentScreenShell title="Support Centre" subtitle="Live chat & tickets">
+    <StudentScreenShell title="Support Centre" subtitle="Help & requests">
       <ScrollView
         contentContainerStyle={styles.container}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />}
         keyboardShouldPersistTaps="handled"
       >
-        {loading && !meta ? (
-          <ActivityIndicator color={studentTheme.primary} style={{ marginTop: 24 }} />
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search help topics..."
+            placeholderTextColor="#94A3B8"
+          />
+        </View>
+
+        {faqHits.length ? (
+          <View style={styles.card}>
+            {faqHits.slice(0, 6).map((hit) => (
+              <View key={hit.id} style={styles.faqHit}>
+                <Text style={styles.listTitle}>{hit.question}</Text>
+                <Text style={styles.listPreview}>{hit.answer}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        <Text style={styles.sectionLabel}>Quick Help</Text>
+        <View style={styles.chipWrap}>
+          {categories.map((cat) => (
+            <Pressable
+              key={cat}
+              style={styles.quickChip}
+              onPress={() => openCompose('ticket', cat)}
+            >
+              <Text style={styles.quickIcon}>{QUICK_ICONS[cat] ?? '•'}</Text>
+              <Text style={styles.quickText}>{formatSupportCategory(cat)}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.welcomeCard}>
+          <Text style={styles.welcomeTitle}>Welcome to Support Centre</Text>
+          <Text style={styles.welcomeText}>
+            {meta?.settings?.welcomeMessage?.trim() ||
+              'How can we help you today? Start a live chat or raise a support ticket.'}
+          </Text>
+          <Pressable style={styles.primaryBtn} onPress={() => openCompose('chat')}>
+            <Text style={styles.primaryBtnText}>Start Live Chat</Text>
+          </Pressable>
+          <Pressable style={styles.outlineBtn} onPress={() => openCompose('ticket')}>
+            <Text style={styles.outlineBtnText}>Raise Support Ticket</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionLabel}>My Requests</Text>
+          <Text style={styles.countLabel}>{requests.length} Total</Text>
+        </View>
+        {loading && requests.length === 0 ? (
+          <ActivityIndicator color={studentTheme.primary} />
+        ) : requests.length === 0 ? (
+          <Text style={styles.muted}>No chats or tickets yet.</Text>
         ) : (
-          <>
-            <View style={styles.welcomeCard}>
-              <Text style={styles.welcomeTitle}>How can we help?</Text>
-              <Text style={styles.welcomeText}>
-                {meta?.settings?.welcomeMessage?.trim() ||
-                  'Chat with campus support or raise a ticket for follow-up.'}
-              </Text>
-              {meta?.settings?.supportHours ? (
-                <Text style={styles.welcomeMeta}>Hours: {meta.settings.supportHours}</Text>
-              ) : null}
-              {(meta?.settings?.contactEmail || meta?.settings?.contactPhone) && (
-                <Text style={styles.welcomeMeta}>
-                  {[meta.settings.contactEmail, meta.settings.contactPhone]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.actionRow}>
-              <Pressable style={styles.actionBtn} onPress={() => openCompose('chat')}>
-                <Text style={styles.actionBtnText}>Start chat</Text>
-              </Pressable>
+          requests.map((item) => {
+            const color = supportStatusColor(item.status);
+            return (
               <Pressable
-                style={[styles.actionBtn, styles.actionBtnSecondary]}
-                onPress={() => openCompose('ticket')}
+                key={item.id}
+                style={styles.requestCard}
+                onPress={() => router.push(item.href as never)}
               >
-                <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>
-                  Raise ticket
-                </Text>
+                <View style={styles.listInfo}>
+                  <Text style={styles.listTitle}>{item.title}</Text>
+                  <Text style={styles.listPreview}>{item.detail}</Text>
+                  {item.when ? <Text style={styles.listMeta}>{formatWhen(item.when)}</Text> : null}
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: `${color}18` }]}>
+                  <Text style={[styles.statusText, { color }]}>
+                    {formatSupportStatus(item.status)}
+                  </Text>
+                </View>
               </Pressable>
-            </View>
-
-            <View style={styles.tabRow}>
-              <Pressable
-                style={[styles.tab, tab === 'chat' && styles.tabActive]}
-                onPress={() => setTab('chat')}
-              >
-                <Text style={[styles.tabText, tab === 'chat' && styles.tabTextActive]}>
-                  Chats ({openChats.length})
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.tab, tab === 'tickets' && styles.tabActive]}
-                onPress={() => setTab('tickets')}
-              >
-                <Text style={[styles.tabText, tab === 'tickets' && styles.tabTextActive]}>
-                  Tickets ({openTickets.length})
-                </Text>
-              </Pressable>
-            </View>
-
-            {tab === 'chat' ? (
-              <View style={styles.listCard}>
-                {chats.length === 0 ? (
-                  <Text style={styles.muted}>No chats yet. Start a conversation with support.</Text>
-                ) : (
-                  chats.map((chat) => {
-                    const color = supportStatusColor(chat.status);
-                    return (
-                      <Pressable
-                        key={chat.id}
-                        style={styles.listRow}
-                        onPress={() => router.push(`/(student)/support-chat/${chat.id}` as never)}
-                      >
-                        <View style={styles.listInfo}>
-                          <View style={styles.listTitleRow}>
-                            <Text style={styles.listTitle} numberOfLines={1}>
-                              {chat.subject?.trim() ||
-                                formatSupportCategory(chat.category) ||
-                                'Support chat'}
-                            </Text>
-                            {(chat.unreadStudent ?? 0) > 0 ? (
-                              <View style={styles.unreadDot}>
-                                <Text style={styles.unreadText}>{chat.unreadStudent}</Text>
-                              </View>
-                            ) : null}
-                          </View>
-                          <Text style={styles.listPreview} numberOfLines={1}>
-                            {chat.lastMessagePreview || formatSupportCategory(chat.category)}
-                          </Text>
-                          <Text style={styles.listMeta}>
-                            {formatWhen(chat.lastMessageAt) || '—'}
-                            {chat.agent?.displayName ? ` · ${chat.agent.displayName}` : ''}
-                          </Text>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: `${color}18` }]}>
-                          <Text style={[styles.statusText, { color }]}>
-                            {formatSupportStatus(chat.status)}
-                          </Text>
-                        </View>
-                      </Pressable>
-                    );
-                  })
-                )}
-              </View>
-            ) : (
-              <View style={styles.listCard}>
-                {tickets.length === 0 ? (
-                  <Text style={styles.muted}>No tickets yet. Raise one for tracked support.</Text>
-                ) : (
-                  tickets.map((ticket) => {
-                    const color = supportStatusColor(ticket.status);
-                    return (
-                      <Pressable
-                        key={ticket.id}
-                        style={styles.listRow}
-                        onPress={() =>
-                          router.push(`/(student)/support-ticket/${ticket.id}` as never)
-                        }
-                      >
-                        <View style={styles.listInfo}>
-                          <Text style={styles.listTitle} numberOfLines={1}>
-                            {ticket.ticketNo} · {ticket.subject}
-                          </Text>
-                          <Text style={styles.listPreview} numberOfLines={1}>
-                            {formatSupportCategory(ticket.category)}
-                            {ticket.department?.name ? ` · ${ticket.department.name}` : ''}
-                          </Text>
-                          <Text style={styles.listMeta}>{formatWhen(ticket.updatedAt)}</Text>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: `${color}18` }]}>
-                          <Text style={[styles.statusText, { color }]}>
-                            {formatSupportStatus(ticket.status)}
-                          </Text>
-                        </View>
-                      </Pressable>
-                    );
-                  })
-                )}
-              </View>
-            )}
-          </>
+            );
+          })
         )}
+
+        <Text style={styles.sectionLabel}>Contact Information</Text>
+        <View style={styles.card}>
+          <ContactRow icon="🏫" label="College Office" value={officeName} />
+          {contactPhone ? (
+            <ContactRow
+              icon="📞"
+              label="Phone"
+              value={contactPhone}
+              onPress={() => void Linking.openURL(`tel:${contactPhone.replace(/[^\d+]/g, '')}`)}
+            />
+          ) : null}
+          {contactEmail ? (
+            <ContactRow
+              icon="✉️"
+              label="Email"
+              value={contactEmail}
+              onPress={() => void Linking.openURL(`mailto:${contactEmail}`)}
+            />
+          ) : null}
+          {supportHours ? <ContactRow icon="🕐" label="Office Hours" value={supportHours} /> : null}
+        </View>
+
+        <Text style={styles.sectionLabel}>Helpful Links</Text>
+        <Pressable style={styles.linkCard} onPress={() => setFaqOpen(true)}>
+          <Text style={styles.linkIcon}>❓</Text>
+          <Text style={styles.linkText}>FAQ</Text>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable>
+        <Pressable style={styles.linkCard} onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}>
+          <Text style={styles.linkIcon}>🔒</Text>
+          <Text style={styles.linkText}>Privacy Policy</Text>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable>
+        <Pressable style={styles.linkCard} onPress={() => void Linking.openURL(TERMS_URL)}>
+          <Text style={styles.linkIcon}>📋</Text>
+          <Text style={styles.linkText}>Terms & Conditions</Text>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable>
       </ScrollView>
 
       <Modal
@@ -369,50 +432,130 @@ export default function StudentSupportScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={faqOpen} animationType="slide" onRequestClose={() => setFaqOpen(false)}>
+        <View style={styles.faqModal}>
+          <Text style={styles.modalTitle}>FAQ</Text>
+          <ScrollView contentContainerStyle={styles.faqList}>
+            {faq.length === 0 ? (
+              <Text style={styles.muted}>No help topics have been published yet.</Text>
+            ) : (
+              faq.map((group) => (
+                <View key={group.id} style={styles.faqGroup}>
+                  <Text style={styles.sectionLabel}>{group.name}</Text>
+                  {group.articles.map((article) => (
+                    <View key={article.id} style={styles.faqHit}>
+                      <Text style={styles.listTitle}>{article.question}</Text>
+                      <Text style={styles.listPreview}>{article.answer}</Text>
+                    </View>
+                  ))}
+                </View>
+              ))
+            )}
+          </ScrollView>
+          <Pressable style={styles.primaryBtn} onPress={() => setFaqOpen(false)}>
+            <Text style={styles.primaryBtnText}>Close</Text>
+          </Pressable>
+        </View>
+      </Modal>
     </StudentScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, gap: 14, paddingBottom: 28 },
-  welcomeCard: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 16,
-    padding: 14,
+  container: { padding: 16, gap: 12, paddingBottom: 32 },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fff',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
-    gap: 4,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
   },
-  welcomeTitle: { fontSize: 15, fontWeight: '800', color: studentTheme.text },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: 14, color: studentTheme.text },
+  sectionLabel: { fontSize: 15, fontWeight: '800', color: studentTheme.text, marginTop: 4 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  quickChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  quickIcon: { fontSize: 13 },
+  quickText: { fontSize: 12, fontWeight: '700', color: studentTheme.text },
+  welcomeCard: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    padding: 16,
+    gap: 10,
+  },
+  welcomeTitle: { fontSize: 16, fontWeight: '800', color: studentTheme.text },
   welcomeText: { fontSize: 13, color: studentTheme.textMuted, lineHeight: 18 },
-  welcomeMeta: { fontSize: 12, color: studentTheme.primaryLight, fontWeight: '600', marginTop: 2 },
-  actionRow: { flexDirection: 'row', gap: 10 },
-  actionBtn: {
-    flex: 1,
+  primaryBtn: {
     backgroundColor: studentTheme.primary,
     borderRadius: 12,
     paddingVertical: 13,
     alignItems: 'center',
   },
-  actionBtnSecondary: {
-    backgroundColor: studentTheme.surface,
-    borderWidth: 1,
-    borderColor: studentTheme.border,
-  },
-  actionBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  actionBtnTextSecondary: { color: studentTheme.primary },
-  tabRow: {
-    flexDirection: 'row',
-    backgroundColor: studentTheme.surface,
+  primaryBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  outlineBtn: {
+    backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 4,
+    paddingVertical: 13,
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: studentTheme.border,
+    borderColor: '#BFDBFE',
   },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
-  tabActive: { backgroundColor: '#eff6ff' },
-  tabText: { fontSize: 13, fontWeight: '700', color: studentTheme.textMuted },
-  tabTextActive: { color: studentTheme.primaryLight },
+  outlineBtnText: { color: studentTheme.primary, fontSize: 14, fontWeight: '800' },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  countLabel: { fontSize: 12, fontWeight: '700', color: studentTheme.textMuted },
+  requestCard: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E8EEF7',
+    padding: 12,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8EEF7',
+    padding: 12,
+    gap: 8,
+  },
+  contactRow: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 4 },
+  contactIcon: { fontSize: 16, width: 24, textAlign: 'center' },
+  contactLabel: { fontSize: 11, color: studentTheme.textMuted, fontWeight: '700' },
+  contactValue: { fontSize: 14, fontWeight: '700', color: studentTheme.text },
+  linkCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E8EEF7',
+    padding: 12,
+  },
+  linkIcon: { fontSize: 16 },
+  linkText: { flex: 1, fontSize: 14, fontWeight: '800', color: studentTheme.text },
+  chevron: { fontSize: 22, color: '#9CA3AF' },
+  faqHit: { gap: 2, paddingVertical: 6 },
+  faqModal: { flex: 1, backgroundColor: '#F8FAFC', padding: 16, paddingTop: 48, gap: 12 },
+  faqList: { gap: 12, paddingBottom: 20 },
+  faqGroup: { gap: 8 },
   listCard: {
     backgroundColor: studentTheme.surface,
     borderRadius: 16,

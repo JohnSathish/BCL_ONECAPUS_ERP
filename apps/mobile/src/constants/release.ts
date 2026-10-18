@@ -1,11 +1,12 @@
 /** White-label campus portal — college-first in-app; product branding on splash/about */
 export const COLLEGE_NAME = 'Don Bosco College, Tura';
+export const COLLEGE_MOTTO = 'In Pursuit of Excellence';
 /**
  * Compile-time fallback only. Prefer remote branding.productName from bootstrap/login context.
  * Do not treat this as the platform identity for other tenants.
  */
 export const PRODUCT_NAME = 'Bosco Connect';
-export const APP_VERSION = '1.0.36';
+export const APP_VERSION = '1.0.37';
 export const DEVELOPER_NAME = 'BaseCode Labs Pvt. Ltd.';
 export const DEVELOPER_TAGLINE = 'Your Technology Growth Partner';
 /** Shown under college name on welcome/login (client-facing) */

@@ -6,6 +6,7 @@ import { studentTheme } from './theme';
 type StudentScreenShellProps = {
   title: string;
   subtitle?: string;
+  motto?: string;
   rightSlot?: ReactNode;
   showMenu?: boolean;
   children: ReactNode;
@@ -14,6 +15,7 @@ type StudentScreenShellProps = {
 export function StudentScreenShell({
   title,
   subtitle,
+  motto,
   rightSlot,
   showMenu = true,
   children,
@@ -23,6 +25,7 @@ export function StudentScreenShell({
       <StudentScreenHeader
         title={title}
         subtitle={subtitle}
+        motto={motto}
         rightSlot={rightSlot}
         showMenu={showMenu}
       />

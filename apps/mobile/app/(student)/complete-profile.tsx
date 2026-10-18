@@ -12,7 +12,9 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
+import { useStudentPortal } from '@/components/student-portal/student-portal-context';
 import { studentTheme } from '@/components/student-portal/theme';
 import {
   fetchClass12Subjects,
@@ -50,8 +52,40 @@ function emptySubjectRows(count = MIN_CLASS12_SUBJECTS): SubjectRow[] {
   }));
 }
 
+const CHECK_ICONS: Record<string, string> = {
+  aadhaar: '🪪',
+  abcId: '🎓',
+  bloodGroup: '🩸',
+  mobile: '📞',
+  email: '✉️',
+  dob: '📅',
+  gender: '👤',
+  fatherMobile: '👨‍👩‍👧',
+  address: '📍',
+  bank: '🏦',
+  classXii: '🎓',
+  photo: '📷',
+  marksheet: '📄',
+};
+
+function genderIcon(value: string) {
+  if (value === 'MALE') return '♂';
+  if (value === 'FEMALE') return '♀';
+  if (value === 'TRANSGENDER') return '⚧';
+  if (value === 'OTHER') return '⋯';
+  return '⊘';
+}
+
+function verificationLabel(value?: string | null) {
+  const text = String(value ?? '')
+    .replace(/_/g, ' ')
+    .trim();
+  return text ? text.toUpperCase() : 'NOT SUBMITTED';
+}
+
 export default function CompleteProfileScreen() {
   const { beginEditing, endEditing } = useSyncGuard();
+  const { home } = useStudentPortal();
   const [bootstrap, setBootstrap] = useState<ProfileBootstrap | null>(null);
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
@@ -504,23 +538,71 @@ export default function CompleteProfileScreen() {
     <StudentScreenShell title="Complete Profile" subtitle="Update permitted personal details">
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
-          {student?.fullName ? <Text style={styles.name}>{student.fullName}</Text> : null}
-          <Text style={styles.meta}>
-            {[student?.rollNumber, student?.programme].filter(Boolean).join(' · ') || ' '}
-          </Text>
-          <Text style={styles.heading}>
-            {completion ? `${completion.percent}% complete` : 'Loading…'}
-          </Text>
+          <View style={styles.identityRow}>
+            <StudentAvatar
+              name={student?.fullName || 'Student'}
+              photoUrl={home?.profile?.photoUrl}
+              size={72}
+            />
+            <View style={styles.identityText}>
+              <View style={styles.identityTop}>
+                <Text style={styles.name}>{student?.fullName || 'Student'}</Text>
+                <View style={styles.verifyPill}>
+                  <Text style={styles.verifyText}>
+                    {verificationLabel(bootstrap?.verificationStatus)}
+                  </Text>
+                </View>
+              </View>
+              {student?.rollNumber ? (
+                <Text style={styles.meta}>🎓 {student.rollNumber}</Text>
+              ) : null}
+              {student?.programme ? <Text style={styles.meta}>📘 {student.programme}</Text> : null}
+            </View>
+          </View>
+          <View style={styles.progressHead}>
+            <Text style={styles.progressPercent}>
+              {completion ? `${completion.percent}% Complete` : 'Loading…'}
+            </Text>
+            {completion ? (
+              <Text style={styles.progressCount}>
+                {completion.filledCount} of {completion.totalCount} details completed
+              </Text>
+            ) : null}
+          </View>
           <View style={styles.barTrack}>
             <View style={[styles.barFill, { width: `${completion?.percent ?? 0}%` }]} />
           </View>
-          {(completion?.missing ?? []).map((m) => (
-            <Text key={m.key} style={styles.missing}>
-              • {m.label}
-            </Text>
-          ))}
-          {bootstrap?.verificationStatus ? (
-            <Text style={styles.status}>Status: {bootstrap.verificationStatus}</Text>
+          {(completion?.checks ?? []).length ? (
+            <View style={styles.pendingBox}>
+              <Text style={styles.pendingTitle}>Pending Details</Text>
+              <Text style={styles.hint}>
+                Please complete the following details to keep your records accurate.
+              </Text>
+              <View style={styles.checkGrid}>
+                {completion?.checks?.map((check) => (
+                  <View
+                    key={check.key}
+                    style={[
+                      styles.checkChip,
+                      check.filled ? styles.checkDone : styles.checkPending,
+                    ]}
+                  >
+                    <Text style={styles.checkIcon}>{CHECK_ICONS[check.key] ?? '•'}</Text>
+                    <View style={styles.checkCopy}>
+                      <Text style={styles.checkLabel}>{check.label}</Text>
+                      <Text
+                        style={[
+                          styles.checkState,
+                          check.filled ? styles.checkStateDone : styles.checkStatePending,
+                        ]}
+                      >
+                        {check.filled ? 'Completed' : 'Pending'}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
           ) : null}
         </View>
 
@@ -533,7 +615,8 @@ export default function CompleteProfileScreen() {
         ) : null}
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Personal details</Text>
+          <Text style={styles.sectionTitle}>Personal Details</Text>
+          <Text style={styles.sectionHint}>Update your basic personal information</Text>
           <Text style={styles.label}>Gender *</Text>
           <View style={styles.chipRow}>
             {genderOptions.map((opt) => {
@@ -549,6 +632,7 @@ export default function CompleteProfileScreen() {
                   disabled={!canEditProfile}
                   onPress={() => setGender(opt.value)}
                 >
+                  <Text style={styles.chipIcon}>{genderIcon(opt.value)}</Text>
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>
                     {opt.label}
                   </Text>
@@ -557,20 +641,34 @@ export default function CompleteProfileScreen() {
             })}
           </View>
           <Text style={styles.label}>Mobile Number *</Text>
-          <TextInput
-            style={styles.input}
-            value={mobile}
-            onChangeText={(t) => setMobile(t.replace(/[^\d+]/g, '').slice(0, 13))}
-            keyboardType="phone-pad"
-          />
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldIcon}>📞</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={mobile}
+              onChangeText={(t) => setMobile(t.replace(/[^\d+]/g, '').slice(0, 13))}
+              keyboardType="phone-pad"
+              placeholder="Enter your mobile number"
+              placeholderTextColor="#94a3b8"
+              editable={canEditProfile}
+            />
+          </View>
+          <Text style={styles.example}>e.g. 9876543210</Text>
           <Text style={styles.label}>Personal Email *</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldIcon}>✉️</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="Enter your personal email address"
+              placeholderTextColor="#94a3b8"
+              editable={canEditProfile}
+            />
+          </View>
+          <Text style={styles.example}>Use an email you can open</Text>
           <Text style={styles.label}>Aadhaar Number *</Text>
           <TextInput
             style={styles.input}
@@ -1046,10 +1144,72 @@ const styles = StyleSheet.create({
     borderColor: studentTheme.border,
     gap: 8,
   },
-  name: { fontSize: 18, fontWeight: '700', color: studentTheme.text },
-  meta: { fontSize: 13, color: studentTheme.textMuted, marginBottom: 4 },
-  heading: { fontSize: 16, fontWeight: '600', color: studentTheme.text },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: studentTheme.text, marginBottom: 4 },
+  identityRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  identityText: { flex: 1, gap: 3 },
+  identityTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  name: { flex: 1, fontSize: 18, fontWeight: '800', color: studentTheme.text, lineHeight: 24 },
+  meta: { fontSize: 13, color: studentTheme.textMuted, fontWeight: '600' },
+  verifyPill: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  verifyText: { color: '#DC2626', fontSize: 9, fontWeight: '800' },
+  progressHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  progressPercent: { fontSize: 16, fontWeight: '800', color: '#1D4ED8' },
+  progressCount: {
+    fontSize: 11,
+    color: studentTheme.textMuted,
+    fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  pendingBox: { backgroundColor: '#EFF6FF', borderRadius: 14, padding: 12, gap: 8, marginTop: 4 },
+  pendingTitle: { fontSize: 14, fontWeight: '800', color: '#1E3A8A' },
+  checkGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  checkChip: {
+    width: '48%',
+    flexGrow: 1,
+    flexDirection: 'row',
+    gap: 8,
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'center',
+  },
+  checkPending: { backgroundColor: '#FEF2F2' },
+  checkDone: { backgroundColor: '#ECFDF5' },
+  checkIcon: { fontSize: 16 },
+  checkCopy: { flex: 1 },
+  checkLabel: { fontSize: 12, fontWeight: '800', color: studentTheme.text },
+  checkState: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+  checkStatePending: { color: '#DC2626' },
+  checkStateDone: { color: '#059669' },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: studentTheme.text },
+  sectionHint: { fontSize: 12, color: studentTheme.textMuted, marginTop: -4 },
+  fieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    backgroundColor: '#fff',
+  },
+  fieldIcon: { fontSize: 16 },
+  fieldInput: { flex: 1, paddingVertical: 10, fontSize: 15, color: studentTheme.text },
+  example: { fontSize: 11, color: '#94A3B8', marginTop: -2 },
   subCard: {
     borderWidth: 1,
     borderColor: '#e5e7eb',
@@ -1084,13 +1244,17 @@ const styles = StyleSheet.create({
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderWidth: 1,
     borderColor: studentTheme.border,
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     backgroundColor: '#fff',
   },
+  chipIcon: { fontSize: 13, color: studentTheme.textMuted },
   chipActive: {
     borderColor: studentTheme.primary,
     backgroundColor: `${studentTheme.primary}18`,
