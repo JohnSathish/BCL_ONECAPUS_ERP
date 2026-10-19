@@ -2342,7 +2342,7 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['admissions:read', 'reports:read'],
           },
           {
-            label: 'Monthly Attendance',
+            label: 'Attendance Report Hub',
             href: '/admin/reports/attendance/monthly',
             permissions: ['reports:read', ...P.studentAttendance],
           },

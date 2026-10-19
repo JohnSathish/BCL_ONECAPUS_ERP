@@ -607,7 +607,7 @@ export async function rejectAttendanceCorrection(id: string, reason: string) {
 
 export async function downloadAttendanceReportExport(
   type: string,
-  format: 'csv' | 'xlsx',
+  format: 'csv' | 'xlsx' | 'pdf',
   params?: Record<string, string | undefined>,
 ) {
   const response = await api.get(`/v1/staff/attendance/reports/${type}/export.${format}`, {
@@ -617,7 +617,9 @@ export async function downloadAttendanceReportExport(
   const mime =
     format === 'csv'
       ? 'text/csv;charset=utf-8'
-      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      : format === 'pdf'
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   const blob = new Blob([response.data], { type: mime });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

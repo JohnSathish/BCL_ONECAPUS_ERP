@@ -1636,7 +1636,30 @@ export class StaffAttendanceService {
     return result;
   }
 
-  async report(tenantId: string, type: string, query: AttendanceQueryDto) {
+  async report(
+    tenantId: string,
+    type: string,
+    query: AttendanceQueryDto,
+    user?: { sub: string; permissions?: string[] },
+  ) {
+    let scoped = query;
+    const permissions = user?.permissions ?? [];
+    const collegeWide = permissions.some((permission) =>
+      [
+        'staff-attendance:reports',
+        'staff-attendance:admin',
+        'staff-biometric:admin',
+      ].includes(permission),
+    );
+    if (user && !collegeWide) {
+      const staff = await this.prisma.staffProfile.findFirst({
+        where: { tenantId, portalUserId: user.sub, deletedAt: null },
+        select: { id: true },
+      });
+      if (staff) scoped = { ...query, staffProfileId: staff.id };
+    }
+    if (type === 'regularisation')
+      return this.regularisationReport(tenantId, scoped);
     if (type === 'raw-punches')
       return this.reportPayload(
         'Raw Punch Report',
@@ -1658,7 +1681,7 @@ export class StaffAttendanceService {
       );
     }
     if (type === 'monthly') return this.monthlySummary(tenantId, query);
-    const rows = await this.dailyRegister(tenantId, query);
+    const rows = await this.dailyRegister(tenantId, scoped);
     const filtered = rows.filter((row: any) => {
       if (type === 'late')
         return (row.lateMinutes ?? 0) > 0 || this.hasFlag(row, 'LATE');
@@ -1666,6 +1689,9 @@ export class StaffAttendanceService {
         return (row.earlyMinutes ?? 0) > 0 || this.hasFlag(row, 'EARLY_OUT');
       if (type === 'ot' || type === 'overtime')
         return (row.overtimeMinutes ?? 0) > 0 || this.hasFlag(row, 'OVERTIME');
+      if (type === 'working-hours') return true;
+      if (type === 'absence' || type === 'absent')
+        return row.status === 'ABSENT';
       if (type === 'missing-punch' || type === 'biometric-exception')
         return (
           this.hasFlag(row, 'MISSING_OUT') || this.hasFlag(row, 'NO_PUNCH')
@@ -1679,7 +1705,7 @@ export class StaffAttendanceService {
       if (type === 'shift-wise') return true;
       if (type === 'staff-card' || type === 'staff-summary')
         return (
-          !query.staffProfileId || row.staffProfileId === query.staffProfileId
+          !scoped.staffProfileId || row.staffProfileId === scoped.staffProfileId
         );
       if (type === 'muster-roll' || type === 'weekly' || type === 'yearly')
         return true;
@@ -1739,6 +1765,40 @@ export class StaffAttendanceService {
     };
   }
 
+  private async regularisationReport(
+    tenantId: string,
+    query: AttendanceQueryDto,
+  ) {
+    const rows = await this.db().staffAttendanceCorrection.findMany({
+      where: {
+        tenantId,
+        ...(query.staffProfileId
+          ? { staffProfileId: query.staffProfileId }
+          : {}),
+        ...(query.from || query.to
+          ? {
+              attendanceDate: {
+                ...(query.from ? { gte: new Date(query.from) } : {}),
+                ...(query.to ? { lte: new Date(query.to) } : {}),
+              },
+            }
+          : {}),
+      },
+      include: { staff: { select: { fullName: true, employeeCode: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+    });
+    return this.reportPayload(
+      'Attendance Regularisation Report',
+      rows.map((row: any) => ({
+        ...row,
+        employeeCode: row.staff?.employeeCode ?? '',
+        fullName: row.staff?.fullName ?? '',
+      })),
+      { totalRows: rows.length },
+    );
+  }
+
   private reportTitle(type: string) {
     const titles: Record<string, string> = {
       daily: 'Daily Attendance Register',
@@ -1747,6 +1807,9 @@ export class StaffAttendanceService {
       weekly: 'Weekly Attendance Report',
       yearly: 'Yearly Attendance Report',
       late: 'Late Arrival Report',
+      'working-hours': 'Working Hours Report',
+      absence: 'Staff Absence Report',
+      regularisation: 'Attendance Regularisation Report',
       early: 'Early Exit Report',
       'early-exit': 'Early Exit Report',
       ot: 'Overtime Report',

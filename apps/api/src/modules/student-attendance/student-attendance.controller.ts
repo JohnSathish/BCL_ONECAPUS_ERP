@@ -205,7 +205,7 @@ export class StudentAttendanceController {
     @Param('type') type: string,
     @Query() query: AttendanceReportQueryDto,
   ) {
-    const result = await this.service.reports(user.tid, type, query);
+    const result = await this.service.reports(user.tid, type, query, user);
     if (
       (query.format === 'xlsx' || query.format === 'pdf') &&
       result &&

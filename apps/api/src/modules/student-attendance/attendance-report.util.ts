@@ -51,6 +51,29 @@ export function percentageFromFold(fold: StatusFold): number {
   return Math.round((fold.countedPresent / denominator) * 10000) / 100;
 }
 
+/** Extra conducted classes still required at the policy threshold, with no further absences. */
+export function classesStillNeeded(
+  conducted: number,
+  countedPresent: number,
+  thresholdPct: number,
+): number {
+  if (conducted <= 0 || thresholdPct <= 0) return 0;
+  return Math.max(
+    0,
+    Math.ceil((thresholdPct / 100) * conducted - countedPresent),
+  );
+}
+
+export function shortageBand(
+  percentage: number,
+  thresholdPct: number,
+): 'CLEAR' | 'NEAR' | 'MID' | 'LOW' {
+  if (percentage >= thresholdPct) return 'CLEAR';
+  if (percentage >= Math.max(0, thresholdPct - 5)) return 'NEAR';
+  if (percentage >= 60) return 'MID';
+  return 'LOW';
+}
+
 export function foldEntries(
   entries: Array<{ sessionId: string; status: string }>,
 ): StatusFold {

@@ -35,6 +35,7 @@ import {
   getZonedWeekday,
 } from '../../common/utils/time-greeting';
 import { AttendancePolicyService } from './attendance-policy.service';
+import { StudentAttendanceHubService } from './student-attendance-hub.service';
 import {
   dayTemplateShouldRun,
   sessionMarkingAllowed,
@@ -64,6 +65,7 @@ export class StudentAttendanceService {
     private readonly subjectGroups: TeachingSubjectGroupService,
     private readonly attendancePolicy: AttendancePolicyService,
     private readonly workingDays: WorkingDayEngineService,
+    private readonly attendanceHub: StudentAttendanceHubService,
   ) {}
 
   async dashboard(tenantId: string) {
@@ -1183,33 +1185,77 @@ export class StudentAttendanceService {
     tenantId: string,
     type: string,
     query: AttendanceReportQueryDto,
+    user?: JwtUser,
   ) {
-    const format = query.format ?? 'json';
+    const scoped = user
+      ? await this.attendanceHub.scopedQuery(user, query)
+      : query;
+    const format = scoped.format ?? 'json';
+    const hubTypes = new Set([
+      'daily',
+      'semester',
+      'subject',
+      'statement',
+      'absentees',
+      'shortage',
+      'register',
+      'period',
+      'department',
+      'faculty-submission',
+      'timetable-gap',
+      'audit',
+      'dashboard',
+    ]);
+    if (hubTypes.has(type)) {
+      const report = await this.attendanceHub.build(tenantId, type, scoped);
+      if (
+        user?.permissions?.includes('student-attendance:reports') ||
+        user?.permissions?.includes('student-attendance:admin')
+      ) {
+        report.rows = report.rows;
+      } else if (Array.isArray(report.rows)) {
+        report.rows = report.rows.map((row: any) => ({ ...row, mobile: null }));
+      }
+      return this.maybeExportReport(report, type, format);
+    }
     if (type === 'unmarked') {
-      return this.listSessions(tenantId, { ...query, status: 'OPEN' });
+      return this.listSessions(tenantId, { ...scoped, status: 'OPEN' });
     }
     if (type === 'daily') {
-      return this.listSessions(tenantId, query);
+      return this.listSessions(tenantId, scoped);
     }
     if (type === 'monthly') {
       const report = await this.buildPeriodAttendanceReport(tenantId, {
-        ...query,
+        ...scoped,
         scope: 'monthly',
       });
+      if (format === 'json') {
+        const grid = await this.attendanceHub.build(
+          tenantId,
+          'register',
+          scoped,
+        );
+        (
+          report as { dateColumns?: string[]; registerRows?: unknown[] }
+        ).dateColumns = (grid as { dateColumns?: string[] }).dateColumns;
+        (report as { registerRows?: unknown[] }).registerRows = (
+          grid as { rows?: unknown[] }
+        ).rows;
+      }
       return this.maybeExportReport(report, 'monthly-attendance', format);
     }
     if (type === 'cumulative') {
       const report = await this.buildPeriodAttendanceReport(tenantId, {
-        ...query,
+        ...scoped,
         scope: 'cumulative',
       });
       return this.maybeExportReport(report, 'cumulative-attendance', format);
     }
     if (type === 'shortage' || type === 'defaulters') {
-      const report = await this.buildDefaulterReport(tenantId, query);
+      const report = await this.buildDefaulterReport(tenantId, scoped);
       return this.maybeExportReport(report, 'attendance-defaulters', format);
     }
-    return this.summaries(tenantId, query as AttendanceEligibilityQueryDto);
+    return this.summaries(tenantId, scoped as AttendanceEligibilityQueryDto);
   }
 
   async getPolicy(tenantId: string) {
@@ -2758,13 +2804,14 @@ export class StudentAttendanceService {
       rows: Array<Record<string, unknown>>;
       subjectSummaries?: Array<Record<string, unknown>>;
       classSummaries?: Array<Record<string, unknown>>;
+      exportColumns?: Array<{ key: string; label: string }>;
     },
     filenameBase: string,
     format: 'json' | 'xlsx' | 'csv' | 'pdf',
   ) {
     if (format === 'json') return report;
 
-    const columns = [
+    const columns = report.exportColumns ?? [
       { key: 'rollNumber', label: 'Roll No' },
       { key: 'enrollmentNumber', label: 'Enrollment' },
       { key: 'fullName', label: 'Student' },
@@ -2774,8 +2821,12 @@ export class StudentAttendanceService {
       { key: 'leaveCount', label: 'Leave' },
       { key: 'dutyCount', label: 'On Duty' },
       { key: 'percentage', label: '%' },
-      ...(report.type === 'defaulters'
-        ? [{ key: 'eligibilityStatus', label: 'Status' }]
+      ...(report.type === 'defaulters' || report.type === 'shortage'
+        ? [
+            { key: 'band', label: 'Band' },
+            { key: 'classesStillNeeded', label: 'Classes needed' },
+            { key: 'eligibilityStatus', label: 'Status' },
+          ]
         : []),
     ];
     const summaryColumns = [
@@ -2794,7 +2845,9 @@ export class StudentAttendanceService {
         ? 'Attendance Defaulters'
         : report.type === 'monthly'
           ? 'Monthly Attendance Report'
-          : 'Cumulative Attendance Report';
+          : report.type === 'cumulative'
+            ? 'Cumulative Attendance Report'
+            : `${report.type} attendance report`;
     const institutionName =
       report.institutionName?.trim() || 'Don Bosco College, Tura';
 

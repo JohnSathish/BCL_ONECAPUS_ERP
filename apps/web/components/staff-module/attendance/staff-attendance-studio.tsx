@@ -3225,7 +3225,7 @@ function ReportsAndFoundations({ kind }: { kind: PageKind }) {
   );
   const [from, setFrom] = useState(new Date().toISOString().slice(0, 10));
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
-  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
+  const [exporting, setExporting] = useState<'csv' | 'xlsx' | 'pdf' | null>(null);
   const qc = useQueryClient();
   const report = useQuery({
     queryKey: ['staff-attendance', 'report', reportType, from, to],
@@ -3243,7 +3243,7 @@ function ReportsAndFoundations({ kind }: { kind: PageKind }) {
       : [];
   const summary = reportData.summary ?? reportData.totals ?? {};
 
-  async function handleExport(format: 'csv' | 'xlsx') {
+  async function handleExport(format: 'csv' | 'xlsx' | 'pdf') {
     setExporting(format);
     try {
       await downloadAttendanceReportExport(reportType, format, { from, to });
@@ -3275,6 +3275,9 @@ function ReportsAndFoundations({ kind }: { kind: PageKind }) {
               ['early-exit', 'Early Exit Report'],
               ['overtime', 'Overtime Report'],
               ['missing-punch', 'Missing Punch Report'],
+              ['working-hours', 'Working Hours'],
+              ['absence', 'Absence'],
+              ['regularisation', 'Regularisation'],
               ['biometric-exception', 'Biometric Exception Report'],
               ['shift-wise', 'Shift Compliance Report'],
               ['department-wise', 'Department Attendance Report'],
@@ -3329,8 +3332,14 @@ function ReportsAndFoundations({ kind }: { kind: PageKind }) {
           >
             {exporting === 'xlsx' ? 'Exporting...' : 'Export Excel'}
           </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => window.print()}>
-            PDF / Print
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={exporting === 'pdf'}
+            onClick={() => void handleExport('pdf')}
+          >
+            {exporting === 'pdf' ? 'Exporting...' : 'Export PDF'}
           </Button>
         </div>
       </div>

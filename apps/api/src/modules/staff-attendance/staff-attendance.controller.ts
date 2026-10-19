@@ -17,6 +17,7 @@ import {
 } from './dto/staff-attendance.dto';
 import { AttendanceAnalyticsService } from './attendance-analytics.service';
 import { AttendanceExportService } from './attendance-export.service';
+import { buildAttendanceReportPdf } from '../student-attendance/attendance-report-pdf';
 import { StaffAttendanceService } from './staff-attendance.service';
 
 @ApiBearerAuth()
@@ -151,7 +152,7 @@ export class StaffAttendanceController {
     @Param('type') type: string,
     @Query() query: AttendanceQueryDto,
   ) {
-    return this.service.report(user.tid, type, query);
+    return this.service.report(user.tid, type, query, user);
   }
 
   @Get('reports/:type/export.csv')
@@ -162,7 +163,7 @@ export class StaffAttendanceController {
     @Query() query: AttendanceQueryDto,
     @Res() res: Response,
   ) {
-    const report = await this.service.report(user.tid, type, query);
+    const report = await this.service.report(user.tid, type, query, user);
     const rows = this.extractReportRows(report);
     const csv = this.exportService.buildCsv(
       String((report as { title?: string }).title ?? 'Attendance Report'),
@@ -184,7 +185,7 @@ export class StaffAttendanceController {
     @Query() query: AttendanceQueryDto,
     @Res() res: Response,
   ) {
-    const report = await this.service.report(user.tid, type, query);
+    const report = await this.service.report(user.tid, type, query, user);
     const rows = this.extractReportRows(report);
     const summary = (report as { summary?: Record<string, unknown> }).summary;
     const buffer = await this.exportService.buildExcel(
@@ -199,6 +200,47 @@ export class StaffAttendanceController {
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="${type}-attendance.xlsx"`,
+    );
+    res.send(buffer);
+  }
+
+  @Get('reports/:type/export.pdf')
+  @RequireAnyPermission('staff-attendance:reports', 'staff-attendance:view')
+  async exportReportPdf(
+    @CurrentUser() user: JwtUser,
+    @Param('type') type: string,
+    @Query() query: AttendanceQueryDto,
+    @Res() res: Response,
+  ) {
+    const report = await this.service.report(user.tid, type, query, user);
+    const rows = this.extractReportRows(report) as Array<
+      Record<string, unknown>
+    >;
+    const buffer = await buildAttendanceReportPdf({
+      institutionName: 'Don Bosco College, Tura',
+      title: String((report as { title?: string }).title ?? 'Staff attendance'),
+      periodLabel:
+        [query.from, query.to].filter(Boolean).join(' to ') ||
+        'Selected period',
+      generatedAt: new Date(),
+      summaryLines: [
+        'Staff attendance uses processed daily records, including approved corrections.',
+      ],
+      columns: [
+        { key: 'employeeCode', label: 'Code', width: 70 },
+        { key: 'fullName', label: 'Staff', width: 160 },
+        { key: 'status', label: 'Status', width: 80 },
+        { key: 'workedMinutes', label: 'Minutes', width: 70 },
+        { key: 'lateMinutes', label: 'Late', width: 50 },
+        { key: 'earlyMinutes', label: 'Early', width: 50 },
+        { key: 'overtimeMinutes', label: 'OT', width: 50 },
+      ],
+      rows,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${type}-attendance.pdf"`,
     );
     res.send(buffer);
   }

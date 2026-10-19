@@ -5,6 +5,7 @@ import { TeachingSubjectGroupModule } from '../timetable-engine/teaching-subject
 import { AttendancePolicyService } from './attendance-policy.service';
 import { StudentAttendanceSchedulerService } from './student-attendance-scheduler.service';
 import { StudentAttendanceController } from './student-attendance.controller';
+import { StudentAttendanceHubService } from './student-attendance-hub.service';
 import { StudentAttendanceService } from './student-attendance.service';
 
 @Module({
@@ -16,6 +17,7 @@ import { StudentAttendanceService } from './student-attendance.service';
   controllers: [StudentAttendanceController],
   providers: [
     StudentAttendanceService,
+    StudentAttendanceHubService,
     AttendancePolicyService,
     StudentAttendanceSchedulerService,
   ],

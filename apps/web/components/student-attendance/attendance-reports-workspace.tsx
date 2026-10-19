@@ -17,7 +17,26 @@ import { downloadBlob } from '@/utils/download-blob';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 
-type ReportKind = 'monthly' | 'cumulative' | 'defaulters';
+const REPORTS = [
+  ['monthly', 'Monthly'],
+  ['cumulative', 'Semester / cumulative'],
+  ['daily', 'Daily'],
+  ['semester', 'Semester subjects'],
+  ['subject', 'Subject'],
+  ['statement', 'Student statement'],
+  ['absentees', 'Absentees'],
+  ['shortage', 'Shortage'],
+  ['defaulters', 'Defaulters'],
+  ['register', 'Register'],
+  ['period', 'Period'],
+  ['department', 'Department'],
+  ['faculty-submission', 'Faculty submission'],
+  ['timetable-gap', 'Timetable gaps'],
+  ['dashboard', 'Dashboard'],
+  ['audit', 'Audit'],
+] as const;
+
+type ReportKind = (typeof REPORTS)[number][0];
 
 type ReportRow = {
   studentId: string;
@@ -32,6 +51,10 @@ type ReportRow = {
   dutyCount?: number;
   percentage: number;
   eligibilityStatus?: string;
+  subjectName?: string;
+  status?: string;
+  band?: string;
+  classesStillNeeded?: number;
 };
 
 type GroupSummary = {
@@ -69,17 +92,33 @@ type ReportPayload = {
   classSummaries?: GroupSummary[];
   departmentSummaries?: GroupSummary[];
   semesterSummaries?: GroupSummary[];
+  dateColumns?: string[];
+  registerRows?: Array<Record<string, string | number | null>>;
 };
 
 const TITLES: Record<ReportKind, string> = {
   monthly: 'Monthly Attendance Report',
   cumulative: 'Cumulative Attendance Report',
+  daily: 'Daily Attendance Report',
+  semester: 'Semester Attendance Report',
+  subject: 'Subject Attendance Report',
+  statement: 'Student Attendance Statement',
+  absentees: 'Absentee Report',
+  shortage: 'Attendance Shortage Report',
   defaulters: 'Attendance Defaulters',
+  register: 'Attendance Register',
+  period: 'Period-wise Attendance',
+  department: 'Department Attendance',
+  'faculty-submission': 'Faculty Submission Report',
+  'timetable-gap': 'Timetable vs Attendance',
+  dashboard: 'Attendance Analytics',
+  audit: 'Attendance Audit',
 };
 
 const fieldClass = 'mt-1 block h-9 rounded-lg border border-border bg-background px-2 text-sm';
 
-export function AttendanceReportsWorkspace({ kind }: { kind: ReportKind }) {
+export function AttendanceReportsWorkspace({ kind: initialKind }: { kind: ReportKind }) {
+  const [kind, setKind] = useState<ReportKind>(initialKind);
   const session = useRequireAuth();
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -211,6 +250,30 @@ export function AttendanceReportsWorkspace({ kind }: { kind: ReportKind }) {
             Excel
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {REPORTS.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            className={cn(
+              'rounded-full border px-3 py-1 text-xs font-semibold',
+              kind === value
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-card',
+            )}
+            onClick={() => setKind(value)}
+          >
+            {label}
+          </button>
+        ))}
+        <a
+          className="rounded-full border border-border px-3 py-1 text-xs font-semibold"
+          href="/admin/staff/attendance/audit"
+        >
+          Staff audit
+        </a>
       </div>
 
       <div className="flex flex-wrap gap-3 rounded-2xl border border-border bg-card p-3">
@@ -364,6 +427,35 @@ export function AttendanceReportsWorkspace({ kind }: { kind: ReportKind }) {
         />
       </div>
 
+      {report?.dateColumns?.length ? (
+        <div className="overflow-auto rounded-2xl border border-border">
+          <table className="min-w-full text-xs">
+            <thead className="bg-muted/40 text-left uppercase text-muted-foreground">
+              <tr>
+                <th className="sticky left-0 bg-muted/40 px-3 py-2">Student</th>
+                {report.dateColumns.map((date) => (
+                  <th key={date} className="px-2 py-2">
+                    {date.slice(5)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(report.registerRows ?? []).map((row, index) => (
+                <tr key={`${row.studentId}-${index}`} className="border-t border-border">
+                  <td className="sticky left-0 bg-card px-3 py-2">{row.fullName}</td>
+                  {report.dateColumns?.map((date) => (
+                    <td key={date} className="px-2 py-2 font-mono">
+                      {row[date] ?? ''}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
       <ReportTable
         rows={rows}
         loading={reportQ.isLoading}
@@ -407,12 +499,13 @@ function ReportTable({
             <th className="px-3 py-2">Leave</th>
             <th className="px-3 py-2">On duty</th>
             <th className="px-3 py-2">%</th>
+            <th className="px-3 py-2">Details</th>
             {showStatus ? <th className="px-3 py-2">Status</th> : null}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.studentId} className="border-t border-border">
+          {rows.map((row, index) => (
+            <tr key={`${row.studentId}-${index}`} className="border-t border-border">
               <td className="px-3 py-2 font-mono text-xs">{row.rollNumber ?? '—'}</td>
               <td className="px-3 py-2">{row.fullName}</td>
               <td className="px-3 py-2">{row.totalSessions}</td>
@@ -431,8 +524,18 @@ function ReportTable({
                         : 'bg-emerald-100 text-emerald-800',
                   )}
                 >
-                  {Number(row.percentage).toFixed(2)}%
+                  {Number(row.percentage || 0).toFixed(2)}%
                 </span>
+              </td>
+              <td className="px-3 py-2 text-xs">
+                {[
+                  row.subjectName,
+                  row.status,
+                  row.band,
+                  row.classesStillNeeded ? `${row.classesStillNeeded} needed` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || '—'}
               </td>
               {showStatus ? (
                 <td className="px-3 py-2 text-xs">{row.eligibilityStatus ?? '—'}</td>
