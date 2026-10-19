@@ -42,6 +42,7 @@ export function PasswordResetSuccessDialog({
       setCopiedToast(false);
       return;
     }
+    setRevealed(true);
     const t = window.setTimeout(() => {
       const el = inputRef.current;
       if (!el) return;
@@ -118,8 +119,11 @@ export function PasswordResetSuccessDialog({
                 id={passwordInputId}
                 type={revealed ? 'text' : 'password'}
                 readOnly
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
                 value={value || '—'}
-                className="min-w-0 flex-1 bg-transparent px-2.5 py-2 font-mono text-sm tracking-wide outline-none select-all"
+                className="min-w-0 flex-1 bg-transparent px-2.5 py-2 font-mono text-lg tracking-[0.35em] outline-none select-all"
                 onFocus={(e) => e.currentTarget.select()}
                 onClick={(e) => e.currentTarget.select()}
               />
@@ -152,10 +156,9 @@ export function PasswordResetSuccessDialog({
             role="note"
             className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-3 text-sm leading-relaxed text-amber-950 dark:text-amber-100"
           >
-            <p className="font-medium">This is a temporary password.</p>
+            <p className="font-medium">This is a 6-digit temporary password.</p>
             <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
-              Please share it securely with the user. They will be prompted to change the password
-              after their first login.
+              Read it out or copy it. The user must set a new password after the first login.
             </p>
           </div>
 

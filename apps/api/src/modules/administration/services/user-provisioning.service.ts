@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomInt } from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import { AdminAuditHelper } from '../admin-audit.helper';
 import { PasswordPolicyService } from '../../../common/security/password-policy.service';
@@ -42,6 +42,11 @@ export class UserProvisioningService {
       'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
     const bytes = randomBytes(length);
     return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+  }
+
+  /** Six digits, no letters or symbols, so it can be read out and typed on a phone. */
+  generateEasyTemporaryPassword(): string {
+    return String(randomInt(100000, 1000000));
   }
 
   async provisionUser(input: ProvisionUserInput) {
@@ -284,7 +289,21 @@ export class UserProvisioningService {
         plainPassword = roll;
         skipPolicy = true;
       } else {
-        plainPassword = this.generatePassword();
+        plainPassword = this.generateEasyTemporaryPassword();
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const recent = await this.prisma.passwordHistory.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            take: historyCount,
+          });
+          const reused = await Promise.all(
+            recent.map((row) =>
+              bcrypt.compare(plainPassword, row.passwordHash),
+            ),
+          );
+          if (!reused.some(Boolean)) break;
+          plainPassword = this.generateEasyTemporaryPassword();
+        }
       }
     }
 
