@@ -13,7 +13,7 @@ const KEEP_XML = `<?xml version="1.0" encoding="utf-8"?>
   Required in this monorepo when android.enableShrinkResourcesInReleaseBuilds=true.
 -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@raw/*,@drawable/*,@mipmap/*" />
+    tools:keep="@raw/*" />
 `;
 
 function withAndroidR8Keep(config) {

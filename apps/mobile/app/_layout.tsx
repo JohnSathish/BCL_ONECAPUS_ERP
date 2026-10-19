@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
 import * as ExpoSplashScreen from 'expo-splash-screen';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppUpdateGate } from '@/components/app-update/app-update-gate';
 import { useAuthFailureRedirect } from '@/hooks/useAuthFailureRedirect';
@@ -50,6 +51,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      <SystemBars style="auto" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />

@@ -52,7 +52,32 @@ check(
     ? `gradle=${gradleVN || 'n/a'}/${gradleVC || 'n/a'} app.config=${appVersion}/${versionCode}`
     : `stale android/ gradle=${gradleVN}/${gradleVC}; will refresh on expo prebuild --clean → ${appVersion}/${versionCode}`,
 );
-check('version-code-gt-42', versionCode > 42, `versionCode=${versionCode} (last Play AAB was 42)`);
+check(
+  'version-code-gt-58',
+  versionCode > 58,
+  `versionCode=${versionCode} (Play production is 57; 58 was built before these Play fixes)`,
+);
+check(
+  'r8-keeps-method-inlining',
+  !appConfig.includes('!method/inlining') && !appConfig.includes('-dontoptimize'),
+  'extraProguardRules must not disable R8 inlining or optimisation',
+);
+check(
+  'edge-to-edge-activity',
+  fs
+    .readFileSync(path.join(root, 'plugins', 'with-android-target-sdk-36.js'), 'utf8')
+    .includes('enableEdgeToEdge()'),
+  'MainActivity plugin injects androidx enableEdgeToEdge()',
+);
+check(
+  'large-screen-mlkit',
+  fs
+    .readFileSync(path.join(root, 'plugins', 'with-android-target-sdk-36.js'), 'utf8')
+    .includes('GmsBarcodeScanningDelegateActivity'),
+  'ML Kit portrait lock is removed at prebuild',
+);
+const rootLayout = fs.readFileSync(path.join(root, 'app', '_layout.tsx'), 'utf8');
+check('system-bars-root', rootLayout.includes('<SystemBars'), 'root layout mounts SystemBars');
 check(
   'target-sdk-plugin',
   fs.existsSync(path.join(root, 'plugins', 'with-android-target-sdk-36.js')),

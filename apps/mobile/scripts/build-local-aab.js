@@ -15,7 +15,7 @@ process.chdir(root);
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const appVersion = pkg.version || '1.0.34';
-const versionCode = '57';
+const versionCode = '59';
 
 const jdkCandidates = [
   process.env.JAVA_HOME,
@@ -148,6 +148,7 @@ function patchGradleProperties() {
     'android.enableShrinkResourcesInReleaseBuilds': 'true',
     'android.enablePngCrunchInReleaseBuilds': 'true',
     'expo.edgeToEdgeEnabled': 'true',
+    'android.enableR8.fullMode': 'true',
   };
   for (const [key, value] of Object.entries(sdkProps)) {
     const line = `${key}=${value}`;
@@ -245,12 +246,15 @@ for folder, px in sizes.items():
     x = (px - im.width) // 2
     y = (px - im.height) // 2
     canvas.paste(im, (x, y), im)
-    canvas.save(p, 'PNG', optimize=True, compress_level=9)
-    print('splash', folder, canvas.size, os.path.getsize(p))
+    webp = os.path.splitext(p)[0] + '.webp'
+    canvas.save(webp, 'WEBP', quality=82, method=6)
+    os.remove(p)
+    print('splash', folder, canvas.size, os.path.getsize(webp))
 
 for dirpath, _, files in os.walk(root):
     for name in files:
-        if not name.lower().endswith('.png'):
+        lower = name.lower()
+        if not lower.endswith('.png') or lower.endswith('.9.png'):
             continue
         p = os.path.join(dirpath, name)
         try:
@@ -258,10 +262,10 @@ for dirpath, _, files in os.walk(root):
             if before < 40_000:
                 continue
             im = Image.open(p).convert('RGBA')
-            im.save(p, 'PNG', optimize=True, compress_level=9)
-            after = os.path.getsize(p)
-            if after < before:
-                print('crunch', os.path.relpath(p, root), before, '->', after)
+            webp = os.path.splitext(p)[0] + '.webp'
+            im.save(webp, 'WEBP', quality=82, method=6)
+            os.remove(p)
+            print('webp', os.path.relpath(webp, root), before, '->', os.path.getsize(webp))
         except Exception as e:
             print('skip', p, e)
 `,
@@ -273,12 +277,42 @@ for dirpath, _, files in os.walk(root):
     /* ignore */
   }
   if (r.status !== 0) {
-    console.warn('Could not shrink splash logos; continuing.');
+    throw new Error(
+      'Bitmap optimisation failed. Install Pillow (python -m pip install pillow) and rebuild.',
+    );
+  }
+  const resRoot = path.join(root, 'android', 'app', 'src', 'main', 'res');
+  const oversized = [];
+  if (fs.existsSync(resRoot)) {
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.(png|webp)$/i.test(entry.name) && fs.statSync(full).size > 200 * 1024) {
+          oversized.push(path.relative(resRoot, full));
+        }
+      }
+    };
+    walk(resRoot);
+  }
+  if (oversized.length) {
+    throw new Error(`Oversized Android bitmaps remain: ${oversized.join(', ')}`);
   }
 }
 
 function verifyReleaseManifest() {
   const candidates = [
+    path.join(
+      root,
+      'android',
+      'app',
+      'build',
+      'intermediates',
+      'bundle_manifest',
+      'release',
+      'processApplicationManifestReleaseForBundle',
+      'AndroidManifest.xml',
+    ),
     path.join(
       root,
       'android',
@@ -328,6 +362,43 @@ function verifyReleaseManifest() {
   if (Number(target) < 36) {
     throw new Error(`Release manifest still targets API ${target}. Play Console requires 36+.`);
   }
+  for (const block of xml.split(/<activity\b/)) {
+    if (!block.includes('android:screenOrientation="portrait"')) continue;
+    const name = (block.match(/android:name="([^"]+)"/) || [])[1] || 'unknown activity';
+    throw new Error(`Release manifest still locks ${name} to portrait.`);
+  }
+}
+
+function assertReleaseOptimisation() {
+  const gradle = fs.readFileSync(path.join(root, 'android', 'app', 'build.gradle'), 'utf8');
+  const rulesPath = path.join(root, 'android', 'app', 'proguard-rules.pro');
+  const rules = fs.existsSync(rulesPath) ? fs.readFileSync(rulesPath, 'utf8') : '';
+  const mainActivity = path.join(
+    root,
+    'android',
+    'app',
+    'src',
+    'main',
+    'java',
+    'edu',
+    'onecampus',
+    'mobile',
+    'MainActivity.kt',
+  );
+  const activity = fs.existsSync(mainActivity) ? fs.readFileSync(mainActivity, 'utf8') : '';
+  const problems = [];
+  if (!gradle.includes('proguard-android-optimize.txt')) {
+    problems.push('release build does not use proguard-android-optimize.txt');
+  }
+  if (!gradle.includes('minifyEnabled')) problems.push('minifyEnabled is missing');
+  if (rules.includes('!method/inlining') || rules.includes('-dontoptimize')) {
+    problems.push('proguard rules disable R8 optimisation');
+  }
+  if (!activity.includes('enableEdgeToEdge()')) {
+    problems.push('MainActivity does not call enableEdgeToEdge()');
+  }
+  if (problems.length) throw new Error(problems.join('; '));
+  console.log('Release optimisation checks passed (R8 optimize, edge-to-edge activity).');
 }
 
 function copyMappingFile(base) {
@@ -448,6 +519,7 @@ patchGradleProperties();
 patchAndroidSdkGradleFiles();
 assertTargetSdk36();
 ensureProguardRules();
+assertReleaseOptimisation();
 shrinkSplashLogos();
 
 const keepDir = path.join(root, 'android', 'app', 'src', 'main', 'res', 'raw');
@@ -456,7 +528,7 @@ fs.writeFileSync(
   path.join(keepDir, 'keep.xml'),
   `<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@raw/*,@drawable/*,@mipmap/*" />
+    tools:keep="@raw/*" />
 `,
 );
 
