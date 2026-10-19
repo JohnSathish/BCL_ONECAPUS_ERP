@@ -340,9 +340,9 @@ JOIN planner_target ty
  AND ty."site_id" = sy."site_id"
 JOIN "academic"."website_academic_planner_days" dest
   ON dest."year_id" = ty."id"
- AND dest."date" = src."date"
  AND dest."deleted_at" IS NULL
 WHERE src."year_id" = sy."id"
+  AND dest."date" = src."date"
   AND src."deleted_at" IS NULL
   AND src."date" >= DATE '2026-06-01'
   AND src."date" < DATE '2027-07-01'
