@@ -151,9 +151,11 @@ export class CertificateVariableService {
             ? String(custom.gender)
             : '—';
     const studentCategory =
-      custom.student_category ??
-      student?.masterProfile?.admissionCategory ??
-      '—';
+      String(
+        custom.student_category ??
+          student?.masterProfile?.admissionCategory ??
+          '',
+      ).trim() || '—';
 
     const permanentAddress = this.formatPermanentAddress(
       student?.addresses,
@@ -234,7 +236,7 @@ export class CertificateVariableService {
       student_title: studentTitle,
       son_daughter: sonDaughter,
       parent_name: parentName,
-      permanent_address: permanentAddress,
+      permanent_address: permanentAddress || '—',
       gender: genderLabel,
       student_category: String(studentCategory),
       admission_number: student?.admissionNumber ?? '',
@@ -257,16 +259,21 @@ export class CertificateVariableService {
         currentRegistration?.semester?.academicYearIndex ?? String(sessionEnd),
       academic_session: academicSession,
       date_of_admission: student?.admissionDate
-        ? new Date(student.admissionDate).toLocaleDateString('en-IN')
-        : '',
+        ? new Date(student.admissionDate).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+          })
+        : 'Not Provided',
       date_of_leaving: this.formatDisplayDate(leavingDate),
       date_of_birth: student?.masterProfile?.dateOfBirth
         ? new Date(student.masterProfile.dateOfBirth).toLocaleDateString(
             'en-IN',
+            { day: '2-digit', month: 'long', year: 'numeric' },
           )
-        : '',
-      father_name: fatherName,
-      mother_name: motherName,
+        : 'Not Provided',
+      father_name: fatherName || 'Not Provided',
+      mother_name: motherName || 'Not Provided',
       last_class_attended: custom.last_class_attended ?? lastSemesterCompleted,
       last_semester_completed: lastSemesterCompleted,
       academic_status: academicStatus,
@@ -278,7 +285,7 @@ export class CertificateVariableService {
       fee_clearance: String(feeClearance),
       library_clearance: String(libraryClearance),
       hostel_clearance: String(hostelClearance),
-      remarks: String(remarks),
+      remarks: String(remarks || '—'),
       study_period: admissionYear
         ? `${admissionYear} - ${sessionEnd}`
         : academicSession,
@@ -305,22 +312,30 @@ export class CertificateVariableService {
       principal_name: principal?.displayName ?? 'Principal',
       registrar_name: registrar?.displayName ?? '',
       principal_signature_block: this.buildSignatureBlock(
-        principal?.displayName ?? 'Principal',
         issueMeta?.categoryCode === 'TRANSFER'
-          ? 'Principal & Official Seal'
+          ? 'Principal'
+          : (principal?.displayName ?? 'Principal'),
+        issueMeta?.categoryCode === 'TRANSFER'
+          ? 'Don Bosco College, Tura'
           : 'Principal',
         principal?.signaturePath,
-        'dbc-signature',
+        issueMeta?.categoryCode === 'TRANSFER'
+          ? 'dbc-tc-signature'
+          : 'dbc-signature',
       ),
       prepared_by_block: this.buildSignatureBlock(
-        String(preparedByName),
-        'Prepared By',
+        issueMeta?.categoryCode === 'TRANSFER'
+          ? 'Prepared By'
+          : String(preparedByName),
+        issueMeta?.categoryCode === 'TRANSFER' ? 'Office' : 'Prepared By',
         null,
         'dbc-tc-signature',
       ),
       verified_by_block: this.buildSignatureBlock(
-        String(verifiedByName),
-        'Verified By',
+        issueMeta?.categoryCode === 'TRANSFER'
+          ? 'Verified By'
+          : String(verifiedByName),
+        issueMeta?.categoryCode === 'TRANSFER' ? 'Registrar' : 'Verified By',
         registrar?.signaturePath,
         'dbc-tc-signature',
       ),

@@ -31,6 +31,7 @@ import {
 import {
   DBC_OFFICIAL_TEMPLATES,
   DBC_OFFICIAL_VARIABLE_KEYS,
+  getDbcOfficialTemplate,
 } from './templates/dbc-certificate.layout';
 
 const DEFAULT_TEMPLATE = `
@@ -657,7 +658,7 @@ export class CertificatesService {
       },
     );
     const renderedHtml = this.variables.renderTemplate(
-      version?.html ?? DEFAULT_TEMPLATE,
+      this.officialLayoutHtml(category.code, template?.code, version?.html),
       variableSnapshot,
     );
     return { renderedHtml, variableSnapshot, templateId: template?.id ?? null };
@@ -785,6 +786,19 @@ export class CertificatesService {
     };
   }
 
+  /** Official DBC layouts live in source so a published copy cannot keep an old design. */
+  private officialLayoutHtml(
+    categoryCode: string,
+    templateCode?: string | null,
+    storedHtml?: string | null,
+  ) {
+    const official = getDbcOfficialTemplate(categoryCode);
+    if (official && (!templateCode || templateCode === official.code)) {
+      return official.html;
+    }
+    return storedHtml || official?.html || DEFAULT_TEMPLATE;
+  }
+
   private async resolveTemplate(
     tenantId: string,
     categoryId: string,
@@ -858,7 +872,7 @@ export class CertificatesService {
     );
     const version = template?.versions?.[0];
     const renderedHtml = this.variables.renderTemplate(
-      version?.html ?? DEFAULT_TEMPLATE,
+      this.officialLayoutHtml(category.code, template?.code, version?.html),
       variableSnapshot,
     );
     const qrPayload = `/verify/certificates/${verificationToken}`;
