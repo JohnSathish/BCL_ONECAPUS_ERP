@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { WorkingDayEngineService } from '../academic-calendar/working-day-engine.service';
+import { resolveStudentFullName } from './attendance-display.util';
 import { AttendancePolicyService } from './attendance-policy.service';
 import type { AttendanceReportQueryDto } from './dto/student-attendance.dto';
 import {
@@ -149,6 +150,7 @@ export class StudentAttendanceHubService {
               masterProfile: {
                 select: { fullName: true, mobileNumber: true, email: true },
               },
+              user: { select: { displayName: true } },
             },
           })
         : [],
@@ -266,7 +268,7 @@ export class StudentAttendanceHubService {
       studentId,
       rollNumber: student?.rollNumber ?? null,
       enrollmentNumber: student?.enrollmentNumber ?? null,
-      fullName: student?.masterProfile?.fullName ?? 'Student',
+      fullName: resolveStudentFullName(student),
       mobile: bundle.includeContact
         ? (student?.masterProfile?.mobileNumber ?? null)
         : null,
@@ -301,6 +303,7 @@ export class StudentAttendanceHubService {
         rows.push({
           ...this.studentName(bundle, entry.studentId),
           subject: this.courseLabel(bundle, session),
+          subjectName: this.courseLabel(bundle, session),
           status: entry.status,
           periodNo: session.periodNo,
           facultyName:

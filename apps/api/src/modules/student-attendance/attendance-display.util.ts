@@ -44,6 +44,26 @@ export function majorMinorCategory(
   return null;
 }
 
+/** Profile name, then the login display name. Blank profile text must not hide the login name. */
+export function resolveStudentFullName(
+  student?: {
+    masterProfile?: { fullName?: string | null } | null;
+    user?: { displayName?: string | null } | null;
+    enrollmentNumber?: string | null;
+    rollNumber?: string | null;
+  } | null,
+) {
+  const profile = student?.masterProfile?.fullName?.trim();
+  if (profile) return profile;
+  const display = student?.user?.displayName?.trim();
+  if (display) return display;
+  return (
+    student?.rollNumber?.trim() ||
+    student?.enrollmentNumber?.trim() ||
+    'Student'
+  );
+}
+
 /** Fields the attendance roll needs. Do not load the full profile (address JSON can fail the request). */
 export const rosterStudentSelect = {
   id: true,

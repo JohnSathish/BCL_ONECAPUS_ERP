@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, FileSpreadsheet, FileText, Loader2, Printer } from 'lucide-react';
 
@@ -43,6 +43,10 @@ type ReportRow = {
   rollNumber?: string | null;
   enrollmentNumber?: string | null;
   fullName: string;
+  subject?: string | null;
+  semesterNo?: number | null;
+  classLabel?: string | null;
+  departmentName?: string | null;
   totalSessions: number;
   presentCount: number;
   attendedCount?: number;
@@ -132,6 +136,8 @@ export function AttendanceReportsWorkspace({ kind: initialKind }: { kind: Report
   const [studentQuery, setStudentQuery] = useState('');
   const [exporting, setExporting] = useState<'xlsx' | 'csv' | 'pdf' | null>(null);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const yearsQ = useQuery({
     queryKey: ['org', 'academic-years'],
@@ -143,6 +149,28 @@ export function AttendanceReportsWorkspace({ kind: initialKind }: { kind: Report
     queryFn: () => fetchAcademicDepartments(),
     enabled: Boolean(session),
   });
+  useEffect(() => {
+    if (academicYearId || !yearsQ.data?.length) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const covering = yearsQ.data.find(
+      (item) => item.startDate.slice(0, 10) <= today && item.endDate.slice(0, 10) >= today,
+    );
+    const active = yearsQ.data.find((item) => item.status === 'ACTIVE');
+    const chosen = covering ?? active ?? yearsQ.data[0];
+    if (!chosen) return;
+    setAcademicYearId(chosen.id);
+    if (initialKind === 'cumulative') {
+      const start = chosen.startDate.slice(0, 10);
+      const end = chosen.endDate.slice(0, 10);
+      setFrom(start);
+      setTo(end < today ? end : today);
+    }
+  }, [academicYearId, initialKind, yearsQ.data]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [kind, academicYearId, departmentId, semesterNo, courseId, from, to, month, year]);
+
   const coursesQ = useQuery({
     queryKey: ['courses', 'attendance-report', departmentId],
     queryFn: () => fetchCourses({ departmentId: departmentId || undefined, limit: 100, page: 1 }),
@@ -177,6 +205,17 @@ export function AttendanceReportsWorkspace({ kind: initialKind }: { kind: Report
         .includes(needle),
     );
   }, [report?.rows, studentQuery]);
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const visibleRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const averagePercentage = useMemo(() => {
+    if (typeof report?.summary?.averagePercentage === 'number') {
+      return report.summary.averagePercentage;
+    }
+    if (!rows.length) return 0;
+    return rows.reduce((sum, row) => sum + Number(row.percentage || 0), 0) / rows.length;
+  }, [report?.summary?.averagePercentage, rows]);
 
   if (!session) return null;
 
@@ -263,7 +302,10 @@ export function AttendanceReportsWorkspace({ kind: initialKind }: { kind: Report
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'border-border bg-card',
             )}
-            onClick={() => setKind(value)}
+            onClick={() => {
+              setKind(value);
+              setPage(1);
+            }}
           >
             {label}
           </button>
@@ -394,7 +436,10 @@ export function AttendanceReportsWorkspace({ kind: initialKind }: { kind: Report
             className={fieldClass}
             value={studentQuery}
             placeholder="Name or roll"
-            onChange={(event) => setStudentQuery(event.target.value)}
+            onChange={(event) => {
+              setStudentQuery(event.target.value);
+              setPage(1);
+            }}
           />
         </label>
       </div>
@@ -411,20 +456,9 @@ export function AttendanceReportsWorkspace({ kind: initialKind }: { kind: Report
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Working days" value={report?.summary?.workingDays ?? '—'} />
-        <SummaryCard label="Scheduled classes" value={report?.summary?.scheduledClasses ?? '—'} />
-        <SummaryCard
-          label="Conducted classes"
-          value={report?.summary?.conductedClasses ?? report?.summary?.sessions ?? 0}
-        />
-        <SummaryCard
-          label={kind === 'defaulters' ? 'Detained' : 'Average %'}
-          value={
-            kind === 'defaulters'
-              ? (report?.summary?.detained ?? 0)
-              : (report?.summary?.averagePercentage ?? 0)
-          }
-        />
+        {summaryCards(kind, report, rows, averagePercentage).map((card) => (
+          <SummaryCard key={card.label} label={card.label} value={card.value} tone={card.tone} />
+        ))}
       </div>
 
       {report?.dateColumns?.length ? (
@@ -457,9 +491,19 @@ export function AttendanceReportsWorkspace({ kind: initialKind }: { kind: Report
       ) : null}
 
       <ReportTable
-        rows={rows}
+        rows={visibleRows}
+        total={rows.length}
+        page={safePage}
+        pageCount={pageCount}
+        pageSize={pageSize}
+        onPage={setPage}
+        onPageSize={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
         loading={reportQ.isLoading}
         showStatus={kind === 'defaulters'}
+        showClass={kind === 'cumulative' || kind === 'monthly'}
         unitLabel={report?.unitLabels?.working ?? 'Conducted'}
       />
 
@@ -475,17 +519,78 @@ export function AttendanceReportsWorkspace({ kind: initialKind }: { kind: Report
   );
 }
 
+function displayStudentName(row: ReportRow) {
+  const name = String(row.fullName ?? '').trim();
+  if (name && name !== 'Student') return name;
+  return row.rollNumber || row.enrollmentNumber || 'Name not on profile';
+}
+
+function summaryCards(
+  kind: ReportKind,
+  report: ReportPayload | null,
+  rows: ReportRow[],
+  averagePercentage: number,
+) {
+  const average = `${Number(averagePercentage || 0).toFixed(2)}%`;
+  if (kind === 'daily') {
+    return [
+      {
+        label: 'Students',
+        value: report?.summary?.students ?? new Set(rows.map((row) => row.studentId)).size,
+        tone: 'slate',
+      },
+      { label: 'Present', value: report?.summary?.present ?? 0, tone: 'green' },
+      { label: 'Absent', value: report?.summary?.absent ?? 0, tone: 'rose' },
+      { label: 'Average attendance', value: average, tone: 'amber' },
+    ];
+  }
+  if (kind === 'defaulters') {
+    return [
+      { label: 'Students', value: rows.length, tone: 'slate' },
+      { label: 'Working days', value: report?.summary?.workingDays ?? '—', tone: 'blue' },
+      { label: 'Conducted classes', value: report?.summary?.conductedClasses ?? 0, tone: 'green' },
+      { label: 'Detained', value: report?.summary?.detained ?? rows.length, tone: 'rose' },
+    ];
+  }
+  return [
+    { label: 'Students', value: report?.summary?.students ?? rows.length, tone: 'slate' },
+    { label: 'Working days', value: report?.summary?.workingDays ?? '—', tone: 'blue' },
+    {
+      label: 'Conducted classes',
+      value: report?.summary?.conductedClasses ?? report?.summary?.sessions ?? 0,
+      tone: 'green',
+    },
+    { label: 'Average attendance', value: average, tone: 'rose' },
+  ];
+}
+
 function ReportTable({
   rows,
+  total,
+  page,
+  pageCount,
+  pageSize,
+  onPage,
+  onPageSize,
   loading,
   showStatus,
+  showClass,
   unitLabel,
 }: {
   rows: ReportRow[];
+  total: number;
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  onPage: (page: number) => void;
+  onPageSize: (size: number) => void;
   loading: boolean;
   showStatus: boolean;
+  showClass: boolean;
   unitLabel: string;
 }) {
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
   return (
     <div className="overflow-auto rounded-2xl border border-border">
       <table className="min-w-full text-sm">
@@ -493,6 +598,7 @@ function ReportTable({
           <tr>
             <th className="px-3 py-2">Roll</th>
             <th className="px-3 py-2">Student</th>
+            {showClass ? <th className="px-3 py-2">Class</th> : null}
             <th className="px-3 py-2">{unitLabel}</th>
             <th className="px-3 py-2">Attended</th>
             <th className="px-3 py-2">Absent</th>
@@ -507,7 +613,19 @@ function ReportTable({
           {rows.map((row, index) => (
             <tr key={`${row.studentId}-${index}`} className="border-t border-border">
               <td className="px-3 py-2 font-mono text-xs">{row.rollNumber ?? '—'}</td>
-              <td className="px-3 py-2">{row.fullName}</td>
+              <td className="px-3 py-2">
+                <div className="font-medium">{displayStudentName(row)}</div>
+                {row.departmentName ? (
+                  <div className="text-xs text-muted-foreground">{row.departmentName}</div>
+                ) : null}
+              </td>
+              {showClass ? (
+                <td className="px-3 py-2 text-xs">
+                  {[row.semesterNo ? `Semester ${row.semesterNo}` : '', row.classLabel]
+                    .filter(Boolean)
+                    .join(' · ') || '—'}
+                </td>
+              ) : null}
               <td className="px-3 py-2">{row.totalSessions}</td>
               <td className="px-3 py-2">{row.attendedCount ?? row.presentCount}</td>
               <td className="px-3 py-2">{row.absentCount}</td>
@@ -529,7 +647,7 @@ function ReportTable({
               </td>
               <td className="px-3 py-2 text-xs">
                 {[
-                  row.subjectName,
+                  row.subjectName || row.subject,
                   row.status,
                   row.band,
                   row.classesStillNeeded ? `${row.classesStillNeeded} needed` : '',
@@ -544,7 +662,7 @@ function ReportTable({
           ))}
         </tbody>
       </table>
-      {!loading && rows.length === 0 ? (
+      {!loading && total === 0 ? (
         <p className="px-3 py-6 text-sm text-muted-foreground">
           No attendance rows for the selected period.
         </p>
@@ -554,6 +672,45 @@ function ReportTable({
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading report…
         </p>
+      ) : null}
+      {total > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2 text-xs text-muted-foreground">
+          <span>
+            Showing {from} to {to} of {total} students
+          </span>
+          <div className="flex items-center gap-2">
+            <select
+              className="h-8 rounded-md border border-border bg-background px-2"
+              value={pageSize}
+              onChange={(event) => onPageSize(Number(event.target.value))}
+            >
+              {[10, 25, 50, 100].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => onPage(page - 1)}
+            >
+              Previous
+            </Button>
+            <span>
+              {page} / {pageCount}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= pageCount}
+              onClick={() => onPage(page + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       ) : null}
     </div>
   );
@@ -598,9 +755,27 @@ function SummaryTable({ title, rows }: { title: string; rows: GroupSummary[] }) 
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number | string }) {
+function SummaryCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  tone: string;
+}) {
+  const toneClass =
+    tone === 'blue'
+      ? 'bg-sky-50'
+      : tone === 'green'
+        ? 'bg-emerald-50'
+        : tone === 'rose'
+          ? 'bg-rose-50'
+          : tone === 'amber'
+            ? 'bg-amber-50'
+            : 'bg-card';
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
+    <div className={cn('rounded-2xl border border-border p-4', toneClass)}>
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
     </div>

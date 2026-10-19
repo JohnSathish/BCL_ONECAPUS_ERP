@@ -26,6 +26,7 @@ import {
   majorMinorCategorySetWhere,
   registrationLineCategoryWhere,
   resolveAttendanceDisplayTitle,
+  resolveStudentFullName,
   rosterStudentSelect,
 } from './attendance-display.util';
 import { compareAttendanceRoll } from './attendance-roll-order.util';
@@ -942,10 +943,7 @@ export class StudentAttendanceService {
           rollNumber: student.rollNumber,
           enrollmentNumber: student.enrollmentNumber,
           admissionNumber: student.admissionNumber,
-          fullName:
-            student.masterProfile?.fullName ??
-            student.user?.displayName ??
-            student.enrollmentNumber,
+          fullName: resolveStudentFullName(student),
           status: entryByStudent.get(student.id)?.status ?? defaultStatus,
           remarks: entryByStudent.get(student.id)?.remarks ?? '',
         }))
@@ -2541,6 +2539,10 @@ export class StudentAttendanceService {
       string,
       Array<{ sessionId: string; status: string }>
     >();
+    const studentContext = new Map<
+      string,
+      { semesterNo: number | null; classLabel: string; departmentName: string }
+    >();
     const subjectGroups = new Map<string, Group>();
     const classGroups = new Map<string, Group>();
     const departmentGroups = new Map<string, Group>();
@@ -2581,6 +2583,15 @@ export class StudentAttendanceService {
       for (const group of groups) group.sessionIds.add(session.id);
       for (const entry of session.entries ?? []) {
         if (query.studentId && entry.studentId !== query.studentId) continue;
+        if (!studentContext.has(entry.studentId)) {
+          studentContext.set(entry.studentId, {
+            semesterNo: session.semesterNo ?? null,
+            classLabel: section?.sectionCode
+              ? `Section ${section.sectionCode}`
+              : '',
+            departmentName: course?.department?.name ?? '',
+          });
+        }
         const identity = dayMode ? dateKey : session.id;
         const bucket = studentEntries.get(entry.studentId) ?? [];
         bucket.push({ sessionId: identity, status: entry.status });
@@ -2614,6 +2625,7 @@ export class StudentAttendanceService {
     const rows = [...studentEntries.entries()]
       .map(([studentId, entries]) => {
         const student = studentMap.get(studentId);
+        const context = studentContext.get(studentId);
         const fold = foldEntries(entries);
         const seen = new Set<string>();
         let medicalLeaveCount = 0;
@@ -2626,10 +2638,10 @@ export class StudentAttendanceService {
           studentId,
           rollNumber: student?.rollNumber ?? null,
           enrollmentNumber: student?.enrollmentNumber ?? null,
-          fullName:
-            student?.masterProfile?.fullName ??
-            student?.user?.displayName ??
-            'Student',
+          fullName: resolveStudentFullName(student),
+          semesterNo: context?.semesterNo ?? null,
+          classLabel: context?.classLabel || null,
+          departmentName: context?.departmentName || null,
           totalSessions: fold.conducted - fold.exempted,
           presentCount: fold.countedPresent,
           attendedCount: fold.attended,
@@ -2640,7 +2652,7 @@ export class StudentAttendanceService {
           percentage: percentageFromFold(fold),
         };
       })
-      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+      .sort(compareAttendanceRoll);
 
     const averagePercentage = rows.length
       ? Math.round(
@@ -2815,6 +2827,13 @@ export class StudentAttendanceService {
       { key: 'rollNumber', label: 'Roll No' },
       { key: 'enrollmentNumber', label: 'Enrollment' },
       { key: 'fullName', label: 'Student' },
+      ...(report.type === 'cumulative'
+        ? [
+            { key: 'departmentName', label: 'Department' },
+            { key: 'semesterNo', label: 'Semester' },
+            { key: 'classLabel', label: 'Class' },
+          ]
+        : []),
       { key: 'totalSessions', label: 'Conducted' },
       { key: 'attendedCount', label: 'Attended' },
       { key: 'absentCount', label: 'Absent' },
