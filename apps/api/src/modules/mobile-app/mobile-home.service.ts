@@ -40,15 +40,14 @@ export class MobileHomeService {
       fees: dashboard.fees,
       academicChips: dashboard.academicChips,
       attendance: {
-        percentage: dashboard.quickStats?.find((s) => s.key === 'attendance')
-          ?.value
-          ? parseFloat(
-              String(
-                dashboard.quickStats.find((s) => s.key === 'attendance')
-                  ?.value ?? '0',
-              ).replace('%', ''),
-            )
-          : null,
+        percentage: (() => {
+          const raw = dashboard.quickStats?.find(
+            (s) => s.key === 'attendance',
+          )?.value;
+          const parsed =
+            raw != null ? parseFloat(String(raw).replace('%', '')) : NaN;
+          return Number.isFinite(parsed) ? parsed : null;
+        })(),
       },
       unreadNotificationCount: dashboard.unreadNotificationCount,
       calendarEvents: upcoming,

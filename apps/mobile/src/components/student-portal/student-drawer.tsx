@@ -66,7 +66,11 @@ export function StudentDrawer() {
   const studentName = home?.profile?.displayFullName ?? 'Student';
   const program = home?.profile?.programName ?? home?.profile?.programLabel ?? 'Program';
   const semester = home?.profile?.semesterLabel ?? 'Semester';
-  const attendance = home?.attendance?.percentage ?? 91;
+  const attendancePct = home?.attendance?.percentage;
+  const attendance =
+    typeof attendancePct === 'number' && Number.isFinite(attendancePct)
+      ? `${Math.round(attendancePct)}%`
+      : '—';
   const feeDue = home?.fees?.due ?? 0;
 
   function navigate(href: string) {
@@ -112,7 +116,7 @@ export function StudentDrawer() {
           <View style={styles.statsRow}>
             <View style={styles.statPill}>
               <Text style={styles.statLabel}>Attendance</Text>
-              <Text style={styles.statValue}>{attendance}%</Text>
+              <Text style={styles.statValue}>{attendance}</Text>
             </View>
             <View style={styles.statPill}>
               <Text style={styles.statLabel}>Outstanding</Text>
