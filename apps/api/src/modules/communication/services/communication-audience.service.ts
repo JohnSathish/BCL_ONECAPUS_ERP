@@ -120,6 +120,13 @@ export class CommunicationAudienceService {
         return this.resolveIndividuals(tenantId, audienceFilter);
       case 'COMMITTEE':
         return this.resolveCommittee(tenantId, audienceFilter);
+      case 'STUDENTS_AND_STAFF': {
+        const [students, faculty] = await Promise.all([
+          this.resolveStudents(tenantId, audienceFilter),
+          this.resolveFaculty(tenantId, audienceFilter),
+        ]);
+        return this.dedupe([...students, ...faculty]);
+      }
       case 'ALL_USERS': {
         const [students, faculty, parents] = await Promise.all([
           this.resolveStudents(tenantId, audienceFilter),
@@ -346,6 +353,17 @@ export class CommunicationAudienceService {
     }
     if (filter.programVersionIds?.length) {
       where.programVersionId = { in: filter.programVersionIds };
+    }
+    if (filter.sectionIds?.length) {
+      and.push({
+        semesterRegistrations: {
+          some: {
+            lines: {
+              some: { offeringSectionId: { in: filter.sectionIds } },
+            },
+          },
+        },
+      });
     }
     if (filter.studentIds?.length || filter.excludeStudentIds?.length) {
       const idFilter: Prisma.StringFilter<'Student'> = {};

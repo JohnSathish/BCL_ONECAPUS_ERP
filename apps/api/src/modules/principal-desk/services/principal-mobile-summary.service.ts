@@ -168,6 +168,12 @@ export class PrincipalMobileSummaryService {
         icon: 'megaphone',
       },
       {
+        id: 'push',
+        label: 'Send Push Notification',
+        href: '/(principal)/push',
+        icon: 'notifications',
+      },
+      {
         id: 'calendar',
         label: 'Schedule Meeting',
         href: '/(principal)/(tabs)#schedule',

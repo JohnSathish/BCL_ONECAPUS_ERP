@@ -148,6 +148,11 @@ export const PRINCIPAL_DESK_NAV: PrincipalNavGroup[] = [
         icon: Megaphone,
       },
       {
+        href: '/principal-desk/push',
+        label: 'Send Push Notification',
+        icon: Bell,
+      },
+      {
         href: '/principal-desk/events',
         label: 'Events & Calendar',
         icon: CalendarDays,
@@ -278,6 +283,12 @@ export const PRINCIPAL_FAB_ACTIONS = [
     label: 'Send Notice',
     href: '/principal-desk/notices',
     icon: FileText,
+  },
+  {
+    id: 'push',
+    label: 'Send Push Notification',
+    href: '/principal-desk/push',
+    icon: Bell,
   },
   {
     id: 'events',

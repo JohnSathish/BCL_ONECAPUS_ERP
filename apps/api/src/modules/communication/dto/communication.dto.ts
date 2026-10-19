@@ -27,6 +27,7 @@ export const AUDIENCE_TYPES = [
   'INDIVIDUAL',
   'COMMITTEE',
   'ALL_USERS',
+  'STUDENTS_AND_STAFF',
   'APPLICANTS',
   'ALUMNI',
 ] as const;

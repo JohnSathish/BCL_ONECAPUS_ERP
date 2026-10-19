@@ -74,6 +74,7 @@ function ActionIcon({ name, color }: { name?: string; color: string }) {
     list: 'list',
     search: 'search',
     school: 'school',
+    notifications: 'notifications',
   };
   const glyph = (name && map[name]) || 'ellipse';
   return <Ionicons name={glyph} size={22} color={color} />;

@@ -137,6 +137,12 @@ export const PRINCIPAL_MOBILE_NAV: PrincipalMobileNavGroup[] = [
         href: '/(principal)/module/announcements',
       },
       {
+        id: 'push',
+        label: 'Send Push Notification',
+        icon: 'notifications-outline',
+        href: '/(principal)/push',
+      },
+      {
         id: 'events',
         label: 'Events & Calendar',
         icon: 'calendar-outline',

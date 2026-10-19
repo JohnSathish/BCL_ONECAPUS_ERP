@@ -63,6 +63,8 @@ import { BrandedEmailLayoutService } from './services/branded-email-layout.servi
     CommunicationWhatsAppService,
     FcmPushService,
     BrandedEmailLayoutService,
+    CommunicationCampaignsService,
+    CommunicationAudienceService,
   ],
 })
 export class CommunicationModule {}

@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   CurrentUser,
@@ -18,7 +26,9 @@ import { PrincipalAttendanceControlService } from './services/principal-attendan
 import { PrincipalDeskDashboardService } from './services/principal-desk-dashboard.service';
 import { PrincipalFeeDefaulterService } from './services/principal-fee-defaulter.service';
 import { PrincipalInstitutionalHealthService } from './services/principal-institutional-health.service';
+import { PrincipalPushDto } from './dto/principal-push.dto';
 import { PrincipalMobileSummaryService } from './services/principal-mobile-summary.service';
+import { PrincipalPushService } from './services/principal-push.service';
 import { PrincipalStaffCommandService } from './services/principal-staff-command.service';
 import { PrincipalStudentCommandService } from './services/principal-student-command.service';
 
@@ -40,7 +50,38 @@ export class PrincipalDeskController {
     private readonly naac: NaacDashboardService,
     private readonly governance: GovernanceDashboardService,
     private readonly committees: GovernanceCommitteeService,
+    private readonly push: PrincipalPushService,
   ) {}
+
+  @Get('push/options')
+  pushOptions(@CurrentUser() user: JwtUser) {
+    return this.push.options(user.tid);
+  }
+
+  @Get('push/people')
+  pushPeople(@CurrentUser() user: JwtUser, @Query('q') q = '') {
+    return this.push.searchPeople(user.tid, q);
+  }
+
+  @Get('push')
+  pushHistory(@CurrentUser() user: JwtUser) {
+    return this.push.history(user.tid);
+  }
+
+  @Get('push/:id')
+  pushDetail(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.push.detail(user.tid, id);
+  }
+
+  @Post('push/preview')
+  pushPreview(@CurrentUser() user: JwtUser, @Body() dto: PrincipalPushDto) {
+    return this.push.preview(user.tid, dto);
+  }
+
+  @Post('push')
+  sendPush(@CurrentUser() user: JwtUser, @Body() dto: PrincipalPushDto) {
+    return this.push.send(user, dto);
+  }
 
   @Get('mobile/summary')
   @RequirePermissions('principal-mobile:access')

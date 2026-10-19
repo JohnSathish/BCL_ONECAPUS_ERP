@@ -104,3 +104,95 @@ export async function fetchStudentLeaveTypes() {
   const { data } = await api.get('/v1/students/leave/types');
   return data;
 }
+
+export type PrincipalPushAudience = 'STUDENTS' | 'STAFF' | 'STUDENTS_AND_STAFF';
+
+export type PrincipalPushPayload = {
+  audience: PrincipalPushAudience;
+  title: string;
+  message: string;
+  noticeLink?: string;
+  scheduledAt?: string;
+  departmentIds?: string[];
+  semesterSequences?: number[];
+  sectionIds?: string[];
+  studentIds?: string[];
+  staffProfileIds?: string[];
+};
+
+export async function fetchPrincipalPushOptions() {
+  const { data } = await api.get('/v1/principal-desk/push/options');
+  return data as {
+    fcmConfigured: boolean;
+    fcmDemoMode: boolean;
+    audiences: Array<{ id: PrincipalPushAudience; label: string }>;
+    departments: Array<{ id: string; name: string; code: string }>;
+    semesters: number[];
+    sections: Array<{
+      id: string;
+      sectionCode: string;
+      semesterNo: number | null;
+      courseCode: string;
+      courseTitle: string;
+    }>;
+  };
+}
+
+export async function searchPrincipalPushPeople(q: string) {
+  const { data } = await api.get('/v1/principal-desk/push/people', { params: { q } });
+  return data as {
+    students: Array<{ id: string; name: string; rollNumber: string | null }>;
+    staff: Array<{ id: string; name: string; employeeCode: string }>;
+  };
+}
+
+export async function previewPrincipalPush(body: PrincipalPushPayload) {
+  const { data } = await api.post('/v1/principal-desk/push/preview', body);
+  return data as { total: number; withPush: number };
+}
+
+export async function sendPrincipalPush(body: PrincipalPushPayload) {
+  const { data } = await api.post('/v1/principal-desk/push', body);
+  return data as {
+    id: string;
+    status: string;
+    recipients: number;
+    devices: number;
+    audienceLabel: string;
+  };
+}
+
+export async function fetchPrincipalPushHistory() {
+  const { data } = await api.get('/v1/principal-desk/push');
+  return data as Array<{
+    id: string;
+    title: string;
+    message: string;
+    audienceLabel: string;
+    status: string;
+    sender: string;
+    createdAt: string;
+    sentAt: string | null;
+    scheduledAt: string | null;
+    acceptedByFcm: number;
+    failed: number;
+    skipped: number;
+  }>;
+}
+
+export async function fetchPrincipalPushDetail(id: string) {
+  const { data } = await api.get(`/v1/principal-desk/push/${id}`);
+  return data as {
+    id: string;
+    title: string;
+    message: string;
+    audienceLabel: string;
+    status: string;
+    sender: string;
+    acceptedByFcm: number;
+    failed: number;
+    skipped: number;
+    noticeLink?: string | null;
+    failures: Array<{ name: string; error: string; at: string }>;
+  };
+}

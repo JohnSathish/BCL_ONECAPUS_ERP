@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { join } from 'path';
 import { PrismaService } from '../../../database/prisma.service';
 import { resolveUploadRoot } from '../../../common/uploads/upload-paths';
@@ -408,12 +409,18 @@ export class CommunicationDeliveryService {
             select: { id: true },
             orderBy: { createdAt: 'desc' },
           });
+          const noticeLink =
+            typeof metadata.noticeLink === 'string'
+              ? metadata.noticeLink.trim()
+              : '';
           const pushLink =
+            noticeLink ||
             resolveNotificationLink({
               recipientType: recipient.recipientType,
               triggerKey: String(metadata.trigger ?? ''),
               entityType: String(metadata.entityType ?? ''),
-            }) ?? '/student/notifications';
+            }) ||
+            '/student/notifications';
           const result = await this.fcm.sendToTokens(tokens, {
             title: subject,
             body: bodyText ?? subject,
@@ -472,6 +479,14 @@ export class CommunicationDeliveryService {
             });
           }
 
+          const accepted =
+            result.successCount ?? (result.ok ? tokens.length : 0);
+          const rejected =
+            result.failureCount ?? (result.ok ? 0 : tokens.length);
+          const detail =
+            rejected > 0
+              ? `FCM accepted ${accepted} device(s) and rejected ${rejected}. ${result.error ?? ''}`.trim()
+              : result.error;
           await this.logDelivery({
             tenantId,
             campaignId,
@@ -480,7 +495,12 @@ export class CommunicationDeliveryService {
             status: result.ok ? 'SENT' : 'FAILED',
             provider: result.provider,
             providerRef: result.providerRef,
-            errorMessage: result.error,
+            errorMessage: detail || undefined,
+            metadata: {
+              fcmAccepted: accepted,
+              fcmRejected: rejected,
+              deviceDeliveryConfirmed: false,
+            },
           });
           if (result.ok) sentCount++;
           else failedCount++;
@@ -728,7 +748,7 @@ export class CommunicationDeliveryService {
         provider: input.provider,
         providerRef: input.providerRef,
         errorMessage: input.errorMessage,
-        metadata: (input.metadata ?? {}) as object,
+        metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
         sentAt: ['SENT', 'DELIVERED'].includes(input.status)
           ? new Date()
           : undefined,
@@ -774,6 +794,7 @@ export class CommunicationDeliveryService {
     provider?: string;
     providerRef?: string;
     errorMessage?: string;
+    metadata?: Record<string, unknown>;
   }) {
     return this.prisma.communicationDeliveryLog.create({
       data: {
@@ -785,6 +806,7 @@ export class CommunicationDeliveryService {
         provider: input.provider,
         providerRef: input.providerRef,
         errorMessage: input.errorMessage,
+        metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
         sentAt: ['SENT', 'DELIVERED'].includes(input.status)
           ? new Date()
           : undefined,
