@@ -6,13 +6,14 @@ import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { StudentBulkImportPanel } from '@/components/student-records/student-bulk-import-panel';
 import { useRequireAuth } from '@/hooks/use-auth';
 
-const TITLES: Record<1 | 3 | 5, string> = {
+const TITLES: Record<1 | 3 | 5 | 7, string> = {
   1: 'Semester 1 Subject Import',
   3: 'Semester 3 Subject Import',
   5: 'Semester 5 Subject Import',
+  7: 'Semester 7 Subject Import',
 };
 
-export function SemesterSubjectImportPage({ semester }: { semester: 1 | 3 | 5 }) {
+export function SemesterSubjectImportPage({ semester }: { semester: 1 | 3 | 5 | 7 }) {
   const session = useRequireAuth();
 
   const canImport = useMemo(

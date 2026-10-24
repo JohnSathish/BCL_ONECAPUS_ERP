@@ -347,6 +347,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['students:import', 'students:manage'],
           },
           {
+            label: 'Semester 7 Import',
+            href: '/admin/students/subject-registration/semester-7-import',
+            permissions: ['students:import', 'students:manage'],
+          },
+          {
             label: 'Student Profile Verification',
             href: '/admin/students/profile-verification',
             permissions: [

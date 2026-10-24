@@ -121,7 +121,7 @@ const FOCUS_SEMESTER_COPY: Record<
   7: {
     title: 'Semester 7 Lateral / Advanced Entry',
     description:
-      'Import Sem 7 students (own college or other NEHU-affiliated) with Major, Minor, and attested Sem-6 aggregate %. Research pathway is chosen later at Sem 8 registration.',
+      'Import Semester 7 Day-shift students with Major and Minor. Leave the Sem 6 aggregate blank until NEHU releases it. Research pathway is chosen later at Sem 8 registration.',
     templateLabel: 'Sem 7 Template',
   },
 };
