@@ -2184,8 +2184,8 @@ function Sem7TemplateDialog({
             department(s) in catalog
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Required columns: Major, Minor, Aggregate % Through Sem 6. LATERAL for other NEHU
-            colleges.
+            Required columns: Major, Minor, and Shift. Semester 7 and 8 are Day shift. Aggregate %
+            through Sem 6 can stay blank until NEHU releases it. LATERAL for other NEHU colleges.
           </p>
         </div>
 

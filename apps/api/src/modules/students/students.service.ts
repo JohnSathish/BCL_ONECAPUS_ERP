@@ -1115,29 +1115,15 @@ export class StudentsService {
       });
     }
 
-    if (
-      dto.aggregatePercentageThroughSem6 != null ||
-      (dto.currentSemester != null && dto.currentSemester >= 7)
-    ) {
-      if (
-        dto.currentSemester != null &&
-        dto.currentSemester >= 7 &&
-        dto.aggregatePercentageThroughSem6 == null
-      ) {
-        throw new BadRequestException(
-          'NEHU-attested aggregate percentage through Semester 6 is required for Semester 7+ entry.',
-        );
-      }
-      if (dto.aggregatePercentageThroughSem6 != null) {
-        await this.prisma.studentAcademicStanding.update({
-          where: { studentId: student.id },
-          data: {
-            aggregatePercentageThroughSem6: new Prisma.Decimal(
-              Number(dto.aggregatePercentageThroughSem6).toFixed(2),
-            ),
-          },
-        });
-      }
+    if (dto.aggregatePercentageThroughSem6 != null) {
+      await this.prisma.studentAcademicStanding.update({
+        where: { studentId: student.id },
+        data: {
+          aggregatePercentageThroughSem6: new Prisma.Decimal(
+            Number(dto.aggregatePercentageThroughSem6).toFixed(2),
+          ),
+        },
+      });
     }
 
     if (dto.previousCollegeName?.trim()) {

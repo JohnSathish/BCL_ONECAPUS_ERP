@@ -178,13 +178,13 @@ export function validateStepFields(
     const semester = draft.currentSemester ?? 1;
     if (semester >= 7) {
       if (
-        draft.aggregatePercentageThroughSem6 == null ||
-        !Number.isFinite(draft.aggregatePercentageThroughSem6) ||
-        draft.aggregatePercentageThroughSem6 < 0 ||
-        draft.aggregatePercentageThroughSem6 > 100
+        draft.aggregatePercentageThroughSem6 != null &&
+        (!Number.isFinite(draft.aggregatePercentageThroughSem6) ||
+          draft.aggregatePercentageThroughSem6 < 0 ||
+          draft.aggregatePercentageThroughSem6 > 100)
       ) {
         errors.aggregatePercentageThroughSem6 =
-          'Enter NEHU-attested aggregate % through Semester 6 (0–100).';
+          'Aggregate % through Semester 6 must be between 0 and 100.';
       }
       if (!draft.majorSubjectSlug?.trim()) {
         errors.majorSubjectSlug = 'Major subject is required for Semester 7+ entry.';

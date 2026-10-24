@@ -35,7 +35,7 @@ export const SEM7_ADMISSION_TEMPLATE_HELPERS: Record<string, string> = {
   Programme: 'Select from dropdown — e.g. BA-ECO, BA-GEO',
   'Admission Batch': 'BATCH-2026',
   Stream: 'ARTS',
-  Shift: 'MORNING or DAY',
+  Shift: 'DAY — Semester 7 and 8 are offered on Day shift',
   'Academic Session': '2026-27',
   'Current Semester': 'Must be 7',
   'Admission Type':
@@ -45,7 +45,7 @@ export const SEM7_ADMISSION_TEMPLATE_HELPERS: Record<string, string> = {
   'Minor Department':
     'Allowed minor for this major — Sem 7 papers (2 Minor) at registration',
   'Aggregate % Through Sem 6':
-    'NEHU-attested aggregate percentage through Semester 6 (required, 0–100)',
+    'Optional. Leave blank while NEHU holds the attested aggregate. Needed later for Honours with Research (75%).',
   'Previous College': 'Previous NEHU-affiliated college name (lateral entry)',
   'NEHU Registration Number': 'University registration number from NEHU docs',
   'NEHU Roll Number': 'University roll number from NEHU docs',
@@ -61,7 +61,7 @@ export const SEM7_ADMISSION_SAMPLE_ROW: Record<string, string> = {
   Programme: 'BA-ECO',
   'Admission Batch': 'BATCH-2026',
   Stream: 'ARTS',
-  Shift: 'MORNING',
+  Shift: 'DAY',
   'Academic Session': '2026-27',
   'Current Semester': '7',
   'Admission Type': 'LATERAL',
@@ -81,7 +81,7 @@ export const SEM7_ADMISSION_SAMPLE_ROW: Record<string, string> = {
 export const SEM7_STRUCTURE_NOTES = [
   'Semester 7 FYUGP: 3 Major + 2 Minor = 5 papers, 20 credits. Same pattern for all students.',
   'Do not choose Honours vs Research here — that happens at Semester 8 registration.',
-  'Aggregate % Through Sem 6 must be attested from NEHU documents (Research needs ≥ 75% later).',
+  'Aggregate % Through Sem 6 is optional at import. NEHU holds the attested figure; it is required later only for Honours with Research (75%).',
   'Major/Minor departments use the NEHU matrix; Sem 7 papers are auto-assigned at registration.',
   'Admission Type LATERAL for other NEHU-affiliated colleges; verify documents before import.',
 ];

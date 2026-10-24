@@ -1462,10 +1462,6 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       } else {
         aggregatePercentageThroughSem6 = parsed;
       }
-    } else if (targetSemester === 7) {
-      errors.push(
-        'Aggregate % Through Sem 6 is required for Semester 7 imports (NEHU-attested)',
-      );
     }
     const previousCollegeName =
       this.firstText(raw, ['previousCollegeName', 'previousCollege']) ||
