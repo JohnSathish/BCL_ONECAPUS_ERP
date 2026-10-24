@@ -2450,42 +2450,70 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
         catalog,
         majorDepartment,
       );
-      if (!department) {
+      const majorSubject = this.findSubjectMaster(
+        majorDepartment,
+        ctx.fyugp.subjectMasters,
+      );
+      if (!department && !majorSubject) {
         ctx.errors.push(
           `Unknown Major Department "${majorDepartment}" for programme ${catalog.programCode}. Choose from the template dropdown.`,
         );
       } else {
+        if (!department && majorSubject) {
+          ctx.warnings.push(
+            `Major Department "${majorDepartment}" is not on the Semester 7 paper list for ${catalog.programCode}. Saved as ${majorSubject.name}. Papers can be added later.`,
+          );
+        }
+        const majorLabel = department?.departmentName ?? majorSubject!.name;
         mapping.major = {
           category: 'MAJOR',
           input: majorDepartment,
-          resolvedLabel: department.departmentName,
-          subjectSlug: department.subjectSlug,
+          resolvedLabel: majorLabel,
+          subjectSlug: department?.subjectSlug ?? majorSubject!.slug,
           resolutionMode: 'NAME',
         };
         if (minorDepartment) {
-          const allowed = this.sem7Curriculum.resolveMinorDepartment(
-            catalog,
-            department.departmentName,
+          const allowed = department
+            ? this.sem7Curriculum.resolveMinorDepartment(
+                catalog,
+                department.departmentName,
+                minorDepartment,
+              )
+            : undefined;
+          const minorSubject = this.findSubjectMaster(
             minorDepartment,
+            ctx.fyugp.subjectMasters,
           );
-          if (!allowed) {
+          const minorOption = this.sem7Curriculum.resolveMinorDepartmentOption(
+            catalog,
+            allowed ?? minorDepartment,
+          );
+          if (!allowed && !minorSubject && !minorOption) {
             ctx.errors.push(
-              `Minor Department "${minorDepartment}" is not allowed for Major Department "${department.departmentName}". Choose from the template dropdown.`,
+              `Unknown Minor Department "${minorDepartment}" for Major Department "${majorLabel}".`,
             );
           } else {
-            const minorOption =
-              this.sem7Curriculum.resolveMinorDepartmentOption(
-                catalog,
-                allowed,
+            const allowedList = department
+              ? (catalog.minorByMajor[
+                  this.sem7Curriculum.normalizeLabel(department.departmentName)
+                ] ?? [])
+              : [];
+            if (!allowed && allowedList.length > 0) {
+              ctx.warnings.push(
+                `Minor Department "${minorDepartment}" is outside the usual list for ${majorLabel}. Saved for this Semester 7 student.`,
               );
+            }
+            const resolvedMinor =
+              allowed ?? minorOption?.departmentName ?? minorSubject!.name;
             mapping.minor = {
               category: 'MINOR',
               input: minorDepartment,
-              resolvedLabel: allowed,
+              resolvedLabel: resolvedMinor,
               subjectSlug:
                 minorOption?.subjectSlug ??
+                minorSubject?.slug ??
                 this.resolveMajorDepartmentSlug(
-                  allowed,
+                  resolvedMinor,
                   ctx.fyugp.subjectMasters,
                 ),
               resolutionMode: 'NAME',
@@ -3139,6 +3167,36 @@ export class StudentImportHandler implements ImportModuleHandler<NormalizedStude
       sectionCode: section?.sectionCode,
       categoryPoolId: offering.categoryPoolId ?? undefined,
     };
+  }
+
+  private findSubjectMaster(input: string, subjectMasters: SubjectMasterRow[]) {
+    const normalized = this.bareDepartmentKey(this.normalizeSubjectKey(input));
+    const codeInput = input.trim().toLowerCase();
+    const slug = slugifySubject(input);
+    return subjectMasters.find((subject) => {
+      if (!subject.isActive) return false;
+      const name = this.bareDepartmentKey(
+        this.normalizeSubjectKey(subject.name),
+      );
+      const departmentName = subject.department?.name
+        ? this.bareDepartmentKey(
+            this.normalizeSubjectKey(subject.department.name),
+          )
+        : '';
+      const departmentCode =
+        subject.department?.code?.trim().toLowerCase() ?? '';
+      return (
+        name === normalized ||
+        departmentName === normalized ||
+        (departmentCode !== '' &&
+          (departmentCode === codeInput || departmentCode === normalized)) ||
+        subject.slug === slug
+      );
+    });
+  }
+
+  private bareDepartmentKey(normalized: string) {
+    return normalized.replace(/^(department|dept)\s+of\s+/, '');
   }
 
   private resolveMajorDepartmentSlug(

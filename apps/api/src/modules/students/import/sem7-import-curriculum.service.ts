@@ -19,14 +19,16 @@ export type Sem7PaperOption = {
 
 export type Sem7MajorDepartmentOption = {
   departmentName: string;
+  departmentCode?: string;
   subjectSlug: string;
   paper1: Sem7PaperOption;
-  paper2: Sem7PaperOption;
-  paper3: Sem7PaperOption;
+  paper2?: Sem7PaperOption;
+  paper3?: Sem7PaperOption;
 };
 
 export type Sem7MinorDepartmentOption = {
   departmentName: string;
+  departmentCode?: string;
   subjectSlug: string;
   papers: Sem7PaperOption[];
 };
@@ -281,10 +283,8 @@ export class Sem7ImportCurriculumService {
     catalog: Sem7ImportCurriculumCatalog,
     input: string,
   ): Sem7MajorDepartmentOption | undefined {
-    const normalized = this.normalizeLabel(input);
-    return catalog.majorDepartments.find(
-      (department) =>
-        this.normalizeLabel(department.departmentName) === normalized,
+    return catalog.majorDepartments.find((department) =>
+      this.sameDepartmentLabel(department, input),
     );
   }
 
@@ -293,21 +293,53 @@ export class Sem7ImportCurriculumService {
     majorDepartment: string,
     minorInput: string,
   ): string | undefined {
-    const majorKey = this.normalizeLabel(majorDepartment);
+    const major = this.resolveMajorDepartment(catalog, majorDepartment);
+    const majorKey = this.normalizeLabel(
+      major?.departmentName ?? majorDepartment,
+    );
     const allowed = catalog.minorByMajor[majorKey] ?? [];
-    const normalized = this.normalizeLabel(minorInput);
-    return allowed.find((minor) => this.normalizeLabel(minor) === normalized);
+    return allowed.find((minor) => this.sameDepartmentLabel(minor, minorInput));
   }
 
   resolveMinorDepartmentOption(
     catalog: Sem7ImportCurriculumCatalog,
     input: string,
   ): Sem7MinorDepartmentOption | undefined {
-    const normalized = this.normalizeLabel(input);
-    return catalog.minorDepartments.find(
-      (department) =>
-        this.normalizeLabel(department.departmentName) === normalized,
+    return catalog.minorDepartments.find((department) =>
+      this.sameDepartmentLabel(department, input),
     );
+  }
+
+  /** Name, code, subject slug, or "Department of X" all refer to the same department. */
+  sameDepartmentLabel(
+    candidate:
+      | string
+      | {
+          departmentName: string;
+          departmentCode?: string;
+          subjectSlug?: string;
+        },
+    input: string,
+  ) {
+    const name =
+      typeof candidate === 'string' ? candidate : candidate.departmentName;
+    const code =
+      typeof candidate === 'string' ? undefined : candidate.departmentCode;
+    const subjectSlug =
+      typeof candidate === 'string' ? undefined : candidate.subjectSlug;
+    const left = this.bareDepartmentLabel(this.normalizeLabel(name));
+    const right = this.bareDepartmentLabel(this.normalizeLabel(input));
+    if (left === right) return true;
+    if (slugifySubject(name) === slugifySubject(input)) return true;
+    if (subjectSlug && subjectSlug === slugifySubject(input)) return true;
+    if (code && this.normalizeLabel(code) === this.normalizeLabel(input)) {
+      return true;
+    }
+    return false;
+  }
+
+  private bareDepartmentLabel(normalized: string) {
+    return normalized.replace(/^(department|dept)\.?\s+of\s+/, '');
   }
 
   private async buildMinorByMajor(
@@ -365,30 +397,40 @@ export class Sem7ImportCurriculumService {
         })),
         3,
       );
-      if (assigned.length < 3) continue;
+      if (assigned.length < 1) continue;
 
-      const paper1Offering = bucket.find(
-        (offering) => offering.courseId === assigned[0]!.courseId,
-      );
-      const paper2Offering = bucket.find(
-        (offering) => offering.courseId === assigned[1]!.courseId,
-      );
-      const paper3Offering = bucket.find(
-        (offering) => offering.courseId === assigned[2]!.courseId,
-      );
-      if (!paper1Offering || !paper2Offering || !paper3Offering) continue;
+      const paperOffering = (index: number) =>
+        bucket.find(
+          (offering) => offering.courseId === assigned[index]?.courseId,
+        );
+      const paper1Offering = paperOffering(0);
+      const paper2Offering = paperOffering(1);
+      const paper3Offering = paperOffering(2);
+      if (!paper1Offering) continue;
 
-      const departmentName = bucket[0]!.course.department?.name ?? key;
+      const departmentName =
+        paper1Offering.course.department?.name?.trim() ||
+        bucket[0]!.course.department?.name?.trim() ||
+        key;
       const subjectSlug =
         paper1Offering.course.subjectSlug?.trim() ||
         slugifySubject(departmentName);
+      const departmentCode =
+        paper1Offering.course.department?.code?.trim() ||
+        paper1Offering.course.code.split('-')[0]?.trim() ||
+        undefined;
 
       departments.push({
         departmentName,
+        departmentCode,
         subjectSlug,
         paper1: this.toPaperOption(paper1Offering),
-        paper2: this.toPaperOption(paper2Offering),
-        paper3: this.toPaperOption(paper3Offering),
+        ...(paper2Offering
+          ? { paper2: this.toPaperOption(paper2Offering) }
+          : {}),
+        ...(paper3Offering
+          ? { paper3: this.toPaperOption(paper3Offering) }
+          : {}),
       });
     }
 
@@ -419,8 +461,13 @@ export class Sem7ImportCurriculumService {
         const subjectSlug =
           bucket[0]!.course.subjectSlug?.trim() ||
           slugifySubject(departmentName);
+        const departmentCode =
+          bucket[0]!.course.department?.code?.trim() ||
+          bucket[0]!.course.code.split('-')[0]?.trim() ||
+          undefined;
         return {
           departmentName,
+          departmentCode,
           subjectSlug,
           papers: bucket.map((offering) => this.toPaperOption(offering)),
         };
