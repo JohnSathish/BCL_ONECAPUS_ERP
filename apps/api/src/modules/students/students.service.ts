@@ -611,7 +611,15 @@ export class StudentsService {
       this.prisma.student.findMany({
         where,
         include: directoryInclude,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [
+          {
+            academicStanding: {
+              currentSemesterSequence: { sort: 'asc', nulls: 'first' },
+            },
+          },
+          { rollNumber: { sort: 'asc', nulls: 'last' } },
+          { enrollmentNumber: 'asc' },
+        ],
         skip: (page - 1) * limit,
         take: limit,
       }),
