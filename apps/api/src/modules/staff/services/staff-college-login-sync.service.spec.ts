@@ -1,6 +1,10 @@
 import { ConflictException } from '@nestjs/common';
 import { StaffCollegeLoginSyncService } from './staff-college-login-sync.service';
 
+jest.mock('bcrypt', () => ({
+  hash: jest.fn().mockResolvedValue('hashed-notice-password'),
+}));
+
 function staffRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'staff-1',
@@ -137,5 +141,65 @@ describe('StaffCollegeLoginSyncService', () => {
     await expect(
       service.syncStaffPortalLogin('staff-1', { strict: true }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('sets the notice password only for college logins that have never signed in', async () => {
+    const prisma = {
+      staffProfile: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([{ tenantId: 'tenant-1' }])
+          .mockResolvedValueOnce([
+            { portalUserId: 'user-1', fullName: 'Kaushik Paul' },
+          ]),
+      },
+      auditLog: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
+      },
+      user: { update: jest.fn().mockResolvedValue({}) },
+      passwordHistory: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const service = new StaffCollegeLoginSyncService(prisma as never);
+
+    const result = await service.applyUnseenLoginPasswords();
+
+    expect(result).toEqual({ updated: 1 });
+    expect(prisma.staffProfile.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          portalUser: {
+            is: expect.objectContaining({ lastLoginAt: null }),
+          },
+        }),
+      }),
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: expect.objectContaining({
+        passwordHash: 'hashed-notice-password',
+        mustResetPassword: true,
+      }),
+    });
+  });
+
+  it('does not change passwords after the notice has already been applied', async () => {
+    const prisma = {
+      staffProfile: {
+        findMany: jest.fn().mockResolvedValue([{ tenantId: 'tenant-1' }]),
+      },
+      auditLog: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'audit-1' }),
+        create: jest.fn(),
+      },
+      user: { update: jest.fn() },
+      passwordHistory: { create: jest.fn() },
+    };
+    const service = new StaffCollegeLoginSyncService(prisma as never);
+
+    const result = await service.applyUnseenLoginPasswords();
+
+    expect(result).toEqual({ updated: 0 });
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });

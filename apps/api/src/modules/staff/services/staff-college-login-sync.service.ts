@@ -5,12 +5,18 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../../database/prisma.service';
 import {
+  COLLEGE_EMAIL_DOMAIN,
   isOfficialCollegeEmail,
   normalizeEmail,
   officialCollegeEmail,
 } from '../utils/staff-college-email.util';
+
+/** Published in the faculty app notice. Shared only until first sign-in. */
+const NOTICE_TEMP_PASSWORD = 'Dbcstaff@2026';
+const NOTICE_PASSWORD_ACTION = 'staff_notice_temp_password_2026';
 
 export type StaffCollegeLoginSyncStatus =
   | 'updated'
@@ -25,10 +31,15 @@ export class StaffCollegeLoginSyncService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   onModuleInit() {
-    void this.syncAll().catch((error: unknown) => {
+    void this.prepareStaffLogins().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Staff college login sync failed: ${message}`);
     });
+  }
+
+  async prepareStaffLogins() {
+    await this.syncAll();
+    await this.applyUnseenLoginPasswords();
   }
 
   /**
@@ -50,6 +61,87 @@ export class StaffCollegeLoginSyncService implements OnModuleInit {
       `Staff college login sync: ${counts.updated} updated, ${counts.unchanged} already matched, ${counts.skipped} left unchanged, ${counts.conflict} conflicts`,
     );
     return counts;
+  }
+
+  /**
+   * One-time notice password for staff who have never signed in.
+   * Accounts with a portal or app login are left unchanged.
+   */
+  async applyUnseenLoginPasswords() {
+    const tenants = await this.prisma.staffProfile.findMany({
+      where: { deletedAt: null, portalUserId: { not: null } },
+      distinct: ['tenantId'],
+      select: { tenantId: true },
+    });
+    let updated = 0;
+    for (const { tenantId } of tenants) {
+      const done = await this.prisma.auditLog.findFirst({
+        where: { tenantId, action: NOTICE_PASSWORD_ACTION },
+        select: { id: true },
+      });
+      if (done) continue;
+
+      const count = await this.applyTenantNoticePasswords(tenantId);
+      updated += count;
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId,
+          module: 'staff',
+          action: NOTICE_PASSWORD_ACTION,
+          entityType: 'StaffNotice',
+          metadata: { updated: count },
+        },
+      });
+      this.logger.log(
+        `Temporary password set for ${count} staff accounts that have not signed in`,
+      );
+    }
+    return { updated };
+  }
+
+  private async applyTenantNoticePasswords(tenantId: string) {
+    const rows = await this.prisma.staffProfile.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: { in: ['ACTIVE', 'ON_LEAVE'] },
+        portalUser: {
+          is: {
+            deletedAt: null,
+            isActive: true,
+            lastLoginAt: null,
+            refreshSessions: { none: {} },
+            email: {
+              endsWith: `@${COLLEGE_EMAIL_DOMAIN}`,
+              mode: 'insensitive',
+            },
+          },
+        },
+      },
+      select: { portalUserId: true, fullName: true },
+    });
+    const pending = rows.filter(
+      (row): row is { portalUserId: string; fullName: string } =>
+        Boolean(row.portalUserId),
+    );
+    if (!pending.length) return 0;
+
+    const now = new Date();
+    const passwordHash = await bcrypt.hash(NOTICE_TEMP_PASSWORD, 12);
+    for (const row of pending) {
+      await this.prisma.user.update({
+        where: { id: row.portalUserId },
+        data: {
+          passwordHash,
+          passwordChangedAt: now,
+          mustResetPassword: true,
+        },
+      });
+      await this.prisma.passwordHistory.create({
+        data: { userId: row.portalUserId, passwordHash },
+      });
+    }
+    return pending.length;
   }
 
   async assertAvailable(tenantId: string, portalUserId: string, email: string) {
