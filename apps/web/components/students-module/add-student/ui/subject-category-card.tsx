@@ -111,8 +111,8 @@ export function SubjectCategoryCard({
           />
           {sections.length === 0 && ineligibleSections.length === 0 ? (
             <p className="mt-1 text-[10px] text-muted-foreground">
-              No section is open on this shift yet. Reopen this step after the semester pool is
-              assigned to the programme.
+              No paper is open on the selected shift for this category. Reopen this step after the
+              semester pool is linked to the programme.
             </p>
           ) : null}
           {overrideReason ? (

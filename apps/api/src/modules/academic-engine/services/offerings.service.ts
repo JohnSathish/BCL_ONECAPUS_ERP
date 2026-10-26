@@ -188,7 +188,10 @@ export class OfferingsService {
       user.tid,
       filters.programVersionId,
       filters.semesterSequence,
-      filters.category ? { category: filters.category } : undefined,
+      {
+        ...(filters.category ? { category: filters.category } : {}),
+        ...(shiftId ? { shiftId } : {}),
+      },
     );
 
     let sections = await this.prisma.offeringSection.findMany({
@@ -473,12 +476,15 @@ export class OfferingsService {
   ) {
     if (!this.poolSections) return;
 
-    const poolIds = await this.curriculum.getAssignedPoolIds(
+    const poolIds = await this.curriculum.getCatalogPoolIds(
       tenantId,
       programVersionId,
       semesterSequence,
+      shiftId,
     );
     if (!poolIds.length) return;
+
+    await this.curriculum.materializePoolOfferings(tenantId, poolIds);
 
     const exclusions = await this.curriculum.getExcludedCourseIdsByPool(
       tenantId,

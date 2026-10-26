@@ -6,8 +6,9 @@ describe('CurriculumResolutionService', () => {
     programVersion: { findFirst: jest.fn() },
     programmePoolAssignment: { findMany: jest.fn() },
     programmePoolCourseExclusion: { findMany: jest.fn() },
-    courseOffering: { findMany: jest.fn() },
+    courseOffering: { findMany: jest.fn(), upsert: jest.fn() },
     categoryPool: { findMany: jest.fn() },
+    semesterStructureRule: { findFirst: jest.fn() },
   };
 
   const service = new CurriculumResolutionService(prisma as never);
@@ -115,5 +116,28 @@ describe('CurriculumResolutionService', () => {
         }),
       }),
     );
+  });
+
+  it('uses the semester MDC pool when the programme has no pool assignment', async () => {
+    prisma.programmePoolAssignment.findMany.mockResolvedValue([]);
+    prisma.semesterStructureRule.findFirst.mockResolvedValue({
+      categoryCounts: { MAJOR: 1, MDC: 1, AEC: 1 },
+    });
+    prisma.programVersion.findFirst.mockResolvedValue({
+      program: { department: { institutionId: 'inst-1' } },
+    });
+    prisma.categoryPool.findMany.mockResolvedValue([
+      { id: 'pool-mdc', categoryType: 'MDC', shiftId: null },
+      { id: 'pool-aec', categoryType: 'AEC', shiftId: 'shift-morning' },
+    ]);
+
+    const ids = await service.getCatalogPoolIds(
+      'tenant-1',
+      'pv-1',
+      1,
+      'shift-day',
+    );
+
+    expect(ids).toEqual(expect.arrayContaining(['pool-mdc', 'pool-aec']));
   });
 });

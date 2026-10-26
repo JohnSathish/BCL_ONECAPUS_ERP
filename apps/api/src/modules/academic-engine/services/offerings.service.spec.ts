@@ -32,6 +32,8 @@ describe('OfferingsService catalog with pools', () => {
     })),
     resolveProgrammeCurriculum: jest.fn(),
     getAssignedPoolIds: jest.fn(),
+    getCatalogPoolIds: jest.fn(),
+    materializePoolOfferings: jest.fn(),
     getExcludedCourseIdsByPool: jest.fn(async () => new Map()),
   };
   const poolSections = {
@@ -107,7 +109,7 @@ describe('OfferingsService catalog with pools', () => {
       deletedAt: null,
       status: 'active',
     });
-    curriculum.getAssignedPoolIds.mockResolvedValue(['pool-mdc']);
+    curriculum.getCatalogPoolIds.mockResolvedValue(['pool-mdc']);
     curriculum.getExcludedCourseIdsByPool.mockResolvedValue(new Map());
     prisma.courseOffering.findMany.mockResolvedValue([
       {

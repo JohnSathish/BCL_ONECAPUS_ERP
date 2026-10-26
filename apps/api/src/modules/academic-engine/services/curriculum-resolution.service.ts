@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { MAPPING_SOURCE } from '../domain/category-pools';
+import { isSharedPoolCapacityCategory } from '../domain/section-capacity';
 
 export type ResolvedPoolOffering = {
   offering: Prisma.CourseOfferingGetPayload<{
@@ -236,16 +237,168 @@ export class CurriculumResolutionService {
     return { directOfferings, inheritedPoolOfferings };
   }
 
+  /**
+   * Assigned pools, plus the institution's semester pools for any MDC/AEC/SEC/VAC/VTC
+   * category the programme still requires. A late admission on Day shift can then see
+   * those papers even when the programme assignment was saved only for another shift.
+   */
+  async getCatalogPoolIds(
+    tenantId: string,
+    programVersionId: string,
+    semesterSequence: number,
+    shiftId?: string,
+  ): Promise<string[]> {
+    const assignedIds = await this.getAssignedPoolIds(
+      tenantId,
+      programVersionId,
+      semesterSequence,
+    );
+    const required = await this.requiredPoolCategories(
+      tenantId,
+      programVersionId,
+      semesterSequence,
+    );
+    if (!required.length) return [...new Set(assignedIds)];
+
+    const assignedPools = assignedIds.length
+      ? await this.prisma.categoryPool.findMany({
+          where: { id: { in: assignedIds }, active: true },
+          select: {
+            id: true,
+            categoryType: true,
+            _count: {
+              select: {
+                courses: { where: { active: true } },
+                offerings: { where: { deletedAt: null } },
+              },
+            },
+          },
+        })
+      : [];
+    const covered = new Set(
+      assignedPools
+        .filter((pool) => pool._count.courses > 0 || pool._count.offerings > 0)
+        .map((pool) => pool.categoryType.trim().toUpperCase()),
+    );
+    const missing = required.filter((category) => !covered.has(category));
+    if (!missing.length) return [...new Set(assignedIds)];
+
+    const institutionId = await this.resolveProgramVersionInstitutionId(
+      tenantId,
+      programVersionId,
+    );
+    if (!institutionId) return [...new Set(assignedIds)];
+
+    const semesterPools = await this.prisma.categoryPool.findMany({
+      where: {
+        tenantId,
+        institutionId,
+        semesterNo: semesterSequence,
+        active: true,
+      },
+      select: { id: true, categoryType: true, shiftId: true },
+    });
+    const matchesCategory = (categoryType: string) =>
+      missing.includes(categoryType.trim().toUpperCase());
+    const preferred = semesterPools.filter(
+      (pool) =>
+        matchesCategory(pool.categoryType) &&
+        (!shiftId || pool.shiftId === shiftId || pool.shiftId == null),
+    );
+    const preferredCategories = new Set(
+      preferred.map((pool) => pool.categoryType.trim().toUpperCase()),
+    );
+    const remainder = semesterPools.filter(
+      (pool) =>
+        matchesCategory(pool.categoryType) &&
+        !preferredCategories.has(pool.categoryType.trim().toUpperCase()),
+    );
+    return [
+      ...new Set([
+        ...assignedIds,
+        ...preferred.map((pool) => pool.id),
+        ...remainder.map((pool) => pool.id),
+      ]),
+    ];
+  }
+
+  async materializePoolOfferings(
+    tenantId: string,
+    poolIds: string[],
+  ): Promise<void> {
+    if (!poolIds.length) return;
+    const pools = await this.prisma.categoryPool.findMany({
+      where: { id: { in: poolIds }, active: true },
+      select: {
+        id: true,
+        semesterNo: true,
+        categoryType: true,
+        courses: {
+          where: { active: true },
+          select: { courseId: true, displayOrder: true },
+        },
+      },
+    });
+    for (const pool of pools) {
+      if (!isSharedPoolCapacityCategory(pool.categoryType)) continue;
+      for (const course of pool.courses) {
+        await this.prisma.courseOffering.upsert({
+          where: {
+            categoryPoolId_courseId: {
+              categoryPoolId: pool.id,
+              courseId: course.courseId,
+            },
+          },
+          create: {
+            tenantId,
+            categoryPoolId: pool.id,
+            mappingSource: MAPPING_SOURCE.SHARED_POOL,
+            courseId: course.courseId,
+            semesterSequence: pool.semesterNo,
+            category: pool.categoryType,
+            displayOrder: course.displayOrder,
+            programVersionId: null,
+          },
+          update: {
+            deletedAt: null,
+            semesterSequence: pool.semesterNo,
+            category: pool.categoryType,
+            mappingSource: MAPPING_SOURCE.SHARED_POOL,
+          },
+        });
+      }
+    }
+  }
+
+  private async requiredPoolCategories(
+    tenantId: string,
+    programVersionId: string,
+    semesterSequence: number,
+  ): Promise<string[]> {
+    const rule = await this.prisma.semesterStructureRule.findFirst({
+      where: { tenantId, programVersionId, semesterSequence },
+      select: { categoryCounts: true },
+    });
+    const counts = (rule?.categoryCounts ?? {}) as Record<string, unknown>;
+    return Object.entries(counts)
+      .filter(
+        ([category, count]) =>
+          Number(count) > 0 && isSharedPoolCapacityCategory(category),
+      )
+      .map(([category]) => category.trim().toUpperCase());
+  }
+
   async resolveCatalogSectionWhere(
     tenantId: string,
     programVersionId: string,
     semesterSequence: number,
-    filters?: { category?: string },
+    filters?: { category?: string; shiftId?: string },
   ): Promise<Prisma.OfferingSectionWhereInput> {
-    const poolIds = await this.getAssignedPoolIds(
+    const poolIds = await this.getCatalogPoolIds(
       tenantId,
       programVersionId,
       semesterSequence,
+      filters?.shiftId,
     );
 
     const normalizedCategory = this.normalizeCategory(filters?.category);
@@ -273,7 +426,7 @@ export class CurriculumResolutionService {
             tenantId,
             programVersionId,
             semesterSequence,
-            filters,
+            filters?.category ? { category: filters.category } : undefined,
           ),
           poolOfferingFilter,
         ],
