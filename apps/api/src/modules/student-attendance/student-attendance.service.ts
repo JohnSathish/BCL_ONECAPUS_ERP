@@ -60,6 +60,13 @@ const ABSENT_STATUSES = new Set(['A']);
 const MEDICAL_STATUSES = new Set(['ML']);
 const NEUTRAL_STATUSES = new Set(['EXEMPTED']);
 
+function portalMarkStatus(status: string): 'present' | 'absent' | 'leave' {
+  if (ABSENT_STATUSES.has(status)) return 'absent';
+  if (MEDICAL_STATUSES.has(status)) return 'leave';
+  if (PRESENT_STATUSES.has(status)) return 'present';
+  return 'leave';
+}
+
 @Injectable()
 export class StudentAttendanceService {
   private readonly logger = new Logger(StudentAttendanceService.name);
@@ -1293,11 +1300,12 @@ export class StudentAttendanceService {
     });
     if (!student) return { subjects: [], overall: null, alerts: [] };
     const policy = await this.attendancePolicy.getOrCreate(user.tid);
-    const subjects = await this.subjectsFromMarkedEntries(
+    const built = await this.subjectsFromMarkedEntries(
       user.tid,
       student.id,
       policy,
     );
+    const subjects = built.subjects;
     const totalSessions = subjects.reduce(
       (sum, row) => sum + row.totalSessions,
       0,
@@ -1315,6 +1323,7 @@ export class StudentAttendanceService {
       attendanceMode: policy.attendanceMode,
       aggregationUnit: policy.aggregationUnit,
       unitLabels: policy.unitLabels,
+      marks: built.marks,
       alerts: subjects
         .filter((row) => row.percentage < 75)
         .map((row) => ({
@@ -1492,8 +1501,21 @@ export class StudentAttendanceService {
       : [];
     const courseById = new Map(courses.map((course) => [course.id, course]));
 
+    const marks: Array<{
+      date: string;
+      subjectId: string;
+      status: 'present' | 'absent' | 'leave';
+    }> = [];
     const subjects = [...bySubject.entries()].map(([subjectKey, rows]) => {
       const tally = this.tallyEntryRows(rows, policy);
+      for (const mark of tally.counted) {
+        if (!mark.date) continue;
+        marks.push({
+          date: mark.date,
+          subjectId: subjectKey,
+          status: mark.status,
+        });
+      }
       const sample = rows[0];
       const group = sample.teachingSubjectGroupId
         ? groupById.get(sample.teachingSubjectGroupId)
@@ -1533,9 +1555,12 @@ export class StudentAttendanceService {
       };
     });
 
-    return subjects
-      .filter((row) => row.totalSessions > 0)
-      .sort((a, b) => a.label.localeCompare(b.label));
+    return {
+      subjects: subjects
+        .filter((row) => row.totalSessions > 0)
+        .sort((a, b) => a.label.localeCompare(b.label)),
+      marks: marks.sort((a, b) => a.date.localeCompare(b.date)),
+    };
   }
 
   private tallyEntryRows(
@@ -1600,6 +1625,10 @@ export class StudentAttendanceService {
       absentCount: absent,
       medicalLeaveCount: medical,
       percentage,
+      counted: counted.map((row) => ({
+        date: this.localDateString(row.session?.sessionDate),
+        status: portalMarkStatus(row.status),
+      })),
     };
   }
 
