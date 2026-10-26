@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,7 +9,9 @@ import type { StaffProfileSection } from '../dto/staff.dto';
 import { STAFF_PROFILE_SECTIONS } from '../dto/staff.dto';
 import { StaffEmploymentService } from './staff-employment.service';
 import { teachingShiftCategoryLabel } from './staff-shift-category';
+import { StaffCollegeLoginSyncService } from './staff-college-login-sync.service';
 import { StaffProvisioningService } from './staff-provisioning.service';
+import { isOfficialCollegeEmail } from '../utils/staff-college-email.util';
 import {
   assertBiometricIdUnique,
   normalizeBiometricId,
@@ -91,6 +92,7 @@ export class StaffProfileService {
     private readonly prisma: PrismaService,
     private readonly provisioning: StaffProvisioningService,
     private readonly employment: StaffEmploymentService,
+    private readonly collegeLogins: StaffCollegeLoginSyncService,
   ) {}
 
   async getProfile(tenantId: string, staffProfileId: string) {
@@ -188,34 +190,30 @@ export class StaffProfileService {
       payload,
     );
 
-    if (sectionKey === 'basic' && typeof payload.email === 'string') {
-      const nextEmail = payload.email.trim().toLowerCase();
-      if (nextEmail && staff.portalUserId) {
-        const emailTaken = await this.prisma.user.findFirst({
-          where: {
-            tenantId,
-            email: nextEmail,
-            deletedAt: null,
-            NOT: { id: staff.portalUserId },
-          },
-          select: { id: true },
-        });
-        if (emailTaken) {
-          throw new ConflictException(
-            'Email is already used by another portal login',
-          );
-        }
-        await this.prisma.user.update({
-          where: { id: staff.portalUserId },
-          data: { email: nextEmail },
-        });
-      }
+    const nextOfficialEmail =
+      sectionKey === 'basic' &&
+      typeof payload.email === 'string' &&
+      isOfficialCollegeEmail(payload.email)
+        ? payload.email.trim().toLowerCase()
+        : null;
+    if (nextOfficialEmail && staff.portalUserId) {
+      await this.collegeLogins.assertAvailable(
+        tenantId,
+        staff.portalUserId,
+        nextOfficialEmail,
+      );
     }
 
     await this.prisma.staffProfile.update({
       where: { id: staffProfileId },
       data,
     });
+
+    if (nextOfficialEmail) {
+      await this.collegeLogins.syncStaffPortalLogin(staffProfileId, {
+        strict: true,
+      });
+    }
 
     return this.getProfile(tenantId, staffProfileId);
   }

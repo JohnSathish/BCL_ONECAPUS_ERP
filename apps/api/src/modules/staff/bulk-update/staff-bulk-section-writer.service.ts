@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { StaffCollegeLoginSyncService } from '../services/staff-college-login-sync.service';
 import { StaffEmploymentService } from '../services/staff-employment.service';
+import { isOfficialCollegeEmail } from '../utils/staff-college-email.util';
 import {
   STAFF_BULK_UPDATE_FIELD_MAP,
   serializeStaffBulkValue,
@@ -19,6 +21,7 @@ export class StaffBulkSectionWriterService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly employment: StaffEmploymentService,
+    private readonly collegeLogins: StaffCollegeLoginSyncService,
   ) {}
 
   loadStaffForBulk(tenantId: string, staffProfileId: string) {
@@ -104,6 +107,14 @@ export class StaffBulkSectionWriterService {
         where: { id: staffProfileId },
         data: basicData as Prisma.StaffProfileUpdateInput,
       });
+      if (
+        typeof basicData.email === 'string' &&
+        isOfficialCollegeEmail(basicData.email)
+      ) {
+        await this.collegeLogins.syncStaffPortalLogin(staffProfileId, {
+          strict: true,
+        });
+      }
     }
 
     if (

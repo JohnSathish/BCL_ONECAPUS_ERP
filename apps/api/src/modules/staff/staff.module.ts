@@ -26,6 +26,7 @@ import { StaffDocumentsService } from './services/staff-documents.service';
 import { StaffAwardService } from './services/staff-award.service';
 import { StaffEmploymentService } from './services/staff-employment.service';
 import { StaffLifecycleService } from './services/staff-lifecycle.service';
+import { StaffCollegeLoginSyncService } from './services/staff-college-login-sync.service';
 import { StaffProfileService } from './services/staff-profile.service';
 import { StaffProvisioningService } from './services/staff-provisioning.service';
 import { StaffPublicationService } from './services/staff-publication.service';
@@ -68,6 +69,7 @@ import { StaffProfileReviewService } from './services/staff-profile-review.servi
     StaffService,
     StaffSummaryService,
     EmployeeCodeService,
+    StaffCollegeLoginSyncService,
     StaffProvisioningService,
     StaffProfileService,
     StaffSubjectAssignmentService,

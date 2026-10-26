@@ -6,7 +6,9 @@ import {
 import { Prisma } from '@prisma/client';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
+import { StaffCollegeLoginSyncService } from './staff-college-login-sync.service';
 import { StaffPortalService } from './staff-portal.service';
+import { isOfficialCollegeEmail } from '../utils/staff-college-email.util';
 
 const APPROVAL = {
   PENDING: 'PENDING',
@@ -27,6 +29,7 @@ export class StaffSelfServiceProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly portal: StaffPortalService,
+    private readonly collegeLogins: StaffCollegeLoginSyncService,
   ) {}
 
   private async staffOf(user: JwtUser) {
@@ -188,6 +191,12 @@ export class StaffSelfServiceProfileService {
           : {}),
       },
     });
+    if (
+      dto.publicEmail !== undefined &&
+      isOfficialCollegeEmail(dto.publicEmail)
+    ) {
+      await this.collegeLogins.syncStaffPortalLogin(staff.id, { strict: true });
+    }
     await this.audit(
       user.tid,
       staff.id,

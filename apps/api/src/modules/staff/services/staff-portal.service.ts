@@ -11,6 +11,8 @@ import { BirthdayQueryService } from '../../communication/services/birthday-quer
 import { LmsDashboardService } from '../../lms/services/lms-dashboard.service';
 import { AcademicCalendarService } from '../../academic-calendar/academic-calendar.service';
 import { StudentAttendanceService } from '../../student-attendance/student-attendance.service';
+import { StaffCollegeLoginSyncService } from './staff-college-login-sync.service';
+import { isOfficialCollegeEmail } from '../utils/staff-college-email.util';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import {
   dateKeyToUtcMidnight,
@@ -69,6 +71,7 @@ export class StaffPortalService {
     private readonly birthdays: BirthdayQueryService,
     private readonly academicCalendar: AcademicCalendarService,
     private readonly studentAttendance: StudentAttendanceService,
+    private readonly collegeLogins: StaffCollegeLoginSyncService,
   ) {}
 
   async resolveStaffProfile(tenantId: string, userId: string) {
@@ -890,6 +893,12 @@ export class StaffPortalService {
         }),
       },
     });
+    if (
+      (dto.email !== undefined && isOfficialCollegeEmail(dto.email)) ||
+      (dto.publicEmail !== undefined && isOfficialCollegeEmail(dto.publicEmail))
+    ) {
+      await this.collegeLogins.syncStaffPortalLogin(staff.id, { strict: true });
+    }
     return this.getMe(user);
   }
 
