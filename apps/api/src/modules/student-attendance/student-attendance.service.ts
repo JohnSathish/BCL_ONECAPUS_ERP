@@ -48,6 +48,10 @@ import {
   foldEntries,
   percentageFromFold,
 } from './attendance-report.util';
+import {
+  pickMarkedRows,
+  sessionCountsForCurrentSemester,
+} from './attendance-portal.util';
 
 const POOL_FYUGP_CATEGORIES = ['MDC', 'AEC', 'SEC', 'VAC', 'VTC'] as const;
 
@@ -1289,14 +1293,21 @@ export class StudentAttendanceService {
     });
     if (!student) return { subjects: [], overall: null, alerts: [] };
     const policy = await this.attendancePolicy.getOrCreate(user.tid);
-    const subjects = await this.summaries(user.tid, { studentId: student.id });
-    const percentages = subjects.map((row: any) => Number(row.percentage ?? 0));
-    const overall = percentages.length
-      ? Math.round(
-          (percentages.reduce((sum: number, value: number) => sum + value, 0) /
-            percentages.length) *
-            100,
-        ) / 100
+    const subjects = await this.subjectsFromMarkedEntries(
+      user.tid,
+      student.id,
+      policy,
+    );
+    const totalSessions = subjects.reduce(
+      (sum, row) => sum + row.totalSessions,
+      0,
+    );
+    const presentCount = subjects.reduce(
+      (sum, row) => sum + row.presentCount,
+      0,
+    );
+    const overall = totalSessions
+      ? Math.round((presentCount / totalSessions) * 10000) / 100
       : null;
     return {
       subjects,
@@ -1305,15 +1316,290 @@ export class StudentAttendanceService {
       aggregationUnit: policy.aggregationUnit,
       unitLabels: policy.unitLabels,
       alerts: subjects
-        .filter((row: any) => Number(row.percentage ?? 0) < 75)
-        .map((row: any) => ({
+        .filter((row) => row.percentage < 75)
+        .map((row) => ({
           courseId: row.courseId,
-          percentage: Number(row.percentage ?? 0),
-          message:
-            Number(row.percentage ?? 0) < 65
-              ? 'Detention risk'
-              : 'Condonation zone',
+          percentage: row.percentage,
+          message: row.percentage < 65 ? 'Detention risk' : 'Condonation zone',
         })),
+    };
+  }
+
+  /**
+   * The student app used to read only the summary table. A saved class roll
+   * can exist without a summary when the rebuild is skipped or the session
+   * still carries semester 1. Count the marked entries instead.
+   */
+  private async subjectsFromMarkedEntries(
+    tenantId: string,
+    studentId: string,
+    policy: { attendanceMode: string },
+  ) {
+    const standing = await this.prisma.studentAcademicStanding.findFirst({
+      where: { tenantId, studentId },
+      select: { currentSemesterSequence: true },
+    });
+    const currentSemester = standing?.currentSemesterSequence ?? null;
+    const registration = await this.prisma.semesterRegistration.findFirst({
+      where: {
+        tenantId,
+        studentId,
+        archivedAt: null,
+        status: { notIn: ['draft', 'cancelled', 'rejected'] },
+        ...(currentSemester != null
+          ? { semesterSequence: currentSemester }
+          : {}),
+      },
+      orderBy: { semesterSequence: 'desc' },
+      select: {
+        semesterSequence: true,
+        lines: {
+          select: {
+            offeringSectionId: true,
+            offering: { select: { courseId: true } },
+          },
+        },
+      },
+    });
+    const semester = currentSemester ?? registration?.semesterSequence ?? null;
+    const registeredCourseIds = new Set<string>();
+    const registeredSectionIds = new Set<string>();
+    for (const line of registration?.lines ?? []) {
+      if (line.offering?.courseId)
+        registeredCourseIds.add(line.offering.courseId);
+      if (line.offeringSectionId) {
+        registeredSectionIds.add(line.offeringSectionId);
+      }
+    }
+
+    const entryRows = await (
+      this.prisma as any
+    ).studentAttendanceEntry.findMany({
+      where: {
+        tenantId,
+        studentId,
+        session: { status: { not: 'CANCELLED' } },
+      },
+      select: {
+        status: true,
+        session: {
+          select: {
+            courseId: true,
+            offeringSectionId: true,
+            teachingSubjectGroupId: true,
+            semesterNo: true,
+            periodNo: true,
+            sessionDate: true,
+            deletedAt: true,
+            metadata: true,
+          },
+        },
+      },
+      take: 8000,
+    });
+
+    const groupIds = [
+      ...new Set(
+        entryRows
+          .map((row: any) => row.session?.teachingSubjectGroupId)
+          .filter(Boolean),
+      ),
+    ] as string[];
+    const groups = groupIds.length
+      ? await (this.prisma as any).teachingSubjectGroup.findMany({
+          where: { tenantId, id: { in: groupIds } },
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            semesterNo: true,
+            fyugpCategory: true,
+            academicSubject: { select: { name: true } },
+            department: { select: { name: true } },
+          },
+        })
+      : [];
+    const groupById = new Map<string, any>(
+      groups.map((group: any) => [group.id, group]),
+    );
+
+    const shaped = entryRows
+      .filter((row: any) => row.session)
+      .map((row: any) => {
+        const session = row.session;
+        const subjectKey = session.teachingSubjectGroupId
+          ? `g:${session.teachingSubjectGroupId}`
+          : session.courseId
+            ? `c:${session.courseId}`
+            : session.offeringSectionId
+              ? `s:${session.offeringSectionId}`
+              : 'class';
+        const dateKey = this.localDateString(session.sessionDate);
+        const periodNo = Number(session.periodNo ?? 0);
+        const collectionUnit =
+          session.metadata && typeof session.metadata === 'object'
+            ? ((session.metadata as any).collectionUnit ?? null)
+            : null;
+        return {
+          key: `${dateKey}|${subjectKey}|${periodNo}|${collectionUnit ?? ''}`,
+          deleted: Boolean(session.deletedAt),
+          subjectKey,
+          courseId: session.courseId ?? null,
+          offeringSectionId: session.offeringSectionId ?? null,
+          teachingSubjectGroupId: session.teachingSubjectGroupId ?? null,
+          semesterNo: session.semesterNo ?? null,
+          status: row.status,
+          session,
+          inSemester: sessionCountsForCurrentSemester({
+            currentSemester: semester,
+            sessionSemester: session.semesterNo ?? null,
+            courseId: session.courseId,
+            offeringSectionId: session.offeringSectionId,
+            groupSemester: session.teachingSubjectGroupId
+              ? (groupById.get(session.teachingSubjectGroupId)?.semesterNo ??
+                null)
+              : null,
+            registeredCourseIds,
+            registeredSectionIds,
+          }),
+        };
+      });
+    const marked = pickMarkedRows(shaped);
+    const scoped = marked.filter((row) => row.inSemester);
+    const chosen = scoped.length ? scoped : marked;
+
+    const bySubject = new Map<string, typeof chosen>();
+    for (const row of chosen) {
+      const bucket = bySubject.get(row.subjectKey) ?? [];
+      bucket.push(row);
+      bySubject.set(row.subjectKey, bucket);
+    }
+
+    const courseIds = [
+      ...new Set(chosen.map((row) => row.courseId).filter(Boolean)),
+    ] as string[];
+    const courses = courseIds.length
+      ? await this.prisma.course.findMany({
+          where: { id: { in: courseIds } },
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            courseType: true,
+            department: { select: { name: true } },
+          },
+        })
+      : [];
+    const courseById = new Map(courses.map((course) => [course.id, course]));
+
+    const subjects = [...bySubject.entries()].map(([subjectKey, rows]) => {
+      const tally = this.tallyEntryRows(rows, policy);
+      const sample = rows[0];
+      const group = sample.teachingSubjectGroupId
+        ? groupById.get(sample.teachingSubjectGroupId)
+        : null;
+      const course = sample.courseId ? courseById.get(sample.courseId) : null;
+      const label =
+        resolveAttendanceDisplayTitle({
+          fyugpCategory: group?.fyugpCategory ?? course?.courseType,
+          departmentName: group?.department?.name ?? course?.department?.name,
+          academicSubjectName: group?.academicSubject?.name,
+          subjectGroupTitle: group?.title,
+          courseTitle: course?.title,
+          courseCode: course?.code ?? group?.code,
+        }) ||
+        course?.title ||
+        group?.title ||
+        'Subject';
+      const semesterNo =
+        group?.semesterNo ?? semester ?? sample.semesterNo ?? null;
+      return {
+        id: subjectKey,
+        label,
+        courseId: sample.courseId,
+        offeringSectionId: sample.offeringSectionId,
+        semesterNo,
+        totalSessions: tally.totalSessions,
+        presentCount: tally.presentCount,
+        absentCount: tally.absentCount,
+        percentage: tally.percentage,
+        metadata: {
+          courseTitle: label,
+          courseCode: course?.code ?? group?.code ?? null,
+          title: label,
+          teachingSubjectGroupId: sample.teachingSubjectGroupId,
+          attendanceMode: policy.attendanceMode,
+        },
+      };
+    });
+
+    return subjects
+      .filter((row) => row.totalSessions > 0)
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  private tallyEntryRows(
+    rows: Array<{ status?: string | null; session?: any }>,
+    policy: { attendanceMode: string },
+  ) {
+    const normalized = rows.map((row) => ({
+      ...row,
+      status: String(row.status ?? '').toUpperCase(),
+    }));
+    const byDate = new Map<string, number[]>();
+    for (const row of normalized) {
+      const dateKey = this.localDateString(row.session?.sessionDate);
+      const periodNo = Number(row.session?.periodNo ?? 0);
+      if (!periodNo) continue;
+      const bucket = byDate.get(dateKey) ?? [];
+      bucket.push(periodNo);
+      byDate.set(dateKey, bucket);
+    }
+    const countable = normalized.filter((row) => {
+      if (NEUTRAL_STATUSES.has(row.status)) return false;
+      const dateKey = this.localDateString(row.session?.sessionDate);
+      const collectionUnit =
+        row.session?.metadata && typeof row.session.metadata === 'object'
+          ? ((row.session.metadata as any).collectionUnit ?? null)
+          : null;
+      return this.attendancePolicy.isEntryCountable({
+        mode: policy.attendanceMode,
+        periodNo: row.session?.periodNo,
+        teachingPeriodNos: byDate.get(dateKey) ?? [],
+        collectionUnit,
+      });
+    });
+    // A saved present/absent still counts when the period number or the
+    // day-mode tag is missing. Otherwise the class shows as 0%.
+    let counted = countable.length
+      ? countable
+      : normalized.filter((row) => !NEUTRAL_STATUSES.has(row.status));
+    if (this.attendancePolicy.isDayAggregationMode(policy.attendanceMode)) {
+      const byDay = new Map<string, (typeof counted)[number]>();
+      for (const row of counted) {
+        const dateKey = this.localDateString(row.session?.sessionDate);
+        if (!byDay.has(dateKey)) byDay.set(dateKey, row);
+      }
+      counted = [...byDay.values()];
+    }
+    const present = counted.filter((row) =>
+      PRESENT_STATUSES.has(row.status),
+    ).length;
+    const absent = counted.filter((row) =>
+      ABSENT_STATUSES.has(row.status),
+    ).length;
+    const medical = counted.filter((row) =>
+      MEDICAL_STATUSES.has(row.status),
+    ).length;
+    const percentage = counted.length
+      ? Math.round((present / counted.length) * 10000) / 100
+      : 0;
+    return {
+      totalSessions: counted.length,
+      presentCount: present,
+      absentCount: absent,
+      medicalLeaveCount: medical,
+      percentage,
     };
   }
 
@@ -1866,21 +2152,28 @@ export class StudentAttendanceService {
       include: { entries: true },
     });
     if (!session) return;
-    const paperTargets = session.teachingSubjectGroupId
+    let paperTargets = session.teachingSubjectGroupId
       ? await this.subjectGroups.linkedPaperIds(
           tenantId,
           session.teachingSubjectGroupId,
         )
-      : session.courseId
-        ? [
-            {
-              courseId: session.courseId,
-              offeringSectionId: session.offeringSectionId,
-            },
-          ]
-        : [];
-
-    if (!paperTargets.length) return;
+      : [];
+    if (!paperTargets.length && session.courseId) {
+      paperTargets = [
+        {
+          courseId: session.courseId,
+          offeringSectionId: session.offeringSectionId,
+        },
+      ];
+    }
+    if (!paperTargets.length) {
+      paperTargets = [
+        {
+          courseId: null,
+          offeringSectionId: session.offeringSectionId ?? null,
+        },
+      ];
+    }
 
     const policy = await this.attendancePolicy.getOrCreate(tenantId);
 
@@ -1889,14 +2182,21 @@ export class StudentAttendanceService {
         const sessionFilter: Record<string, unknown> = {
           deletedAt: null,
           status: { not: 'CANCELLED' },
-          semesterNo: session.semesterNo,
         };
         if (session.teachingSubjectGroupId) {
+          // The group is the class. Do not also require semesterNo: older
+          // rows were stored as semester 1 after the class moved to 3 or 5.
           sessionFilter.teachingSubjectGroupId = session.teachingSubjectGroupId;
-        } else {
+        } else if (paper.courseId) {
           sessionFilter.courseId = paper.courseId;
-          sessionFilter.offeringSectionId =
-            paper.offeringSectionId ?? session.offeringSectionId;
+          if (session.semesterNo != null) {
+            sessionFilter.OR = [
+              { semesterNo: session.semesterNo },
+              { semesterNo: null },
+            ];
+          }
+        } else if (session.offeringSectionId) {
+          sessionFilter.offeringSectionId = session.offeringSectionId;
         }
 
         const allEntries = await (
@@ -1918,53 +2218,11 @@ export class StudentAttendanceService {
           },
         });
 
-        const byDate = new Map<string, number[]>();
-        for (const row of allEntries) {
-          const dateKey = this.localDateString(row.session?.sessionDate);
-          const periodNo = Number(row.session?.periodNo ?? 0);
-          if (!periodNo) continue;
-          const bucket = byDate.get(dateKey) ?? [];
-          bucket.push(periodNo);
-          byDate.set(dateKey, bucket);
-        }
-
-        const countableRows = allEntries.filter((row: any) => {
-          if (NEUTRAL_STATUSES.has(row.status)) return false;
-          const dateKey = this.localDateString(row.session?.sessionDate);
-          const teachingNos = byDate.get(dateKey) ?? [];
-          const collectionUnit =
-            (row.session?.metadata as any)?.collectionUnit ?? null;
-          return this.attendancePolicy.isEntryCountable({
-            mode: policy.attendanceMode,
-            periodNo: row.session?.periodNo,
-            teachingPeriodNos: teachingNos,
-            collectionUnit,
-          });
-        });
-
-        // Day mode: one countable unit per calendar date (whole-day mark).
-        let counted = countableRows;
-        if (this.attendancePolicy.isDayAggregationMode(policy.attendanceMode)) {
-          const byDay = new Map<string, any>();
-          for (const row of countableRows) {
-            const dateKey = this.localDateString(row.session?.sessionDate);
-            if (!byDay.has(dateKey)) byDay.set(dateKey, row);
-          }
-          counted = [...byDay.values()];
-        }
-
-        const present = counted.filter((row: any) =>
-          PRESENT_STATUSES.has(row.status),
-        ).length;
-        const absent = counted.filter((row: any) =>
-          ABSENT_STATUSES.has(row.status),
-        ).length;
-        const medical = counted.filter((row: any) =>
-          MEDICAL_STATUSES.has(row.status),
-        ).length;
-        const percentage = counted.length
-          ? Math.round((present / counted.length) * 10000) / 100
-          : 0;
+        const tally = this.tallyEntryRows(allEntries, policy);
+        const present = tally.presentCount;
+        const absent = tally.absentCount;
+        const medical = tally.medicalLeaveCount;
+        const percentage = tally.percentage;
         const offeringSectionId =
           paper.offeringSectionId ?? session.offeringSectionId ?? null;
         const semesterNo = session.semesterNo ?? null;
@@ -1977,20 +2235,27 @@ export class StudentAttendanceService {
           unitLabels: policy.unitLabels,
         };
         // Prisma compound unique upsert rejects null keys; use find+update/create.
-        await this.upsertAttendanceSummary({
-          tenantId,
-          studentId: entry.studentId,
-          courseId: paper.courseId,
-          offeringSectionId,
-          semesterNo,
-          periodKey: 'SEMESTER',
-          totalSessions: counted.length,
-          presentCount: present,
-          absentCount: absent,
-          medicalLeaveCount: medical,
-          percentage,
-          metadata,
-        });
+        try {
+          await this.upsertAttendanceSummary({
+            tenantId,
+            studentId: entry.studentId,
+            courseId: paper.courseId ?? null,
+            offeringSectionId,
+            semesterNo,
+            periodKey: 'SEMESTER',
+            totalSessions: tally.totalSessions,
+            presentCount: present,
+            absentCount: absent,
+            medicalLeaveCount: medical,
+            percentage,
+            metadata,
+          });
+        } catch (err) {
+          this.logger.error(
+            { err, sessionId, studentId: entry.studentId, tenantId },
+            'Attendance summary row was not saved',
+          );
+        }
       }
     }
   }
@@ -1998,7 +2263,7 @@ export class StudentAttendanceService {
   private async upsertAttendanceSummary(input: {
     tenantId: string;
     studentId: string;
-    courseId: string;
+    courseId: string | null;
     offeringSectionId: string | null;
     semesterNo: number | null;
     periodKey: string;
@@ -3376,7 +3641,9 @@ export class StudentAttendanceService {
       session.periodNo ?? '',
       session.teachingSubjectGroupId ?? session.courseId ?? '',
       session.offeringSectionId ?? '',
-      session.semesterNo ?? '',
+      // Subject-group classes are one roll. A regenerated session often
+      // moves from semester 1 to semester 3 and must not become a second class.
+      session.teachingSubjectGroupId ? '' : (session.semesterNo ?? ''),
       session.sessionType ?? 'THEORY',
     ].join('|');
   }
@@ -3409,12 +3676,19 @@ export class StudentAttendanceService {
     }
 
     const removeIds: string[] = [];
+    const recalcIds = new Set<string>();
     for (const bucket of buckets.values()) {
       if (bucket.length <= 1) continue;
       const sorted = bucket.sort(
         (a, b) => this.sessionPriorityScore(b) - this.sessionPriorityScore(a),
       );
+      const keeper = sorted[0];
       for (const duplicate of sorted.slice(1)) {
+        const moved = await this.moveEntriesOntoSession(
+          keeper,
+          duplicate.entries ?? [],
+        );
+        if (moved) recalcIds.add(keeper.id);
         removeIds.push(duplicate.id);
       }
     }
@@ -3425,7 +3699,50 @@ export class StudentAttendanceService {
       where: { id: { in: removeIds } },
       data: { deletedAt: new Date() },
     });
+    for (const id of recalcIds) {
+      try {
+        await this.recalculateForSession(tenantId, id);
+      } catch (err) {
+        this.logger.error(
+          { err, sessionId: id, tenantId },
+          'Merged attendance but summary recalculation failed',
+        );
+      }
+    }
     return removeIds.length;
+  }
+
+  /** Keep marks when a later timetable row replaces the session that was saved. */
+  private async moveEntriesOntoSession(
+    keeper: {
+      id: string;
+      status?: string | null;
+      entries?: Array<{ studentId: string }>;
+    },
+    duplicateEntries: Array<{ id: string; studentId: string }>,
+  ) {
+    const taken = new Set(
+      (keeper.entries ?? []).map((entry) => entry.studentId).filter(Boolean),
+    );
+    let moved = 0;
+    for (const entry of duplicateEntries) {
+      if (!entry?.id || !entry.studentId || taken.has(entry.studentId))
+        continue;
+      await (this.prisma as any).studentAttendanceEntry.update({
+        where: { id: entry.id },
+        data: { sessionId: keeper.id },
+      });
+      taken.add(entry.studentId);
+      moved += 1;
+    }
+    if (moved && String(keeper.status ?? '').toUpperCase() === 'OPEN') {
+      await (this.prisma as any).studentAttendanceSession.update({
+        where: { id: keeper.id },
+        data: { status: 'MARKED' },
+      });
+      keeper.status = 'MARKED';
+    }
+    return moved;
   }
 
   /** Holidays filed on any published calendar close attendance for that date. */
