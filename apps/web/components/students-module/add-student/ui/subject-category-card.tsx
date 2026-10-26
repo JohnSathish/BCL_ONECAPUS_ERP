@@ -109,6 +109,12 @@ export function SubjectCategoryCard({
             onChange={onChange}
             onIneligiblePick={onIneligiblePick}
           />
+          {sections.length === 0 && ineligibleSections.length === 0 ? (
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              No section is open on this shift yet. Reopen this step after the semester pool is
+              assigned to the programme.
+            </p>
+          ) : null}
           {overrideReason ? (
             <p className="mt-1 text-[10px] text-muted-foreground">Override: {overrideReason}</p>
           ) : null}

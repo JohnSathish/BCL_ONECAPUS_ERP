@@ -18,7 +18,9 @@ import {
 import type { CreateOfferingSectionDto } from '../dto/academic-engine.dto';
 import { CurriculumResolutionService } from './curriculum-resolution.service';
 import { offeringPaperTitle } from '../domain/offering-paper-title';
+import { isSharedPoolCapacityCategory } from '../domain/section-capacity';
 import { CourseEligibilityService } from './course-eligibility.service';
+import { PoolSectionProvisioningService } from './pool-section-provisioning.service';
 import type { EligibilityPreviewInput } from './course-eligibility.service';
 import { LmsWorkspaceService } from '../../lms/services/lms-workspace.service';
 
@@ -45,6 +47,7 @@ export class OfferingsService {
     private readonly curriculum: CurriculumResolutionService,
     private readonly courseEligibility: CourseEligibilityService,
     private readonly lmsWorkspaces: LmsWorkspaceService,
+    private readonly poolSections?: PoolSectionProvisioningService,
   ) {}
 
   listShifts(tenantId: string, campusId?: string) {
@@ -160,6 +163,15 @@ export class OfferingsService {
       shiftId = student?.primaryShiftId ?? user.primaryShiftId ?? shiftId;
     }
     shiftId = this.shiftScope.assertCanUseShiftId(user, shiftId);
+
+    if (shiftId) {
+      await this.ensureShiftPoolSections(
+        user.tid,
+        filters.programVersionId,
+        filters.semesterSequence,
+        shiftId,
+      );
+    }
 
     let studentStreamId: string | null = null;
     if (user.roles.includes('student')) {
@@ -445,6 +457,69 @@ export class OfferingsService {
     }
     const day = eligible.find((s) => s.shift.code === 'DAY');
     return day ?? eligible[0];
+  }
+
+  /**
+   * Pool papers (MDC, AEC, SEC, VAC, VTC) are often opened on the original
+   * admission shift only. A student added later on another shift then sees
+   * the direct major and empty pool dropdowns. Open section A on their shift
+   * so the office can register those papers.
+   */
+  private async ensureShiftPoolSections(
+    tenantId: string,
+    programVersionId: string,
+    semesterSequence: number,
+    shiftId: string,
+  ) {
+    if (!this.poolSections) return;
+
+    const poolIds = await this.curriculum.getAssignedPoolIds(
+      tenantId,
+      programVersionId,
+      semesterSequence,
+    );
+    if (!poolIds.length) return;
+
+    const exclusions = await this.curriculum.getExcludedCourseIdsByPool(
+      tenantId,
+      programVersionId,
+      poolIds,
+    );
+
+    const offerings = await this.prisma.courseOffering.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        mappingSource: 'SHARED_POOL',
+        categoryPoolId: { in: poolIds },
+        semesterSequence,
+        course: { deletedAt: null },
+      },
+      select: {
+        id: true,
+        courseId: true,
+        category: true,
+        categoryPoolId: true,
+        sections: {
+          where: { shiftId, deletedAt: null, status: 'active' },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+
+    for (const offering of offerings) {
+      if (!isSharedPoolCapacityCategory(offering.category)) continue;
+      if (offering.sections.length > 0) continue;
+      const excluded = offering.categoryPoolId
+        ? exclusions.get(offering.categoryPoolId)
+        : undefined;
+      if (excluded?.has(offering.courseId)) continue;
+      await this.poolSections.ensureDefaultSection(tenantId, offering.id, {
+        shiftId,
+        sectionCode: 'A',
+      });
+    }
   }
 
   private async resolveCatalogEligibilityContext(

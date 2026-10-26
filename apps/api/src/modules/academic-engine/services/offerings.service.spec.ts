@@ -31,6 +31,11 @@ describe('OfferingsService catalog with pools', () => {
       poolName: poolMeta?.get(section.courseOffering.categoryPoolId)?.poolName,
     })),
     resolveProgrammeCurriculum: jest.fn(),
+    getAssignedPoolIds: jest.fn(),
+    getExcludedCourseIdsByPool: jest.fn(async () => new Map()),
+  };
+  const poolSections = {
+    ensureDefaultSection: jest.fn(),
   };
 
   const courseEligibility = {
@@ -50,6 +55,8 @@ describe('OfferingsService catalog with pools', () => {
     sectionStreams as never,
     curriculum as never,
     courseEligibility as never,
+    undefined,
+    poolSections as never,
   );
 
   const user = {
@@ -91,5 +98,58 @@ describe('OfferingsService catalog with pools', () => {
     expect(curriculum.filterSectionsByPoolExclusions).toHaveBeenCalled();
     expect(rows[0].mappingSource).toBe('SHARED_POOL');
     expect(rows[0].poolName).toBe('MDC Semester 1 Pool');
+    expect(poolSections.ensureDefaultSection).not.toHaveBeenCalled();
+  });
+
+  it('opens pool section A on the student shift when none exists', async () => {
+    curriculum.resolveCatalogSectionWhere.mockResolvedValue({
+      tenantId: 'tenant-1',
+      deletedAt: null,
+      status: 'active',
+    });
+    curriculum.getAssignedPoolIds.mockResolvedValue(['pool-mdc']);
+    curriculum.getExcludedCourseIdsByPool.mockResolvedValue(new Map());
+    prisma.courseOffering.findMany.mockResolvedValue([
+      {
+        id: 'off-mdc',
+        courseId: 'course-mdc',
+        category: 'MDC',
+        categoryPoolId: 'pool-mdc',
+        sections: [],
+      },
+    ]);
+    poolSections.ensureDefaultSection.mockResolvedValue({
+      created: true,
+      sectionId: 'sec-new',
+    });
+    prisma.offeringSection.findMany.mockResolvedValue([
+      {
+        id: 'sec-new',
+        courseOffering: {
+          id: 'off-mdc',
+          mappingSource: 'SHARED_POOL',
+          categoryPoolId: 'pool-mdc',
+          category: 'MDC',
+          course: { code: 'MDC101' },
+        },
+      },
+    ]);
+    prisma.categoryPool.findMany.mockResolvedValue([
+      { id: 'pool-mdc', poolName: 'MDC Pool' },
+    ]);
+
+    const rows = (await service.catalog(user, {
+      programVersionId: 'pv-1',
+      semesterSequence: 1,
+      shiftId: 'shift-morning',
+    })) as any[];
+
+    expect(poolSections.ensureDefaultSection).toHaveBeenCalledWith(
+      'tenant-1',
+      'off-mdc',
+      { shiftId: 'shift-morning', sectionCode: 'A' },
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].courseOffering.category).toBe('MDC');
   });
 });

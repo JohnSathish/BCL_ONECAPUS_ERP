@@ -93,6 +93,22 @@ export class PoolSectionProvisioningService {
     });
     if (existing) return { created: false, sectionId: existing.id };
 
+    const dormant = await this.prisma.offeringSection.findFirst({
+      where: { courseOfferingId: offeringId, shiftId, sectionCode },
+    });
+    if (dormant) {
+      await this.prisma.offeringSection.update({
+        where: { id: dormant.id },
+        data: { deletedAt: null, status: 'active' },
+      });
+      await this.prisma.offeringSeatLedger.upsert({
+        where: { offeringSectionId: dormant.id },
+        create: { tenantId, offeringSectionId: dormant.id },
+        update: {},
+      });
+      return { created: false, sectionId: dormant.id };
+    }
+
     const tenantDefaultCapacity = await resolveTenantSharedPoolCapacity(
       this.prisma,
       tenantId,
@@ -105,18 +121,37 @@ export class PoolSectionProvisioningService {
         })
       : (opts?.capacity ?? offering.capacity ?? 80);
 
-    const section = await this.prisma.offeringSection.create({
-      data: {
-        tenantId,
-        courseOfferingId: offeringId,
-        shiftId,
-        sectionCode,
-        capacity,
-        waitlistCapacity:
-          opts?.waitlistCapacity ?? offering.waitlistCapacity ?? 10,
-        status: 'active',
-      },
-    });
+    let section: { id: string };
+    try {
+      section = await this.prisma.offeringSection.create({
+        data: {
+          tenantId,
+          courseOfferingId: offeringId,
+          shiftId,
+          sectionCode,
+          capacity,
+          waitlistCapacity:
+            opts?.waitlistCapacity ?? offering.waitlistCapacity ?? 10,
+          status: 'active',
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const raced = await this.prisma.offeringSection.findFirst({
+          where: {
+            courseOfferingId: offeringId,
+            shiftId,
+            sectionCode,
+            deletedAt: null,
+          },
+        });
+        if (raced) return { created: false, sectionId: raced.id };
+      }
+      throw error;
+    }
 
     await this.prisma.offeringSeatLedger.upsert({
       where: { offeringSectionId: section.id },
