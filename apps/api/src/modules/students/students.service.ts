@@ -612,11 +612,7 @@ export class StudentsService {
         where,
         include: directoryInclude,
         orderBy: [
-          {
-            academicStanding: {
-              currentSemesterSequence: { sort: 'asc', nulls: 'first' },
-            },
-          },
+          { academicStanding: { currentSemesterSequence: 'asc' } },
           { rollNumber: { sort: 'asc', nulls: 'last' } },
           { enrollmentNumber: 'asc' },
         ],
