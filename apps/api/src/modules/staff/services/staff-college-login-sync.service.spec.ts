@@ -3,6 +3,7 @@ import { StaffCollegeLoginSyncService } from './staff-college-login-sync.service
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed-notice-password'),
+  compare: jest.fn().mockResolvedValue(false),
 }));
 
 function staffRow(overrides: Record<string, unknown> = {}) {
@@ -150,12 +151,10 @@ describe('StaffCollegeLoginSyncService', () => {
           .fn()
           .mockResolvedValueOnce([{ tenantId: 'tenant-1' }])
           .mockResolvedValueOnce([
-            { portalUserId: 'user-1', fullName: 'Kaushik Paul' },
+            {
+              portalUser: { id: 'user-1', passwordHash: 'old-hash' },
+            },
           ]),
-      },
-      auditLog: {
-        findFirst: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
       },
       user: { update: jest.fn().mockResolvedValue({}) },
       passwordHistory: { create: jest.fn().mockResolvedValue({}) },
@@ -183,14 +182,19 @@ describe('StaffCollegeLoginSyncService', () => {
     });
   });
 
-  it('does not change passwords after the notice has already been applied', async () => {
+  it('leaves a never-used login alone when it already has the notice password', async () => {
+    const bcrypt = jest.requireMock('bcrypt') as { compare: jest.Mock };
+    bcrypt.compare.mockResolvedValueOnce(true);
     const prisma = {
       staffProfile: {
-        findMany: jest.fn().mockResolvedValue([{ tenantId: 'tenant-1' }]),
-      },
-      auditLog: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'audit-1' }),
-        create: jest.fn(),
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([{ tenantId: 'tenant-1' }])
+          .mockResolvedValueOnce([
+            {
+              portalUser: { id: 'user-1', passwordHash: 'already' },
+            },
+          ]),
       },
       user: { update: jest.fn() },
       passwordHistory: { create: jest.fn() },

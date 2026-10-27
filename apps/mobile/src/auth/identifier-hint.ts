@@ -54,7 +54,7 @@ export function detectIdentifierHint(raw: string): IdentifierHint | null {
     if (/staff@|\.staff\.|employee/.test(lower)) {
       return { label: 'Staff Account', tone: '#0d9488', icon: '👔' };
     }
-    if (/student|\.edu|\.ac\./.test(lower)) {
+    if (/student|\.edu/.test(lower)) {
       return { label: 'Student Account', tone: '#2563eb', icon: '👨‍🎓' };
     }
     return null;
@@ -91,7 +91,8 @@ export function toIdentifierHint(response: LoginHintResponse): IdentifierHint | 
   };
 }
 
-function shouldLookupRemote(localHint: IdentifierHint | null) {
+function shouldLookupRemote(identifier: string, localHint: IdentifierHint | null) {
+  if (identifier.includes('@')) return true;
   if (!localHint) return true;
   return localHint.label === 'Registered Mobile';
 }
@@ -106,7 +107,7 @@ export function useIdentifierHint(identifier: string): IdentifierHint | null {
       setRemoteHint(null);
       return;
     }
-    if (!shouldLookupRemote(localHint)) {
+    if (!shouldLookupRemote(value, localHint)) {
       setRemoteHint(null);
       return;
     }
