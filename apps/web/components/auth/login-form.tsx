@@ -122,6 +122,7 @@ export function LoginForm({
   });
 
   const passwordValue = watch('password') ?? '';
+  const identifierValue = watch('identifier') ?? '';
   const challengeAnswer = watch('challengeAnswer') ?? '';
 
   useEffect(() => {
@@ -373,6 +374,7 @@ export function LoginForm({
       formInfo={info}
       verificationError={verificationError}
       passwordValue={passwordValue}
+      identifierValue={identifierValue}
       challengeAnswer={challengeAnswer}
       onFillDemoCredentials={fillDemoCredentials}
       schoolPortal={schoolLogin}

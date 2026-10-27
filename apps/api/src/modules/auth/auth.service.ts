@@ -21,7 +21,10 @@ import { AccessDeviceService } from '../administration/services/access-device.se
 import { SecurityNotifyService } from '../administration/services/security-notify.service';
 import { SuspiciousLoginService } from '../administration/services/suspicious-login.service';
 import { MfaService } from './mfa/mfa.service';
-import { resolveLoginHintFromRoles } from './login-hint.util';
+import {
+  resolveLoginHintFromRoles,
+  facultyDepartmentEmailHint,
+} from './login-hint.util';
 import {
   compactStudentId,
   resolveStudentDefaultPassword,
@@ -917,13 +920,23 @@ export class AuthService {
     if (!trimmed) return { recognized: false as const };
 
     const user = await this.resolveLoginUser(tenantId, trimmed);
-    if (!user) return { recognized: false as const };
+    const facultyEmail = facultyDepartmentEmailHint(trimmed);
+    if (!user) {
+      if (facultyEmail) return { recognized: true as const, ...facultyEmail };
+      return { recognized: false as const };
+    }
 
     const roleCodes = (user.roles ?? [])
       .map((entry) => entry.role?.slug)
       .filter((slug): slug is string => Boolean(slug));
     const hint = resolveLoginHintFromRoles(roleCodes);
-    if (!hint) return { recognized: false as const };
+    if (!hint) {
+      if (facultyEmail) return { recognized: true as const, ...facultyEmail };
+      return { recognized: false as const };
+    }
+    if (hint.kind === 'student' && facultyEmail) {
+      return { recognized: true as const, ...facultyEmail };
+    }
 
     return { recognized: true as const, ...hint };
   }

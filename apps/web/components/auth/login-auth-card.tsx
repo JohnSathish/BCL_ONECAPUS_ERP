@@ -13,6 +13,7 @@ import { LoginDemoWorkspace } from './login-demo-workspace';
 import { LoginField } from './login-field';
 import { LoginHumanVerification } from './login-human-verification';
 import { LoginInstitutionHeader } from './login-institution-header';
+import { isFacultyDepartmentEmail } from '@/lib/auth/faculty-department-email';
 import type { LoginFormValues } from './login-schema';
 
 type Props = {
@@ -32,6 +33,7 @@ type Props = {
   formInfo?: string | null;
   verificationError?: string | null;
   passwordValue: string;
+  identifierValue?: string;
   challengeAnswer: string;
   onFillDemoCredentials?: (email: string, password: string) => void;
   schoolPortal?: boolean;
@@ -71,6 +73,7 @@ export function LoginAuthCard({
   formInfo,
   verificationError,
   passwordValue,
+  identifierValue = '',
   challengeAnswer,
   onFillDemoCredentials,
   schoolPortal: schoolPortalProp,
@@ -137,6 +140,11 @@ export function LoginAuthCard({
                 error={errors.identifier?.message}
                 register={register}
               />
+              {!schoolPortal && isFacultyDepartmentEmail(identifierValue) ? (
+                <p className="text-xs font-medium text-teal-700" role="status">
+                  Faculty Account
+                </p>
+              ) : null}
               <LoginField
                 id="password"
                 label="Password"

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/api/client';
+import { isFacultyDepartmentEmail } from '@/auth/faculty-department-email';
 
 export type IdentifierHint = {
   label: string;
@@ -47,6 +48,9 @@ export function detectIdentifierHint(raw: string): IdentifierHint | null {
     }
     if (/library|librarian/.test(lower)) {
       return { label: 'Staff Account', tone: '#0d9488', icon: '👔' };
+    }
+    if (isFacultyDepartmentEmail(lower)) {
+      return { label: 'Faculty Account', tone: '#0d9488', icon: '👩‍🏫' };
     }
     if (/faculty|teacher|prof\./.test(lower)) {
       return { label: 'Faculty Account', tone: '#0d9488', icon: '👩‍🏫' };
@@ -135,5 +139,7 @@ export function useIdentifierHint(identifier: string): IdentifierHint | null {
     };
   }, [identifier, localHint]);
 
-  return remoteHint ?? localHint;
+  return remoteHint?.label === 'Student Account' && localHint?.label === 'Faculty Account'
+    ? localHint
+    : (remoteHint ?? localHint);
 }
