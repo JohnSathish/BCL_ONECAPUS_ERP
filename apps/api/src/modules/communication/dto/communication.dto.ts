@@ -384,6 +384,16 @@ export class DeliveryLogQueryDto {
   limit?: number;
 }
 
+export const INBOX_CLEAR_AUDIENCES = ['STUDENTS', 'STAFF', 'ALL'] as const;
+
+export class ClearNotificationHistoryDto {
+  @IsIn(INBOX_CLEAR_AUDIENCES)
+  audience!: (typeof INBOX_CLEAR_AUDIENCES)[number];
+
+  @IsBoolean()
+  confirm!: boolean;
+}
+
 export class NotificationPreferenceDto {
   @IsIn(CHANNELS)
   channel!: string;

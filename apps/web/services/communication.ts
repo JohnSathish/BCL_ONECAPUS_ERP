@@ -186,6 +186,34 @@ export const uploadCommunicationAttachment = (file: File) => {
 export const cancelCommunicationCampaign = (id: string) =>
   api.post(`${base}/campaigns/${id}/cancel`).then((res) => res.data);
 
+export const revokeCommunicationCampaign = (id: string) =>
+  api
+    .post<{
+      campaignId: string;
+      status: string;
+      removedNotifications: number;
+    }>(`${base}/campaigns/${id}/revoke`)
+    .then((res) => res.data);
+
+export type NotificationHistorySummary = {
+  students: number;
+  staff: number;
+  all: number;
+};
+
+export const fetchNotificationHistorySummary = () =>
+  api
+    .get<NotificationHistorySummary>(`${base}/notification-history/summary`)
+    .then((res) => res.data);
+
+export const clearNotificationHistory = (audience: 'STUDENTS' | 'STAFF' | 'ALL') =>
+  api
+    .post<{ audience: string; removed: number }>(`${base}/notification-history/clear`, {
+      audience,
+      confirm: true,
+    })
+    .then((res) => res.data);
+
 export const fetchCampaignRecipients = (id: string) =>
   api.get<CommunicationRecipient[]>(`${base}/campaigns/${id}/recipients`).then((res) => res.data);
 

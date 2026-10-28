@@ -100,7 +100,16 @@ export class CommunicationDeliveryService {
     if (!campaignRow) {
       return { sentCount: 0, failedCount: 0, recipientCount: 0 };
     }
-    if (campaignRow.status === 'SENT' || campaignRow.status === 'CANCELLED') {
+    if (
+      campaignRow.status === 'SENT' ||
+      campaignRow.status === 'CANCELLED' ||
+      campaignRow.status === 'REVOKED'
+    ) {
+      if (campaignRow.status === 'REVOKED') {
+        await this.prisma.userNotification.deleteMany({
+          where: { tenantId, campaignId },
+        });
+      }
       return { sentCount: 0, failedCount: 0, recipientCount: 0, skipped: true };
     }
 
@@ -134,9 +143,28 @@ export class CommunicationDeliveryService {
         limit,
         { finalize: false },
       );
+      if (batch && 'skipped' in batch && batch.skipped) break;
       sentCount += batch?.sentCount ?? 0;
       failedCount += batch?.failedCount ?? 0;
       offset += limit;
+    }
+
+    const stopped = await this.prisma.communicationCampaign.findFirst({
+      where: { id: campaignId, tenantId },
+      select: { status: true },
+    });
+    if (stopped?.status === 'REVOKED' || stopped?.status === 'CANCELLED') {
+      if (stopped.status === 'REVOKED') {
+        await this.prisma.userNotification.deleteMany({
+          where: { tenantId, campaignId },
+        });
+      }
+      return {
+        sentCount,
+        failedCount,
+        recipientCount: total,
+        skipped: true,
+      };
     }
 
     const pushFailed = await this.prisma.communicationDeliveryLog.count({
@@ -188,6 +216,14 @@ export class CommunicationDeliveryService {
     if (!campaign) {
       this.logger.warn(`Campaign ${campaignId} not found`);
       return;
+    }
+
+    // A revoke must not be overwritten by a batch that is still finishing.
+    if (campaign.status === 'REVOKED') {
+      await this.prisma.userNotification.deleteMany({
+        where: { tenantId, campaignId },
+      });
+      return { sentCount: 0, failedCount: 0, recipientCount: 0, skipped: true };
     }
 
     // Full re-deliver of a finished campaign can create duplicate inbox rows.
@@ -687,20 +723,30 @@ export class CommunicationDeliveryService {
     const shouldFinalize = options?.finalize !== false;
 
     if (shouldFinalize && isLastBatch) {
-      const anySent = await this.prisma.communicationDeliveryLog.count({
-        where: {
-          tenantId,
-          campaignId,
-          status: { in: ['SENT', 'DELIVERED'] },
-        },
+      const current = await this.prisma.communicationCampaign.findFirst({
+        where: { id: campaignId, tenantId },
+        select: { status: true },
       });
-      await this.prisma.communicationCampaign.update({
-        where: { id: campaignId },
-        data: {
-          status: anySent > 0 ? 'SENT' : 'FAILED',
-          sentAt: anySent > 0 ? new Date() : undefined,
-        },
-      });
+      if (current?.status === 'REVOKED') {
+        await this.prisma.userNotification.deleteMany({
+          where: { tenantId, campaignId },
+        });
+      } else if (current?.status !== 'CANCELLED') {
+        const anySent = await this.prisma.communicationDeliveryLog.count({
+          where: {
+            tenantId,
+            campaignId,
+            status: { in: ['SENT', 'DELIVERED'] },
+          },
+        });
+        await this.prisma.communicationCampaign.update({
+          where: { id: campaignId },
+          data: {
+            status: anySent > 0 ? 'SENT' : 'FAILED',
+            sentAt: anySent > 0 ? new Date() : undefined,
+          },
+        });
+      }
     }
 
     return { sentCount, failedCount, recipientCount: recipients.length };

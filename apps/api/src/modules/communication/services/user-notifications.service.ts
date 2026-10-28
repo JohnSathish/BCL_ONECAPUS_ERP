@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
@@ -113,6 +117,48 @@ export class UserNotificationsService {
       where: { id },
       data: { readAt: new Date() },
     });
+  }
+
+  async inboxHistorySummary(tenantId: string) {
+    const [students, staff, all] = await Promise.all([
+      this.prisma.userNotification.count({
+        where: this.inboxAudienceWhere(tenantId, 'STUDENTS'),
+      }),
+      this.prisma.userNotification.count({
+        where: this.inboxAudienceWhere(tenantId, 'STAFF'),
+      }),
+      this.prisma.userNotification.count({
+        where: this.inboxAudienceWhere(tenantId, 'ALL'),
+      }),
+    ]);
+    return { students, staff, all };
+  }
+
+  async clearInboxHistory(
+    tenantId: string,
+    audience: 'STUDENTS' | 'STAFF' | 'ALL',
+    confirm: boolean,
+  ) {
+    if (!confirm) {
+      throw new BadRequestException('Confirmation is required');
+    }
+    const removed = await this.prisma.userNotification.deleteMany({
+      where: this.inboxAudienceWhere(tenantId, audience),
+    });
+    return { audience, removed: removed.count };
+  }
+
+  private inboxAudienceWhere(
+    tenantId: string,
+    audience: 'STUDENTS' | 'STAFF' | 'ALL',
+  ): Prisma.UserNotificationWhereInput {
+    if (audience === 'STUDENTS') {
+      return { tenantId, user: { student: { isNot: null } } };
+    }
+    if (audience === 'STAFF') {
+      return { tenantId, user: { staffProfile: { isNot: null } } };
+    }
+    return { tenantId };
   }
 
   async markAllRead(user: JwtUser) {

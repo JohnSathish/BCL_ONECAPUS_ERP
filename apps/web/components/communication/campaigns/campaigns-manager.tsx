@@ -6,10 +6,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { confirmRevokeCampaign } from '@/components/communication/notifications/notification-history-admin';
 import {
   cancelCommunicationCampaign,
   fetchCommunicationCampaigns,
   fetchCampaignRecipients,
+  revokeCommunicationCampaign,
   sendCommunicationCampaign,
 } from '@/services/communication';
 import type { CommunicationCampaign } from '@/types/communication';
@@ -32,6 +34,7 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
   const [filter, setFilter] = useState<'all' | 'automated' | 'manual'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionNote, setActionNote] = useState<string | null>(null);
 
   const campaigns = useQuery({
     queryKey: ['communication', 'campaigns', statusFilter],
@@ -57,6 +60,18 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
   const cancel = useMutation({
     mutationFn: cancelCommunicationCampaign,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['communication'] }),
+  });
+
+  const revoke = useMutation({
+    mutationFn: revokeCommunicationCampaign,
+    onSuccess: (result) => {
+      setActionError(null);
+      setActionNote(
+        `Revoked. Removed ${result.removedNotifications.toLocaleString('en-IN')} notification${result.removedNotifications === 1 ? '' : 's'} from app lists.`,
+      );
+      qc.invalidateQueries({ queryKey: ['communication'] });
+    },
+    onError: (err) => setActionError(apiErrorMessage(err, 'Could not revoke this campaign')),
   });
 
   const filtered = useMemo(() => {
@@ -87,6 +102,12 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
             </Button>
           ))}
         </div>
+      ) : null}
+
+      {actionNote ? (
+        <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
+          {actionNote}
+        </p>
       ) : null}
 
       {actionError ? (
@@ -122,6 +143,10 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {c.audienceType} · {c.status} · {campaignRecipientLabel(c)}
+                  {c._count?.notifications != null &&
+                  ['SENT', 'SENDING', 'FAILED', 'REVOKED'].includes(c.status)
+                    ? ` · ${c._count.notifications.toLocaleString('en-IN')} in app lists`
+                    : ''}
                 </p>
                 {failureReason ? <p className="text-xs text-destructive">{failureReason}</p> : null}
               </div>
@@ -147,6 +172,19 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                       Cancel
                     </Button>
                   </>
+                ) : null}
+                {['SENT', 'SENDING', 'FAILED'].includes(c.status) ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={revoke.isPending}
+                    onClick={() => {
+                      if (!confirmRevokeCampaign(c.name)) return;
+                      revoke.mutate(c.id);
+                    }}
+                  >
+                    Revoke
+                  </Button>
                 ) : null}
               </div>
             </div>

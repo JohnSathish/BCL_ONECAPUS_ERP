@@ -25,6 +25,7 @@ import {
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
 import {
+  ClearNotificationHistoryDto,
   CommunicationCampaignDto,
   CommunicationTemplateDto,
   DeliveryLogQueryDto,
@@ -439,6 +440,12 @@ export class CommunicationController {
     return this.campaigns.cancel(user, id);
   }
 
+  @Post('campaigns/:id/revoke')
+  @RequirePermissions('communication:manage')
+  revokeCampaign(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.campaigns.revoke(user, id);
+  }
+
   @Get('campaigns/:id/recipients')
   @RequireAnyPermission('communication:read', 'communication:manage')
   campaignRecipients(@CurrentUser() user: JwtUser, @Param('id') id: string) {
@@ -458,6 +465,25 @@ export class CommunicationController {
   @RequirePermissions('communication:manage')
   retryDelivery(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.campaigns.retryDelivery(user, id);
+  }
+
+  @Get('notification-history/summary')
+  @RequirePermissions('communication:manage')
+  notificationHistorySummary(@CurrentUser() user: JwtUser) {
+    return this.notifications.inboxHistorySummary(user.tid);
+  }
+
+  @Post('notification-history/clear')
+  @RequirePermissions('communication:manage')
+  clearNotificationHistory(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ClearNotificationHistoryDto,
+  ) {
+    return this.notifications.clearInboxHistory(
+      user.tid,
+      dto.audience,
+      dto.confirm,
+    );
   }
 
   @Get('notifications')

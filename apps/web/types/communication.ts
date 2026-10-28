@@ -36,7 +36,7 @@ export type CommunicationCampaign = {
     size?: number;
   }>;
   template?: { id: string; name: string; code: string } | null;
-  _count?: { recipients: number; deliveryLogs: number };
+  _count?: { recipients: number; deliveryLogs: number; notifications?: number };
 };
 
 export type CommunicationQueueStats = {

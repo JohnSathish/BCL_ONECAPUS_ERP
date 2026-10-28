@@ -153,7 +153,7 @@ export function SmartComposeForm() {
       qc.invalidateQueries({ queryKey: ['communication'] });
       setMessage({
         text: sendNow
-          ? 'Campaign queued for delivery. Check Logs / Push Center for status.'
+          ? 'Campaign queued for delivery. Check Push Center or Campaigns to revoke it if this was sent by mistake.'
           : 'Campaign saved as draft.',
         tone: 'ok',
       });

@@ -8,6 +8,7 @@ import { Bell, CalendarClock, FileText, Send, Users, AlertTriangle } from 'lucid
 import { SaaSCard } from '@/components/dashboard/command-center-ui';
 import { Button } from '@/components/ui/button';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { NotificationHistoryAdmin } from '@/components/communication/notifications/notification-history-admin';
 import { fetchCommunicationDashboard } from '@/services/communication';
 
 const AUDIENCE_HINTS = [
@@ -33,6 +34,7 @@ export function PushCenterPage() {
 
   return (
     <div className="space-y-4">
+      <NotificationHistoryAdmin showRecentCampaigns />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <SaaSCard>
           <p className="text-sm text-muted-foreground">Firebase / FCM</p>

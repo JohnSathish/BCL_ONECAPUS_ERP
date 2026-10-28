@@ -34,7 +34,9 @@ export class CommunicationCampaignsService {
       orderBy: { createdAt: 'desc' },
       include: {
         template: { select: { id: true, name: true, code: true } },
-        _count: { select: { recipients: true, deliveryLogs: true } },
+        _count: {
+          select: { recipients: true, deliveryLogs: true, notifications: true },
+        },
       },
       take: 100,
     });
@@ -283,12 +285,57 @@ export class CommunicationCampaignsService {
     });
   }
 
+  /**
+   * Stop a sent or in-progress campaign and delete its in-app copies.
+   * A banner already drawn on a phone lock screen cannot be recalled.
+   */
+  async revoke(user: JwtUser, campaignId: string) {
+    const campaign = await this.get(user.tid, campaignId);
+    if (!['SENT', 'SENDING', 'FAILED'].includes(campaign.status)) {
+      throw new BadRequestException(
+        'Only a sent or in-progress campaign can be revoked',
+      );
+    }
+
+    await this.prisma.communicationCampaign.update({
+      where: { id: campaignId },
+      data: { status: 'REVOKED' },
+    });
+
+    const removed = await this.prisma.userNotification.deleteMany({
+      where: { tenantId: user.tid, campaignId },
+    });
+
+    await this.prisma.communicationCampaign.update({
+      where: { id: campaignId },
+      data: {
+        metadata: {
+          ...(campaign.metadata as object),
+          revokedAt: new Date().toISOString(),
+          revokedById: user.sub,
+          revokedNotificationCount: removed.count,
+        },
+      },
+    });
+
+    return {
+      campaignId,
+      status: 'REVOKED',
+      removedNotifications: removed.count,
+    };
+  }
+
   async retryDelivery(user: JwtUser, logId: string) {
     const log = await this.prisma.communicationDeliveryLog.findFirst({
       where: { id: logId, tenantId: user.tid, status: 'FAILED' },
     });
     if (!log?.campaignId)
       throw new NotFoundException('Failed delivery log not found');
+
+    const campaign = await this.get(user.tid, log.campaignId);
+    if (campaign.status === 'REVOKED' || campaign.status === 'CANCELLED') {
+      throw new BadRequestException('This campaign was revoked');
+    }
 
     await this.queue.enqueueNotification({
       jobType: 'campaign-deliver-retry',
