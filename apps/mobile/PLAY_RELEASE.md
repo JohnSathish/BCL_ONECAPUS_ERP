@@ -15,7 +15,7 @@ npm run build:aab
 
 Upload `DonBoscoCollege-Tura-v<version>-vc<versionCode>.aab` from the Desktop copy. Upload the matching `mapping.txt` in Play Console so crash reports stay readable.
 
-Raise `package.json` version, `app.config.ts` `version` / `android.versionCode` / `ios.buildNumber`, `src/constants/release.ts`, and `scripts/build-local-aab.js` `versionCode` together. Play production of 19 Oct 2026 is versionCode 57. The 1.0.38 / versionCode 58 bundle was built before these Play fixes. The first bundle that contains them is 1.0.39 / versionCode 59.
+Raise `package.json` version, `app.config.ts` `version` / `android.versionCode` / `ios.buildNumber`, `src/constants/release.ts`, and `scripts/build-local-aab.js` `versionCode` together. Play production of 19 Oct 2026 is versionCode 57. The 1.0.38 / versionCode 58 bundle was built before these Play fixes. 1.0.39 / versionCode 59 contains those fixes. 1.0.40 / versionCode 60 removes the Android title bar that covered the in-app menu. 1.0.41 / versionCode 61 is the same build with a new version code after 60 was already uploaded. 1.0.42 / versionCode 62 / iOS build 24 is the month-wise student attendance release. 1.0.43 / versionCode 63 / iOS build 25 colours each attendance calendar day. 1.0.44 / versionCode 64 / iOS build 26 shows a department college email as a faculty login. 1.0.45 / versionCode 65 / iOS build 27 lets faculty search the class roll by student name or roll number while taking attendance.
 
 ## What the release build always applies
 

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SystemBars } from 'react-native-edge-to-edge';
+import { useStableTopInset } from '@/hooks/use-stable-top-inset';
 import { useFacultyPortal } from './faculty-portal-context';
 import { facultyTheme } from './theme';
 
@@ -19,19 +20,22 @@ export function FacultyScreenHeader({
   showMenu = true,
   tone = 'default',
 }: FacultyScreenHeaderProps) {
-  const insets = useSafeAreaInsets();
+  const topInset = useStableTopInset();
   const { openDrawer } = useFacultyPortal();
 
   const brand = tone === 'brand';
 
   return (
-    <View style={[styles.wrap, brand && styles.wrapBrand, { paddingTop: insets.top + 8 }]}>
+    <View style={[styles.wrap, brand && styles.wrapBrand, { paddingTop: topInset + 10 }]}>
+      <SystemBars style={{ statusBar: brand ? 'light' : 'dark', navigationBar: 'dark' }} />
       <View style={styles.row}>
         {showMenu ? (
           <Pressable
             style={[styles.menuBtn, brand && styles.menuBtnBrand]}
             onPress={openDrawer}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Open menu"
           >
             <Text style={[styles.menuIcon, brand && styles.menuIconBrand]}>☰</Text>
           </Pressable>

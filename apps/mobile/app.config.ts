@@ -76,7 +76,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
   slug: 'onecampus-mobile',
-  version: '1.0.39',
+  version: '1.0.45',
   scheme: ['onecampus', 'schoolerp'],
   // Play large-screen guidance: do not lock to portrait in the manifest.
   orientation: 'default',
@@ -101,8 +101,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'edu.onecampus.mobile',
-    // In-app update prompts from App Update Management (1.0.39).
-    buildNumber: '21',
+    // Faculty attendance search by name or roll number (1.0.45).
+    buildNumber: '27',
     ...(hasGoogleServiceInfo && googleServiceInfoFile
       ? { googleServicesFile: googleServiceInfoFile }
       : {}),
@@ -121,7 +121,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 59,
+    versionCode: 65,
     edgeToEdgeEnabled: true,
     allowBackup: false,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
@@ -148,6 +148,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
   },
   plugins: [
+    // First so the mod runs after splash screen and can drop the activity title.
+    './plugins/with-android-no-title-bar',
     './plugins/with-android-r8-keep',
     './plugins/with-android-pdf-view',
     // Register early so this infoPlist mod runs last and keeps NSCameraUsageDescription.

@@ -170,16 +170,75 @@ module.exports = function withAndroidTargetSdk36(config) {
   });
   config = withMainActivity(config, (cfg) => {
     let src = cfg.modResults.contents;
+    if (src.includes('fun hideNativeTitleBar()')) {
+      cfg.modResults.contents = src;
+      return cfg;
+    }
+    if (!src.includes('import android.view.View')) {
+      src = src.replace(
+        'import android.os.Bundle',
+        'import android.os.Bundle\nimport android.view.View',
+      );
+    }
+    if (!src.includes('import android.view.Window')) {
+      src = src.replace(
+        'import android.os.Bundle',
+        'import android.os.Bundle\nimport android.view.Window',
+      );
+    }
     if (!src.includes('androidx.activity.enableEdgeToEdge')) {
       src = src.replace(
         'import android.os.Bundle',
         'import android.os.Bundle\nimport androidx.activity.enableEdgeToEdge',
       );
     }
-    if (!src.includes('enableEdgeToEdge()')) {
+    // Keep edge-to-edge after the splash theme switch. Calling it first leaves
+    // the activity label painted as a title bar over the in-app menu.
+    src = src.replace(/^[ \t]*enableEdgeToEdge\(\)\r?\n/m, '');
+    const noTitlePrelude = `try {
+      requestWindowFeature(Window.FEATURE_NO_TITLE)
+    } catch (_: Exception) {
+    }`;
+    if (src.includes('SplashScreenManager.registerOnActivity(this)')) {
+      src = src.replace(
+        'SplashScreenManager.registerOnActivity(this)',
+        `${noTitlePrelude}\n    SplashScreenManager.registerOnActivity(this)\n    enableEdgeToEdge()`,
+      );
+    } else {
       src = src.replace(
         /override fun onCreate\(savedInstanceState: Bundle\?\) \{\r?\n/,
-        'override fun onCreate(savedInstanceState: Bundle?) {\n    enableEdgeToEdge()\n',
+        `override fun onCreate(savedInstanceState: Bundle?) {\n    ${noTitlePrelude}\n    enableEdgeToEdge()\n`,
+      );
+    }
+    if (!src.includes('hideNativeTitleBar()')) {
+      src = src.replace(
+        /super\.onCreate\(null\)\r?\n/,
+        'super.onCreate(null)\n    hideNativeTitleBar()\n    window.decorView.post { hideNativeTitleBar() }\n',
+      );
+    }
+    if (!src.includes('fun hideNativeTitleBar()')) {
+      src = src.replace(
+        /\n  override fun getMainComponentName\(\)/,
+        `
+  override fun onResume() {
+    super.onResume()
+    hideNativeTitleBar()
+  }
+
+  private fun hideNativeTitleBar() {
+    supportActionBar?.hide()
+    actionBar?.hide()
+    title = ""
+    val decor = window.decorView
+    decor.findViewById<View>(android.R.id.title)?.visibility = View.GONE
+    val titleContainerId = resources.getIdentifier("title_container", "id", "android")
+    if (titleContainerId != 0) {
+      decor.findViewById<View>(titleContainerId)?.visibility = View.GONE
+    }
+    decor.requestLayout()
+  }
+
+  override fun getMainComponentName()`,
       );
     }
     if (!src.includes('enableEdgeToEdge()')) {
@@ -247,6 +306,22 @@ module.exports = function withAndroidTargetSdk36(config) {
       if (name !== 'AppTheme' && name !== 'Theme.App.SplashScreen') continue;
       const items = Array.isArray(style.item) ? style.item : [];
       style.item = items.filter((item) => !DEPRECATED_EDGE_ITEMS.has(item.$?.name));
+      if (name === 'AppTheme' || name === 'Theme.App.SplashScreen') {
+        for (const itemName of [
+          'windowActionBar',
+          'android:windowActionBar',
+          'windowNoTitle',
+          'android:windowNoTitle',
+        ]) {
+          if (!style.item.some((item) => item.$?.name === itemName)) {
+            const noTitle = itemName.toLowerCase().includes('notitle');
+            style.item.push({
+              $: { name: itemName },
+              _: noTitle ? 'true' : 'false',
+            });
+          }
+        }
+      }
     }
     cfg.modResults.resources.style = styles;
     return cfg;

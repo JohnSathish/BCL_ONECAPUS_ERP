@@ -14,7 +14,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStableTopInset } from '@/hooks/use-stable-top-inset';
 import { APP_VERSION } from '@/api/client';
 import { fetchAuthLoginContext, type AuthLoginMethods } from '@/auth/auth-context';
 import {
@@ -73,6 +75,7 @@ export default function LoginScreen() {
   const sessionExpired = params.reason === 'session_expired';
   const unlockParam = params.unlock === '1' || params.unlock === 'true';
   const insets = useSafeAreaInsets();
+  const topInset = useStableTopInset();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = authColors(scheme);
   const { config, error: bootstrapError } = useBootstrap();
@@ -326,6 +329,7 @@ export default function LoginScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: pageBg }]}>
+      <SystemBars style={{ statusBar: 'light', navigationBar: 'dark' }} />
       <ScrollView
         bounces={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
@@ -334,7 +338,7 @@ export default function LoginScreen() {
       >
         <LinearGradient
           colors={['#1e3a8a', '#2563eb', '#1d4ed8']}
-          style={[styles.header, { paddingTop: insets.top + 12 }]}
+          style={[styles.header, { paddingTop: topInset + 16 }]}
         >
           <InstitutionLogoRing branding={config?.branding} size={92} shape="rounded" />
           <Text style={styles.collegeName}>

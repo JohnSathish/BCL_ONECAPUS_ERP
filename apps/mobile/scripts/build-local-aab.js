@@ -15,7 +15,7 @@ process.chdir(root);
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const appVersion = pkg.version || '1.0.34';
-const versionCode = '59';
+const versionCode = '65';
 
 const jdkCandidates = [
   process.env.JAVA_HOME,
@@ -228,6 +228,8 @@ function shrinkSplashLogos() {
     pyPath,
     `from PIL import Image
 import os
+import stat
+import time
 root = r'''${path.join(root, 'android', 'app', 'src', 'main', 'res')}'''
 sizes = {
     'drawable-mdpi': 160,
@@ -236,11 +238,26 @@ sizes = {
     'drawable-xxhdpi': 480,
     'drawable-xxxhdpi': 640,
 }
+
+def remove_file(path):
+    last = None
+    for _ in range(10):
+        try:
+            os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+            os.remove(path)
+            return
+        except PermissionError as exc:
+            last = exc
+            time.sleep(0.5)
+    raise last
+
 for folder, px in sizes.items():
     p = os.path.join(root, folder, 'splashscreen_logo.png')
     if not os.path.exists(p):
         continue
-    im = Image.open(p).convert('RGBA')
+    with Image.open(p) as src:
+        im = src.convert('RGBA')
+        im.load()
     im.thumbnail((px, px), Image.Resampling.LANCZOS)
     canvas = Image.new('RGBA', (px, px), (0, 0, 0, 0))
     x = (px - im.width) // 2
@@ -248,7 +265,7 @@ for folder, px in sizes.items():
     canvas.paste(im, (x, y), im)
     webp = os.path.splitext(p)[0] + '.webp'
     canvas.save(webp, 'WEBP', quality=82, method=6)
-    os.remove(p)
+    remove_file(p)
     print('splash', folder, canvas.size, os.path.getsize(webp))
 
 for dirpath, _, files in os.walk(root):
@@ -261,10 +278,12 @@ for dirpath, _, files in os.walk(root):
             before = os.path.getsize(p)
             if before < 40_000:
                 continue
-            im = Image.open(p).convert('RGBA')
+            with Image.open(p) as src:
+                im = src.convert('RGBA')
+                im.load()
             webp = os.path.splitext(p)[0] + '.webp'
             im.save(webp, 'WEBP', quality=82, method=6)
-            os.remove(p)
+            remove_file(p)
             print('webp', os.path.relpath(webp, root), before, '->', os.path.getsize(webp))
         except Exception as e:
             print('skip', p, e)
@@ -505,6 +524,50 @@ $1}$2`,
   }
 }
 
+function assertMenuBarNotCovered() {
+  const mainActivity = fs.readFileSync(
+    path.join(
+      root,
+      'android',
+      'app',
+      'src',
+      'main',
+      'java',
+      'edu',
+      'onecampus',
+      'mobile',
+      'MainActivity.kt',
+    ),
+    'utf8',
+  );
+  const styles = fs.readFileSync(
+    path.join(root, 'android', 'app', 'src', 'main', 'res', 'values', 'styles.xml'),
+    'utf8',
+  );
+  const onCreate = mainActivity.slice(
+    mainActivity.indexOf('override fun onCreate'),
+    mainActivity.indexOf('override fun onResume') === -1
+      ? mainActivity.indexOf('override fun getMainComponentName')
+      : mainActivity.indexOf('override fun onResume'),
+  );
+  const registerAt = onCreate.indexOf('SplashScreenManager.registerOnActivity(this)');
+  const edgeAt = onCreate.indexOf('enableEdgeToEdge()');
+  const splashStyle = styles.slice(styles.indexOf('Theme.App.SplashScreen'));
+  if (
+    registerAt === -1 ||
+    edgeAt === -1 ||
+    edgeAt < registerAt ||
+    !mainActivity.includes('fun hideNativeTitleBar()') ||
+    !splashStyle.includes('android:windowNoTitle')
+  ) {
+    console.error(
+      'Prebuild left the Android activity title in place. The in-app menu would stay hidden.',
+    );
+    process.exit(1);
+  }
+  console.log('Menu bar check passed (no activity title over the menu).');
+}
+
 console.log('JAVA_HOME =', javaHome);
 console.log(`Package = edu.onecampus.mobile`);
 console.log(`Version = ${appVersion} versionCode ${versionCode}`);
@@ -515,6 +578,7 @@ const prebuildArgs = ['expo', 'prebuild', '--platform', 'android'];
 if (!skipClean) prebuildArgs.push('--clean');
 run('npx', prebuildArgs);
 
+assertMenuBarNotCovered();
 patchGradleProperties();
 patchAndroidSdkGradleFiles();
 assertTargetSdk36();

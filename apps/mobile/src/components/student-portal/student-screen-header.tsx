@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SystemBars } from 'react-native-edge-to-edge';
+import { useStableTopInset } from '@/hooks/use-stable-top-inset';
 import { useStudentPortal } from './student-portal-context';
 import { studentTheme } from './theme';
 
@@ -19,14 +20,21 @@ export function StudentScreenHeader({
   rightSlot,
   showMenu = true,
 }: StudentScreenHeaderProps) {
-  const insets = useSafeAreaInsets();
+  const topInset = useStableTopInset();
   const { openDrawer } = useStudentPortal();
 
   return (
-    <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+    <View style={[styles.header, { paddingTop: topInset + 10 }]}>
+      <SystemBars style={{ statusBar: 'light', navigationBar: 'dark' }} />
       <View style={styles.row}>
         {showMenu ? (
-          <Pressable style={styles.menuButton} onPress={openDrawer} hitSlop={8}>
+          <Pressable
+            style={styles.menuButton}
+            onPress={openDrawer}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Open menu"
+          >
             <Text style={styles.menuIcon}>☰</Text>
           </Pressable>
         ) : (

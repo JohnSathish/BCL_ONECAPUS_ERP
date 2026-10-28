@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SystemBars } from 'react-native-edge-to-edge';
+import { useStableTopInset } from '@/hooks/use-stable-top-inset';
 import { principalTheme } from './theme';
 import { usePrincipalDrawerOptional } from './principal-drawer-context';
 
@@ -23,7 +24,7 @@ export function PrincipalScreenShell({
   showMenu = true,
   children,
 }: Props) {
-  const insets = useSafeAreaInsets();
+  const topInset = useStableTopInset();
   const drawer = usePrincipalDrawerOptional();
 
   const menu =
@@ -41,7 +42,8 @@ export function PrincipalScreenShell({
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <SystemBars style={{ statusBar: 'dark', navigationBar: 'dark' }} />
+      <View style={[styles.header, { paddingTop: topInset + 10 }]}>
         {menu ? <View style={styles.left}>{menu}</View> : null}
         <View style={styles.titles}>
           <Text style={styles.eyebrow}>Executive Command Center</Text>

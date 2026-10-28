@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -24,6 +26,25 @@ import {
 import { resolveAttendanceScan } from '@/utils/attendance-scan-resolve';
 
 const STATUS_CYCLE = ['P', 'A', 'L'] as const;
+
+function studentSearchText(student: AttendanceRosterStudent) {
+  return [student.fullName, student.rollNumber, student.enrollmentNumber, student.admissionNumber]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+/** Name, roll, enrollment, or admission number. Spaces and hyphens are ignored. */
+function matchesStudentQuery(student: AttendanceRosterStudent, rawQuery: string) {
+  const query = rawQuery.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!query) return true;
+  const text = studentSearchText(student);
+  if (text.includes(query)) return true;
+  const compact = text.replace(/[\s-]/g, '');
+  const compactQuery = query.replace(/[\s-]/g, '');
+  if (compactQuery && compact.includes(compactQuery)) return true;
+  return query.split(' ').every((token) => text.includes(token));
+}
 
 export default function MarkAttendanceScreen() {
   const router = useRouter();
@@ -43,8 +64,18 @@ export default function MarkAttendanceScreen() {
   const [students, setStudents] = useState<AttendanceRosterStudent[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [lastScanNote, setLastScanNote] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const studentsRef = useRef(students);
   studentsRef.current = students;
+
+  const visibleStudents = useMemo(
+    () =>
+      students
+        .map((student, index) => ({ student, index }))
+        .filter(({ student }) => matchesStudentQuery(student, query)),
+    [query, students],
+  );
+  const searching = query.trim().length > 0;
 
   const load = useCallback(async () => {
     if (!sessionId) return;
@@ -173,7 +204,30 @@ export default function MarkAttendanceScreen() {
             <Text style={styles.toolBtnText}>Scan ID</Text>
           </Pressable>
         </View>
-        <Text style={styles.count}>{students.length} students</Text>
+      </View>
+
+      <View style={styles.searchBox}>
+        <Ionicons name="search" size={18} color={facultyTheme.textSubtle} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search by student name or roll number..."
+          placeholderTextColor={facultyTheme.textSubtle}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+          style={styles.searchInput}
+          accessibilityLabel="Search students by name or roll number"
+        />
+        {searching ? (
+          <Pressable
+            onPress={() => setQuery('')}
+            hitSlop={8}
+            accessibilityLabel="Clear student search"
+          >
+            <Ionicons name="close-circle" size={18} color={facultyTheme.textSubtle} />
+          </Pressable>
+        ) : null}
       </View>
 
       {lastScanNote ? (
@@ -182,25 +236,52 @@ export default function MarkAttendanceScreen() {
         </View>
       ) : null}
 
-      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}>
-        {students.length === 0 ? (
-          <Text style={styles.emptyRoster}>
-            No students are on this class roll yet. Check that the paper is registered for this
-            semester, then pull to refresh from Attendance.
-          </Text>
-        ) : null}
-        {students.map((student) => (
-          <Pressable key={student.id} style={styles.row} onPress={() => toggleStatus(student.id)}>
-            <View style={styles.rowText}>
-              <Text style={styles.name}>{student.fullName ?? 'Student'}</Text>
-              <Text style={styles.roll}>{student.rollNumber ?? '—'}</Text>
-            </View>
-            <View style={[styles.statusPill, statusStyle(student.status ?? 'P')]}>
-              <Text style={styles.statusText}>{student.status ?? 'P'}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <View style={styles.listHeader}>
+        <Text style={styles.listTitle}>Student List</Text>
+        <Text style={styles.count}>
+          {searching
+            ? `${visibleStudents.length} of ${students.length}`
+            : `${students.length} students`}
+        </Text>
+      </View>
+
+      <FlatList
+        data={visibleStudents}
+        keyExtractor={(item) => item.student.id}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        style={styles.listFlex}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
+        ListEmptyComponent={
+          students.length === 0 ? (
+            <Text style={styles.emptyRoster}>
+              No students are on this class roll yet. Check that the paper is registered for this
+              semester, then pull to refresh from Attendance.
+            </Text>
+          ) : (
+            <Text style={styles.emptyRoster}>
+              No students match “{query.trim()}”. Try another name or roll number.
+            </Text>
+          )
+        }
+        renderItem={({ item }) => {
+          const student = item.student;
+          return (
+            <Pressable style={styles.row} onPress={() => toggleStatus(student.id)}>
+              <View style={styles.indexBadge}>
+                <Text style={styles.indexText}>{item.index + 1}</Text>
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.name}>{student.fullName ?? 'Student'}</Text>
+                <Text style={styles.roll}>{student.rollNumber ?? '—'}</Text>
+              </View>
+              <View style={[styles.statusPill, statusStyle(student.status ?? 'P')]}>
+                <Text style={styles.statusText}>{student.status ?? 'P'}</Text>
+              </View>
+            </Pressable>
+          );
+        }}
+      />
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <Pressable
@@ -269,7 +350,45 @@ const styles = StyleSheet.create({
   },
   scanBtn: { backgroundColor: facultyTheme.primaryDark },
   toolBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: facultyTheme.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: facultyTheme.border,
+    paddingHorizontal: 12,
+    minHeight: 44,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: facultyTheme.text,
+    paddingVertical: 10,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  listTitle: { fontSize: 15, fontWeight: '800', color: facultyTheme.text },
   count: { fontSize: 12, color: facultyTheme.textMuted, fontWeight: '600' },
+  listFlex: { flex: 1 },
+  indexBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  indexText: { fontSize: 12, fontWeight: '800', color: '#1D4ED8' },
   scanNote: {
     marginHorizontal: 16,
     marginBottom: 8,

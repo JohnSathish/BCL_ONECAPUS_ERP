@@ -10,7 +10,9 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStableTopInset } from '@/hooks/use-stable-top-inset';
 import { logout } from '@/auth/logout';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import {
@@ -25,6 +27,7 @@ import { facultyTheme } from './theme';
 export function FacultyDrawer() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const topInset = useStableTopInset();
   const { drawerOpen, closeDrawer, home } = useFacultyPortal();
   const [query, setQuery] = useState('');
   const slide = useRef(new Animated.Value(-facultyTheme.drawerWidth)).current;
@@ -112,6 +115,7 @@ export function FacultyDrawer() {
   return (
     <Modal visible={drawerOpen} transparent animationType="none" onRequestClose={closeDrawer}>
       <View style={styles.overlay}>
+        {drawerOpen ? <SystemBars style={{ statusBar: 'dark', navigationBar: 'dark' }} /> : null}
         <Animated.View style={[styles.backdrop, { opacity: backdrop }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeDrawer} />
         </Animated.View>
@@ -120,7 +124,7 @@ export function FacultyDrawer() {
           style={[
             styles.panel,
             {
-              paddingTop: insets.top + 8,
+              paddingTop: topInset + 12,
               paddingBottom: insets.bottom + 12,
               transform: [{ translateX: slide }],
             },

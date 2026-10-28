@@ -1,7 +1,9 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStableTopInset } from '@/hooks/use-stable-top-inset';
 import {
   POWERED_BY,
   POWERED_BY_TAGLINE,
@@ -87,6 +89,7 @@ function PageDots() {
 
 export function PremiumSplashScreen() {
   const insets = useSafeAreaInsets();
+  const topInset = useStableTopInset();
   const [productName, setProductName] = useState(PRODUCT_NAME);
   const [productTagline, setProductTagline] = useState(SPLASH_PRODUCT_TAGLINE);
   const [poweredByText, setPoweredByText] = useState(POWERED_BY);
@@ -182,6 +185,7 @@ export function PremiumSplashScreen() {
 
   return (
     <View style={styles.root}>
+      <SystemBars style={{ statusBar: 'light', navigationBar: 'dark' }} />
       <LinearGradient
         colors={['#020f2e', '#0a2456', '#143d7a', '#0a2456', '#020f2e']}
         locations={[0, 0.25, 0.5, 0.75, 1]}
@@ -202,7 +206,7 @@ export function PremiumSplashScreen() {
         style={[
           styles.content,
           {
-            paddingTop: insets.top + 36,
+            paddingTop: topInset + 28,
             paddingBottom: insets.bottom + 12,
           },
         ]}

@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStableTopInset } from '@/hooks/use-stable-top-inset';
 import {
   PRINCIPAL_MOBILE_NAV,
   isPrincipalMobileNavActive,
@@ -48,6 +49,7 @@ export function PrincipalDrawer({ badges = {}, showOptionalCampus = true }: Prop
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const topInset = useStableTopInset();
   const { width: windowW } = useWindowDimensions();
   const isTablet = windowW >= TABLET_BREAKPOINT;
   const drawerWidth = isTablet ? TABLET_DRAWER_WIDTH : Math.min(windowW * PHONE_DRAWER_RATIO, 360);
@@ -122,7 +124,7 @@ export function PrincipalDrawer({ badges = {}, showOptionalCampus = true }: Prop
             styles.drawer,
             {
               width: drawerWidth,
-              paddingTop: insets.top,
+              paddingTop: topInset + 8,
               paddingBottom: insets.bottom + 8,
               transform: [{ translateX }],
             },

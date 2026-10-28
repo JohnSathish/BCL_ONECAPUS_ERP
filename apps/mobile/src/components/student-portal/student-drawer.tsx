@@ -10,7 +10,9 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SystemBars } from 'react-native-edge-to-edge';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStableTopInset } from '@/hooks/use-stable-top-inset';
 import { logout } from '@/auth/logout';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { DRAWER_MENU_SECTIONS, filterDrawerByFeatureFlags } from './drawer-menu';
@@ -22,6 +24,7 @@ import { useMobileConfig } from '@/hooks/useMobileConfig';
 export function StudentDrawer() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const topInset = useStableTopInset();
   const { drawerOpen, closeDrawer, expandedSectionId, toggleSection, home } = useStudentPortal();
   const { featureFlags } = useMobileConfig();
   const [query, setQuery] = useState('');
@@ -88,6 +91,7 @@ export function StudentDrawer() {
   return (
     <Modal visible={drawerOpen} transparent animationType="none" onRequestClose={closeDrawer}>
       <View style={styles.overlay}>
+        {drawerOpen ? <SystemBars style={{ statusBar: 'dark', navigationBar: 'dark' }} /> : null}
         <Animated.View style={[styles.backdrop, { opacity: backdrop }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeDrawer} />
         </Animated.View>
@@ -96,7 +100,7 @@ export function StudentDrawer() {
           style={[
             styles.panel,
             {
-              paddingTop: insets.top + 8,
+              paddingTop: topInset + 12,
               paddingBottom: insets.bottom + 12,
               transform: [{ translateX: slide }],
             },
