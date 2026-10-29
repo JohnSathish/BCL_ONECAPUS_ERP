@@ -324,12 +324,22 @@ export const fetchLibraryNaacReportSummary = (params?: {
   from?: string;
   to?: string;
   academicYear?: string;
+  departmentId?: string;
+  categoryId?: string;
+  medium?: 'ALL' | 'PHYSICAL' | 'DIGITAL';
 }) =>
   api.get<LibraryNaacReportBundle>(`${base}/reports/naac/summary`, { params }).then((r) => r.data);
 
 export const downloadLibraryNaacReport = (
   format: 'pdf' | 'xlsx' | 'csv',
-  params?: { from?: string; to?: string; academicYear?: string },
+  params?: {
+    from?: string;
+    to?: string;
+    academicYear?: string;
+    departmentId?: string;
+    categoryId?: string;
+    medium?: 'ALL' | 'PHYSICAL' | 'DIGITAL';
+  },
 ) =>
   api
     .get(`${base}/reports/naac/export`, {
@@ -478,6 +488,16 @@ export const fetchLibraryDepartmentHeatmap = () =>
 export const fetchLibraryGenderTrends = () =>
   api
     .get<NonNullable<LibraryDashboard['genderTrends']>>(`${base}/analytics/gender-trends`)
+    .then((r) => r.data);
+
+export const fetchLibraryReportsDesk = (params: {
+  days?: number;
+  from?: string;
+  to?: string;
+  year?: number;
+}) =>
+  api
+    .get<import('@/types/library').LibraryReportsDesk>(`${base}/reports/overview`, { params })
     .then((r) => r.data);
 
 export const fetchLibraryReadingAnalytics = (params: {
@@ -726,6 +746,7 @@ export type CatalogueDashboard = {
   withdrawnCopies: number;
   titlesWithoutDepartment: number;
   recentlyAcquiredCopies: number;
+  growth?: { titles: number | null; copies: number | null };
   departments: {
     department: string;
     titles: number;

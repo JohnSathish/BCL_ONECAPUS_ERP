@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import puppeteer from 'puppeteer';
@@ -76,6 +77,49 @@ export type LibraryNaacBundle = {
     printJournalTitles: number;
     digitalJournalAssets: number;
     eJournalDownloads: number;
+  };
+  overview: LibraryNaacOverview;
+};
+
+export type LibraryNaacOverview = {
+  titles: number;
+  copies: number;
+  digital: number;
+  members: number;
+  students: number;
+  staff: number;
+  visits: number;
+  activeLoans: number;
+  issues: number;
+  activeMembers: number;
+  averageLoanDays: number | null;
+  seats: number | null;
+  automation: string[];
+  growth: {
+    titles: number | null;
+    copies: number | null;
+    digital: number | null;
+    members: number | null;
+    visits: number | null;
+  };
+  departments: {
+    department: string;
+    titles: number;
+    copies: number;
+    available: number;
+    issued: number;
+    overdue: number;
+    lostDamaged: number;
+    eResources: number;
+  }[];
+  resourceTypes: { name: string; count: number }[];
+  years: { year: number; titles: number; copies: number; eResources: number }[];
+  status: {
+    available: number;
+    issued: number;
+    overdue: number;
+    lostDamaged: number;
+    other: number;
   };
 };
 
@@ -315,6 +359,488 @@ export class LibraryNaacReportsService {
         digitalJournalAssets,
         eJournalDownloads,
       },
+      overview: await this.collectionOverview(
+        tenantId,
+        query,
+        from,
+        to,
+        genderVisits.total,
+      ),
+    };
+  }
+
+  private async collectionOverview(
+    tenantId: string,
+    query: NaacLibraryReportQueryDto,
+    from: Date,
+    to: Date,
+    visits: number,
+  ): Promise<LibraryNaacOverview> {
+    const medium = query.medium ?? 'ALL';
+    const physical = medium !== 'DIGITAL';
+    const digital = medium !== 'PHYSICAL';
+    const bookWhere: Prisma.LibraryBookWhereInput = {
+      deletedAt: null,
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.departmentId
+        ? {
+            OR: [
+              { departmentId: query.departmentId },
+              { departments: { some: { departmentId: query.departmentId } } },
+            ],
+          }
+        : {}),
+    };
+    const copyWhere: Prisma.LibraryBookCopyWhereInput = {
+      tenantId,
+      book: bookWhere,
+    };
+    const assetWhere: Prisma.LibraryDigitalAssetWhereInput = {
+      tenantId,
+      deletedAt: null,
+      status: 'PUBLISHED',
+      ...(query.departmentId ? { departmentId: query.departmentId } : {}),
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+    };
+    const span = Math.max(to.getTime() - from.getTime(), 0);
+    const previousTo = new Date(from.getTime() - 1);
+    const previousFrom = new Date(previousTo.getTime() - span);
+    const physicalFilters = [
+      Prisma.sql`c.tenant_id = CAST(${tenantId} AS uuid)`,
+      Prisma.sql`b.deleted_at IS NULL`,
+    ];
+    if (query.departmentId) {
+      physicalFilters.push(
+        Prisma.sql`COALESCE(b.department_id, (
+          SELECT bd.department_id FROM library.library_book_departments bd
+          WHERE bd.book_id = b.id ORDER BY bd.created_at LIMIT 1
+        )) = CAST(${query.departmentId} AS uuid)`,
+      );
+    }
+    if (query.categoryId) {
+      physicalFilters.push(
+        Prisma.sql`b.category_id = CAST(${query.categoryId} AS uuid)`,
+      );
+    }
+    const where = Prisma.join(physicalFilters, ' AND ');
+    const assetFilters = [
+      Prisma.sql`a.tenant_id = CAST(${tenantId} AS uuid)`,
+      Prisma.sql`a.deleted_at IS NULL`,
+      Prisma.sql`a.status = 'PUBLISHED'`,
+    ];
+    if (query.departmentId) {
+      assetFilters.push(
+        Prisma.sql`a.department_id = CAST(${query.departmentId} AS uuid)`,
+      );
+    }
+    if (query.categoryId) {
+      assetFilters.push(
+        Prisma.sql`a.category_id = CAST(${query.categoryId} AS uuid)`,
+      );
+    }
+    const assetWhereSql = Prisma.join(assetFilters, ' AND ');
+
+    const [
+      titles,
+      copies,
+      titlesThen,
+      titlesAdded,
+      copiesThen,
+      copiesAdded,
+      digitalCount,
+      digitalThen,
+      digitalAdded,
+      previousVisits,
+      activeLoans,
+      issues,
+      averageRow,
+      activeMembersRow,
+      memberRow,
+      settings,
+      departmentRows,
+      categoryRows,
+      yearRows,
+      digitalDepartments,
+      digitalYears,
+    ] = await Promise.all([
+      physical
+        ? this.prisma.libraryBook.count({ where: { tenantId, ...bookWhere } })
+        : 0,
+      physical ? this.prisma.libraryBookCopy.count({ where: copyWhere }) : 0,
+      physical
+        ? this.prisma.libraryBook.count({
+            where: {
+              tenantId,
+              ...bookWhere,
+              copies: { some: { acquisitionDate: { lt: from } } },
+            },
+          })
+        : 0,
+      physical
+        ? this.prisma.libraryBook.count({
+            where: {
+              tenantId,
+              ...bookWhere,
+              copies: {
+                some: { acquisitionDate: { gte: from, lte: to } },
+                none: { acquisitionDate: { lt: from } },
+              },
+            },
+          })
+        : 0,
+      physical
+        ? this.prisma.libraryBookCopy.count({
+            where: { ...copyWhere, acquisitionDate: { lt: from } },
+          })
+        : 0,
+      physical
+        ? this.prisma.libraryBookCopy.count({
+            where: { ...copyWhere, acquisitionDate: { gte: from, lte: to } },
+          })
+        : 0,
+      digital
+        ? this.prisma.libraryDigitalAsset.count({ where: assetWhere })
+        : 0,
+      digital
+        ? this.prisma.libraryDigitalAsset.count({
+            where: { ...assetWhere, createdAt: { lt: from } },
+          })
+        : 0,
+      digital
+        ? this.prisma.libraryDigitalAsset.count({
+            where: { ...assetWhere, createdAt: { gte: from, lte: to } },
+          })
+        : 0,
+      this.prisma.libraryVisit.count({
+        where: { tenantId, entryAt: { gte: previousFrom, lte: previousTo } },
+      }),
+      physical
+        ? this.prisma.libraryLoan.count({
+            where: {
+              tenantId,
+              status: 'ACTIVE',
+              returnedAt: null,
+              copy: { book: bookWhere },
+            },
+          })
+        : 0,
+      physical
+        ? this.prisma.libraryLoan.count({
+            where: {
+              tenantId,
+              issuedAt: { gte: from, lte: to },
+              copy: { book: bookWhere },
+            },
+          })
+        : 0,
+      physical
+        ? this.prisma.$queryRaw<{ days: number | null }[]>`
+            SELECT AVG(EXTRACT(EPOCH FROM (l.returned_at - l.issued_at)) / 86400.0) AS days
+            FROM library.library_loans l
+            JOIN library.library_book_copies c ON c.id = l.copy_id
+            JOIN library.library_books b ON b.id = c.book_id
+            WHERE l.tenant_id = CAST(${tenantId} AS uuid)
+              AND l.returned_at IS NOT NULL
+              AND l.returned_at >= l.issued_at
+              AND l.issued_at >= ${from}
+              AND l.issued_at <= ${to}
+              AND ${where}
+          `
+        : Promise.resolve([{ days: null }]),
+      physical
+        ? this.prisma.$queryRaw<{ members: number }[]>`
+            SELECT COUNT(DISTINCT person)::int AS members
+            FROM (
+              SELECT l.student_id AS person
+              FROM library.library_loans l
+              JOIN library.library_book_copies c ON c.id = l.copy_id
+              JOIN library.library_books b ON b.id = c.book_id
+              WHERE l.tenant_id = CAST(${tenantId} AS uuid)
+                AND l.student_id IS NOT NULL
+                AND l.issued_at >= ${from}
+                AND l.issued_at <= ${to}
+                AND ${where}
+              UNION
+              SELECT l.staff_profile_id
+              FROM library.library_loans l
+              JOIN library.library_book_copies c ON c.id = l.copy_id
+              JOIN library.library_books b ON b.id = c.book_id
+              WHERE l.tenant_id = CAST(${tenantId} AS uuid)
+                AND l.staff_profile_id IS NOT NULL
+                AND l.issued_at >= ${from}
+                AND l.issued_at <= ${to}
+                AND ${where}
+            ) people
+          `
+        : Promise.resolve([{ members: 0 }]),
+      this.prisma.$queryRaw<
+        { students: number; staff: number; before: number; added: number }[]
+      >`
+        WITH people AS (
+          SELECT student_id AS person_id, 'STUDENT' AS kind, entry_at AS at
+          FROM library.library_visits
+          WHERE tenant_id = CAST(${tenantId} AS uuid) AND student_id IS NOT NULL
+          UNION ALL
+          SELECT staff_profile_id, 'STAFF', entry_at
+          FROM library.library_visits
+          WHERE tenant_id = CAST(${tenantId} AS uuid) AND staff_profile_id IS NOT NULL
+          UNION ALL
+          SELECT student_id, 'STUDENT', issued_at
+          FROM library.library_loans
+          WHERE tenant_id = CAST(${tenantId} AS uuid) AND student_id IS NOT NULL
+          UNION ALL
+          SELECT staff_profile_id, 'STAFF', issued_at
+          FROM library.library_loans
+          WHERE tenant_id = CAST(${tenantId} AS uuid) AND staff_profile_id IS NOT NULL
+        ),
+        firsts AS (
+          SELECT person_id, kind, MIN(at) AS first_at
+          FROM people
+          GROUP BY person_id, kind
+        )
+        SELECT
+          COUNT(*) FILTER (WHERE kind = 'STUDENT')::int AS students,
+          COUNT(*) FILTER (WHERE kind = 'STAFF')::int AS staff,
+          COUNT(*) FILTER (WHERE first_at < ${from})::int AS before,
+          COUNT(*) FILTER (WHERE first_at >= ${from} AND first_at <= ${to})::int AS added
+        FROM firsts
+      `,
+      this.prisma.librarySettings.findUnique({
+        where: { tenantId },
+        select: {
+          totalSeats: true,
+          qrEntryEnabled: true,
+          rfidEntryEnabled: true,
+          selfCheckInEnabled: true,
+        },
+      }),
+      physical
+        ? this.prisma.$queryRaw<
+            {
+              department: string;
+              titles: number;
+              copies: number;
+              available: number;
+              issued: number;
+              overdue: number;
+              lost: number;
+            }[]
+          >`
+            SELECT
+              COALESCE(dep.department_name, NULLIF(BTRIM(c.collection_code), ''), '(Unmapped)') AS department,
+              COUNT(DISTINCT b.id)::int AS titles,
+              COUNT(c.id)::int AS copies,
+              COUNT(c.id) FILTER (WHERE loan.id IS NULL AND c.status = 'AVAILABLE')::int AS available,
+              COUNT(c.id) FILTER (
+                WHERE loan.id IS NOT NULL
+                  AND c.status NOT IN ('LOST', 'DAMAGED')
+                  AND (loan.due_at IS NULL OR loan.due_at >= NOW())
+              )::int AS issued,
+              COUNT(c.id) FILTER (
+                WHERE loan.id IS NOT NULL
+                  AND c.status NOT IN ('LOST', 'DAMAGED')
+                  AND loan.due_at < NOW()
+              )::int AS overdue,
+              COUNT(c.id) FILTER (WHERE c.status IN ('LOST', 'DAMAGED'))::int AS lost
+            FROM library.library_book_copies c
+            JOIN library.library_books b ON b.id = c.book_id
+            LEFT JOIN LATERAL (
+              SELECT COALESCE(b.department_id, (
+                SELECT bd.department_id FROM library.library_book_departments bd
+                WHERE bd.book_id = b.id ORDER BY bd.created_at LIMIT 1
+              )) AS department_id
+            ) mapped ON true
+            LEFT JOIN core.departments dep ON dep.id = mapped.department_id AND dep.deleted_at IS NULL
+            LEFT JOIN LATERAL (
+              SELECT l.id, l.due_at
+              FROM library.library_loans l
+              WHERE l.copy_id = c.id AND l.returned_at IS NULL AND l.status = 'ACTIVE'
+              LIMIT 1
+            ) loan ON true
+            WHERE ${where}
+            GROUP BY 1
+            ORDER BY copies DESC
+          `
+        : Promise.resolve([]),
+      physical
+        ? this.prisma.$queryRaw<{ name: string; count: number }[]>`
+            SELECT COALESCE(cat.name, 'Uncategorised') AS name, COUNT(c.id)::int AS count
+            FROM library.library_book_copies c
+            JOIN library.library_books b ON b.id = c.book_id
+            LEFT JOIN library.library_categories cat ON cat.id = b.category_id
+            WHERE ${where}
+            GROUP BY 1
+            ORDER BY count DESC
+          `
+        : Promise.resolve([]),
+      physical
+        ? this.prisma.$queryRaw<
+            { year: number; titles: number; copies: number }[]
+          >`
+            SELECT EXTRACT(YEAR FROM c.acquisition_date)::int AS year,
+              COUNT(DISTINCT b.id)::int AS titles,
+              COUNT(c.id)::int AS copies
+            FROM library.library_book_copies c
+            JOIN library.library_books b ON b.id = c.book_id
+            WHERE ${where}
+              AND c.acquisition_date IS NOT NULL
+            GROUP BY 1
+            ORDER BY 1
+          `
+        : Promise.resolve([]),
+      digital
+        ? this.prisma.$queryRaw<{ department: string; assets: number }[]>`
+            SELECT COALESCE(dep.department_name, '(Unmapped)') AS department, COUNT(a.id)::int AS assets
+            FROM library.library_digital_assets a
+            LEFT JOIN core.departments dep ON dep.id = a.department_id AND dep.deleted_at IS NULL
+            WHERE ${assetWhereSql}
+            GROUP BY 1
+          `
+        : Promise.resolve([]),
+      digital
+        ? this.prisma.$queryRaw<{ year: number; assets: number }[]>`
+            SELECT EXTRACT(YEAR FROM a.created_at)::int AS year, COUNT(a.id)::int AS assets
+            FROM library.library_digital_assets a
+            WHERE ${assetWhereSql}
+            GROUP BY 1
+          `
+        : Promise.resolve([]),
+    ]);
+
+    const digitalByDepartment = new Map(
+      digitalDepartments.map((row) => [row.department, Number(row.assets)]),
+    );
+    const departments = departmentRows.map((row) => ({
+      department: row.department,
+      titles: Number(row.titles),
+      copies: Number(row.copies),
+      available: Number(row.available),
+      issued: Number(row.issued),
+      overdue: Number(row.overdue),
+      lostDamaged: Number(row.lost),
+      eResources: digitalByDepartment.get(row.department) ?? 0,
+    }));
+    for (const [department, assets] of digitalByDepartment) {
+      if (!departments.some((row) => row.department === department)) {
+        departments.push({
+          department,
+          titles: 0,
+          copies: 0,
+          available: 0,
+          issued: 0,
+          overdue: 0,
+          lostDamaged: 0,
+          eResources: Number(assets),
+        });
+      }
+    }
+    const available = departments.reduce((sum, row) => sum + row.available, 0);
+    const issued = departments.reduce((sum, row) => sum + row.issued, 0);
+    const overdue = departments.reduce((sum, row) => sum + row.overdue, 0);
+    const lostDamaged = departments.reduce(
+      (sum, row) => sum + row.lostDamaged,
+      0,
+    );
+    const topCategories = categoryRows.slice(0, 5).map((row) => ({
+      name: row.name,
+      count: Number(row.count),
+    }));
+    const otherCategories = categoryRows
+      .slice(5)
+      .reduce((sum, row) => sum + Number(row.count), 0);
+    const resourceTypes = [
+      ...topCategories,
+      ...(otherCategories > 0
+        ? [{ name: 'Others', count: otherCategories }]
+        : []),
+      ...(digitalCount > 0
+        ? [{ name: 'E-Resources', count: digitalCount }]
+        : []),
+    ];
+    const yearMap = new Map<
+      number,
+      { titles: number; copies: number; eResources: number }
+    >();
+    for (const row of yearRows) {
+      yearMap.set(Number(row.year), {
+        titles: Number(row.titles),
+        copies: Number(row.copies),
+        eResources: 0,
+      });
+    }
+    for (const row of digitalYears) {
+      const current = yearMap.get(Number(row.year)) ?? {
+        titles: 0,
+        copies: 0,
+        eResources: 0,
+      };
+      current.eResources = Number(row.assets);
+      yearMap.set(Number(row.year), current);
+    }
+    const yearNumbers = [...yearMap.keys()]
+      .filter((year) => Number.isFinite(year))
+      .sort((a, b) => a - b);
+    const years: LibraryNaacOverview['years'] = [];
+    if (yearNumbers.length) {
+      for (
+        let year = yearNumbers[0];
+        year <= yearNumbers[yearNumbers.length - 1];
+        year += 1
+      ) {
+        years.push({
+          year,
+          ...(yearMap.get(year) ?? { titles: 0, copies: 0, eResources: 0 }),
+        });
+      }
+    }
+    const members = memberRow[0] ?? {
+      students: 0,
+      staff: 0,
+      before: 0,
+      added: 0,
+    };
+    const automation = [
+      settings?.qrEntryEnabled ? 'QR entry' : '',
+      settings?.rfidEntryEnabled ? 'RFID entry' : '',
+      settings?.selfCheckInEnabled ? 'Self check-in' : '',
+    ].filter(Boolean);
+    const average = averageRow[0]?.days;
+
+    return {
+      titles,
+      copies,
+      digital: digitalCount,
+      members: Number(members.students) + Number(members.staff),
+      students: Number(members.students),
+      staff: Number(members.staff),
+      visits,
+      activeLoans,
+      issues,
+      activeMembers: Number(activeMembersRow[0]?.members ?? 0),
+      averageLoanDays:
+        average == null ? null : Math.round(Number(average) * 10) / 10,
+      seats: settings?.totalSeats ?? null,
+      automation,
+      growth: {
+        titles: ratio(titlesThen + titlesAdded, titlesThen),
+        copies: ratio(copiesThen + copiesAdded, copiesThen),
+        digital: ratio(digitalThen + digitalAdded, digitalThen),
+        members: ratio(
+          Number(members.before) + Number(members.added),
+          Number(members.before),
+        ),
+        visits: ratio(visits, previousVisits),
+      },
+      departments,
+      resourceTypes,
+      years,
+      status: {
+        available,
+        issued,
+        overdue,
+        lostDamaged,
+        other: Math.max(0, copies - available - issued - overdue - lostDamaged),
+      },
     };
   }
 
@@ -385,6 +911,22 @@ export class LibraryNaacReportsService {
           ],
         ),
       );
+      zip.file(
+        'department-collection.csv',
+        this.reports.toCsv(
+          bundle.overview.departments as Record<string, unknown>[],
+          [
+            { key: 'department', header: 'Department' },
+            { key: 'titles', header: 'Distinct Titles' },
+            { key: 'copies', header: 'Physical Copies' },
+            { key: 'available', header: 'Available' },
+            { key: 'issued', header: 'Issued' },
+            { key: 'overdue', header: 'Overdue' },
+            { key: 'lostDamaged', header: 'Lost/Damaged' },
+            { key: 'eResources', header: 'E-Resources' },
+          ],
+        ),
+      );
       zip.file('manifest.json', JSON.stringify(bundle, null, 2));
       const buffer = await zip.generateAsync({ type: 'nodebuffer' });
       return {
@@ -419,6 +961,30 @@ export class LibraryNaacReportsService {
           row.visits,
           row.issues,
           row.uniqueReaders,
+        ]);
+      }
+
+      const collectionSheet = workbook.addWorksheet('Department Collection');
+      collectionSheet.addRow([
+        'Department',
+        'Distinct Titles',
+        'Physical Copies',
+        'Available',
+        'Issued',
+        'Overdue',
+        'Lost/Damaged',
+        'E-Resources',
+      ]);
+      for (const row of bundle.overview.departments) {
+        collectionSheet.addRow([
+          row.department,
+          row.titles,
+          row.copies,
+          row.available,
+          row.issued,
+          row.overdue,
+          row.lostDamaged,
+          row.eResources,
         ]);
       }
 
@@ -529,6 +1095,31 @@ export class LibraryNaacReportsService {
           ],
         ],
       )}
+      <h2>Department-wise Book Collection</h2>
+      ${table(
+        [
+          'Department',
+          'Titles',
+          'Copies',
+          'Available',
+          'Issued',
+          'Overdue',
+          'Lost/Damaged',
+          'E-Resources',
+        ],
+        bundle.overview.departments
+          .slice(0, 25)
+          .map((row) => [
+            row.department,
+            String(row.titles),
+            String(row.copies),
+            String(row.available),
+            String(row.issued),
+            String(row.overdue),
+            String(row.lostDamaged),
+            String(row.eResources),
+          ]),
+      )}
       <h2>Books Added (Year-wise)</h2>
       ${table(
         ['Year', 'Titles', 'Copies'],
@@ -596,4 +1187,9 @@ export class LibraryNaacReportsService {
       await browser.close();
     }
   }
+}
+
+function ratio(current: number, previous: number) {
+  if (previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
 }

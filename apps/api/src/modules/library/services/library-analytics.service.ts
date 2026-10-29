@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { libraryHealth } from '../library-health.logic';
 import { LibrarySettingsService } from './library-settings.service';
@@ -1163,6 +1164,309 @@ export class LibraryAnalyticsService {
       weeklyIssues,
     };
   }
+
+  async reportsDesk(
+    tenantId: string,
+    query: { days?: number; from?: string; to?: string; year?: number },
+  ) {
+    const range = resolveReadingRange(query);
+    const { from, to, days } = range;
+    const previousFrom = new Date(from);
+    previousFrom.setDate(previousFrom.getDate() - days);
+    const end = new Date(to);
+    end.setDate(end.getDate() - 1);
+    const year = query.year ?? end.getFullYear();
+    const yearStart = new Date(year, 0, 1);
+    const yearEnd = new Date(year + 1, 0, 1);
+    const now = new Date();
+    const tenant = Prisma.sql`CAST(${tenantId} AS uuid)`;
+
+    const [
+      current,
+      previous,
+      overdueNow,
+      overdueThen,
+      newNow,
+      newPrev,
+      issuedMonths,
+      returnedMonths,
+      categoryRows,
+      bookRows,
+      readerRows,
+      yearRows,
+      studentDeptRows,
+      staffDeptRows,
+    ] = await Promise.all([
+      this.periodLoanStats(tenant, from, to),
+      this.periodLoanStats(tenant, previousFrom, from),
+      this.prisma.$queryRaw<{ count: number }[]>`
+        SELECT COUNT(*)::int AS count
+        FROM library.library_loans
+        WHERE tenant_id = ${tenant}
+          AND status = 'ACTIVE'
+          AND due_at < ${now}
+      `,
+      this.prisma.$queryRaw<{ count: number }[]>`
+        SELECT COUNT(*)::int AS count
+        FROM library.library_loans
+        WHERE tenant_id = ${tenant}
+          AND issued_at < ${from}
+          AND due_at < ${from}
+          AND (returned_at IS NULL OR returned_at >= ${from})
+      `,
+      this.firstIssueCount(tenant, from, to),
+      this.firstIssueCount(tenant, previousFrom, from),
+      this.monthCounts(tenant, 'issued_at', yearStart, yearEnd),
+      this.monthCounts(tenant, 'returned_at', yearStart, yearEnd),
+      this.prisma.$queryRaw<{ name: string; issues: number; titles: number }[]>`
+        SELECT COALESCE(cat.name, 'Uncategorised') AS name,
+          COUNT(*)::int AS issues,
+          COUNT(DISTINCT b.id)::int AS titles
+        FROM library.library_loans l
+        JOIN library.library_book_copies c ON c.id = l.copy_id
+        JOIN library.library_books b ON b.id = c.book_id
+        LEFT JOIN library.library_categories cat ON cat.id = b.category_id
+        WHERE l.tenant_id = ${tenant}
+          AND l.issued_at >= ${from}
+          AND l.issued_at < ${to}
+        GROUP BY 1
+        ORDER BY issues DESC
+      `,
+      this.prisma.$queryRaw<
+        {
+          id: string;
+          title: string;
+          author: string | null;
+          accession_no: string;
+          issues: number;
+        }[]
+      >`
+        SELECT b.id, b.title, b.author, b.accession_no, COUNT(*)::int AS issues
+        FROM library.library_loans l
+        JOIN library.library_book_copies c ON c.id = l.copy_id
+        JOIN library.library_books b ON b.id = c.book_id
+        WHERE l.tenant_id = ${tenant}
+          AND l.issued_at >= ${from}
+          AND l.issued_at < ${to}
+        GROUP BY b.id, b.title, b.author, b.accession_no
+        ORDER BY issues DESC
+        LIMIT 10
+      `,
+      this.prisma.$queryRaw<
+        {
+          member_type: string;
+          student_id: string | null;
+          staff_profile_id: string | null;
+          issues: number;
+        }[]
+      >`
+        SELECT member_type, student_id, staff_profile_id, COUNT(*)::int AS issues
+        FROM library.library_loans
+        WHERE tenant_id = ${tenant}
+          AND issued_at >= ${from}
+          AND issued_at < ${to}
+          AND (student_id IS NOT NULL OR staff_profile_id IS NOT NULL)
+        GROUP BY member_type, student_id, staff_profile_id
+        ORDER BY issues DESC
+        LIMIT 10
+      `,
+      this.prisma.$queryRaw<{ year: number }[]>`
+        SELECT DISTINCT EXTRACT(YEAR FROM issued_at)::int AS year
+        FROM library.library_loans
+        WHERE tenant_id = ${tenant}
+        ORDER BY year DESC
+      `,
+      this.prisma.$queryRaw<{ name: string; issues: number }[]>`
+        SELECT d.department_name AS name, COUNT(*)::int AS issues
+        FROM library.library_loans l
+        JOIN academic.students s ON s.id = l.student_id
+        JOIN core.departments d ON d.id = s.department_id
+        WHERE l.tenant_id = ${tenant}
+          AND l.issued_at >= ${from}
+          AND l.issued_at < ${to}
+        GROUP BY d.department_name
+      `,
+      this.prisma.$queryRaw<{ name: string; issues: number }[]>`
+        SELECT d.department_name AS name, COUNT(*)::int AS issues
+        FROM library.library_loans l
+        JOIN academic.staff_profiles sp ON sp.id = l.staff_profile_id
+        JOIN core.departments d ON d.id = sp.department_id
+        WHERE l.tenant_id = ${tenant}
+          AND l.issued_at >= ${from}
+          AND l.issued_at < ${to}
+        GROUP BY d.department_name
+      `,
+    ]);
+
+    const studentIds = readerRows
+      .map((row) => row.student_id)
+      .filter((id): id is string => Boolean(id));
+    const staffIds = readerRows
+      .map((row) => row.staff_profile_id)
+      .filter((id): id is string => Boolean(id));
+    const [students, staff] = await Promise.all([
+      studentIds.length
+        ? this.prisma.student.findMany({
+            where: { tenantId, id: { in: studentIds } },
+            select: {
+              id: true,
+              masterProfile: { select: { fullName: true } },
+              department: { select: { name: true } },
+              programVersion: {
+                select: { program: { select: { name: true } } },
+              },
+            },
+          })
+        : [],
+      staffIds.length
+        ? this.prisma.staffProfile.findMany({
+            where: { tenantId, id: { in: staffIds } },
+            select: {
+              id: true,
+              fullName: true,
+              department: { select: { name: true } },
+            },
+          })
+        : [],
+    ]);
+
+    const deptMap = new Map<string, number>();
+    for (const row of [...studentDeptRows, ...staffDeptRows]) {
+      deptMap.set(row.name, (deptMap.get(row.name) ?? 0) + Number(row.issues));
+    }
+    const departments = [...deptMap.entries()]
+      .map(([name, issues]) => ({ name, issues }))
+      .sort((a, b) => b.issues - a.issues)
+      .slice(0, 5);
+
+    const months = Array.from({ length: 12 }, (_, index) => ({
+      month: index + 1,
+      label: MONTHS[index],
+      issued: Number(
+        issuedMonths.find((row) => Number(row.month) === index + 1)?.count ?? 0,
+      ),
+      returned: Number(
+        returnedMonths.find((row) => Number(row.month) === index + 1)?.count ??
+          0,
+      ),
+    }));
+
+    const currentAvg = current.avgDays;
+    const previousAvg = previous.avgDays;
+    return {
+      from: localDateKey(from),
+      to: localDateKey(end),
+      days,
+      year,
+      years: [
+        ...new Set([year, ...yearRows.map((row) => Number(row.year))]),
+      ].filter((value) => Number.isFinite(value)),
+      summary: {
+        totalIssues: current.issues,
+        activeMembers: current.readers,
+        newReaders: Number(newNow[0]?.readers ?? 0),
+        averageLoanDays: currentAvg,
+        overdue: Number(overdueNow[0]?.count ?? 0),
+        deltas: {
+          totalIssues: percentChange(current.issues, previous.issues),
+          activeMembers: percentChange(current.readers, previous.readers),
+          newReaders: percentChange(
+            Number(newNow[0]?.readers ?? 0),
+            Number(newPrev[0]?.readers ?? 0),
+          ),
+          averageLoanDays:
+            currentAvg == null || previousAvg == null
+              ? null
+              : percentChange(currentAvg, previousAvg),
+          overdue: percentChange(
+            Number(overdueNow[0]?.count ?? 0),
+            Number(overdueThen[0]?.count ?? 0),
+          ),
+        },
+      },
+      months,
+      categories: shareCategories(
+        categoryRows.map((row) => ({
+          name: row.name,
+          issues: Number(row.issues),
+          titles: Number(row.titles),
+        })),
+      ),
+      topBooks: bookRows.map((row) => ({
+        bookId: row.id,
+        title: row.title,
+        author: row.author,
+        accessionNo: row.accession_no,
+        issues: Number(row.issues),
+      })),
+      topReaders: readerRows.map((row) => {
+        const student = students.find((item) => item.id === row.student_id);
+        const member = staff.find((item) => item.id === row.staff_profile_id);
+        return {
+          memberType: row.member_type,
+          memberId: row.student_id ?? row.staff_profile_id ?? '',
+          fullName:
+            student?.masterProfile?.fullName ?? member?.fullName ?? 'Member',
+          department:
+            student?.department?.name ?? member?.department?.name ?? null,
+          programme: student?.programVersion?.program?.name ?? null,
+          issues: Number(row.issues),
+        };
+      }),
+      departments,
+    };
+  }
+
+  private periodLoanStats(tenant: Prisma.Sql, from: Date, to: Date) {
+    return this.prisma.$queryRaw<
+      { issues: number; readers: number; avg_days: string | number | null }[]
+    >`
+      SELECT COUNT(*)::int AS issues,
+        COUNT(DISTINCT COALESCE(student_id, staff_profile_id))::int AS readers,
+        ROUND(AVG(EXTRACT(EPOCH FROM (returned_at - issued_at)) / 86400) FILTER (
+          WHERE returned_at IS NOT NULL AND returned_at >= issued_at
+        )::numeric, 1) AS avg_days
+      FROM library.library_loans
+      WHERE tenant_id = ${tenant}
+        AND issued_at >= ${from}
+        AND issued_at < ${to}
+    `.then((rows) => ({
+      issues: Number(rows[0]?.issues ?? 0),
+      readers: Number(rows[0]?.readers ?? 0),
+      avgDays: rows[0]?.avg_days == null ? null : Number(rows[0].avg_days),
+    }));
+  }
+
+  private firstIssueCount(tenant: Prisma.Sql, from: Date, to: Date) {
+    return this.prisma.$queryRaw<{ readers: number }[]>`
+      SELECT COUNT(*)::int AS readers
+      FROM (
+        SELECT COALESCE(student_id, staff_profile_id) AS member_id, MIN(issued_at) AS first_at
+        FROM library.library_loans
+        WHERE tenant_id = ${tenant}
+          AND (student_id IS NOT NULL OR staff_profile_id IS NOT NULL)
+        GROUP BY 1
+      ) firsts
+      WHERE first_at >= ${from} AND first_at < ${to}
+    `;
+  }
+
+  private monthCounts(
+    tenant: Prisma.Sql,
+    column: 'issued_at' | 'returned_at',
+    from: Date,
+    to: Date,
+  ) {
+    const field = Prisma.raw(column);
+    return this.prisma.$queryRaw<{ month: number; count: number }[]>`
+      SELECT EXTRACT(MONTH FROM ${field})::int AS month, COUNT(*)::int AS count
+      FROM library.library_loans
+      WHERE tenant_id = ${tenant}
+        AND ${field} >= ${from}
+        AND ${field} < ${to}
+      GROUP BY 1
+    `;
+  }
 }
 
 const DAY_NAMES = [
@@ -1237,4 +1541,47 @@ function meanLoanDays(loans: { issuedAt: Date; returnedAt: Date | null }[]) {
 function percentChange(current: number, previous: number) {
   if (previous <= 0) return null;
   return Math.round(((current - previous) / previous) * 1000) / 10;
+}
+
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+function shareCategories(
+  rows: { name: string; issues: number; titles: number }[],
+) {
+  const top = rows.slice(0, 4);
+  const rest = rows.slice(4);
+  const grouped = rest.length
+    ? [
+        ...top,
+        {
+          name: 'Others',
+          issues: rest.reduce((sum, row) => sum + row.issues, 0),
+          titles: rest.reduce((sum, row) => sum + row.titles, 0),
+        },
+      ]
+    : top;
+  const issueTotal = grouped.reduce((sum, row) => sum + row.issues, 0);
+  const titleTotal = grouped.reduce((sum, row) => sum + row.titles, 0);
+  return grouped.map((row) => ({
+    ...row,
+    issueShare: issueTotal
+      ? Math.round((row.issues / issueTotal) * 1000) / 10
+      : 0,
+    titleShare: titleTotal
+      ? Math.round((row.titles / titleTotal) * 1000) / 10
+      : 0,
+  }));
 }

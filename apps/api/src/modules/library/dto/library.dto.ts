@@ -142,6 +142,10 @@ export class LibrarySettingsDto {
   @IsInt()
   @Min(1)
   accessionNextSeq?: number;
+
+  @IsOptional()
+  @IsString()
+  updatedAt?: string;
 }
 
 export class MemberSummaryQueryDto {
@@ -976,6 +980,30 @@ export class ReadingAnalyticsQueryDto {
   to?: string;
 }
 
+export class ReportsDeskQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(7)
+  @Max(730)
+  days?: number = 30;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2000)
+  @Max(2100)
+  year?: number;
+}
+
 export class LibraryMemberQueryDto {
   @IsOptional()
   @Type(() => Number)
@@ -1312,6 +1340,18 @@ export class NaacLibraryReportQueryDto {
   @IsOptional()
   @IsString()
   academicYear?: string;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsIn(['ALL', 'PHYSICAL', 'DIGITAL'])
+  medium?: 'ALL' | 'PHYSICAL' | 'DIGITAL';
 }
 
 export class LibraryAssistantAskDto {

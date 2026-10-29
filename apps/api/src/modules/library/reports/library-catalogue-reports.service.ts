@@ -119,6 +119,8 @@ export class LibraryCatalogueReportsService {
     const yearAgo = new Date();
     yearAgo.setFullYear(yearAgo.getFullYear() - 1);
     const now = new Date();
+    const cutoff = new Date(now);
+    cutoff.setDate(cutoff.getDate() - 30);
     const [
       titles,
       copies,
@@ -130,6 +132,10 @@ export class LibraryCatalogueReportsService {
       issued,
       overdue,
       recent,
+      titlesThen,
+      copiesThen,
+      titlesAdded,
+      copiesAdded,
       departments,
     ] = await Promise.all([
       this.prisma.libraryBook.count({ where: { tenantId, deletedAt: null } }),
@@ -179,6 +185,37 @@ export class LibraryCatalogueReportsService {
           book: { deletedAt: null },
         },
       }),
+      this.prisma.libraryBook.count({
+        where: {
+          tenantId,
+          deletedAt: null,
+          copies: { some: { acquisitionDate: { lt: cutoff } } },
+        },
+      }),
+      this.prisma.libraryBookCopy.count({
+        where: {
+          tenantId,
+          acquisitionDate: { lt: cutoff },
+          book: { deletedAt: null },
+        },
+      }),
+      this.prisma.libraryBook.count({
+        where: {
+          tenantId,
+          deletedAt: null,
+          copies: {
+            some: { acquisitionDate: { gte: cutoff } },
+            none: { acquisitionDate: { lt: cutoff } },
+          },
+        },
+      }),
+      this.prisma.libraryBookCopy.count({
+        where: {
+          tenantId,
+          acquisitionDate: { gte: cutoff },
+          book: { deletedAt: null },
+        },
+      }),
       this.departmentRows(tenantId, {}),
     ]);
     return {
@@ -192,6 +229,10 @@ export class LibraryCatalogueReportsService {
       withdrawnCopies: withdrawn,
       titlesWithoutDepartment: unmapped,
       recentlyAcquiredCopies: recent,
+      growth: {
+        titles: stockGrowth(titlesThen + titlesAdded, titlesThen),
+        copies: stockGrowth(copiesThen + copiesAdded, copiesThen),
+      },
       departments: departments.slice(0, 12),
       generatedAt: now.toISOString(),
     };
@@ -1128,6 +1169,11 @@ const copyBookSelect = {
   price: true,
   category: { select: { name: true } },
 } satisfies Prisma.LibraryBookSelect;
+
+function stockGrowth(current: number, previous: number) {
+  if (previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
 
 function copyRow(
   row: {

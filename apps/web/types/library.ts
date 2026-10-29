@@ -509,6 +509,9 @@ export type LibrarySettings = {
   finePolicy?: FinePolicy;
   accessionPrefix?: string;
   accessionNextSeq?: number;
+  maxUploadMb?: number;
+  studentDigitalAccessEnabled?: boolean;
+  updatedAt?: string;
 };
 
 export type LibraryAssistantResponse = {
@@ -723,6 +726,47 @@ export type LibraryNaacReportBundle = {
     digitalJournalAssets: number;
     eJournalDownloads: number;
   };
+  overview: {
+    titles: number;
+    copies: number;
+    digital: number;
+    members: number;
+    students: number;
+    staff: number;
+    visits: number;
+    activeLoans: number;
+    issues: number;
+    activeMembers: number;
+    averageLoanDays: number | null;
+    seats: number | null;
+    automation: string[];
+    growth: {
+      titles: number | null;
+      copies: number | null;
+      digital: number | null;
+      members: number | null;
+      visits: number | null;
+    };
+    departments: {
+      department: string;
+      titles: number;
+      copies: number;
+      available: number;
+      issued: number;
+      overdue: number;
+      lostDamaged: number;
+      eResources: number;
+    }[];
+    resourceTypes: { name: string; count: number }[];
+    years: { year: number; titles: number; copies: number; eResources: number }[];
+    status: {
+      available: number;
+      issued: number;
+      overdue: number;
+      lostDamaged: number;
+      other: number;
+    };
+  };
 };
 
 export type LibraryCopyIncident = {
@@ -843,6 +887,52 @@ export type ResearchItemListResponse = {
   total: number;
   page: number;
   limit: number;
+};
+
+export type LibraryReportsDesk = {
+  from: string;
+  to: string;
+  days: number;
+  year: number;
+  years: number[];
+  summary: {
+    totalIssues: number;
+    activeMembers: number;
+    newReaders: number;
+    averageLoanDays: number | null;
+    overdue: number;
+    deltas: {
+      totalIssues: number | null;
+      activeMembers: number | null;
+      newReaders: number | null;
+      averageLoanDays: number | null;
+      overdue: number | null;
+    };
+  };
+  months: { month: number; label: string; issued: number; returned: number }[];
+  categories: {
+    name: string;
+    issues: number;
+    titles: number;
+    issueShare: number;
+    titleShare: number;
+  }[];
+  topBooks: {
+    bookId: string;
+    title: string;
+    author: string | null;
+    accessionNo: string;
+    issues: number;
+  }[];
+  topReaders: {
+    memberType: string;
+    memberId: string;
+    fullName: string;
+    department: string | null;
+    programme: string | null;
+    issues: number;
+  }[];
+  departments: { name: string; issues: number }[];
 };
 
 export type LibraryReadingAnalytics = {

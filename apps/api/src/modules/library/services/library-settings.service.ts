@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import type { LibrarySettingsDto } from '../dto/library.dto';
@@ -65,7 +65,15 @@ export class LibrarySettingsService {
   }
 
   async updateSettings(tenantId: string, dto: LibrarySettingsDto) {
-    await this.ensureTenantDefaults(tenantId);
+    const current = await this.getSettings(tenantId);
+    if (dto.updatedAt) {
+      const seen = new Date(dto.updatedAt).getTime();
+      if (!Number.isFinite(seen) || seen !== current.updatedAt.getTime()) {
+        throw new ConflictException(
+          'Library settings were saved by someone else. Reload this page before saving again.',
+        );
+      }
+    }
     return this.prisma.librarySettings.update({
       where: { tenantId },
       data: {

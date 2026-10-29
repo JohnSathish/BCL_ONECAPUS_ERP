@@ -43,6 +43,16 @@ export class LibraryDigitalAssetsService {
       .toLowerCase();
   }
 
+  private async assertStudentAccess(user: JwtUser) {
+    if (!this.isStudentOnly(user)) return;
+    const limits = await this.uploadLimits(user.tid);
+    if (limits.studentDigitalAccessEnabled === false) {
+      throw new ForbiddenException(
+        'The digital library is closed to students.',
+      );
+    }
+  }
+
   private async uploadLimits(tenantId: string) {
     const s = await this.settings.getSettings(tenantId);
     const allowed = Array.isArray(s.allowedMimeTypes)
@@ -120,6 +130,7 @@ export class LibraryDigitalAssetsService {
   }
 
   async list(user: JwtUser, query: DigitalAssetQueryDto) {
+    await this.assertStudentAccess(user);
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const skip = (page - 1) * limit;
@@ -202,6 +213,7 @@ export class LibraryDigitalAssetsService {
   }
 
   async getById(user: JwtUser, id: string) {
+    await this.assertStudentAccess(user);
     const row = await this.prisma.libraryDigitalAsset.findFirst({
       where: { tenantId: user.tid, id, deletedAt: null },
       include: { category: true },

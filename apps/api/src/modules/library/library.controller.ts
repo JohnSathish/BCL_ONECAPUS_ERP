@@ -56,6 +56,7 @@ import {
   NaacLibraryReportQueryDto,
   PayFineDto,
   ReadingAnalyticsQueryDto,
+  ReportsDeskQueryDto,
   RegisterVisitorDto,
   RenewLoanDto,
   ReportQueryDto,
@@ -762,6 +763,15 @@ export class LibraryController {
     @Param('studentId') studentId: string,
   ) {
     return this.access.getStudentVisits(user.tid, studentId);
+  }
+
+  @Get('reports/overview')
+  @RequireAnyPermission(...LIB_REPORTS)
+  reportsOverview(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ReportsDeskQueryDto,
+  ) {
+    return this.analytics.reportsDesk(user.tid, query);
   }
 
   @Get('reports/visitors/daily')

@@ -27,6 +27,7 @@ export class LibraryPolicyService {
   memberRoleKey(memberType: string): keyof CirculationPolicy {
     if (memberType === 'FACULTY') return 'faculty';
     if (memberType === 'STAFF') return 'staff';
+    if (memberType === 'RESEARCH_SCHOLAR') return 'researchScholar';
     return 'student';
   }
 
