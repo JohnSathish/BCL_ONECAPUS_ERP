@@ -163,6 +163,16 @@ export class ActivityQueryDto {
   @Min(1)
   @Max(50)
   limit?: number = 20;
+
+  @IsOptional()
+  @IsIn(['today', 'recent'])
+  scope?: 'today' | 'recent' = 'today';
+}
+
+export class LibraryDashboardQueryDto {
+  @IsOptional()
+  @IsIn(['today', 'week', 'month'])
+  period?: 'today' | 'week' | 'month' = 'today';
 }
 
 export class CreateReadingZoneDto {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Barcode, CheckCircle2, Eye, Printer, Search } from 'lucide-react';
 
@@ -61,8 +62,13 @@ const EMPTY_FILTERS: Filters = {
 export function BarcodeManagementWorkspace() {
   const enabled = useAuthQueryEnabled();
   const qc = useQueryClient();
-  const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const searchParams = useSearchParams();
+  const initialFilters = {
+    ...EMPTY_FILTERS,
+    printStatus: searchParams.get('printStatus') ?? '',
+  };
+  const [draft, setDraft] = useState<Filters>(initialFilters);
+  const [filters, setFilters] = useState<Filters>(initialFilters);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string[]>([]);
   const [notice, setNotice] = useState('');
@@ -350,6 +356,7 @@ export function BarcodeManagementWorkspace() {
             >
               <option value="CONFIRMED">Print confirmed</option>
               <option value="UNPRINTED">Not confirmed</option>
+              <option value="LOCAL_UNPRINTED">Not printed in this ERP</option>
               <option value="NOT_PRINTABLE">Missing or duplicate accession</option>
             </Select>
             <Input

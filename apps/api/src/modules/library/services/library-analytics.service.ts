@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { libraryHealth } from '../library-health.logic';
 import { LibrarySettingsService } from './library-settings.service';
+
+export type LibraryDashboardPeriod = 'today' | 'week' | 'month';
 export type OccupancySnapshot = {
   studentsInside: number;
   maleStudents: number;
@@ -96,14 +99,26 @@ export class LibraryAnalyticsService {
     };
   }
 
-  async dashboard(tenantId: string) {
+  async dashboard(tenantId: string, period: LibraryDashboardPeriod = 'today') {
     const occupancy = await this.getOccupancy(tenantId);
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(startOfDay);
     endOfDay.setDate(endOfDay.getDate() + 1);
     const startOfWeek = new Date(startOfDay);
-    startOfWeek.setDate(startOfWeek.getDate() - 7);
+    startOfWeek.setDate(startOfWeek.getDate() - 6);
+    const periodStart =
+      period === 'month'
+        ? new Date(startOfDay.getTime() - 29 * 86_400_000)
+        : period === 'week'
+          ? startOfWeek
+          : startOfDay;
+    const periodLabel =
+      period === 'month'
+        ? 'in the last 30 days'
+        : period === 'week'
+          ? 'in the last 7 days'
+          : 'today';
 
     const [
       todayVisitors,
@@ -121,6 +136,17 @@ export class LibraryAnalyticsService {
       researchItems,
       unpaidFines,
       camsFootfall,
+      coverage,
+      attention,
+      departments,
+      periodIssues,
+      periodReturns,
+      periodRenewals,
+      periodDigitalViews,
+      weekIssues,
+      weekReturns,
+      weekRenewals,
+      weekDigitalViews,
     ] = await Promise.all([
       this.prisma.libraryVisit.count({
         where: { tenantId, entryAt: { gte: startOfDay } },
@@ -133,9 +159,11 @@ export class LibraryAnalyticsService {
         where: { tenantId, status: 'ACTIVE', dueAt: { lt: new Date() } },
       }),
       this.prisma.libraryBook.count({ where: { tenantId, deletedAt: null } }),
-      this.prisma.libraryBookCopy.count({ where: { tenantId } }),
       this.prisma.libraryBookCopy.count({
-        where: { tenantId, status: 'AVAILABLE' },
+        where: { tenantId, book: { deletedAt: null } },
+      }),
+      this.prisma.libraryBookCopy.count({
+        where: { tenantId, status: 'AVAILABLE', book: { deletedAt: null } },
       }),
       this.prisma.libraryLoan.count({
         where: { tenantId, issuedAt: { gte: startOfDay, lt: endOfDay } },
@@ -150,7 +178,11 @@ export class LibraryAnalyticsService {
         where: { tenantId, createdAt: { gte: startOfDay, lt: endOfDay } },
       }),
       this.prisma.libraryFine.aggregate({
-        where: { tenantId, paidAt: { gte: startOfDay, lt: endOfDay } },
+        where: {
+          tenantId,
+          paidAt: { gte: startOfDay, lt: endOfDay },
+          waivedAt: null,
+        },
         _sum: { amount: true },
       }),
       this.prisma.libraryDigitalAsset.count({
@@ -164,22 +196,64 @@ export class LibraryAnalyticsService {
         select: { amount: true },
       }),
       this.libraryCamsFootfall(tenantId, startOfDay, endOfDay),
+      this.collectionCoverage(tenantId),
+      this.attentionCounts(tenantId),
+      this.departmentCollection(tenantId),
+      this.prisma.libraryLoan.count({
+        where: { tenantId, issuedAt: { gte: periodStart, lt: endOfDay } },
+      }),
+      this.prisma.libraryLoan.count({
+        where: { tenantId, returnedAt: { gte: periodStart, lt: endOfDay } },
+      }),
+      this.prisma.libraryAuditLog.count({
+        where: {
+          tenantId,
+          action: 'RENEW',
+          createdAt: { gte: periodStart, lt: endOfDay },
+        },
+      }),
+      this.prisma.libraryDigitalAccessLog.count({
+        where: { tenantId, createdAt: { gte: periodStart, lt: endOfDay } },
+      }),
+      this.prisma.libraryLoan.count({
+        where: { tenantId, issuedAt: { gte: startOfWeek, lt: endOfDay } },
+      }),
+      this.prisma.libraryLoan.count({
+        where: { tenantId, returnedAt: { gte: startOfWeek, lt: endOfDay } },
+      }),
+      this.prisma.libraryAuditLog.count({
+        where: {
+          tenantId,
+          action: 'RENEW',
+          createdAt: { gte: startOfWeek, lt: endOfDay },
+        },
+      }),
+      this.prisma.libraryDigitalAccessLog.count({
+        where: { tenantId, createdAt: { gte: startOfWeek, lt: endOfDay } },
+      }),
     ]);
 
     const footfallTrends = await this.footfallTrends(tenantId);
     const departmentHeatmap = await this.departmentHeatmap(tenantId);
     const genderTrends = await this.genderTrends(tenantId);
-    const healthScore = this.computeHealthScore({
-      todayVisitors,
-      totalSeats: occupancy.totalSeats,
-      issuedToday,
-      overdueLoans,
+    const healthScore = libraryHealth({
+      eligibleCopies: coverage.eligible,
+      completeCopies: coverage.complete,
+      periodEvents: periodIssues + periodReturns + periodRenewals,
+      periodLabel,
+      publishedDigitalAssets: digitalAssets,
+      digitalViews: periodDigitalViews,
       activeLoans,
-      digitalViewsToday,
-      weekVisitors,
-      camsActive: camsFootfall.active,
+      overdueLoans,
+      weekEvents:
+        weekIssues +
+        weekReturns +
+        weekRenewals +
+        weekVisitors +
+        weekDigitalViews,
     });
-    const activity = await this.recentActivity(tenantId, 20);
+    const activity = await this.recentActivity(tenantId, 20, 'today');
+    const recentActivity = await this.recentActivity(tenantId, 20, 'recent');
 
     return {
       occupancy,
@@ -206,29 +280,312 @@ export class LibraryAnalyticsService {
       genderTrends,
       healthScore,
       activity,
+      recentActivity,
+      attention,
+      departments,
+      period,
       entryAnalytics: camsFootfall,
     };
   }
 
-  async recentActivity(tenantId: string, limit = 20) {
-    const logs = await this.prisma.libraryAuditLog.findMany({
-      where: {
-        tenantId,
-        action: { in: ['ISSUE', 'RETURN', 'RENEW'] },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
-    return logs.map((log) => {
-      const meta = (log.metadata ?? {}) as Record<string, string>;
-      return {
-        at: log.createdAt.toISOString(),
-        action: log.action,
-        memberName: meta.memberName ?? 'Member',
-        bookTitle: meta.bookTitle ?? '—',
-        programme: meta.programme ?? null,
-      };
-    });
+  async recentActivity(
+    tenantId: string,
+    limit = 20,
+    scope: 'today' | 'recent' = 'recent',
+  ) {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const since = scope === 'today' ? start : undefined;
+    const [issued, returned, renewals] = await Promise.all([
+      this.prisma.libraryLoan.findMany({
+        where: {
+          tenantId,
+          ...(since ? { issuedAt: { gte: since } } : {}),
+        },
+        orderBy: { issuedAt: 'desc' },
+        take: limit,
+        select: {
+          status: true,
+          issuedAt: true,
+          issuedById: true,
+          studentId: true,
+          staffProfileId: true,
+          copy: {
+            select: {
+              accessionNumber: true,
+              barcode: true,
+              book: { select: { title: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.libraryLoan.findMany({
+        where: {
+          tenantId,
+          returnedAt: since ? { gte: since } : { not: null },
+        },
+        orderBy: { returnedAt: 'desc' },
+        take: limit,
+        select: {
+          status: true,
+          returnedAt: true,
+          returnedById: true,
+          studentId: true,
+          staffProfileId: true,
+          copy: {
+            select: {
+              accessionNumber: true,
+              barcode: true,
+              book: { select: { title: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.libraryAuditLog.findMany({
+        where: {
+          tenantId,
+          action: 'RENEW',
+          ...(since ? { createdAt: { gte: since } } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      }),
+    ]);
+
+    const rows = [
+      ...issued.map((loan) => ({
+        at: loan.issuedAt,
+        action: 'ISSUE',
+        bookTitle: loan.copy.book.title,
+        accessionNumber: loan.copy.accessionNumber || loan.copy.barcode,
+        status: 'Issued',
+        studentId: loan.studentId,
+        staffProfileId: loan.staffProfileId,
+        actorId: loan.issuedById,
+        memberName: '',
+      })),
+      ...returned.flatMap((loan) =>
+        loan.returnedAt
+          ? [
+              {
+                at: loan.returnedAt,
+                action: 'RETURN',
+                bookTitle: loan.copy.book.title,
+                accessionNumber: loan.copy.accessionNumber || loan.copy.barcode,
+                status: 'Returned',
+                studentId: loan.studentId,
+                staffProfileId: loan.staffProfileId,
+                actorId: loan.returnedById,
+                memberName: '',
+              },
+            ]
+          : [],
+      ),
+      ...renewals.map((log) => {
+        const meta = (log.metadata ?? {}) as Record<string, string>;
+        return {
+          at: log.createdAt,
+          action: 'RENEW',
+          bookTitle: meta.bookTitle || '—',
+          accessionNumber: meta.accessionNumber || null,
+          status: 'Renewed',
+          studentId: null as string | null,
+          staffProfileId: null as string | null,
+          actorId: log.actorId,
+          memberName: meta.memberName || 'Member',
+        };
+      }),
+    ]
+      .sort((a, b) => b.at.getTime() - a.at.getTime())
+      .slice(0, limit);
+
+    const studentIds = [
+      ...new Set(rows.map((row) => row.studentId).filter(Boolean)),
+    ] as string[];
+    const staffIds = [
+      ...new Set(rows.map((row) => row.staffProfileId).filter(Boolean)),
+    ] as string[];
+    const actorIds = [
+      ...new Set(rows.map((row) => row.actorId).filter(Boolean)),
+    ] as string[];
+    const [students, staff, actors] = await Promise.all([
+      studentIds.length
+        ? this.prisma.student.findMany({
+            where: { tenantId, id: { in: studentIds } },
+            select: { id: true, masterProfile: { select: { fullName: true } } },
+          })
+        : [],
+      staffIds.length
+        ? this.prisma.staffProfile.findMany({
+            where: { tenantId, id: { in: staffIds } },
+            select: { id: true, fullName: true },
+          })
+        : [],
+      actorIds.length
+        ? this.prisma.user.findMany({
+            where: { tenantId, id: { in: actorIds } },
+            select: { id: true, displayName: true, email: true },
+          })
+        : [],
+    ]);
+    const studentNames = new Map(
+      students.map((row) => [row.id, row.masterProfile?.fullName || 'Student']),
+    );
+    const staffNames = new Map(staff.map((row) => [row.id, row.fullName]));
+    const actorNames = new Map(
+      actors.map((row) => [row.id, row.displayName || row.email]),
+    );
+
+    return rows.map((row) => ({
+      at: row.at.toISOString(),
+      action: row.action,
+      memberName:
+        (row.studentId ? studentNames.get(row.studentId) : undefined) ||
+        (row.staffProfileId ? staffNames.get(row.staffProfileId) : undefined) ||
+        row.memberName ||
+        'Member',
+      bookTitle: row.bookTitle,
+      accessionNumber: row.accessionNumber,
+      staffName: row.actorId ? (actorNames.get(row.actorId) ?? null) : null,
+      status: row.status,
+      programme: null,
+    }));
+  }
+
+  private async collectionCoverage(tenantId: string) {
+    const rows = await this.prisma.$queryRaw<
+      { eligible: number; complete: number }[]
+    >`
+      SELECT COUNT(*)::int AS eligible,
+        COUNT(*) FILTER (
+          WHERE NULLIF(BTRIM(c.accession_number), '') IS NOT NULL
+            AND NULLIF(BTRIM(b.title), '') IS NOT NULL
+            AND (
+              NULLIF(BTRIM(COALESCE(c.call_number, '')), '') IS NOT NULL
+              OR NULLIF(BTRIM(COALESCE(b.classification_number, '')), '') IS NOT NULL
+            )
+            AND (
+              b.department_id IS NOT NULL
+              OR EXISTS (
+                SELECT 1 FROM library.library_book_departments bd
+                WHERE bd.book_id = b.id
+              )
+            )
+        )::int AS complete
+      FROM library.library_book_copies c
+      JOIN library.library_books b ON b.id = c.book_id
+      WHERE c.tenant_id = CAST(${tenantId} AS uuid)
+        AND b.deleted_at IS NULL
+    `;
+    return rows[0] ?? { eligible: 0, complete: 0 };
+  }
+
+  private async attentionCounts(tenantId: string) {
+    const rows = await this.prisma.$queryRaw<
+      {
+        missingAccession: number;
+        duplicateGroups: number;
+        unprintedLocal: number;
+        printHistoryUnknown: number;
+      }[]
+    >`
+      SELECT
+        COUNT(*) FILTER (
+          WHERE NULLIF(BTRIM(c.accession_number), '') IS NULL
+        )::int AS "missingAccession",
+        (
+          SELECT COUNT(*)::int FROM (
+            SELECT 1
+            FROM library.library_book_copies d
+            JOIN library.library_books db ON db.id = d.book_id
+            WHERE d.tenant_id = CAST(${tenantId} AS uuid)
+              AND db.deleted_at IS NULL
+              AND NULLIF(BTRIM(d.accession_number), '') IS NOT NULL
+            GROUP BY BTRIM(d.accession_number)
+            HAVING COUNT(*) > 1
+          ) dup
+        ) AS "duplicateGroups",
+        COUNT(*) FILTER (
+          WHERE COALESCE(c.source_system, '') <> 'KOHA'
+            AND NULLIF(BTRIM(c.accession_number), '') IS NOT NULL
+            AND BTRIM(c.accession_number) = c.barcode
+            AND NOT EXISTS (
+              SELECT 1
+              FROM library.library_book_copies d
+              JOIN library.library_books db ON db.id = d.book_id
+              WHERE d.tenant_id = c.tenant_id
+                AND db.deleted_at IS NULL
+                AND d.id <> c.id
+                AND NULLIF(BTRIM(d.accession_number), '') IS NOT NULL
+                AND BTRIM(d.accession_number) = BTRIM(c.accession_number)
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM library.library_barcode_print_items i
+              JOIN library.library_barcode_print_jobs j ON j.id = i.job_id
+              WHERE i.copy_id = c.id AND j.status = 'USER_CONFIRMED'
+            )
+        )::int AS "unprintedLocal",
+        COUNT(*) FILTER (
+          WHERE c.source_system = 'KOHA'
+            AND NOT EXISTS (
+              SELECT 1
+              FROM library.library_barcode_print_items i
+              JOIN library.library_barcode_print_jobs j ON j.id = i.job_id
+              WHERE i.copy_id = c.id AND j.status = 'USER_CONFIRMED'
+            )
+        )::int AS "printHistoryUnknown"
+      FROM library.library_book_copies c
+      JOIN library.library_books b ON b.id = c.book_id
+      WHERE c.tenant_id = CAST(${tenantId} AS uuid)
+        AND b.deleted_at IS NULL
+    `;
+    return (
+      rows[0] ?? {
+        missingAccession: 0,
+        duplicateGroups: 0,
+        unprintedLocal: 0,
+        printHistoryUnknown: 0,
+      }
+    );
+  }
+
+  private async departmentCollection(tenantId: string) {
+    const rows = await this.prisma.$queryRaw<
+      { departmentId: string | null; department: string; copies: number }[]
+    >`
+      SELECT dept.department_id AS "departmentId",
+        COALESCE(NULLIF(BTRIM(d.department_name), ''), 'Unassigned') AS department,
+        COUNT(*)::int AS copies
+      FROM library.library_book_copies c
+      JOIN library.library_books b ON b.id = c.book_id
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(
+          b.department_id,
+          (
+            SELECT bd.department_id
+            FROM library.library_book_departments bd
+            WHERE bd.book_id = b.id
+            ORDER BY bd.created_at
+            LIMIT 1
+          )
+        ) AS department_id
+      ) dept ON true
+      LEFT JOIN core.departments d
+        ON d.id = dept.department_id AND d.deleted_at IS NULL
+      WHERE c.tenant_id = CAST(${tenantId} AS uuid)
+        AND b.deleted_at IS NULL
+      GROUP BY dept.department_id, d.department_name
+      ORDER BY copies DESC
+    `;
+    const totalCopies = rows.reduce((sum, row) => sum + row.copies, 0);
+    return {
+      totalCopies,
+      rows: rows.map((row) => ({
+        ...row,
+        percent: totalCopies ? Math.round((row.copies / totalCopies) * 100) : 0,
+      })),
+    };
   }
 
   private async libraryCamsFootfall(tenantId: string, start: Date, end: Date) {
@@ -289,48 +646,6 @@ export class LibraryAnalyticsService {
       staff,
       guests,
       total: logs.length,
-    };
-  }
-
-  private computeHealthScore(input: {
-    todayVisitors: number;
-    totalSeats: number;
-    issuedToday: number;
-    overdueLoans: number;
-    activeLoans: number;
-    digitalViewsToday: number;
-    weekVisitors: number;
-    camsActive: boolean;
-  }) {
-    const usagePct =
-      input.totalSeats > 0
-        ? Math.min(100, (input.todayVisitors / input.totalSeats) * 100)
-        : 0;
-    const circulationScore = Math.min(100, input.issuedToday * 8 + 20);
-    const digitalScore = Math.min(100, input.digitalViewsToday * 5 + 10);
-    const overdueRate =
-      input.activeLoans > 0
-        ? (input.overdueLoans / input.activeLoans) * 100
-        : 0;
-    const overdueScore = Math.max(0, 100 - overdueRate * 2);
-    const engagementScore = Math.min(100, input.weekVisitors / 10);
-    const camsScore = input.camsActive ? 15 : 5;
-    const overall = Math.round(
-      usagePct * 0.2 +
-        circulationScore * 0.25 +
-        digitalScore * 0.15 +
-        overdueScore * 0.2 +
-        engagementScore * 0.1 +
-        camsScore,
-    );
-    return {
-      overall: Math.min(100, overall),
-      usage: Math.round(usagePct),
-      circulation: Math.round(circulationScore),
-      digital: Math.round(digitalScore),
-      overdueControl: Math.round(overdueScore),
-      engagement: Math.round(engagementScore),
-      entryAnalytics: input.camsActive,
     };
   }
 

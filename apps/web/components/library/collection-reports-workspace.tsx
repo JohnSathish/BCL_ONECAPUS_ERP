@@ -41,8 +41,9 @@ export function CollectionReportsWorkspace() {
   const enabled = useAuthQueryEnabled();
   const params = useSearchParams();
   const [key, setKey] = useState(params.get('report') || 'department-summary');
-  const [draft, setDraft] = useState<Filters>(EMPTY);
-  const [filters, setFilters] = useState<Filters>(EMPTY);
+  const initialFilters = { ...EMPTY, departmentId: params.get('departmentId') || '' };
+  const [draft, setDraft] = useState<Filters>(initialFilters);
+  const [filters, setFilters] = useState<Filters>(initialFilters);
   const [page, setPage] = useState(1);
   const [message, setMessage] = useState('');
 

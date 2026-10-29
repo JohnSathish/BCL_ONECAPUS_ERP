@@ -42,12 +42,12 @@ import type {
 
 const base = '/v1/library';
 
-export const fetchLibraryDashboard = () =>
-  api.get<LibraryDashboard>(`${base}/dashboard`).then((r) => r.data);
+export const fetchLibraryDashboard = (period: 'today' | 'week' | 'month' = 'today') =>
+  api.get<LibraryDashboard>(`${base}/dashboard`, { params: { period } }).then((r) => r.data);
 
-export const fetchLibraryDashboardActivity = (limit = 20) =>
+export const fetchLibraryDashboardActivity = (limit = 20, scope: 'today' | 'recent' = 'today') =>
   api
-    .get<LibraryActivityItem[]>(`${base}/dashboard/activity`, { params: { limit } })
+    .get<LibraryActivityItem[]>(`${base}/dashboard/activity`, { params: { limit, scope } })
     .then((r) => r.data);
 
 export const fetchLibraryMemberSummary = (scanCode: string) =>

@@ -131,17 +131,26 @@ export type LibraryDashboard = {
   };
   healthScore?: LibraryHealthScore;
   activity?: LibraryActivityItem[];
+  recentActivity?: LibraryActivityItem[];
+  attention?: LibraryAttention;
+  departments?: LibraryDepartmentCollection;
+  period?: 'today' | 'week' | 'month';
   entryAnalytics?: LibraryEntryAnalytics;
 };
 
+export type LibraryHealthComponent = {
+  key: string;
+  label: string;
+  score: number | null;
+  detail: string;
+  formula: string;
+  weight: number;
+};
+
 export type LibraryHealthScore = {
-  overall: number;
-  usage: number;
-  circulation: number;
-  digital: number;
-  overdueControl: number;
-  engagement: number;
-  entryAnalytics: boolean;
+  overall: number | null;
+  components: LibraryHealthComponent[];
+  periodLabel: string;
 };
 
 export type LibraryActivityItem = {
@@ -150,6 +159,26 @@ export type LibraryActivityItem = {
   memberName: string;
   bookTitle: string;
   programme?: string | null;
+  accessionNumber?: string | null;
+  staffName?: string | null;
+  status?: string;
+};
+
+export type LibraryAttention = {
+  missingAccession: number;
+  duplicateGroups: number;
+  unprintedLocal: number;
+  printHistoryUnknown: number;
+};
+
+export type LibraryDepartmentCollection = {
+  totalCopies: number;
+  rows: Array<{
+    departmentId: string | null;
+    department: string;
+    copies: number;
+    percent: number;
+  }>;
 };
 
 export type LibraryEntryAnalytics = {

@@ -28,6 +28,7 @@ import { extractClientIp } from '../../common/utils/request-host';
 import { PrismaService } from '../../database/prisma.service';
 import {
   ActivityQueryDto,
+  LibraryDashboardQueryDto,
   BookPreviewQueryDto,
   BookQueryDto,
   CamsLibraryBridgeDto,
@@ -174,8 +175,11 @@ export class LibraryController {
 
   @Get('dashboard')
   @RequireAnyPermission(...LIB_READ)
-  dashboard(@CurrentUser() user: JwtUser) {
-    return this.analytics.dashboard(user.tid);
+  dashboard(
+    @CurrentUser() user: JwtUser,
+    @Query() query: LibraryDashboardQueryDto,
+  ) {
+    return this.analytics.dashboard(user.tid, query.period ?? 'today');
   }
 
   @Get('dashboard/activity')
@@ -184,7 +188,11 @@ export class LibraryController {
     @CurrentUser() user: JwtUser,
     @Query() query: ActivityQueryDto,
   ) {
-    return this.analytics.recentActivity(user.tid, query.limit ?? 20);
+    return this.analytics.recentActivity(
+      user.tid,
+      query.limit ?? 20,
+      query.scope ?? 'today',
+    );
   }
 
   @Get('circulation/member-summary')

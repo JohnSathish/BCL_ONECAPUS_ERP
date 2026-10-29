@@ -496,7 +496,9 @@ export class LibraryBarcodeService {
   ): Promise<Prisma.LibraryBookCopyWhereInput> {
     const search = query.search?.trim();
     const duplicates =
-      query.printStatus === 'NOT_PRINTABLE' || query.printStatus === 'UNPRINTED'
+      query.printStatus === 'NOT_PRINTABLE' ||
+      query.printStatus === 'UNPRINTED' ||
+      query.printStatus === 'LOCAL_UNPRINTED'
         ? (await this.duplicateAccessions(tenantId)).map((row) => row.value)
         : [];
     const book: Prisma.LibraryBookWhereInput = {
@@ -545,7 +547,10 @@ export class LibraryBarcodeService {
     if (query.printStatus === 'CONFIRMED') {
       where.barcodePrintItems = { some: { job: { status: 'USER_CONFIRMED' } } };
     }
-    if (query.printStatus === 'UNPRINTED') {
+    if (
+      query.printStatus === 'UNPRINTED' ||
+      query.printStatus === 'LOCAL_UNPRINTED'
+    ) {
       where.barcodePrintItems = { none: { job: { status: 'USER_CONFIRMED' } } };
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : []),
@@ -554,6 +559,13 @@ export class LibraryBarcodeService {
         { NOT: { barcode: '' } },
         ...(duplicates.length
           ? [{ NOT: { accessionNumber: { in: duplicates } } }]
+          : []),
+        ...(query.printStatus === 'LOCAL_UNPRINTED'
+          ? [
+              {
+                OR: [{ sourceSystem: null }, { sourceSystem: { not: 'KOHA' } }],
+              },
+            ]
           : []),
       ];
     }

@@ -52,6 +52,7 @@ export class LibraryCirculationService {
       memberName: string;
       bookTitle: string;
       programme?: string | null;
+      accessionNumber?: string | null;
     },
   ) {
     await this.prisma.libraryAuditLog.create({
@@ -309,6 +310,7 @@ export class LibraryCirculationService {
       memberName: profile.fullName,
       bookTitle: copy.book.title,
       programme: profile.programme,
+      accessionNumber: copy.accessionNumber || copy.barcode,
     });
 
     return { loan, member: profile };
@@ -384,6 +386,7 @@ export class LibraryCirculationService {
     await this.logActivity(user.tid, user.sub, 'RETURN', {
       memberName: 'Member',
       bookTitle: copy.book.title,
+      accessionNumber: copy.accessionNumber || copy.barcode,
     });
 
     await this.reservations
@@ -459,6 +462,7 @@ export class LibraryCirculationService {
     await this.logActivity(user.tid, user.sub, 'RENEW', {
       memberName: 'Member',
       bookTitle: copy.book.title,
+      accessionNumber: copy.accessionNumber || copy.barcode,
     });
 
     return updated;

@@ -40,8 +40,8 @@ export class BarcodeCopyQueryDto {
   edition?: string;
 
   @IsOptional()
-  @IsIn(['CONFIRMED', 'UNPRINTED', 'NOT_PRINTABLE'])
-  printStatus?: 'CONFIRMED' | 'UNPRINTED' | 'NOT_PRINTABLE';
+  @IsIn(['CONFIRMED', 'UNPRINTED', 'LOCAL_UNPRINTED', 'NOT_PRINTABLE'])
+  printStatus?: 'CONFIRMED' | 'UNPRINTED' | 'LOCAL_UNPRINTED' | 'NOT_PRINTABLE';
 
   @IsOptional()
   @IsString()
