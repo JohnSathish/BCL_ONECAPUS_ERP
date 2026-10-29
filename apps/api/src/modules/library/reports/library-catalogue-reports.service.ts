@@ -695,6 +695,19 @@ export class LibraryCatalogueReportsService {
     };
   }
 
+  private bookIdFilter(value?: string) {
+    if (!value?.trim()) return [];
+    return value
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          id,
+        ),
+      )
+      .slice(0, 100);
+  }
+
   private async copyWhere(
     tenantId: string,
     key: string,
@@ -702,6 +715,7 @@ export class LibraryCatalogueReportsService {
   ): Promise<Prisma.LibraryBookCopyWhereInput> {
     const search = query.search?.trim();
     const now = new Date();
+    const bookIds = this.bookIdFilter(query.bookIds);
     const where: Prisma.LibraryBookCopyWhereInput = {
       tenantId,
       book: {
@@ -718,7 +732,9 @@ export class LibraryCatalogueReportsService {
         ...(query.author
           ? { author: { contains: query.author, mode: 'insensitive' } }
           : {}),
+        ...(query.language ? { language: query.language } : {}),
       },
+      ...(bookIds.length ? { bookId: { in: bookIds } } : {}),
       ...(query.collectionCode && query.collectionCode !== '(Unmapped)'
         ? { collectionCode: query.collectionCode }
         : {}),

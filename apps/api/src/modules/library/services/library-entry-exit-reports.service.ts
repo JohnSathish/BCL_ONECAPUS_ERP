@@ -4,6 +4,7 @@ import puppeteer from 'puppeteer';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import type { EntryExitReportQueryDto } from '../dto/library.dto';
+import { memberTypeWhere } from '../library-visit.logic';
 
 const EXPORT_CAP = 8_000;
 const DEFAULT_LONG_STAY_MINUTES = 180;
@@ -590,9 +591,7 @@ export class LibraryEntryExitReportsService {
     const where: Prisma.LibraryVisitWhereInput = {
       tenantId,
       entryAt: { gte: range.from, lte: range.to },
-      ...(query.memberType && query.memberType !== 'ALL'
-        ? { memberType: query.memberType }
-        : {}),
+      ...memberTypeWhere(query.memberType),
       ...(query.studentId ? { studentId: query.studentId } : {}),
       ...memberFilter,
       ...this.statusWhere(query.visitStatus),
@@ -769,14 +768,24 @@ export class LibraryEntryExitReportsService {
         select: { id: true },
         take: 4_000,
       }),
-      search
+      query.departmentId || search
         ? this.prisma.staffProfile.findMany({
             where: {
               tenantId,
-              OR: [
-                { fullName: { contains: search, mode: 'insensitive' } },
-                { employeeCode: { contains: search, mode: 'insensitive' } },
-              ],
+              deletedAt: null,
+              ...(query.departmentId
+                ? { departmentId: query.departmentId }
+                : {}),
+              ...(search
+                ? {
+                    OR: [
+                      { fullName: { contains: search, mode: 'insensitive' } },
+                      {
+                        employeeCode: { contains: search, mode: 'insensitive' },
+                      },
+                    ],
+                  }
+                : {}),
             },
             select: { id: true },
             take: 500,
@@ -802,7 +811,7 @@ export class LibraryEntryExitReportsService {
       or.push({ studentId: { in: students.map((s) => s.id) } });
     if (staff.length)
       or.push({ staffProfileId: { in: staff.map((s) => s.id) } });
-    if (visitors.length)
+    if (visitors.length && !query.departmentId)
       or.push({ visitorId: { in: visitors.map((v) => v.id) } });
     if (!or.length) return { id: { in: [] } };
     return { OR: or };

@@ -2,23 +2,21 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, DoorOpen, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 
+import { LibraryCatalogueWorkspace } from '@/components/library/library-catalogue-workspace';
 import { LibraryCirculationDesk } from '@/components/library/library-circulation-desk';
 import { LibraryDashboard } from '@/components/library/library-dashboard';
+import { LibraryVisitsWorkspace } from '@/components/library/library-visits-workspace';
 import { LibrarySettingsPanel } from '@/components/library/library-settings-panel';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import {
-  createLibraryBook,
   downloadLibraryReportCsv,
-  fetchLibraryBooks,
-  fetchLibraryCategories,
   fetchLibraryReport,
   fetchLibraryReservations,
-  fetchLibraryVisits,
   fetchLibraryVisitors,
   fetchOverdueLoans,
   registerLibraryVisitor,
@@ -42,12 +40,6 @@ export function LibraryWorkspace({ page = 'dashboard' }: Props) {
   const enabled = useAuthQueryEnabled();
   const qc = useQueryClient();
   const [message, setMessage] = useState('');
-  const [bookForm, setBookForm] = useState({
-    accessionNo: '',
-    title: '',
-    author: '',
-    totalCopies: 1,
-  });
   const [visitorForm, setVisitorForm] = useState({
     fullName: '',
     mobile: '',
@@ -55,21 +47,6 @@ export function LibraryWorkspace({ page = 'dashboard' }: Props) {
     purpose: '',
   });
 
-  const visits = useQuery({
-    queryKey: ['library', 'visits'],
-    queryFn: () => fetchLibraryVisits({ limit: 50 }),
-    enabled: enabled && page === 'visits',
-  });
-  const books = useQuery({
-    queryKey: ['library', 'books'],
-    queryFn: () => fetchLibraryBooks({ limit: 50 }),
-    enabled: enabled && page === 'catalogue',
-  });
-  const categories = useQuery({
-    queryKey: ['library', 'categories'],
-    queryFn: fetchLibraryCategories,
-    enabled: enabled && page === 'catalogue',
-  });
   const overdue = useQuery({
     queryKey: ['library', 'overdue'],
     queryFn: fetchOverdueLoans,
@@ -84,16 +61,6 @@ export function LibraryWorkspace({ page = 'dashboard' }: Props) {
     queryKey: ['library', 'visitors-list'],
     queryFn: fetchLibraryVisitors,
     enabled: enabled && page === 'visitors',
-  });
-
-  const createBookMut = useMutation({
-    mutationFn: () => createLibraryBook(bookForm),
-    onSuccess: () => {
-      setMessage('Book created');
-      void qc.invalidateQueries({ queryKey: ['library', 'books'] });
-      setBookForm({ accessionNo: '', title: '', author: '', totalCopies: 1 });
-    },
-    onError: (e) => setMessage(apiErrorMessage(e)),
   });
 
   const visitorMut = useMutation({
@@ -130,131 +97,11 @@ export function LibraryWorkspace({ page = 'dashboard' }: Props) {
     enabled: enabled && page === 'reports',
   });
 
+  if (page === 'catalogue') return <LibraryCatalogueWorkspace />;
   if (page === 'dashboard') return <LibraryDashboard />;
+  if (page === 'visits') return <LibraryVisitsWorkspace />;
   if (page === 'circulation') return <LibraryCirculationDesk />;
   if (page === 'settings') return <LibrarySettingsPanel />;
-
-  if (page === 'visits') {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <DoorOpen className="h-5 w-5" />
-          <h1 className="text-lg font-semibold">Visit History</h1>
-        </div>
-        {visits.isError ? (
-          <QueryErrorPanel
-            title="Unable to load visits"
-            error={visits.error}
-            onRetry={() => void visits.refetch()}
-            isRetrying={visits.isFetching}
-          />
-        ) : null}
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="p-2 text-left">Member</th>
-                <th className="p-2 text-left">Type</th>
-                <th className="p-2 text-left">In</th>
-                <th className="p-2 text-left">Out</th>
-                <th className="p-2 text-left">Duration</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visits.data?.items.map((v) => (
-                <tr key={v.id} className="border-t">
-                  <td className="p-2">{v.memberName}</td>
-                  <td className="p-2">{v.memberType}</td>
-                  <td className="p-2">{new Date(v.entryAt).toLocaleString()}</td>
-                  <td className="p-2">
-                    {v.exitAt ? new Date(v.exitAt).toLocaleString() : 'Inside'}
-                  </td>
-                  <td className="p-2">{v.durationMinutes ? `${v.durationMinutes} min` : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-
-  if (page === 'catalogue') {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5" />
-          <h1 className="text-lg font-semibold">Catalogue</h1>
-        </div>
-        {message ? <p className="text-sm">{message}</p> : null}
-        {books.isError ? (
-          <QueryErrorPanel
-            title="Unable to load catalogue"
-            error={books.error}
-            onRetry={() => void books.refetch()}
-            isRetrying={books.isFetching}
-          />
-        ) : null}
-        <div className="grid gap-2 rounded-lg border p-4 md:grid-cols-5">
-          <Input
-            placeholder="Accession No"
-            value={bookForm.accessionNo}
-            onChange={(e) => setBookForm({ ...bookForm, accessionNo: e.target.value })}
-          />
-          <Input
-            placeholder="Title"
-            value={bookForm.title}
-            onChange={(e) => setBookForm({ ...bookForm, title: e.target.value })}
-          />
-          <Input
-            placeholder="Author"
-            value={bookForm.author}
-            onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })}
-          />
-          <Input
-            type="number"
-            placeholder="Copies"
-            value={bookForm.totalCopies}
-            onChange={(e) => setBookForm({ ...bookForm, totalCopies: Number(e.target.value) })}
-          />
-          <Button disabled={createBookMut.isPending} onClick={() => createBookMut.mutate()}>
-            Add Book
-          </Button>
-        </div>
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="p-2 text-left">Accession</th>
-                <th className="p-2 text-left">Title</th>
-                <th className="p-2 text-left">Author</th>
-                <th className="p-2 text-left">Copies</th>
-                <th className="p-2 text-left">Available</th>
-              </tr>
-            </thead>
-            <tbody>
-              {books.data?.items.map((b) => (
-                <tr key={b.id} className="border-t">
-                  <td className="p-2">{b.accessionNo}</td>
-                  <td className="p-2">{b.title}</td>
-                  <td className="p-2">{b.author ?? '—'}</td>
-                  <td className="p-2">{b.totalCopies}</td>
-                  <td className="p-2">
-                    {b.copies?.filter((c) => c.status === 'AVAILABLE').length ?? 0}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {categories.data?.length ? (
-          <p className="text-xs text-muted-foreground">
-            {categories.data.length} categories loaded
-          </p>
-        ) : null}
-      </div>
-    );
-  }
 
   if (page === 'reservations') {
     return (

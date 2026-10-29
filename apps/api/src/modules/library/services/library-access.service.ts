@@ -1,10 +1,21 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
 import { PrismaService } from '../../../database/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import type { ScanAccessDto, VisitQueryDto } from '../dto/library.dto';
+import {
+  memberTypeWhere,
+  previousRange,
+  startOfDay,
+  visitPresentation,
+  visitRange,
+} from '../library-visit.logic';
 import { LibraryAnalyticsService } from './library-analytics.service';
 import {
   LibraryMemberLookupService,
@@ -226,37 +237,244 @@ export class LibraryAccessService {
 
   async listVisits(tenantId: string, query: VisitQueryDto) {
     const page = query.page ?? 1;
-    const limit = query.limit ?? 50;
+    const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
-    const from = query.from ? new Date(query.from) : undefined;
-    const to = query.to ? new Date(query.to) : undefined;
-
+    const range = visitRange(query);
+    const people = await this.peopleFilter(tenantId, query);
     const where = {
       tenantId,
-      ...(query.memberType ? { memberType: query.memberType } : {}),
+      entryAt: { gte: range.from, lte: range.to },
+      ...memberTypeWhere(query.memberType),
       ...(query.studentId ? { studentId: query.studentId } : {}),
-      ...(from || to
-        ? {
-            entryAt: {
-              ...(from ? { gte: from } : {}),
-              ...(to ? { lte: to } : {}),
-            },
-          }
-        : {}),
+      ...people.where,
     };
 
-    const [items, total] = await Promise.all([
-      this.prisma.libraryVisit.findMany({
-        where,
-        orderBy: { entryAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.libraryVisit.count({ where }),
+    const [items, total, stats] = await Promise.all([
+      people.empty
+        ? Promise.resolve([])
+        : this.prisma.libraryVisit.findMany({
+            where,
+            orderBy: { entryAt: 'desc' },
+            skip,
+            take: limit,
+          }),
+      people.empty
+        ? Promise.resolve(0)
+        : this.prisma.libraryVisit.count({ where }),
+      this.visitStats(tenantId, range),
     ]);
 
     const enriched = await this.enrichVisits(tenantId, items);
-    return { items: enriched, total, page, limit };
+    const from = skip + (total ? 1 : 0);
+    const to = Math.min(skip + enriched.length, total);
+    return { items: enriched, total, page, limit, from, to, range, stats };
+  }
+
+  async recordExit(tenantId: string, visitId: string) {
+    const visit = await this.prisma.libraryVisit.findFirst({
+      where: { tenantId, id: visitId },
+    });
+    if (!visit) throw new NotFoundException('Visit not found');
+    if (visit.exitAt) {
+      throw new BadRequestException('This visit already has an exit time.');
+    }
+    const exitAt = new Date();
+    const durationMinutes = Math.max(
+      0,
+      Math.round((exitAt.getTime() - visit.entryAt.getTime()) / 60_000),
+    );
+    const updated = await this.prisma.libraryVisit.updateMany({
+      where: { id: visit.id, tenantId, exitAt: null },
+      data: { exitAt, durationMinutes },
+    });
+    if (updated.count !== 1) {
+      throw new BadRequestException('This visit already has an exit time.');
+    }
+    const saved = await this.prisma.libraryVisit.findFirstOrThrow({
+      where: { id: visit.id },
+    });
+    const [row] = await this.enrichVisits(tenantId, [saved]);
+    return row;
+  }
+
+  private async visitStats(tenantId: string, range: { from: Date; to: Date }) {
+    const today = startOfDay(new Date());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const prior = previousRange(range);
+    const [
+      totalToday,
+      yesterdayTotal,
+      students,
+      staff,
+      visitors,
+      currentAvg,
+      previousAvg,
+    ] = await Promise.all([
+      this.prisma.libraryVisit.count({
+        where: { tenantId, entryAt: { gte: today, lt: tomorrow } },
+      }),
+      this.prisma.libraryVisit.count({
+        where: { tenantId, entryAt: { gte: yesterday, lt: today } },
+      }),
+      this.prisma.libraryVisit.count({
+        where: {
+          tenantId,
+          memberType: 'STUDENT',
+          entryAt: { gte: today, lt: tomorrow },
+        },
+      }),
+      this.prisma.libraryVisit.count({
+        where: {
+          tenantId,
+          memberType: { in: ['STAFF', 'FACULTY'] },
+          entryAt: { gte: today, lt: tomorrow },
+        },
+      }),
+      this.prisma.libraryVisit.count({
+        where: {
+          tenantId,
+          memberType: 'VISITOR',
+          entryAt: { gte: today, lt: tomorrow },
+        },
+      }),
+      this.averageStay(tenantId, range),
+      this.averageStay(tenantId, prior),
+    ]);
+    const share = (value: number) =>
+      totalToday > 0 ? Math.round((value / totalToday) * 100) : null;
+    return {
+      totalToday,
+      yesterdayTotal,
+      totalDeltaPct: this.deltaPct(totalToday, yesterdayTotal),
+      students,
+      studentSharePct: share(students),
+      staff,
+      staffSharePct: share(staff),
+      visitors,
+      visitorSharePct: share(visitors),
+      averageDurationMinutes: currentAvg.average,
+      completedVisits: currentAvg.count,
+      previousAverageDurationMinutes: previousAvg.average,
+      averageDeltaPct:
+        previousAvg.count > 0
+          ? this.deltaPct(currentAvg.average ?? 0, previousAvg.average ?? 0)
+          : null,
+    };
+  }
+
+  private async averageStay(tenantId: string, range: { from: Date; to: Date }) {
+    const rows = await this.prisma.$queryRaw<
+      { average: number | null; count: number }[]
+    >`
+      SELECT ROUND(AVG(EXTRACT(EPOCH FROM (exit_at - entry_at)) / 60))::int AS average,
+        COUNT(*)::int AS count
+      FROM library.library_visits
+      WHERE tenant_id = CAST(${tenantId} AS uuid)
+        AND exit_at IS NOT NULL
+        AND exit_at >= entry_at
+        AND entry_at >= ${range.from}
+        AND entry_at <= ${range.to}
+    `;
+    return { average: rows[0]?.average ?? null, count: rows[0]?.count ?? 0 };
+  }
+
+  private deltaPct(current: number, previous: number) {
+    if (previous <= 0) return null;
+    return Math.round(((current - previous) / previous) * 100);
+  }
+
+  private async peopleFilter(tenantId: string, query: VisitQueryDto) {
+    const search = query.search?.trim();
+    if (!search && !query.departmentId) return { empty: false, where: {} };
+    const studentWhere = {
+      tenantId,
+      deletedAt: null,
+      ...(query.departmentId ? { departmentId: query.departmentId } : {}),
+      ...(search
+        ? {
+            OR: [
+              {
+                enrollmentNumber: {
+                  contains: search,
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                rollNumber: { contains: search, mode: 'insensitive' as const },
+              },
+              {
+                libraryCardNumber: {
+                  contains: search,
+                  mode: 'insensitive' as const,
+                },
+              },
+              {
+                masterProfile: {
+                  is: {
+                    fullName: {
+                      contains: search,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const [students, staff, visitors] = await Promise.all([
+      this.prisma.student.findMany({
+        where: studentWhere,
+        select: { id: true },
+        take: 4_000,
+      }),
+      this.prisma.staffProfile.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          ...(query.departmentId ? { departmentId: query.departmentId } : {}),
+          ...(search
+            ? {
+                OR: [
+                  { fullName: { contains: search, mode: 'insensitive' } },
+                  { employeeCode: { contains: search, mode: 'insensitive' } },
+                ],
+              }
+            : {}),
+        },
+        select: { id: true },
+        take: 1_000,
+      }),
+      search && !query.departmentId
+        ? this.prisma.libraryVisitor.findMany({
+            where: {
+              tenantId,
+              OR: [
+                { fullName: { contains: search, mode: 'insensitive' } },
+                { passNumber: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+            select: { id: true },
+            take: 500,
+          })
+        : Promise.resolve([]),
+    ]);
+    const or = [
+      ...(students.length
+        ? [{ studentId: { in: students.map((row) => row.id) } }]
+        : []),
+      ...(staff.length
+        ? [{ staffProfileId: { in: staff.map((row) => row.id) } }]
+        : []),
+      ...(visitors.length
+        ? [{ visitorId: { in: visitors.map((row) => row.id) } }]
+        : []),
+    ];
+    if (!or.length) return { empty: true, where: {} };
+    return { empty: false, where: { OR: or } };
   }
 
   async getStudentVisits(tenantId: string, studentId: string, limit = 50) {
@@ -368,12 +586,12 @@ export class LibraryAccessService {
           staffMember?.employeeCode ??
           visitor?.passNumber ??
           null,
-        programme:
-          student?.programVersion?.program?.name ??
-          staffMember?.department?.name ??
-          null,
+        programme: student?.programVersion?.program?.name ?? null,
         semester: student?.academicStanding?.currentSemesterSequence ?? null,
         zoneName: zone?.name ?? null,
+        purpose: visitor?.purpose ?? null,
+        institution: visitor?.institution ?? null,
+        ...visitPresentation(v.entryAt, v.exitAt, v.durationMinutes),
       };
     });
   }

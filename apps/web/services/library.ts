@@ -96,8 +96,19 @@ export const fetchLibraryAccessDeskDashboard = () =>
 
 export const fetchLibraryVisits = (params?: Record<string, string | number | undefined>) =>
   api
-    .get<{ items: LibraryVisit[]; total: number }>(`${base}/access/visits`, { params })
+    .get<{
+      items: LibraryVisit[];
+      total: number;
+      page: number;
+      limit: number;
+      from: number;
+      to: number;
+      stats: import('@/types/library').LibraryVisitStats;
+    }>(`${base}/access/visits`, { params: compactParams(params) })
     .then((r) => r.data);
+
+export const recordLibraryVisitExit = (id: string) =>
+  api.post<LibraryVisit>(`${base}/access/visits/${id}/exit`).then((r) => r.data);
 
 export const registerLibraryVisitor = (payload: {
   fullName: string;
@@ -105,6 +116,14 @@ export const registerLibraryVisitor = (payload: {
   institution?: string;
   purpose?: string;
 }) => api.post<LibraryVisitor>(`${base}/visitors`, payload).then((r) => r.data);
+
+export const registerLibraryWalkIn = (payload: {
+  fullName: string;
+  mobile?: string;
+  institution?: string;
+  purpose?: string;
+}) =>
+  api.post<{ visitor: LibraryVisitor }>(`${base}/visitors/walk-in`, payload).then((r) => r.data);
 
 export const fetchLibraryVisitors = () =>
   api.get<LibraryVisitor[]>(`${base}/visitors`).then((r) => r.data);
@@ -114,6 +133,22 @@ export const fetchLibraryCategories = () =>
 
 export const fetchLibraryBooks = (params?: Record<string, string | number | undefined>) =>
   api.get<LibraryBookListResponse>(`${base}/books`, { params }).then((r) => r.data);
+
+export const fetchLibraryCatalogueSummary = () =>
+  api
+    .get<import('@/types/library').LibraryCatalogueSummary>(`${base}/books/summary`)
+    .then((r) => r.data);
+
+export const fetchLibraryCatalogueOptions = () =>
+  api
+    .get<{
+      categories: LibraryCategory[];
+      departments: { id: string; name: string }[];
+      subjects: string[];
+      languages: string[];
+      years: string[];
+    }>(`${base}/books/options`)
+    .then((r) => r.data);
 
 export const fetchLibraryBook = (id: string) =>
   api.get<LibraryBook>(`${base}/books/${id}`).then((r) => r.data);
@@ -158,11 +193,64 @@ export const cancelLibraryReservation = (id: string) =>
 export const fetchLibraryReservations = () =>
   api.get<LibraryReservation[]>(`${base}/reservations`).then((r) => r.data);
 
+export const fetchLibraryReservationSummary = () =>
+  api
+    .get<import('@/types/library').LibraryReservationSummary>(`${base}/reservations/summary`)
+    .then((r) => r.data);
+
+export const fetchLibraryReservationList = (params?: Record<string, string | number | undefined>) =>
+  api
+    .get<import('@/types/library').LibraryReservationListResponse>(`${base}/reservations/list`, {
+      params,
+    })
+    .then((r) => r.data);
+
+export const searchLibraryReservationStudents = (search: string) =>
+  api
+    .get<import('@/types/library').LibraryReservationStudent[]>(`${base}/reservations/students`, {
+      params: { search },
+    })
+    .then((r) => r.data);
+
 export const fetchLibraryReservationQueue = () =>
   api.get<LibraryReservationQueueGroup[]>(`${base}/reservations/queue`).then((r) => r.data);
 
 export const fetchLibraryCopyIncidents = (params?: { status?: string; incidentType?: string }) =>
   api.get<LibraryCopyIncident[]>(`${base}/circulation/incidents`, { params }).then((r) => r.data);
+
+export const fetchLibraryIncidentSummary = () =>
+  api
+    .get<import('@/types/library').LibraryIncidentSummary>(`${base}/circulation/incidents/summary`)
+    .then((r) => r.data);
+
+export const fetchLibraryIncidentList = (params?: Record<string, string | number | undefined>) =>
+  api
+    .get<import('@/types/library').LibraryIncidentListResponse>(
+      `${base}/circulation/incidents/list`,
+      {
+        params,
+      },
+    )
+    .then((r) => r.data);
+
+export const previewLibraryIncidentCopy = (code: string) =>
+  api
+    .get<import('@/types/library').LibraryIncidentCopyPreview>(
+      `${base}/circulation/incidents/copy`,
+      {
+        params: { code },
+      },
+    )
+    .then((r) => r.data);
+
+export const replaceLibraryIncidentByBarcode = (payload: {
+  copyBarcode: string;
+  notes?: string;
+  replacementBarcode?: string;
+}) =>
+  api
+    .post<LibraryCopyIncident>(`${base}/circulation/incidents/replace-by-barcode`, payload)
+    .then((r) => r.data);
 
 export const reportLibraryCopyIncident = (payload: {
   copyBarcode: string;
@@ -278,6 +366,11 @@ export const downloadLibraryReportCsv = (
     .get<string>(`${base}/reports/export/${path}`, { params, responseType: 'text' as const })
     .then((r) => r.data);
 
+export const fetchDigitalSummary = () =>
+  api
+    .get<import('@/types/library').LibraryDigitalSummary>(`${base}/digital-assets/summary`)
+    .then((r) => r.data);
+
 export const fetchDigitalAssets = (params?: Record<string, string | number | undefined>) =>
   api
     .get<LibraryDigitalAssetListResponse>(`${base}/digital-assets`, { params })
@@ -387,10 +480,11 @@ export const fetchLibraryGenderTrends = () =>
     .get<NonNullable<LibraryDashboard['genderTrends']>>(`${base}/analytics/gender-trends`)
     .then((r) => r.data);
 
-export const fetchLibraryReadingAnalytics = (days = 365) =>
-  api
-    .get<LibraryReadingAnalytics>(`${base}/analytics/reading`, { params: { days } })
-    .then((r) => r.data);
+export const fetchLibraryReadingAnalytics = (params: {
+  days?: number;
+  from?: string;
+  to?: string;
+}) => api.get<LibraryReadingAnalytics>(`${base}/analytics/reading`, { params }).then((r) => r.data);
 
 export const fetchLibraryMembers = (params?: Record<string, string | number | undefined>) =>
   api.get<LibraryMemberListResponse>(`${base}/members`, { params }).then((r) => r.data);

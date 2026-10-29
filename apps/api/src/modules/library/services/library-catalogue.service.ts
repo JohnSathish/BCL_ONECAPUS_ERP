@@ -49,57 +49,118 @@ export class LibraryCatalogueService {
     });
   }
 
+  async catalogueSummary(tenantId: string) {
+    const [copies, titles, authors, categories, departments] =
+      await Promise.all([
+        this.prisma.libraryBookCopy.count({
+          where: { tenantId, book: { deletedAt: null } },
+        }),
+        this.prisma.libraryBook.count({ where: { tenantId, deletedAt: null } }),
+        this.prisma.$queryRaw<{ count: number }[]>`
+        SELECT COUNT(DISTINCT LOWER(BTRIM(author)))::int AS count
+        FROM library.library_books
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+          AND deleted_at IS NULL
+          AND NULLIF(BTRIM(author), '') IS NOT NULL
+      `,
+        this.prisma.libraryCategory.count({
+          where: { tenantId, active: true },
+        }),
+        this.prisma.$queryRaw<{ count: number }[]>`
+        SELECT COUNT(DISTINCT department_id)::int AS count
+        FROM (
+          SELECT department_id FROM library.library_books
+          WHERE tenant_id = CAST(${tenantId} AS uuid)
+            AND deleted_at IS NULL AND department_id IS NOT NULL
+          UNION
+          SELECT department_id FROM library.library_book_departments
+          WHERE tenant_id = CAST(${tenantId} AS uuid)
+        ) departments
+      `,
+      ]);
+    return {
+      copies,
+      titles,
+      authors: authors[0]?.count ?? 0,
+      categories,
+      departments: departments[0]?.count ?? 0,
+      categoryMeaning: 'Active library categories configured for this college.',
+      departmentMeaning: 'Departments that have at least one catalogue title.',
+      authorMeaning: 'Distinct primary author names on catalogue titles.',
+    };
+  }
+
+  async catalogueOptions(tenantId: string) {
+    const [categories, departments, subjects, languages, years] =
+      await Promise.all([
+        this.listCategories(tenantId),
+        this.prisma.department.findMany({
+          where: { tenantId, deletedAt: null },
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        }),
+        this.prisma.$queryRaw<{ value: string }[]>`
+        SELECT DISTINCT BTRIM(subject) AS value
+        FROM library.library_books
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+          AND deleted_at IS NULL
+          AND NULLIF(BTRIM(subject), '') IS NOT NULL
+        ORDER BY value
+        LIMIT 300
+      `,
+        this.prisma.$queryRaw<{ value: string }[]>`
+        SELECT DISTINCT BTRIM(language) AS value
+        FROM library.library_books
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+          AND deleted_at IS NULL
+          AND NULLIF(BTRIM(language), '') IS NOT NULL
+        ORDER BY value
+        LIMIT 100
+      `,
+        this.prisma.$queryRaw<{ value: string }[]>`
+        SELECT DISTINCT BTRIM(publication_year) AS value
+        FROM library.library_books
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+          AND deleted_at IS NULL
+          AND NULLIF(BTRIM(publication_year), '') IS NOT NULL
+        ORDER BY value DESC
+        LIMIT 100
+      `,
+      ]);
+    return {
+      categories,
+      departments,
+      subjects: subjects.map((row) => row.value),
+      languages: languages.map((row) => row.value),
+      years: years.map((row) => row.value),
+    };
+  }
+
   async listBooks(tenantId: string, query: BookQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const skip = (page - 1) * limit;
-    const search = query.search?.trim();
+    const where = this.bookWhere(tenantId, query);
+    const sort = query.sort ?? 'accession';
+    const dir = query.sortDir === 'desc' ? 'desc' : 'asc';
+    const orderBy = this.bookOrder(sort, dir);
+    const ranked =
+      sort === 'department' || sort === 'available'
+        ? await this.rankedBookIds(tenantId, query, skip, limit)
+        : null;
 
-    const where = {
-      tenantId,
-      deletedAt: null,
-      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.accessionStatus
-        ? { accessionStatus: query.accessionStatus }
-        : {}),
-      ...(search
-        ? {
-            OR: [
-              { title: { contains: search, mode: 'insensitive' as const } },
-              { author: { contains: search, mode: 'insensitive' as const } },
-              {
-                accessionNo: { contains: search, mode: 'insensitive' as const },
-              },
-              { isbn: { contains: search, mode: 'insensitive' as const } },
-              {
-                copies: {
-                  some: {
-                    OR: [
-                      {
-                        barcode: {
-                          contains: search,
-                          mode: 'insensitive' as const,
-                        },
-                      },
-                      {
-                        accessionNumber: {
-                          contains: search,
-                          mode: 'insensitive' as const,
-                        },
-                      },
-                    ],
-                  },
-                },
-              },
-            ],
-          }
-        : {}),
-    };
-
-    const [items, total] = await Promise.all([
+    const [rows, total, facets] = await Promise.all([
       this.prisma.libraryBook.findMany({
-        where,
+        where: ranked
+          ? {
+              tenantId,
+              id: {
+                in: ranked.ids.length
+                  ? ranked.ids
+                  : ['00000000-0000-0000-0000-000000000000'],
+              },
+            }
+          : where,
         include: {
           category: true,
           copies: {
@@ -112,14 +173,246 @@ export class LibraryCatalogueService {
             },
           },
         },
-        orderBy: { accessionNo: 'asc' },
-        skip,
-        take: limit,
+        orderBy: ranked ? undefined : orderBy,
       }),
-      this.prisma.libraryBook.count({ where }),
+      ranked
+        ? Promise.resolve(ranked.total)
+        : this.prisma.libraryBook.count({ where }),
+      query.facets === 'true'
+        ? this.bookFacets(tenantId, query)
+        : Promise.resolve(null),
     ]);
+    if (ranked) {
+      const order = new Map(ranked.ids.map((id, index) => [id, index]));
+      rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    }
+    const departments = await this.departmentNames(
+      tenantId,
+      rows.map((row) => row.departmentId),
+    );
+    const items = rows.map((book) => {
+      const availableCopies = book.copies.filter(
+        (copy) => copy.status === 'AVAILABLE',
+      ).length;
+      const issuedCopies = book.copies.filter(
+        (copy) => copy.status === 'ISSUED',
+      ).length;
+      return {
+        ...book,
+        departmentName: departments.get(book.departmentId ?? '') ?? null,
+        copyCount: book.copies.length,
+        availableCopies,
+        issuedCopies,
+      };
+    });
+    return {
+      items,
+      total,
+      page,
+      limit,
+      from: total ? skip + 1 : 0,
+      to: Math.min(skip + items.length, total),
+      facets,
+    };
+  }
 
-    return { items, total, page, limit };
+  private bookWhere(
+    tenantId: string,
+    query: BookQueryDto,
+  ): Prisma.LibraryBookWhereInput {
+    const search = query.search?.trim();
+    const availability = query.availability;
+    return {
+      tenantId,
+      deletedAt: null,
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.departmentId ? { departmentId: query.departmentId } : {}),
+      ...(query.subject ? { subject: query.subject } : {}),
+      ...(query.language ? { language: query.language } : {}),
+      ...(query.year ? { publicationYear: query.year } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.accessionStatus
+        ? { accessionStatus: query.accessionStatus }
+        : {}),
+      ...(availability === 'AVAILABLE'
+        ? { copies: { some: { status: 'AVAILABLE' } } }
+        : {}),
+      ...(availability === 'ISSUED'
+        ? { copies: { some: { status: 'ISSUED' } } }
+        : {}),
+      ...(availability === 'LOST'
+        ? { copies: { some: { status: { in: ['LOST', 'DAMAGED'] } } } }
+        : {}),
+      ...(availability === 'RESERVED'
+        ? { reservations: { some: { status: 'ACTIVE' } } }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { title: { contains: search, mode: 'insensitive' } },
+              { author: { contains: search, mode: 'insensitive' } },
+              { additionalAuthors: { contains: search, mode: 'insensitive' } },
+              { accessionNo: { contains: search, mode: 'insensitive' } },
+              { isbn: { contains: search, mode: 'insensitive' } },
+              { subject: { contains: search, mode: 'insensitive' } },
+              { publisher: { contains: search, mode: 'insensitive' } },
+              {
+                classificationNumber: { contains: search, mode: 'insensitive' },
+              },
+              {
+                copies: {
+                  some: {
+                    OR: [
+                      { barcode: { contains: search, mode: 'insensitive' } },
+                      {
+                        accessionNumber: {
+                          contains: search,
+                          mode: 'insensitive',
+                        },
+                      },
+                      { callNumber: { contains: search, mode: 'insensitive' } },
+                    ],
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+  }
+
+  private bookOrder(
+    sort: NonNullable<BookQueryDto['sort']> | 'accession',
+    dir: 'asc' | 'desc',
+  ): Prisma.LibraryBookOrderByWithRelationInput {
+    if (sort === 'title') return { title: dir };
+    if (sort === 'author') return { author: dir };
+    if (sort === 'year') return { publicationYear: dir };
+    if (sort === 'copies') return { totalCopies: dir };
+    return { accessionNo: dir };
+  }
+
+  private async bookFacets(tenantId: string, query: BookQueryDto) {
+    const base = { ...query, availability: 'ALL' as const, facets: undefined };
+    const [all, available, borrowed, reserved] = await Promise.all([
+      this.prisma.libraryBook.count({ where: this.bookWhere(tenantId, base) }),
+      this.prisma.libraryBook.count({
+        where: this.bookWhere(tenantId, { ...base, availability: 'AVAILABLE' }),
+      }),
+      this.prisma.libraryBook.count({
+        where: this.bookWhere(tenantId, { ...base, availability: 'ISSUED' }),
+      }),
+      this.prisma.libraryBook.count({
+        where: this.bookWhere(tenantId, { ...base, availability: 'RESERVED' }),
+      }),
+    ]);
+    return { all, available, borrowed, reserved };
+  }
+
+  private async rankedBookIds(
+    tenantId: string,
+    query: BookQueryDto,
+    skip: number,
+    limit: number,
+  ) {
+    const where = this.bookFilterSql(tenantId, query);
+    const direction =
+      query.sortDir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+    const order =
+      query.sort === 'department'
+        ? Prisma.sql`LOWER(COALESCE(d.department_name, '')) ${direction}, b.title ASC`
+        : Prisma.sql`available ${direction}, b.title ASC`;
+    const [ids, totals] = await Promise.all([
+      this.prisma.$queryRaw<{ id: string }[]>`
+        SELECT b.id
+        FROM library.library_books b
+        LEFT JOIN core.departments d ON d.id = b.department_id AND d.deleted_at IS NULL
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) FILTER (WHERE c.status = 'AVAILABLE')::int AS available
+          FROM library.library_book_copies c
+          WHERE c.book_id = b.id
+        ) copies ON true
+        WHERE ${where}
+        ORDER BY ${order}
+        LIMIT ${limit} OFFSET ${skip}
+      `,
+      this.prisma.$queryRaw<{ count: number }[]>`
+        SELECT COUNT(*)::int AS count
+        FROM library.library_books b
+        WHERE ${where}
+      `,
+    ]);
+    return { ids: ids.map((row) => row.id), total: totals[0]?.count ?? 0 };
+  }
+
+  private bookFilterSql(tenantId: string, query: BookQueryDto) {
+    const filters = [
+      Prisma.sql`b.tenant_id = CAST(${tenantId} AS uuid)`,
+      Prisma.sql`b.deleted_at IS NULL`,
+    ];
+    if (query.categoryId)
+      filters.push(
+        Prisma.sql`b.category_id = CAST(${query.categoryId} AS uuid)`,
+      );
+    if (query.departmentId)
+      filters.push(
+        Prisma.sql`b.department_id = CAST(${query.departmentId} AS uuid)`,
+      );
+    if (query.subject) filters.push(Prisma.sql`b.subject = ${query.subject}`);
+    if (query.language)
+      filters.push(Prisma.sql`b.language = ${query.language}`);
+    if (query.year)
+      filters.push(Prisma.sql`b.publication_year = ${query.year}`);
+    if (query.status) filters.push(Prisma.sql`b.status = ${query.status}`);
+    if (query.accessionStatus)
+      filters.push(Prisma.sql`b.accession_status = ${query.accessionStatus}`);
+    const search = query.search?.trim();
+    if (search) {
+      const like = `%${search}%`;
+      filters.push(Prisma.sql`(
+        b.title ILIKE ${like} OR COALESCE(b.author, '') ILIKE ${like}
+        OR COALESCE(b.additional_authors, '') ILIKE ${like}
+        OR b.accession_no ILIKE ${like} OR COALESCE(b.isbn, '') ILIKE ${like}
+        OR COALESCE(b.subject, '') ILIKE ${like} OR COALESCE(b.publisher, '') ILIKE ${like}
+        OR COALESCE(b.classification_number, '') ILIKE ${like}
+        OR EXISTS (
+          SELECT 1 FROM library.library_book_copies c
+          WHERE c.book_id = b.id
+            AND (c.barcode ILIKE ${like} OR COALESCE(c.accession_number, '') ILIKE ${like} OR COALESCE(c.call_number, '') ILIKE ${like})
+        )
+      )`);
+    }
+    if (query.availability === 'AVAILABLE') {
+      filters.push(
+        Prisma.sql`EXISTS (SELECT 1 FROM library.library_book_copies c WHERE c.book_id = b.id AND c.status = 'AVAILABLE')`,
+      );
+    }
+    if (query.availability === 'ISSUED') {
+      filters.push(
+        Prisma.sql`EXISTS (SELECT 1 FROM library.library_book_copies c WHERE c.book_id = b.id AND c.status = 'ISSUED')`,
+      );
+    }
+    if (query.availability === 'LOST') {
+      filters.push(
+        Prisma.sql`EXISTS (SELECT 1 FROM library.library_book_copies c WHERE c.book_id = b.id AND c.status IN ('LOST', 'DAMAGED'))`,
+      );
+    }
+    if (query.availability === 'RESERVED') {
+      filters.push(
+        Prisma.sql`EXISTS (SELECT 1 FROM library.library_reservations r WHERE r.book_id = b.id AND r.status = 'ACTIVE')`,
+      );
+    }
+    return Prisma.join(filters, ' AND ');
+  }
+
+  private async departmentNames(tenantId: string, ids: Array<string | null>) {
+    const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
+    if (!unique.length) return new Map<string, string>();
+    const rows = await this.prisma.department.findMany({
+      where: { tenantId, id: { in: unique } },
+      select: { id: true, name: true },
+    });
+    return new Map(rows.map((row) => [row.id, row.name]));
   }
 
   async getBook(tenantId: string, id: string) {

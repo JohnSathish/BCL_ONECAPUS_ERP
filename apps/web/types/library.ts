@@ -124,6 +124,8 @@ export type LibraryDashboard = {
   departmentHeatmap?: {
     from: string;
     rows: { departmentName: string; visits: number; intensity: number }[];
+    days?: number[];
+    grid?: { departmentName: string; counts: number[] }[];
   };
   genderTrends?: {
     from: string;
@@ -375,6 +377,15 @@ export type LibraryBook = {
   accessionStatus?: string;
   status: string;
   totalCopies: number;
+  publicationYear?: string | null;
+  language?: string | null;
+  subject?: string | null;
+  coverImageUrl?: string | null;
+  classificationNumber?: string | null;
+  departmentName?: string | null;
+  copyCount?: number;
+  availableCopies?: number;
+  issuedCopies?: number;
   category?: LibraryCategory | null;
   copies?: LibraryBookCopy[];
 };
@@ -384,6 +395,22 @@ export type LibraryBookListResponse = {
   total: number;
   page: number;
   limit: number;
+  from?: number;
+  to?: number;
+  facets?: {
+    all: number;
+    available: number;
+    borrowed: number;
+    reserved: number;
+  } | null;
+};
+
+export type LibraryCatalogueSummary = {
+  copies: number;
+  titles: number;
+  authors: number;
+  categories: number;
+  departments: number;
 };
 
 export type LibraryVisit = {
@@ -397,6 +424,31 @@ export type LibraryVisit = {
   durationMinutes?: number | null;
   memberName?: string;
   department?: string | null;
+  programme?: string | null;
+  registrationNumber?: string | null;
+  photoUrl?: string | null;
+  status?: 'INSIDE' | 'COMPLETED' | 'REVIEW';
+  ongoing?: boolean;
+  purpose?: string | null;
+  institution?: string | null;
+  entryMethod?: string | null;
+  zoneName?: string | null;
+};
+
+export type LibraryVisitStats = {
+  totalToday: number;
+  yesterdayTotal: number;
+  totalDeltaPct: number | null;
+  students: number;
+  studentSharePct: number | null;
+  staff: number;
+  staffSharePct: number | null;
+  visitors: number;
+  visitorSharePct: number | null;
+  averageDurationMinutes: number | null;
+  completedVisits: number;
+  previousAverageDurationMinutes: number | null;
+  averageDeltaPct: number | null;
 };
 
 export type LibraryVisitor = {
@@ -514,7 +566,39 @@ export type LibraryReservation = {
   studentName?: string;
   enrollmentNumber?: string | null;
   department?: string | null;
+  memberType?: string;
+  author?: string | null;
+  accessionNo?: string | null;
+  expiresOn?: string | null;
   queuePosition?: number | null;
+};
+
+export type LibraryReservationListResponse = {
+  items: LibraryReservation[];
+  total: number;
+  page: number;
+  limit: number;
+  from: number;
+  to: number;
+};
+
+export type LibraryReservationSummary = {
+  active: number;
+  titles: number;
+  longestDays: number;
+  fulfilledToday: number;
+  fulfilled: number;
+  cancelled: number;
+  expired: number;
+  expiryTracked: boolean;
+  departments: { id: string; name: string }[];
+};
+
+export type LibraryReservationStudent = {
+  id: string;
+  fullName: string;
+  enrollmentNumber: string;
+  department: string | null;
 };
 
 export type LibraryReservationQueueGroup = {
@@ -651,13 +735,51 @@ export type LibraryCopyIncident = {
   chargeAmount?: number | null;
   replacementCopyId?: string | null;
   reportedById?: string | null;
+  reportedByName?: string | null;
+  memberName?: string | null;
+  memberType?: string | null;
+  title?: string | null;
+  author?: string | null;
+  accessionNo?: string | null;
   resolvedAt?: string | null;
   createdAt: string;
   copy?: {
     barcode: string;
-    book?: { title: string; accessionNo: string };
+    accessionNumber?: string | null;
+    book?: { title: string; author?: string | null; accessionNo: string };
   };
-  replacementCopy?: { id: string; barcode: string } | null;
+  replacementCopy?: { id: string; barcode: string; accessionNumber?: string | null } | null;
+};
+
+export type LibraryIncidentListResponse = {
+  items: LibraryCopyIncident[];
+  total: number;
+  page: number;
+  limit: number;
+  from: number;
+  to: number;
+};
+
+export type LibraryIncidentSummary = {
+  total: number;
+  lost: number;
+  damaged: number;
+  replaced: number;
+  resolved: number;
+  closed: number;
+  reporters: { id: string; name: string }[];
+};
+
+export type LibraryIncidentCopyPreview = {
+  copyId: string;
+  title: string;
+  author: string | null;
+  accessionNo: string;
+  barcode: string;
+  status: string;
+  openIncidentId: string | null;
+  openIncidentType: string | null;
+  chargeAmount: number | null;
 };
 
 export type LibraryDigitalAsset = {
@@ -675,6 +797,9 @@ export type LibraryDigitalAsset = {
   downloadCount?: number;
   viewCount?: number;
   publishedAt?: string | null;
+  departmentId?: string | null;
+  departmentName?: string | null;
+  addedYear?: number;
   category?: LibraryCategory | null;
 };
 
@@ -683,6 +808,19 @@ export type LibraryDigitalAssetListResponse = {
   total: number;
   page: number;
   limit: number;
+  from?: number;
+  to?: number;
+};
+
+export type LibraryDigitalSummary = {
+  total: number;
+  ebooks: number;
+  papers: number;
+  research: number;
+  other: number;
+  shares: { ebooks: number; papers: number; research: number; other: number };
+  departments: { id: string; name: string }[];
+  years: number[];
 };
 
 export type ResearchRepositoryItem = {
@@ -709,6 +847,7 @@ export type ResearchItemListResponse = {
 
 export type LibraryReadingAnalytics = {
   from: string;
+  to?: string;
   days: number;
   topBooks: {
     bookId: string;
@@ -723,6 +862,7 @@ export type LibraryReadingAnalytics = {
     fullName: string;
     registrationNumber: string | null;
     department: string | null;
+    programme?: string | null;
     issueCount: number;
   }[];
   departmentUsage: {
@@ -732,6 +872,25 @@ export type LibraryReadingAnalytics = {
     uniqueReaders: number;
     intensity: number;
   }[];
+  summary?: {
+    from: string;
+    to: string;
+    totalIssues: number;
+    activeReaders: number;
+    uniqueTitles: number;
+    departmentsActive: number;
+    departmentsTotal: number;
+    averageLoanDays: number | null;
+    mostActiveDay: string | null;
+    mostPopularCategory: string | null;
+    deltas: {
+      totalIssues: number | null;
+      activeReaders: number | null;
+      uniqueTitles: number | null;
+      averageLoanDays: number | null;
+    };
+  };
+  weeklyIssues?: { date: string; label: string; count: number }[];
 };
 
 export type LibraryMemberListItem = {

@@ -438,6 +438,55 @@ export class ReserveBookDto {
   studentId?: string;
 }
 
+export class ReservationListQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit?: number = 20;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsIn(['ALL', 'ACTIVE', 'FULFILLED', 'CANCELLED', 'EXPIRED'])
+  status?: 'ALL' | 'ACTIVE' | 'FULFILLED' | 'CANCELLED' | 'EXPIRED' = 'ALL';
+
+  @IsOptional()
+  @IsIn(['ALL', 'STUDENT', 'STAFF', 'FACULTY'])
+  memberType?: 'ALL' | 'STUDENT' | 'STAFF' | 'FACULTY' = 'ALL';
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsOptional()
+  @IsIn(['newest', 'oldest', 'title'])
+  sort?: 'newest' | 'oldest' | 'title' = 'newest';
+}
+
+export class ReservationStudentQueryDto {
+  @IsString()
+  @IsNotEmpty()
+  search!: string;
+}
+
 export class VisitQueryDto {
   @IsOptional()
   @Type(() => Number)
@@ -450,11 +499,17 @@ export class VisitQueryDto {
   @IsInt()
   @Min(1)
   @Max(200)
-  limit?: number = 50;
+  limit?: number = 20;
 
   @IsOptional()
-  @IsString()
-  memberType?: string;
+  @IsIn(['ALL', 'STUDENT', 'STAFF', 'FACULTY', 'NON_TEACHING', 'VISITOR'])
+  memberType?:
+    | 'ALL'
+    | 'STUDENT'
+    | 'STAFF'
+    | 'FACULTY'
+    | 'NON_TEACHING'
+    | 'VISITOR';
 
   @IsOptional()
   @IsString()
@@ -467,6 +522,18 @@ export class VisitQueryDto {
   @IsOptional()
   @IsUUID()
   studentId?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsIn(['today', 'week', 'month', 'custom'])
+  period?: 'today' | 'week' | 'month' | 'custom';
 }
 
 export class BookQueryDto {
@@ -498,6 +565,53 @@ export class BookQueryDto {
   @IsOptional()
   @IsString()
   accessionStatus?: string;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsString()
+  subject?: string;
+
+  @IsOptional()
+  @IsString()
+  language?: string;
+
+  @IsOptional()
+  @IsString()
+  year?: string;
+
+  @IsOptional()
+  @IsIn(['ALL', 'AVAILABLE', 'ISSUED', 'RESERVED', 'LOST'])
+  availability?: 'ALL' | 'AVAILABLE' | 'ISSUED' | 'RESERVED' | 'LOST';
+
+  @IsOptional()
+  @IsIn([
+    'accession',
+    'title',
+    'author',
+    'department',
+    'year',
+    'copies',
+    'available',
+  ])
+  sort?:
+    | 'accession'
+    | 'title'
+    | 'author'
+    | 'department'
+    | 'year'
+    | 'copies'
+    | 'available';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortDir?: 'asc' | 'desc';
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  facets?: 'true' | 'false';
 }
 
 export class ReportQueryDto {
@@ -545,8 +659,14 @@ export class EntryExitReportQueryDto {
   gender?: 'ALL' | 'MALE' | 'FEMALE' | 'OTHER';
 
   @IsOptional()
-  @IsIn(['ALL', 'STUDENT', 'STAFF', 'VISITOR'])
-  memberType?: 'ALL' | 'STUDENT' | 'STAFF' | 'VISITOR';
+  @IsIn(['ALL', 'STUDENT', 'STAFF', 'FACULTY', 'NON_TEACHING', 'VISITOR'])
+  memberType?:
+    | 'ALL'
+    | 'STUDENT'
+    | 'STAFF'
+    | 'FACULTY'
+    | 'NON_TEACHING'
+    | 'VISITOR';
 
   @IsOptional()
   @IsIn(['ALL', 'INSIDE', 'EXITED', 'INCOMPLETE'])
@@ -620,8 +740,20 @@ export class DigitalAssetQueryDto {
   categoryId?: string;
 
   @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsString()
+  year?: string;
+
+  @IsOptional()
+  @IsIn(['EBOOK', 'QUESTION_PAPER', 'RESEARCH_PAPER', 'OTHER'])
+  bucket?: 'EBOOK' | 'QUESTION_PAPER' | 'RESEARCH_PAPER' | 'OTHER';
 }
 
 export class CreateDigitalAssetDto {
@@ -834,6 +966,14 @@ export class ReadingAnalyticsQueryDto {
   @Min(7)
   @Max(730)
   days?: number = 365;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
 }
 
 export class LibraryMemberQueryDto {
@@ -1051,6 +1191,74 @@ export class CopyIncidentQueryDto {
   @IsOptional()
   @IsString()
   incidentType?: string;
+}
+
+export class CopyIncidentListQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  limit?: number = 20;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsIn(['ALL', 'LOST', 'DAMAGED', 'REPLACED', 'RESOLVED', 'CLOSED'])
+  bucket?: 'ALL' | 'LOST' | 'DAMAGED' | 'REPLACED' | 'RESOLVED' | 'CLOSED' =
+    'ALL';
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  incidentType?: string;
+
+  @IsOptional()
+  @IsUUID()
+  reportedById?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @IsOptional()
+  @IsIn(['newest', 'oldest', 'title'])
+  sort?: 'newest' | 'oldest' | 'title' = 'newest';
+}
+
+export class IncidentCopyQueryDto {
+  @IsString()
+  @IsNotEmpty()
+  code!: string;
+}
+
+export class ReplaceByBarcodeDto {
+  @IsString()
+  @IsNotEmpty()
+  copyBarcode!: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  replacementBarcode?: string;
 }
 
 export class ResolveIncidentDto {

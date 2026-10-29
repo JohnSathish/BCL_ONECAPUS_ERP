@@ -32,7 +32,10 @@ import {
   BookPreviewQueryDto,
   BookQueryDto,
   CamsLibraryBridgeDto,
+  CopyIncidentListQueryDto,
   CopyIncidentQueryDto,
+  IncidentCopyQueryDto,
+  ReplaceByBarcodeDto,
   CreateAccessionBookDto,
   CreateBookCopyDto,
   CreateBookDto,
@@ -61,6 +64,8 @@ import {
   ReportCopyIncidentDto,
   ReplaceCopyIncidentDto,
   ResolveIncidentDto,
+  ReservationListQueryDto,
+  ReservationStudentQueryDto,
   ReserveBookDto,
   ReturnBookDto,
   ScanAccessDto,
@@ -323,6 +328,39 @@ export class LibraryController {
     return this.notifications.processDueTomorrowReminders(user.tid);
   }
 
+  @Get('circulation/incidents/summary')
+  @RequireAnyPermission(...LIB_READ)
+  incidentSummary(@CurrentUser() user: JwtUser) {
+    return this.incidents.summary(user.tid);
+  }
+
+  @Get('circulation/incidents/list')
+  @RequireAnyPermission(...LIB_READ)
+  incidentList(
+    @CurrentUser() user: JwtUser,
+    @Query() query: CopyIncidentListQueryDto,
+  ) {
+    return this.incidents.list(user.tid, query);
+  }
+
+  @Get('circulation/incidents/copy')
+  @RequireAnyPermission(...LIB_READ)
+  incidentCopy(
+    @CurrentUser() user: JwtUser,
+    @Query() query: IncidentCopyQueryDto,
+  ) {
+    return this.incidents.previewCopy(user.tid, query.code);
+  }
+
+  @Post('circulation/incidents/replace-by-barcode')
+  @RequireAnyPermission(...LIB_MANAGE)
+  replaceIncidentByBarcode(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ReplaceByBarcodeDto,
+  ) {
+    return this.incidents.replaceByBarcode(user, dto);
+  }
+
   @Get('circulation/incidents')
   @RequireAnyPermission(...LIB_READ)
   listIncidents(
@@ -420,6 +458,12 @@ export class LibraryController {
     return this.access.listVisits(user.tid, query);
   }
 
+  @Post('access/visits/:id/exit')
+  @RequireAnyPermission(...LIB_DESK)
+  recordVisitExit(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.access.recordExit(user.tid, id);
+  }
+
   @Get('access/lookup/:scanCode')
   @RequireAnyPermission(...LIB_DESK)
   async lookupMember(
@@ -436,6 +480,15 @@ export class LibraryController {
     @Body() dto: RegisterVisitorDto,
   ) {
     return this.visitors.register(user.tid, dto);
+  }
+
+  @Post('visitors/walk-in')
+  @RequireAnyPermission(...LIB_DESK)
+  registerWalkIn(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: RegisterVisitorDto,
+  ) {
+    return this.visitors.registerWalkIn(user.tid, dto);
   }
 
   @Get('visitors')
@@ -463,6 +516,18 @@ export class LibraryController {
   @RequirePermissions('library:manage')
   createCategory(@CurrentUser() user: JwtUser, @Body() dto: CreateCategoryDto) {
     return this.catalogue.createCategory(user.tid, dto);
+  }
+
+  @Get('books/summary')
+  @RequireAnyPermission(...LIB_READ)
+  catalogueSummary(@CurrentUser() user: JwtUser) {
+    return this.catalogue.catalogueSummary(user.tid);
+  }
+
+  @Get('books/options')
+  @RequireAnyPermission(...LIB_READ)
+  catalogueOptions(@CurrentUser() user: JwtUser) {
+    return this.catalogue.catalogueOptions(user.tid);
   }
 
   @Get('books')
@@ -577,6 +642,30 @@ export class LibraryController {
   @RequireAnyPermission('library:read', 'library:circulate', 'library:manage')
   cancelReservation(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.reservations.cancel(user, id);
+  }
+
+  @Get('reservations/summary')
+  @RequireAnyPermission(...LIB_READ)
+  reservationSummary(@CurrentUser() user: JwtUser) {
+    return this.reservations.summary(user.tid);
+  }
+
+  @Get('reservations/list')
+  @RequireAnyPermission(...LIB_READ)
+  reservationList(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ReservationListQueryDto,
+  ) {
+    return this.reservations.list(user.tid, query);
+  }
+
+  @Get('reservations/students')
+  @RequireAnyPermission(...LIB_READ)
+  reservationStudents(
+    @CurrentUser() user: JwtUser,
+    @Query() query: ReservationStudentQueryDto,
+  ) {
+    return this.reservations.searchStudents(user.tid, query.search);
   }
 
   @Get('reservations')
@@ -903,7 +992,11 @@ export class LibraryController {
     @CurrentUser() user: JwtUser,
     @Query() query: ReadingAnalyticsQueryDto,
   ) {
-    return this.analytics.readingAnalytics(user.tid, query.days ?? 365);
+    return this.analytics.readingAnalytics(user.tid, {
+      days: query.days ?? 365,
+      from: query.from,
+      to: query.to,
+    });
   }
 
   @Get('reports/export/department-visitors.csv')
@@ -1057,6 +1150,12 @@ export class LibraryController {
     @Query() query: DigitalAssetQueryDto,
   ) {
     return this.digital.list(user, query);
+  }
+
+  @Get('digital-assets/summary')
+  @RequireAnyPermission(...LIB_DIGITAL_READ)
+  digitalSummary(@CurrentUser() user: JwtUser) {
+    return this.digital.summary(user.tid);
   }
 
   @Get('digital-assets/popular')

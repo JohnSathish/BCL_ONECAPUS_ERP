@@ -1,0 +1,56 @@
+import {
+  previousRange,
+  visitPresentation,
+  visitRange,
+} from './library-visit.logic';
+
+describe('library visit presentation', () => {
+  const entry = new Date('2026-09-24T04:05:00.000Z');
+
+  it('keeps an open visit inside and marks the duration as ongoing', () => {
+    const result = visitPresentation(
+      entry,
+      null,
+      null,
+      new Date('2026-09-24T04:20:00.000Z'),
+    );
+    expect(result.status).toBe('INSIDE');
+    expect(result.ongoing).toBe(true);
+    expect(result.durationMinutes).toBe(15);
+  });
+
+  it('uses the recorded exit for a completed visit', () => {
+    const exit = new Date('2026-09-24T04:33:00.000Z');
+    const result = visitPresentation(entry, exit, 28);
+    expect(result.status).toBe('COMPLETED');
+    expect(result.durationMinutes).toBe(28);
+    expect(result.ongoing).toBe(false);
+  });
+
+  it('flags an exit that is earlier than the entry', () => {
+    const result = visitPresentation(
+      entry,
+      new Date('2026-09-24T03:00:00.000Z'),
+      10,
+    );
+    expect(result.status).toBe('REVIEW');
+    expect(result.durationMinutes).toBeNull();
+  });
+
+  it('rejects a custom range that ends before it starts', () => {
+    expect(() =>
+      visitRange({ period: 'custom', from: '2026-09-20', to: '2026-09-14' }),
+    ).toThrow(/end date/i);
+  });
+
+  it('places the comparison window immediately before the selected range', () => {
+    const range = visitRange({
+      period: 'custom',
+      from: '2026-09-14',
+      to: '2026-09-14',
+      now: new Date('2026-09-24T10:00:00'),
+    });
+    const previous = previousRange(range);
+    expect(previous.to.getTime()).toBeLessThan(range.from.getTime());
+  });
+});

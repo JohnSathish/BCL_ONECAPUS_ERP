@@ -43,6 +43,40 @@ export class LibraryVisitorService {
     return row;
   }
 
+  async registerWalkIn(tenantId: string, dto: RegisterVisitorDto) {
+    return this.prisma.$transaction(async (tx) => {
+      let passNumber = this.generatePassNumber();
+      for (let i = 0; i < 5; i++) {
+        const exists = await tx.libraryVisitor.findFirst({
+          where: { tenantId, passNumber },
+        });
+        if (!exists) break;
+        passNumber = this.generatePassNumber();
+      }
+      const visitor = await tx.libraryVisitor.create({
+        data: {
+          id: randomUUID(),
+          tenantId,
+          passNumber,
+          fullName: dto.fullName.trim(),
+          mobile: dto.mobile?.trim(),
+          institution: dto.institution?.trim(),
+          purpose: dto.purpose?.trim(),
+        },
+      });
+      const visit = await tx.libraryVisit.create({
+        data: {
+          id: randomUUID(),
+          tenantId,
+          memberType: 'VISITOR',
+          visitorId: visitor.id,
+          entryMethod: 'MANUAL',
+        },
+      });
+      return { visitor, visit };
+    });
+  }
+
   async list(tenantId: string, limit = 50) {
     return this.prisma.libraryVisitor.findMany({
       where: { tenantId },

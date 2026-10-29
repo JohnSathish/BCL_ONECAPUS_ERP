@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { libraryHealth } from '../library-health.logic';
 import { LibrarySettingsService } from './library-settings.service';
@@ -714,7 +714,7 @@ export class LibraryAnalyticsService {
         memberType: 'STUDENT',
         entryAt: { gte: startOfMonth },
       },
-      select: { studentId: true },
+      select: { studentId: true, entryAt: true },
     });
     const studentIds = [
       ...new Set(visits.map((v) => v.studentId).filter(Boolean)),
@@ -745,12 +745,35 @@ export class LibraryAnalyticsService {
 
     const rows = [...map.values()].sort((a, b) => b.visits - a.visits);
     const max = rows[0]?.visits ?? 1;
+    const dayStarts = Array.from({ length: 30 }, (_, index) => {
+      const day = new Date(startOfMonth);
+      day.setDate(startOfMonth.getDate() + index);
+      day.setHours(0, 0, 0, 0);
+      return day;
+    });
+    const grid = rows.slice(0, 6).map((department) => ({
+      departmentName: department.departmentName,
+      counts: dayStarts.map((day) => {
+        const next = new Date(day);
+        next.setDate(next.getDate() + 1);
+        const key = department.departmentId ?? 'unknown';
+        return visits.filter((visit) => {
+          const student = students.find((row) => row.id === visit.studentId);
+          const visitKey = student?.departmentId ?? 'unknown';
+          return (
+            visitKey === key && visit.entryAt >= day && visit.entryAt < next
+          );
+        }).length;
+      }),
+    }));
     return {
-      from: startOfMonth.toISOString().slice(0, 10),
+      from: localDateKey(startOfMonth),
       rows: rows.map((r) => ({
         ...r,
         intensity: Math.round((r.visits / max) * 100),
       })),
+      days: dayStarts.map((day) => day.getDate()),
+      grid,
     };
   }
 
@@ -799,29 +822,56 @@ export class LibraryAnalyticsService {
     return { from: startOfMonth.toISOString().slice(0, 10), weekly };
   }
 
-  async readingAnalytics(tenantId: string, days = 365) {
-    const from = new Date();
-    from.setDate(from.getDate() - days);
-    from.setHours(0, 0, 0, 0);
+  async readingAnalytics(
+    tenantId: string,
+    daysOrQuery: number | { days?: number; from?: string; to?: string } = 365,
+  ) {
+    const range = resolveReadingRange(
+      typeof daysOrQuery === 'number' ? { days: daysOrQuery } : daysOrQuery,
+    );
+    const { from, to, days } = range;
+    const previousFrom = new Date(from);
+    previousFrom.setDate(previousFrom.getDate() - days);
+    const weekStart = new Date();
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - 6);
 
-    const loans = await this.prisma.libraryLoan.findMany({
-      where: { tenantId, issuedAt: { gte: from } },
-      include: {
-        copy: {
+    const [loans, previousLoans, weekLoans, departmentsTotal] =
+      await Promise.all([
+        this.prisma.libraryLoan.findMany({
+          where: { tenantId, issuedAt: { gte: from, lt: to } },
           include: {
-            book: {
-              select: {
-                id: true,
-                title: true,
-                author: true,
-                accessionNo: true,
-                categoryId: true,
+            copy: {
+              include: {
+                book: {
+                  select: {
+                    id: true,
+                    title: true,
+                    author: true,
+                    accessionNo: true,
+                    categoryId: true,
+                  },
+                },
               },
             },
           },
-        },
-      },
-    });
+        }),
+        this.prisma.libraryLoan.findMany({
+          where: { tenantId, issuedAt: { gte: previousFrom, lt: from } },
+          select: {
+            issuedAt: true,
+            returnedAt: true,
+            studentId: true,
+            staffProfileId: true,
+            copy: { select: { bookId: true } },
+          },
+        }),
+        this.prisma.libraryLoan.findMany({
+          where: { tenantId, issuedAt: { gte: weekStart } },
+          select: { issuedAt: true },
+        }),
+        this.prisma.department.count({ where: { tenantId, deletedAt: null } }),
+      ]);
 
     const bookMap = new Map<
       string,
@@ -892,6 +942,9 @@ export class LibraryAnalyticsService {
             include: {
               masterProfile: { select: { fullName: true } },
               department: { select: { id: true, name: true } },
+              programVersion: {
+                select: { program: { select: { name: true } } },
+              },
             },
           })
         : [],
@@ -914,6 +967,7 @@ export class LibraryAnalyticsService {
           fullName: s?.masterProfile?.fullName ?? 'Student',
           registrationNumber: s?.enrollmentNumber ?? null,
           department: s?.department?.name ?? null,
+          programme: s?.programVersion?.program?.name ?? null,
           issueCount: r.issueCount,
         };
       }
@@ -924,6 +978,7 @@ export class LibraryAnalyticsService {
         fullName: sp?.fullName ?? 'Staff',
         registrationNumber: sp?.employeeCode ?? null,
         department: sp?.department?.name ?? null,
+        programme: null,
         issueCount: r.issueCount,
       };
     });
@@ -931,16 +986,44 @@ export class LibraryAnalyticsService {
     const loanStudentIds = [
       ...new Set(loans.map((l) => l.studentId).filter(Boolean)),
     ] as string[];
-    const loanStudents =
+    const loanStaffIds = [
+      ...new Set(loans.map((l) => l.staffProfileId).filter(Boolean)),
+    ] as string[];
+    const [loanStudents, loanStaff, categories] = await Promise.all([
       loanStudentIds.length > 0
-        ? await this.prisma.student.findMany({
+        ? this.prisma.student.findMany({
             where: { tenantId, id: { in: loanStudentIds } },
             include: {
               masterProfile: { select: { fullName: true } },
               department: { select: { id: true, name: true } },
             },
           })
-        : [];
+        : [],
+      loanStaffIds.length > 0
+        ? this.prisma.staffProfile.findMany({
+            where: { tenantId, id: { in: loanStaffIds } },
+            include: { department: { select: { id: true, name: true } } },
+          })
+        : [],
+      this.prisma.libraryCategory.findMany({
+        where: {
+          tenantId,
+          id: {
+            in: [
+              ...new Set(
+                loans
+                  .map((loan) => loan.copy.book.categoryId)
+                  .filter((id): id is string => Boolean(id)),
+              ),
+            ]
+              .slice(0, 200)
+              .concat('00000000-0000-0000-0000-000000000000')
+              .slice(0, 200),
+          },
+        },
+        select: { id: true, name: true },
+      }),
+    ]);
 
     const deptMap = new Map<
       string,
@@ -967,6 +1050,22 @@ export class LibraryAnalyticsService {
       row.uniqueReaders.add(loan.studentId);
       deptMap.set(key, row);
     }
+    for (const loan of loans) {
+      if (!loan.staffProfileId) continue;
+      const staff = loanStaff.find((row) => row.id === loan.staffProfileId);
+      const deptId = staff?.department?.id ?? null;
+      const deptName = staff?.department?.name ?? 'Unknown';
+      const key = deptId ?? 'unknown';
+      const row = deptMap.get(key) ?? {
+        departmentId: deptId,
+        departmentName: deptName,
+        issueCount: 0,
+        uniqueReaders: new Set<string>(),
+      };
+      row.issueCount += 1;
+      row.uniqueReaders.add(loan.staffProfileId);
+      deptMap.set(key, row);
+    }
 
     const maxIssues = Math.max(
       1,
@@ -982,12 +1081,160 @@ export class LibraryAnalyticsService {
       }))
       .sort((a, b) => b.issueCount - a.issueCount);
 
+    const categoryNames = new Map(
+      categories.map((category) => [category.id, category.name]),
+    );
+    const categoryCounts = new Map<string, number>();
+    for (const loan of loans) {
+      const name = loan.copy.book.categoryId
+        ? categoryNames.get(loan.copy.book.categoryId)
+        : null;
+      if (!name) continue;
+      categoryCounts.set(name, (categoryCounts.get(name) ?? 0) + 1);
+    }
+    const mostPopularCategory =
+      [...categoryCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+    for (const loan of loans) dayCounts[loan.issuedAt.getDay()] += 1;
+    const averageLoanDays = meanLoanDays(loans);
+    const previousAverage = meanLoanDays(previousLoans);
+    const activeReaders = new Set(
+      loans
+        .map((loan) => loan.studentId ?? loan.staffProfileId)
+        .filter(Boolean),
+    ).size;
+    const previousReaders = new Set(
+      previousLoans
+        .map((loan) => loan.studentId ?? loan.staffProfileId)
+        .filter(Boolean),
+    ).size;
+    const previousTitles = new Set(
+      previousLoans.map((loan) => loan.copy.bookId),
+    ).size;
+    const end = new Date(to);
+    end.setDate(end.getDate() - 1);
+    const weeklyIssues = Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(weekStart);
+      day.setDate(weekStart.getDate() + index);
+      const key = localDateKey(day);
+      return {
+        date: key,
+        label: day.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+        }),
+        count: weekLoans.filter((loan) => localDateKey(loan.issuedAt) === key)
+          .length,
+      };
+    });
+
     return {
-      from: from.toISOString().slice(0, 10),
+      from: localDateKey(from),
+      to: localDateKey(end),
       days,
       topBooks,
       topReaders,
       departmentUsage,
+      summary: {
+        from: localDateKey(from),
+        to: localDateKey(end),
+        totalIssues: loans.length,
+        activeReaders,
+        uniqueTitles: bookMap.size,
+        departmentsActive: [...deptMap.values()].filter(
+          (row) => row.departmentId,
+        ).length,
+        departmentsTotal,
+        averageLoanDays,
+        mostActiveDay: loans.length
+          ? DAY_NAMES[dayCounts.indexOf(Math.max(...dayCounts))]
+          : null,
+        mostPopularCategory,
+        deltas: {
+          totalIssues: percentChange(loans.length, previousLoans.length),
+          activeReaders: percentChange(activeReaders, previousReaders),
+          uniqueTitles: percentChange(bookMap.size, previousTitles),
+          averageLoanDays:
+            averageLoanDays == null || previousAverage == null
+              ? null
+              : percentChange(averageLoanDays, previousAverage),
+        },
+      },
+      weeklyIssues,
     };
   }
+}
+
+const DAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
+function resolveReadingRange(query: {
+  days?: number;
+  from?: string;
+  to?: string;
+}) {
+  const start = query.from ? startOfDay(query.from) : null;
+  const endDay = query.to ? startOfDay(query.to) : null;
+  if (query.from && query.to && start && endDay) {
+    const from = start <= endDay ? start : endDay;
+    const last = start <= endDay ? endDay : start;
+    const to = new Date(last);
+    to.setDate(to.getDate() + 1);
+    const days = Math.round((to.getTime() - from.getTime()) / 86_400_000);
+    if (days < 1 || days > 730) {
+      throw new BadRequestException('Choose a range of 1 to 730 days');
+    }
+    return { from, to, days };
+  }
+  const days = query.days ?? 365;
+  const to = new Date();
+  to.setHours(0, 0, 0, 0);
+  to.setDate(to.getDate() + 1);
+  const from = new Date(to);
+  from.setDate(from.getDate() - days);
+  return { from, to, days };
+}
+
+function startOfDay(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function localDateKey(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function meanLoanDays(loans: { issuedAt: Date; returnedAt: Date | null }[]) {
+  const completed = loans.filter(
+    (loan) => loan.returnedAt && loan.returnedAt >= loan.issuedAt,
+  );
+  if (!completed.length) return null;
+  const total = completed.reduce(
+    (sum, loan) => sum + (loan.returnedAt!.getTime() - loan.issuedAt.getTime()),
+    0,
+  );
+  return Math.round((total / completed.length / 86_400_000) * 10) / 10;
+}
+
+function percentChange(current: number, previous: number) {
+  if (previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
 }

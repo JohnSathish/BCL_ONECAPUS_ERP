@@ -40,6 +40,14 @@ export class CatalogueReportQueryDto {
 
   @IsOptional()
   @IsString()
+  language?: string;
+
+  @IsOptional()
+  @IsString()
+  bookIds?: string;
+
+  @IsOptional()
+  @IsString()
   branch?: string;
 
   @IsOptional()

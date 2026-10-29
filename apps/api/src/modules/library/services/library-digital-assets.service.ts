@@ -62,6 +62,63 @@ export class LibraryDigitalAssetsService {
     );
   }
 
+  async summary(tenantId: string) {
+    const [counts, departments, years] = await Promise.all([
+      this.prisma.$queryRaw<
+        {
+          total: number;
+          ebooks: number;
+          papers: number;
+          research: number;
+          other: number;
+        }[]
+      >`
+        SELECT COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE asset_type = 'EBOOK')::int AS ebooks,
+          COUNT(*) FILTER (WHERE asset_type = 'QUESTION_PAPER')::int AS papers,
+          COUNT(*) FILTER (WHERE asset_type = 'RESEARCH_PAPER')::int AS research,
+          COUNT(*) FILTER (
+            WHERE asset_type NOT IN ('EBOOK', 'QUESTION_PAPER', 'RESEARCH_PAPER')
+          )::int AS other
+        FROM library.library_digital_assets
+        WHERE tenant_id = CAST(${tenantId} AS uuid) AND deleted_at IS NULL
+      `,
+      this.prisma.department.findMany({
+        where: { tenantId, deletedAt: null },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.$queryRaw<{ year: number }[]>`
+        SELECT DISTINCT EXTRACT(YEAR FROM created_at)::int AS year
+        FROM library.library_digital_assets
+        WHERE tenant_id = CAST(${tenantId} AS uuid) AND deleted_at IS NULL
+        ORDER BY year DESC
+      `,
+    ]);
+    const row = counts[0] ?? {
+      total: 0,
+      ebooks: 0,
+      papers: 0,
+      research: 0,
+      other: 0,
+    };
+    const share = (value: number) =>
+      row.total ? Math.round((value / row.total) * 1000) / 10 : 0;
+    return {
+      ...row,
+      shares: {
+        ebooks: share(row.ebooks),
+        papers: share(row.papers),
+        research: share(row.research),
+        other: share(row.other),
+      },
+      departments,
+      years: years
+        .map((item) => Number(item.year))
+        .filter((year) => Number.isFinite(year)),
+    };
+  }
+
   async list(user: JwtUser, query: DigitalAssetQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
@@ -72,7 +129,23 @@ export class LibraryDigitalAssetsService {
       tenantId: user.tid,
       deletedAt: null,
       ...(query.assetType ? { assetType: query.assetType } : {}),
+      ...(query.bucket === 'OTHER'
+        ? {
+            assetType: { notIn: ['EBOOK', 'QUESTION_PAPER', 'RESEARCH_PAPER'] },
+          }
+        : query.bucket
+          ? { assetType: query.bucket }
+          : {}),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.departmentId ? { departmentId: query.departmentId } : {}),
+      ...(query.year && /^\d{4}$/.test(query.year)
+        ? {
+            createdAt: {
+              gte: new Date(Number(query.year), 0, 1),
+              lt: new Date(Number(query.year) + 1, 0, 1),
+            },
+          }
+        : {}),
       ...(this.isStudentOnly(user)
         ? { status: 'PUBLISHED', visibility: { in: ['STUDENT', 'PUBLIC'] } }
         : query.status
@@ -102,7 +175,30 @@ export class LibraryDigitalAssetsService {
       this.prisma.libraryDigitalAsset.count({ where }),
     ]);
 
-    return { items, total, page, limit };
+    const departmentIds = items.map((item) => item.departmentId);
+    const names = await this.departmentNames(user.tid, departmentIds);
+    return {
+      items: items.map((item) => ({
+        ...item,
+        departmentName: names.get(item.departmentId ?? '') ?? null,
+        addedYear: item.createdAt.getFullYear(),
+      })),
+      total,
+      page,
+      limit,
+      from: total ? skip + 1 : 0,
+      to: Math.min(skip + items.length, total),
+    };
+  }
+
+  private async departmentNames(tenantId: string, ids: Array<string | null>) {
+    const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
+    if (!unique.length) return new Map<string, string>();
+    const rows = await this.prisma.department.findMany({
+      where: { tenantId, id: { in: unique } },
+      select: { id: true, name: true },
+    });
+    return new Map(rows.map((row) => [row.id, row.name]));
   }
 
   async getById(user: JwtUser, id: string) {
