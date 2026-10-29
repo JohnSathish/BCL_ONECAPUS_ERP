@@ -7,9 +7,14 @@ import {
 } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
-import type { NextFunction, Request, Response } from 'express';
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { repairMislabeledMultipart } from './common/http/repair-mislabeled-multipart';
 import { buildCorsOptions } from './config/cors.config';
 import { seedWebsitePublicUploads } from './common/uploads/seed-website-public-uploads';
 import {
@@ -18,9 +23,14 @@ import {
 } from './common/uploads/upload-paths';
 
 async function bootstrap() {
+  // Must run before Nest's JSON/urlencoded parsers. Those parsers 400 a photo
+  // bulk upload when Axios mislabels the multipart body.
+  const server = express();
+  server.use(repairMislabeledMultipart);
+
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule,
-    new ExpressAdapter(),
+    new ExpressAdapter(server),
     { rawBody: true },
   );
 

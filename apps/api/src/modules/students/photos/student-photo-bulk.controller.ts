@@ -26,12 +26,46 @@ import {
 import {
   PhotoBulkApplyDto,
   PhotoBulkDeleteDto,
-  PhotoBulkPreviewDto,
   PhotoIdentifierExportQueryDto,
+  parsePhotoBulkPreviewBody,
 } from './dto/student-photo-bulk.dto';
 import { StudentPhotoBulkService } from './student-photo-bulk.service';
 
 const MAX_UPLOAD_BYTES = 512 * 1024 * 1024;
+
+function isAllowedPhotoUpload(file: Express.Multer.File) {
+  const original = String(file.originalname || '').toLowerCase();
+  const ext = original.includes('.')
+    ? original.slice(original.lastIndexOf('.'))
+    : '';
+  const mime = String(file.mimetype || '').toLowerCase();
+  if (['.jpg', '.jpeg', '.jfif', '.png', '.webp', '.zip'].includes(ext)) {
+    return true;
+  }
+  if (mime.startsWith('image/')) return true;
+  return (
+    mime === 'application/zip' ||
+    mime === 'application/x-zip-compressed' ||
+    mime === 'application/octet-stream'
+  );
+}
+
+const photoUploadInterceptor = FilesInterceptor('files', 5000, {
+  storage: memoryStorage(),
+  limits: {
+    fileSize: MAX_UPLOAD_BYTES,
+    files: 5000,
+    fields: 32,
+    fieldSize: 8 * 1024 * 1024,
+  },
+  fileFilter: (
+    _req: Request,
+    file: Express.Multer.File,
+    cb: (error: Error | null, acceptFile: boolean) => void,
+  ) => {
+    cb(null, isAllowedPhotoUpload(file));
+  },
+});
 
 function clientIp(req: Request) {
   const forwarded = req.headers['x-forwarded-for'];
@@ -48,37 +82,37 @@ export class StudentPhotoBulkController {
   @Post('preview')
   @RequireAnyPermission('students:photos:upload', 'students:manage')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FilesInterceptor('files', 5000, {
-      storage: memoryStorage(),
-      limits: { fileSize: MAX_UPLOAD_BYTES, files: 5000 },
-    }),
-  )
+  @UseInterceptors(photoUploadInterceptor)
   preview(
     @CurrentUser() user: JwtUser,
-    @Body() dto: PhotoBulkPreviewDto,
+    @Body() body: Record<string, unknown>,
     @UploadedFiles() files: Express.Multer.File[],
     @Req() req: Request,
   ) {
-    return this.photoBulk.preview(user, dto, files ?? [], clientIp(req));
+    return this.photoBulk.preview(
+      user,
+      parsePhotoBulkPreviewBody(body),
+      files ?? [],
+      clientIp(req),
+    );
   }
 
   @Post('upload')
   @RequireAnyPermission('students:photos:upload', 'students:manage')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FilesInterceptor('files', 5000, {
-      storage: memoryStorage(),
-      limits: { fileSize: MAX_UPLOAD_BYTES, files: 5000 },
-    }),
-  )
+  @UseInterceptors(photoUploadInterceptor)
   upload(
     @CurrentUser() user: JwtUser,
-    @Body() dto: PhotoBulkPreviewDto,
+    @Body() body: Record<string, unknown>,
     @UploadedFiles() files: Express.Multer.File[],
     @Req() req: Request,
   ) {
-    return this.photoBulk.preview(user, dto, files ?? [], clientIp(req));
+    return this.photoBulk.preview(
+      user,
+      parsePhotoBulkPreviewBody(body),
+      files ?? [],
+      clientIp(req),
+    );
   }
 
   @Post('apply')

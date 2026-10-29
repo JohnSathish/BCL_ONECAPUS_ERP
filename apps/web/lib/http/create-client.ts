@@ -1,8 +1,10 @@
 'use client';
 
 import axios, {
+  AxiosHeaders,
   type AxiosError,
   type AxiosInstance,
+  type AxiosRequestTransformer,
   type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from 'axios';
@@ -34,6 +36,26 @@ function requestId() {
   return `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Axios 1.16 JSON-encodes FormData when Content-Type is application/json, and if
+ * that header is merely deleted it then stamps application/x-www-form-urlencoded.
+ * Either label makes Nest reject bulk photo uploads with 400. `false` is Axios's
+ * omit sentinel: the browser then sets multipart/form-data plus the boundary.
+ */
+function preserveMultipartBody(data: unknown, headers: AxiosHeaders) {
+  if (typeof FormData !== 'undefined' && data instanceof FormData) {
+    headers.set('Content-Type', false);
+    return data;
+  }
+  return data;
+}
+
+function axiosTransformers(): AxiosRequestTransformer[] {
+  const defaults = axios.defaults.transformRequest;
+  const list = Array.isArray(defaults) ? defaults : defaults ? [defaults] : [];
+  return [preserveMultipartBody as AxiosRequestTransformer, ...list];
+}
+
 function unwrapApiEnvelope(res: AxiosResponse) {
   res.data = unwrapApiPayload(res.data);
   return res;
@@ -55,6 +77,7 @@ export function createHttpClient(options: CreateClientOptions = {}): AxiosInstan
     timeout: API_REQUEST_TIMEOUT_MS,
     withCredentials: true,
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    transformRequest: axiosTransformers(),
   });
 
   client.interceptors.request.use(async (config) => {
@@ -79,8 +102,10 @@ export function createHttpClient(options: CreateClientOptions = {}): AxiosInstan
       }
     }
     config.headers['X-Request-Id'] = config.headers['X-Request-Id'] ?? requestId();
-    if (config.data instanceof FormData) {
-      delete config.headers['Content-Type'];
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      const headers = AxiosHeaders.from(config.headers);
+      headers.set('Content-Type', false);
+      config.headers = headers;
     }
     return config;
   });

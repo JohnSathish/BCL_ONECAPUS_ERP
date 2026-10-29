@@ -33,10 +33,11 @@ const MAX_TOTAL_UPLOAD_BYTES = 512 * 1024 * 1024;
 const ASYNC_THRESHOLD = 200;
 /** Stuck async applies (API restart / crashed promise) older than this become FAILED. */
 const STUCK_PROCESSING_MS = 10 * 60 * 1000;
-const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.jfif', '.png', '.webp']);
 const IMAGE_MIMES = new Set([
   'image/jpeg',
   'image/jpg',
+  'image/pjpeg',
   'image/png',
   'image/webp',
 ]);
@@ -79,8 +80,14 @@ export class StudentPhotoBulkService {
     );
     const scopeFilter = this.parseJsonField<any>(dto.scopeFilter);
     const photoFiles = await this.expandFiles(files);
-    if (!photoFiles.length)
-      throw new BadRequestException('Upload photos or a ZIP file');
+    if (!photoFiles.length) {
+      const received = (files ?? []).length;
+      throw new BadRequestException(
+        received
+          ? `None of the ${received} uploaded files were JPG, PNG, WEBP, or ZIP. Name photos like BA26-001.jpg, or zip that folder and upload the ZIP.`
+          : 'Upload photos or a ZIP file. Folder uploads should contain .jpg/.png/.webp images named with the student identifier.',
+      );
+    }
     if (photoFiles.length > MAX_FILES) {
       throw new BadRequestException(`Maximum ${MAX_FILES} files per batch`);
     }
@@ -632,7 +639,9 @@ export class StudentPhotoBulkService {
           originalName: file.originalname,
           fileName: basename(file.originalname),
           buffer: file.buffer,
-          mimeType: file.mimetype || this.mimeFromExtension(ext),
+          mimeType: IMAGE_MIMES.has(file.mimetype)
+            ? file.mimetype
+            : this.mimeFromExtension(ext),
         });
       }
     }

@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { MulterError } from 'multer';
 import { examFeePrismaMessage } from '../../modules/examination-fees/utils/exam-fee-prisma.util';
 import { prismaSchemaDriftMessage } from '../utils/prisma-schema-drift.util';
 
@@ -24,10 +25,22 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
         'unknown',
     );
 
+    const multerError =
+      exception instanceof MulterError ? exception : undefined;
+    const jsonParseError =
+      exception instanceof SyntaxError &&
+      typeof (exception as { status?: number }).status === 'number'
+        ? (exception as SyntaxError & { status: number })
+        : undefined;
+
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+        : multerError
+          ? HttpStatus.BAD_REQUEST
+          : jsonParseError
+            ? HttpStatus.BAD_REQUEST
+            : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const prismaHint =
       exception instanceof HttpException
@@ -38,7 +51,11 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
     const message =
       exception instanceof HttpException
         ? exception.message
-        : (prismaHint ?? 'An unexpected error occurred');
+        : multerError
+          ? this.multerMessage(multerError)
+          : jsonParseError
+            ? 'Request body could not be parsed. If you are uploading files, retry as multipart/form-data (ZIP or photos).'
+            : (prismaHint ?? 'An unexpected error occurred');
 
     const body =
       exception instanceof HttpException
@@ -140,6 +157,19 @@ export class HttpProblemJsonExceptionFilter implements ExceptionFilter {
         ...(issues ? { issues } : {}),
         ...updateHints,
       });
+  }
+
+  private multerMessage(error: MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return 'A file exceeds the 512 MB upload limit. Zip fewer photos per batch.';
+    }
+    if (
+      error.code === 'LIMIT_FILE_COUNT' ||
+      error.code === 'LIMIT_UNEXPECTED_FILE'
+    ) {
+      return 'Too many files in one request. Zip the photos into a single .zip and upload that instead.';
+    }
+    return error.message || 'Photo upload was rejected by the server.';
   }
 
   private errorCode(status: number, body?: Record<string, unknown>) {

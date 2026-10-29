@@ -101,20 +101,52 @@ function filtersToParams(filters: DirectoryFilters): Record<string, string | und
   };
 }
 
+const PHOTO_UPLOAD_NAME_RE = /\.(jpe?g|png|webp|jfif|zip)$/i;
+
+function compactScopeFilter(filter?: Record<string, string | undefined>) {
+  if (!filter) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(filter)) {
+    if (value != null && String(value).trim() !== '') out[key] = String(value);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Busboy 400s on folder paths, quotes, or line breaks inside Content-Disposition. */
+function uploadBaseName(file: File) {
+  const raw = file.webkitRelativePath || file.name;
+  const base = (raw.split(/[/\\]/).pop() || 'photo').replace(/["\r\n]/g, '_').trim();
+  return base || 'photo.jpg';
+}
+
+export function filesForPhotoBulkUpload(files: File[]) {
+  return files.filter(
+    (file) => PHOTO_UPLOAD_NAME_RE.test(file.name) || file.type.startsWith('image/'),
+  );
+}
+
 export async function previewStudentPhotoBulkUpload(
   files: File[],
   payload: PhotoBulkPreviewPayload,
   onUploadProgress?: (pct: number) => void,
 ): Promise<PhotoBulkBatch> {
+  const uploadFiles = filesForPhotoBulkUpload(files);
+  if (!uploadFiles.length) {
+    throw new Error(
+      'No JPG, PNG, WEBP, or ZIP files were selected. Name photos like BA26-001.jpg, or zip that folder and upload the ZIP.',
+    );
+  }
+
   const form = new FormData();
-  files.forEach((file) => form.append('files', file, file.webkitRelativePath || file.name));
+  uploadFiles.forEach((file) => form.append('files', file, uploadBaseName(file)));
   form.append('identifierStrategy', payload.identifierStrategy);
   form.append('uploadMode', payload.uploadMode ?? 'FILES');
   form.append('conflictStrategy', payload.conflictStrategy);
   form.append('duplicateStrategy', payload.duplicateStrategy);
   form.append('cropMode', payload.cropMode);
   form.append('normalization', JSON.stringify(payload.normalization));
-  if (payload.scopeFilter) form.append('scopeFilter', JSON.stringify(payload.scopeFilter));
+  const scopeFilter = compactScopeFilter(payload.scopeFilter);
+  if (scopeFilter) form.append('scopeFilter', JSON.stringify(scopeFilter));
   if (payload.csvMap) form.append('csvMap', payload.csvMap);
 
   const { data } = await uploadApi.post('/v1/students/photos/bulk/preview', form, {
