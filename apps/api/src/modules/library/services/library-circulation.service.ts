@@ -132,9 +132,24 @@ export class LibraryCirculationService {
       activeMember: profile.active,
     }).overall;
 
+    const returnedLoans = await this.prisma.libraryLoan.findMany({
+      where: {
+        tenantId,
+        status: 'RETURNED',
+        ...(profile.studentId ? { studentId: profile.studentId } : {}),
+        ...(profile.staffProfileId
+          ? { staffProfileId: profile.staffProfileId }
+          : {}),
+      },
+      include: { copy: { include: { book: true } }, fines: true },
+      orderBy: { returnedAt: 'desc' },
+      take: 40,
+    });
+
     return {
       profile,
       activeLoans: loans,
+      returnedLoans,
       borrowedCount: activeLoans,
       maxBooks,
       outstandingFine: unpaid,
@@ -162,6 +177,7 @@ export class LibraryCirculationService {
       copy: {
         id: copy.id,
         barcode: copy.barcode,
+        accessionNumber: copy.accessionNumber,
         status: copy.status,
         copyNumber: copy.copyNumber,
       },
@@ -171,7 +187,9 @@ export class LibraryCirculationService {
         author: copy.book.author,
         publisher: copy.book.publisher,
         edition: copy.book.edition,
-        accessionNo: copy.book.accessionNo,
+        isbn: copy.book.isbn,
+        accessionNo: copy.accessionNumber || copy.book.accessionNo,
+        callNumber: copy.callNumber || copy.book.classificationNumber,
         category: copy.book.category?.name ?? null,
         location: this.policy.formatBookLocation(copy.book),
         section: copy.book.section,
@@ -262,7 +280,16 @@ export class LibraryCirculationService {
     const dueAt = this.policy.computeDueDate(loanDays);
 
     const loan = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.libraryLoan.create({
+      const reserved = await tx.libraryBookCopy.updateMany({
+        where: { id: copy.id, status: 'AVAILABLE' },
+        data: { status: 'ISSUED' },
+      });
+      if (reserved.count !== 1) {
+        throw new BadRequestException(
+          'This copy was just issued to someone else.',
+        );
+      }
+      return tx.libraryLoan.create({
         data: {
           id: randomUUID(),
           tenantId: user.tid,
@@ -276,13 +303,6 @@ export class LibraryCirculationService {
         },
         include: { copy: { include: { book: true } } },
       });
-
-      await tx.libraryBookCopy.update({
-        where: { id: copy.id },
-        data: { status: 'ISSUED' },
-      });
-
-      return created;
     });
 
     await this.logActivity(user.tid, user.sub, 'ISSUE', {
@@ -315,13 +335,19 @@ export class LibraryCirculationService {
     );
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const updatedLoan = await tx.libraryLoan.update({
-        where: { id: loan.id },
+      const closed = await tx.libraryLoan.updateMany({
+        where: { id: loan.id, status: 'ACTIVE' },
         data: {
           returnedAt,
           returnedById: user.sub,
           status: 'RETURNED',
         },
+      });
+      if (closed.count !== 1) {
+        throw new BadRequestException('This loan has already been returned.');
+      }
+      const updatedLoan = await tx.libraryLoan.findFirstOrThrow({
+        where: { id: loan.id },
         include: { copy: { include: { book: true } } },
       });
 
@@ -415,12 +441,18 @@ export class LibraryCirculationService {
     const base = loan.dueAt > now ? loan.dueAt : now;
     const newDue = this.policy.computeDueDate(loanDays, base);
 
-    const updated = await this.prisma.libraryLoan.update({
-      where: { id: loan.id },
+    const renewed = await this.prisma.libraryLoan.updateMany({
+      where: { id: loan.id, status: 'ACTIVE', renewalCount: loan.renewalCount },
       data: {
         dueAt: newDue,
         renewalCount: { increment: 1 },
       },
+    });
+    if (renewed.count !== 1) {
+      throw new BadRequestException('This loan was just renewed or returned.');
+    }
+    const updated = await this.prisma.libraryLoan.findFirstOrThrow({
+      where: { id: loan.id },
       include: { copy: { include: { book: true } } },
     });
 
@@ -493,11 +525,18 @@ export class LibraryCirculationService {
     const endOfDay = new Date(startOfDay);
     endOfDay.setDate(endOfDay.getDate() + 1);
 
+    const weekAhead = new Date();
+    weekAhead.setDate(weekAhead.getDate() + 7);
     const [
       issuedToday,
       returnedToday,
       renewalsToday,
       overdueLoans,
+      issuedNow,
+      dueThisWeek,
+      totalCopies,
+      students,
+      staff,
       fineCollectedToday,
       pendingAgg,
       paidAgg,
@@ -519,6 +558,21 @@ export class LibraryCirculationService {
       this.prisma.libraryLoan.count({
         where: { tenantId, status: 'ACTIVE', dueAt: { lt: new Date() } },
       }),
+      this.prisma.libraryLoan.count({
+        where: { tenantId, status: 'ACTIVE' },
+      }),
+      this.prisma.libraryLoan.count({
+        where: {
+          tenantId,
+          status: 'ACTIVE',
+          dueAt: { gte: new Date(), lte: weekAhead },
+        },
+      }),
+      this.prisma.libraryBookCopy.count({
+        where: { tenantId, book: { deletedAt: null } },
+      }),
+      this.prisma.student.count({ where: { tenantId, deletedAt: null } }),
+      this.prisma.staffProfile.count({ where: { tenantId, deletedAt: null } }),
       this.prisma.libraryFine.aggregate({
         where: { tenantId, paidAt: { gte: startOfDay, lt: endOfDay } },
         _sum: { amount: true },
@@ -544,6 +598,10 @@ export class LibraryCirculationService {
         returnedToday,
         renewalsToday,
         overdueLoans,
+        issuedNow,
+        dueThisWeek,
+        totalCopies,
+        totalMembers: students + staff,
         fineCollectedToday: Number(fineCollectedToday._sum.amount ?? 0),
       },
       rules: {

@@ -191,6 +191,7 @@ export type FinePolicy = {
 export type LibraryMemberSummary = {
   profile: LibraryMemberProfile;
   activeLoans: LibraryLoan[];
+  returnedLoans?: LibraryLoan[];
   borrowedCount: number;
   maxBooks: number;
   outstandingFine: number;
@@ -204,6 +205,7 @@ export type LibraryBookPreview = {
   copy: {
     id: string;
     barcode: string;
+    accessionNumber?: string | null;
     status: string;
     copyNumber: number;
   };
@@ -213,7 +215,9 @@ export type LibraryBookPreview = {
     author?: string | null;
     publisher?: string | null;
     edition?: string | null;
+    isbn?: string | null;
     accessionNo: string;
+    callNumber?: string | null;
     category?: string | null;
     location: string;
     section?: string | null;
@@ -239,6 +243,10 @@ export type LibraryCirculationDeskContext = {
     returnedToday: number;
     renewalsToday: number;
     overdueLoans: number;
+    issuedNow?: number;
+    dueThisWeek?: number;
+    totalCopies?: number;
+    totalMembers?: number;
     fineCollectedToday: number;
   };
   rules: {
@@ -315,6 +323,7 @@ export type LibraryBookCopy = {
   id: string;
   copyNumber: number;
   barcode: string;
+  accessionNumber?: string | null;
   status: string;
 };
 
@@ -325,6 +334,7 @@ export type LibraryBook = {
   isbn?: string | null;
   title: string;
   author?: string | null;
+  additionalAuthors?: string | null;
   publisher?: string | null;
   edition?: string | null;
   departmentId?: string | null;

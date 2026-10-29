@@ -25,6 +25,22 @@ const COPY_COLUMNS: ReportColumn[] = [
   { key: 'callNumber', label: 'Call number' },
   { key: 'shelf', label: 'Shelf location' },
   { key: 'status', label: 'Copy status' },
+  { key: 'category', label: 'Category' },
+];
+
+const ACQUISITION_KEYS = new Set([
+  'acquisition-register',
+  'purchased-period',
+  'donated-gifts',
+]);
+
+const ACQUISITION_COLUMNS: ReportColumn[] = [
+  { key: 'acquisitionType', label: 'Acquisition type' },
+  { key: 'supplier', label: 'Supplier / donor' },
+  { key: 'invoice', label: 'Invoice number', text: true },
+  { key: 'price', label: 'Price per copy' },
+  { key: 'funding', label: 'Funding source' },
+  { key: 'condition', label: 'Condition' },
 ];
 
 const SUMMARY_COLUMNS: ReportColumn[] = [
@@ -480,7 +496,9 @@ export class LibraryCatalogueReportsService {
     return {
       ...base,
       notes: copyNotes(key),
-      columns: COPY_COLUMNS,
+      columns: ACQUISITION_KEYS.has(key)
+        ? [...COPY_COLUMNS, ...ACQUISITION_COLUMNS]
+        : COPY_COLUMNS,
       rows,
       total,
       totals: { copies: total },
@@ -777,6 +795,22 @@ export class LibraryCatalogueReportsService {
       if (query.from || query.to || key === 'purchased-period')
         where.acquisitionDate = range;
     }
+    if (key === 'purchased-period') {
+      where.book = {
+        AND: [
+          where.book ?? {},
+          { NOT: { acquisitionType: { in: ['DONATION', 'GIFT'] } } },
+        ],
+      };
+    }
+    if (key === 'donated-gifts') {
+      where.book = {
+        AND: [
+          where.book ?? {},
+          { acquisitionType: { in: ['DONATION', 'GIFT'] } },
+        ],
+      };
+    }
     return where;
   }
 
@@ -1070,6 +1104,12 @@ const copyBookSelect = {
   subject: true,
   classificationNumber: true,
   departmentId: true,
+  bookType: true,
+  acquisitionType: true,
+  supplierName: true,
+  invoiceNumber: true,
+  fundingSource: true,
+  price: true,
   category: { select: { name: true } },
 } satisfies Prisma.LibraryBookSelect;
 
@@ -1081,6 +1121,8 @@ function copyRow(
     collectionCode: string | null;
     callNumber: string | null;
     shelvingLocation: string | null;
+    acquisitionPrice: { toString(): string } | null;
+    copyCondition: string | null;
     book: {
       title: string;
       author: string | null;
@@ -1090,6 +1132,12 @@ function copyRow(
       publicationYear: string | null;
       subject: string | null;
       classificationNumber: string | null;
+      bookType: string | null;
+      acquisitionType: string | null;
+      supplierName: string | null;
+      invoiceNumber: string | null;
+      fundingSource: string | null;
+      price: { toString(): string } | null;
       category: { name: string } | null;
     };
     loans: { dueAt: Date }[];
@@ -1119,6 +1167,12 @@ function copyRow(
     shelf: row.shelvingLocation ?? '',
     status,
     category: row.book.category?.name ?? '',
+    acquisitionType: row.book.acquisitionType ?? '',
+    supplier: row.book.supplierName ?? '',
+    invoice: row.book.invoiceNumber ?? '',
+    price: row.acquisitionPrice?.toString() || row.book.price?.toString() || '',
+    funding: row.book.fundingSource ?? '',
+    condition: row.copyCondition ?? '',
   };
 }
 

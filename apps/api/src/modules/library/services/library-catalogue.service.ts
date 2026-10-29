@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import type {
@@ -15,6 +16,11 @@ import type {
   UpdateBookDto,
 } from '../dto/library.dto';
 import { LibrarySettingsService } from './library-settings.service';
+import {
+  accessionSeries,
+  availabilityToStatuses,
+  splitAuthors,
+} from '../accession-numbers';
 
 @Injectable()
 export class LibraryCatalogueService {
@@ -245,57 +251,157 @@ export class LibraryCatalogueService {
   }
 
   async createAccessionEntry(tenantId: string, dto: CreateAccessionBookDto) {
-    const accessionNo = dto.accessionNo?.trim()
-      ? dto.accessionNo.trim()
-      : await this.reserveAccessionNo(tenantId);
-
-    const existing = await this.prisma.libraryBook.findFirst({
-      where: { tenantId, accessionNo, deletedAt: null },
-    });
-    if (existing) {
-      throw new BadRequestException(`Accession ${accessionNo} already exists`);
-    }
-
+    await this.settings.ensureTenantDefaults(tenantId);
+    const title = dto.title.trim();
+    const authors = splitAuthors(dto.author);
+    if (!title) throw new BadRequestException('Book title is required.');
+    if (!authors.primary)
+      throw new BadRequestException('At least one author is required.');
     const copies = dto.totalCopies ?? 1;
-    const accessionStatus = dto.accessionStatus ?? 'PENDING';
-    const book = await this.prisma.libraryBook.create({
-      data: {
-        id: randomUUID(),
-        tenantId,
-        accessionNo,
-        bookNumber: dto.bookNumber?.trim(),
-        isbn: dto.isbn?.trim(),
-        title: dto.title.trim(),
-        author: dto.author?.trim(),
-        publisher: dto.publisher?.trim(),
-        edition: dto.edition?.trim(),
-        departmentId: dto.departmentId,
-        categoryId: dto.categoryId,
-        price: dto.price,
-        shelf: dto.shelf?.trim(),
-        rack: dto.rack?.trim(),
-        section: dto.section?.trim(),
-        row: dto.row?.trim(),
-        location: dto.location?.trim(),
-        accessionStatus,
-        totalCopies: copies,
-      },
+    if (copies < 1 || copies > 100)
+      throw new BadRequestException('Enter between 1 and 100 copies.');
+    const received = parseIsoDate(dto.dateReceived);
+    if (!received)
+      throw new BadRequestException('Date received must be a valid date.');
+    const departmentIds = [
+      ...new Set([dto.departmentId, ...(dto.departmentIds ?? [])]),
+    ];
+    const departments = await this.prisma.department.findMany({
+      where: { tenantId, id: { in: departmentIds }, deletedAt: null },
+      select: { id: true },
     });
+    if (departments.length !== departmentIds.length) {
+      throw new BadRequestException('Choose a department from this college.');
+    }
+    const category = await this.prisma.libraryCategory.findFirst({
+      where: { tenantId, id: dto.categoryId },
+      select: { id: true },
+    });
+    if (!category)
+      throw new BadRequestException('Choose a subject or category.');
+    const statuses = availabilityToStatuses(dto.availability ?? 'RECEIVED');
+    const location = dto.location?.trim() || null;
+    const price =
+      dto.acquisitionType === 'PURCHASE'
+        ? (dto.price ?? null)
+        : (dto.price ?? null);
 
-    for (let i = 1; i <= copies; i++) {
-      await this.prisma.libraryBookCopy.create({
-        data: {
-          id: randomUUID(),
-          tenantId,
-          bookId: book.id,
-          copyNumber: i,
-          barcode: `${book.accessionNo}-C${i}`,
-          status: accessionStatus === 'ON_SHELF' ? 'AVAILABLE' : 'PROCESSING',
-        },
+    let bookId: string;
+    try {
+      bookId = await this.prisma.$transaction(async (tx) => {
+        const settings = await tx.librarySettings.update({
+          where: { tenantId },
+          data: { accessionNextSeq: { increment: copies } },
+          select: { accessionPrefix: true, accessionNextSeq: true },
+        });
+        const start = settings.accessionNextSeq - copies;
+        const numbers = accessionSeries(
+          settings.accessionPrefix,
+          new Date().getFullYear(),
+          start,
+          copies,
+        );
+        if (numbers.length !== copies)
+          throw new BadRequestException(
+            'Accession numbers could not be reserved.',
+          );
+        const primary = numbers[0];
+        const taken = await tx.libraryBook.findFirst({
+          where: { tenantId, accessionNo: primary, deletedAt: null },
+          select: { id: true },
+        });
+        if (taken)
+          throw new BadRequestException(`Accession ${primary} already exists`);
+        const created = await tx.libraryBook.create({
+          data: {
+            tenantId,
+            accessionNo: primary,
+            bookNumber: primary,
+            isbn: emptyToNull(dto.isbn),
+            title,
+            author: authors.primary,
+            additionalAuthors: emptyToNull(authors.additional),
+            publisher: emptyToNull(dto.publisher),
+            edition: emptyToNull(dto.edition),
+            publicationYear: emptyToNull(dto.publicationYear),
+            language: emptyToNull(dto.language),
+            subject: emptyToNull(dto.keywords),
+            classificationNumber: emptyToNull(dto.classificationNumber),
+            subjectClassification: emptyToNull(dto.subjectClassification),
+            bookType: dto.bookType.trim(),
+            departmentId: dto.departmentId,
+            categoryId: dto.categoryId,
+            price: price == null ? null : price,
+            shelf: location,
+            location,
+            accessionStatus: statuses.accessionStatus,
+            acquisitionType: dto.acquisitionType,
+            supplierName: emptyToNull(dto.supplierName),
+            invoiceNumber: emptyToNull(dto.invoiceNumber),
+            purchaseDate:
+              dto.acquisitionType === 'PURCHASE'
+                ? parseIsoDate(dto.purchaseDate)
+                : null,
+            fundingSource: emptyToNull(dto.fundingSource),
+            description: emptyToNull(dto.remarks),
+            totalCopies: copies,
+          },
+        });
+        for (let index = 0; index < numbers.length; index += 1) {
+          const accessionNo = numbers[index];
+          await tx.libraryBookCopy.create({
+            data: {
+              tenantId,
+              bookId: created.id,
+              copyNumber: index + 1,
+              barcode: accessionNo,
+              accessionNumber: accessionNo,
+              status: statuses.copyStatus,
+              copyCondition: dto.condition ?? 'NEW',
+              acquisitionDate: received,
+              acquisitionPrice: price == null ? null : price,
+              callNumber: emptyToNull(dto.classificationNumber),
+              shelvingLocation: location,
+            },
+          });
+        }
+        if (departmentIds.length) {
+          await tx.libraryBookDepartment.createMany({
+            data: departmentIds.map((departmentId) => ({
+              tenantId,
+              bookId: created.id,
+              departmentId,
+            })),
+          });
+        }
+        await tx.libraryAuditLog.create({
+          data: {
+            tenantId,
+            action: 'ACCESSION_ENTRY',
+            entityType: 'LibraryBook',
+            entityId: created.id,
+            metadata: {
+              copies,
+              acquisitionType: dto.acquisitionType,
+              accessionNumbers: numbers,
+            },
+          },
+        });
+        return created.id;
       });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new BadRequestException(
+          'An accession number or barcode in this batch is already in use. Refresh and save again.',
+        );
+      }
+      throw error;
     }
 
-    return this.getBook(tenantId, book.id);
+    return this.getBook(tenantId, bookId);
   }
 
   async updateAccessionWorkflow(
@@ -336,11 +442,37 @@ export class LibraryCatalogueService {
   }
 
   async findCopyByBarcode(tenantId: string, barcode: string) {
+    const code = barcode.trim();
+    const include = { book: { include: { category: true } } } as const;
     const copy = await this.prisma.libraryBookCopy.findFirst({
-      where: { tenantId, barcode: barcode.trim() },
-      include: { book: { include: { category: true } } },
+      where: { tenantId, barcode: code },
+      include,
     });
-    if (!copy) throw new NotFoundException('Book copy not found');
-    return copy;
+    if (copy) return copy;
+    const matches = await this.prisma.libraryBookCopy.findMany({
+      where: { tenantId, accessionNumber: code },
+      include,
+      take: 2,
+    });
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1) {
+      throw new BadRequestException(
+        'This accession number matches more than one physical copy.',
+      );
+    }
+    throw new NotFoundException('Book copy not found');
   }
+}
+
+function emptyToNull(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? '';
+  return trimmed ? trimmed : null;
+}
+
+function parseIsoDate(value: string | null | undefined) {
+  if (!value?.trim()) return null;
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const date = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }

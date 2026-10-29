@@ -9834,6 +9834,7 @@ model LibrarySettings {
   finePolicy                Json?    @map("fine_policy")
   accessionPrefix           String   @default("ACC") @map("accession_prefix")
   accessionNextSeq          Int      @default(1) @map("accession_next_seq")
+  barcodeLabelSettings      Json?    @map("barcode_label_settings")
   createdAt                 DateTime @default(now()) @map("created_at")
   updatedAt                 DateTime @updatedAt @map("updated_at")
 
@@ -9959,6 +9960,13 @@ model LibraryBook {
   additionalAuthors String? @map("additional_authors")
   issn           String?
   coverImageUrl  String?   @map("cover_image_url")
+  bookType       String?   @map("book_type")
+  subjectClassification String? @map("subject_classification")
+  acquisitionType String?  @map("acquisition_type")
+  supplierName   String?   @map("supplier_name")
+  invoiceNumber  String?   @map("invoice_number")
+  purchaseDate   DateTime? @map("purchase_date") @db.Date
+  fundingSource  String?   @map("funding_source")
   accessionStatus String  @default("ON_SHELF") @map("accession_status")
   status         String    @default("ACTIVE")
   totalCopies    Int       @default(1) @map("total_copies")
@@ -9998,11 +10006,13 @@ model LibraryBookCopy {
   acquisitionPrice Decimal?  @map("acquisition_price") @db.Decimal(12, 2)
   homeBranchCode   String?   @map("home_branch_code")
   itemTypeCode     String?   @map("item_type_code")
+  copyCondition    String?   @map("copy_condition")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   book  LibraryBook   @relation(fields: [bookId], references: [id], onDelete: Cascade)
   loans LibraryLoan[]
+  barcodePrintItems LibraryBarcodePrintItem[]
 
   incidents LibraryCopyIncident[] @relation("IncidentCopy")
   replacementIncidents LibraryCopyIncident[] @relation("ReplacementCopy")
@@ -10014,6 +10024,44 @@ model LibraryBookCopy {
   @@index([tenantId, status])
   @@index([tenantId, collectionCode])
   @@map("library_book_copies")
+  @@schema("library")
+}
+
+model LibraryBarcodePrintJob {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  actorId        String?  @map("actor_id") @db.Uuid
+  actorLabel     String?  @map("actor_label")
+  mode           String
+  status         String   @default("PREPARED")
+  labelCount     Int      @map("label_count")
+  filterSnapshot Json?    @map("filter_snapshot")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  items LibraryBarcodePrintItem[]
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@map("library_barcode_print_jobs")
+  @@schema("library")
+}
+
+model LibraryBarcodePrintItem {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  jobId           String   @map("job_id") @db.Uuid
+  copyId          String   @map("copy_id") @db.Uuid
+  accessionNumber String   @map("accession_number")
+  barcode         String
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  job  LibraryBarcodePrintJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  copy LibraryBookCopy        @relation(fields: [copyId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([tenantId, copyId])
+  @@map("library_barcode_print_items")
   @@schema("library")
 }
 

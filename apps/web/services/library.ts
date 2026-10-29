@@ -133,7 +133,13 @@ export const issueLibraryBook = (memberScan: string, copyBarcode: string) =>
     .then((r) => r.data);
 
 export const returnLibraryBook = (copyBarcode: string) =>
-  api.post(`${base}/circulation/return`, { copyBarcode }).then((r) => r.data);
+  api
+    .post<{
+      loan: LibraryLoan;
+      fine: { id: string; amount: number | string } | null;
+      overdueDays: number;
+    }>(`${base}/circulation/return`, { copyBarcode })
+    .then((r) => r.data);
 
 export const fetchOverdueLoans = () =>
   api.get<LibraryLoan[]>(`${base}/circulation/overdue`).then((r) => r.data);
@@ -677,5 +683,173 @@ export const downloadEntryExitExport = (
     .get(`${base}/reports/entry-exit/export/${format}`, {
       params: compactParams(params),
       responseType: 'blob',
+    })
+    .then((r) => r.data as Blob);
+
+const barcodeBase = `${base}/barcodes`;
+
+export type LibraryBarcodeLabelSettings = {
+  preset: 'A4_2X4' | 'SINGLE' | 'CUSTOM' | 'ROLL';
+  pageWidthMm: number;
+  pageHeightMm: number;
+  columns: number;
+  rows: number;
+  marginTopMm: number;
+  marginRightMm: number;
+  marginBottomMm: number;
+  marginLeftMm: number;
+  gapXMm: number;
+  gapYMm: number;
+  labelWidthMm: number;
+  labelHeightMm: number;
+  barcodeHeightMm: number;
+  moduleWidth: number;
+  fontSizePt: number;
+  showLogo: boolean;
+  showTitle: boolean;
+  showAuthor: boolean;
+  showDepartment: boolean;
+  showCallNumber: boolean;
+  showAccession: boolean;
+  headerTitle: string;
+  headerSubtitle: string;
+  headerCode: string;
+};
+
+export type LibraryBarcodeLabelPayload = {
+  copyId: string;
+  accessionNumber: string;
+  encodedValue: string;
+  title: string;
+  author: string;
+  callNumber: string;
+  department: string;
+};
+
+export type LibraryBarcodeCopyRow = {
+  copyId: string;
+  bookId: string;
+  accessionNumber: string;
+  barcode: string;
+  title: string;
+  author: string;
+  isbn: string;
+  publisher: string;
+  edition: string;
+  publicationYear: string;
+  department: string;
+  category: string;
+  callNumber: string;
+  copyStatus: string;
+  printStatus: string;
+  printable: boolean;
+  blocker: string | null;
+};
+
+export const fetchBarcodeSummary = () =>
+  api
+    .get<{
+      totalCopies: number;
+      withAccession: number;
+      printable: number;
+      confirmedLabels: number;
+      missingAccession: number;
+      duplicateAccessionNumbers: number;
+      duplicateCopyCount: number;
+      note: string;
+    }>(`${barcodeBase}/summary`)
+    .then((r) => r.data);
+
+export const fetchBarcodeCopies = (params: Record<string, string | number | undefined>) =>
+  api
+    .get<{
+      items: LibraryBarcodeCopyRow[];
+      total: number;
+      page: number;
+      limit: number;
+    }>(`${barcodeBase}/copies`, { params })
+    .then((r) => r.data);
+
+export const fetchBarcodeCopyIds = (params: Record<string, string | number | undefined>) =>
+  api
+    .get<{ ids: string[]; total: number; truncated: boolean; limit: number }>(
+      `${barcodeBase}/copies/ids`,
+      {
+        params,
+      },
+    )
+    .then((r) => r.data);
+
+export const previewBarcodeLabels = (copyIds: string[]) =>
+  api
+    .post<{
+      labels: LibraryBarcodeLabelPayload[];
+      rejected: { copyId: string; accessionNumber: string; reason: string }[];
+    }>(`${barcodeBase}/preview`, { copyIds })
+    .then((r) => r.data);
+
+export const createBarcodeJob = (payload: {
+  copyIds: string[];
+  mode: 'INDIVIDUAL' | 'BULK' | 'REPRINT';
+}) =>
+  api
+    .post<{
+      jobId: string;
+      status: string;
+      labels: LibraryBarcodeLabelPayload[];
+    }>(`${barcodeBase}/jobs`, payload)
+    .then((r) => r.data);
+
+export const updateBarcodeJob = (jobId: string, status: 'DIALOG_OPENED' | 'USER_CONFIRMED') =>
+  api.patch(`${barcodeBase}/jobs/${jobId}`, { status }).then((r) => r.data);
+
+export const fetchBarcodeJobs = (page = 1) =>
+  api
+    .get<{
+      items: {
+        id: string;
+        actorLabel: string | null;
+        mode: string;
+        status: string;
+        labelCount: number;
+        createdAt: string;
+        sampleAccessions: string[];
+        copyIds: string[];
+      }[];
+      total: number;
+      note: string;
+    }>(`${barcodeBase}/jobs`, { params: { page } })
+    .then((r) => r.data);
+
+export const fetchBarcodeSettings = () =>
+  api
+    .get<{
+      template: LibraryBarcodeLabelSettings;
+      fits: boolean;
+      institutionName: string;
+    }>(`${barcodeBase}/settings`)
+    .then((r) => r.data);
+
+export const saveBarcodeSettings = (template: LibraryBarcodeLabelSettings) =>
+  api
+    .put<{
+      template: LibraryBarcodeLabelSettings;
+      fits: boolean;
+    }>(`${barcodeBase}/settings`, template)
+    .then((r) => r.data);
+
+export const fetchBarcodeReports = () =>
+  api.get<{ key: string; title: string }[]>(`${barcodeBase}/reports`).then((r) => r.data);
+
+export const downloadBarcodeReport = (
+  key: string,
+  format: 'xlsx' | 'csv' | 'pdf',
+  params: Record<string, string | number | undefined>,
+) =>
+  api
+    .get(`${barcodeBase}/reports/${key}/export`, {
+      params: { ...params, format },
+      responseType: 'blob',
+      timeout: 600_000,
     })
     .then((r) => r.data as Blob);

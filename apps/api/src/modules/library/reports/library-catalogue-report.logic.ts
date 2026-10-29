@@ -256,6 +256,14 @@ export const CATALOGUE_REPORTS: CatalogueReportDefinition[] = [
     formal: false,
   },
   {
+    key: 'donated-gifts',
+    title: 'Donated and Gifted Books',
+    group: 'Inventory',
+    kind: 'copies',
+    sensitive: false,
+    formal: false,
+  },
+  {
     key: 'purchased-period',
     title: 'Books Purchased During a Selected Period',
     group: 'Inventory',

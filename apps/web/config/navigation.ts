@@ -1575,6 +1575,16 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['library:read', 'library:manage'],
           },
           {
+            label: 'Barcode Management',
+            href: '/admin/library/barcodes',
+            permissions: [
+              'library:manage',
+              'library:circulate',
+              'library:reports',
+              'library:settings',
+            ],
+          },
+          {
             label: 'Book Accession',
             href: '/admin/library/accession',
             permissions: ['library:manage'],

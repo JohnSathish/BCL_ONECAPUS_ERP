@@ -12,6 +12,8 @@ import { KohaImportController } from './koha/koha-import.controller';
 import { KohaImportService } from './koha/koha-import.service';
 import { LibraryCatalogueReportsController } from './reports/library-catalogue-reports.controller';
 import { LibraryCatalogueReportsService } from './reports/library-catalogue-reports.service';
+import { LibraryBarcodeController } from './barcodes/library-barcode.controller';
+import { LibraryBarcodeService } from './barcodes/library-barcode.service';
 
 import { LibraryAccessService } from './services/library-access.service';
 
@@ -71,6 +73,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
     LibraryController,
     KohaImportController,
     LibraryCatalogueReportsController,
+    LibraryBarcodeController,
   ],
 
   providers: [
@@ -96,6 +99,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
 
     KohaImportService,
     LibraryCatalogueReportsService,
+    LibraryBarcodeService,
 
     LibraryFinesService,
 

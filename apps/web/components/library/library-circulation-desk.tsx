@@ -1,74 +1,65 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertTriangle,
-  ArrowDownLeft,
-  ArrowUpRight,
   BookOpen,
-  ClipboardList,
-  RefreshCw,
-  RotateCw,
+  CalendarClock,
+  Library,
+  RotateCcw,
   Search,
-  User,
+  Settings,
+  UserPlus,
+  Users,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
-import { useLibraryRealtime } from '@/hooks/use-library-realtime';
 import {
+  fetchActiveLoans,
   fetchLibraryBookPreview,
   fetchLibraryBooks,
-  fetchLibraryDashboardActivity,
   fetchLibraryDeskContext,
-  fetchLibraryFines,
   fetchLibraryIssuePreview,
   fetchLibraryMemberSummary,
+  fetchLibraryMembers,
   fetchLibraryRenewPreview,
-  fetchLibraryReservationQueue,
   fetchLibraryReturnPreview,
+  fetchOverdueLoans,
   issueLibraryBook,
   payLibraryFine,
   renewLibraryLoan,
+  reportLibraryCopyIncident,
   returnLibraryBook,
   waiveLibraryFine,
 } from '@/services/library';
 import type {
-  LibraryActivityItem,
   LibraryBookPreview,
-  LibraryCirculationDeskContext,
-  LibraryIssuePreview,
+  LibraryLoan,
   LibraryMemberSummary,
   LibraryRenewPreview,
   LibraryReturnPreview,
 } from '@/types/library';
 import { apiErrorMessage } from '@/utils/api-error';
-import { cn } from '@/utils/cn';
 
-type DeskMode = 'issue' | 'return' | 'renew';
+type Tab = 'issue' | 'return' | 'renew' | 'history';
+type IssueLine = { barcode: string; accession: string; title: string; dueAt: string };
 
-function playBeep() {
-  try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    gain.gain.value = 0.06;
-    osc.start();
-    setTimeout(() => {
-      osc.stop();
-      void ctx.close();
-    }, 120);
-  } catch {
-    /* ignore */
-  }
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'issue', label: 'Issue Book' },
+  { id: 'return', label: 'Return Book' },
+  { id: 'renew', label: 'Renew Book' },
+  { id: 'history', label: 'Member History' },
+];
+
+function money(value: number) {
+  return `₹${value.toFixed(2)}`;
 }
 
-function fmtDate(iso: string) {
+function fmtDate(iso?: string | null) {
+  if (!iso) return 'Not applicable';
   return new Date(iso).toLocaleDateString('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -76,1071 +67,967 @@ function fmtDate(iso: string) {
   });
 }
 
-function daysLeft(dueAt: string) {
-  const diff = Math.ceil((new Date(dueAt).getTime() - Date.now()) / 86_400_000);
-  return diff;
-}
-
-function loanStatusLabel(dueAt: string) {
-  const left = daysLeft(dueAt);
-  if (left < 0) return { label: 'Overdue', tone: 'text-red-600 bg-red-50' };
-  if (left <= 3) return { label: `${left}d left`, tone: 'text-amber-700 bg-amber-50' };
-  return { label: 'Active', tone: 'text-emerald-700 bg-emerald-50' };
-}
-
-function BookCover({ title }: { title: string }) {
-  return (
-    <div className="flex h-32 w-24 shrink-0 flex-col items-center justify-center rounded-lg border bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 shadow-sm dark:from-amber-950/40 dark:via-orange-950/30 dark:to-amber-900/20">
-      <BookOpen className="mb-2 h-8 w-8 text-amber-700/70" />
-      <span className="px-1 text-center text-[10px] font-bold leading-tight text-amber-900/80">
-        {title.slice(0, 24)}
-      </span>
-    </div>
-  );
-}
-
-function MemberPhoto({
-  name,
-  photoUrl,
-  size = 'lg',
-}: {
-  name: string;
-  photoUrl?: string | null;
-  size?: 'lg' | 'md';
-}) {
-  const dim = size === 'lg' ? 'h-24 w-24' : 'h-16 w-16';
-  if (photoUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={photoUrl}
-        alt={name}
-        className={`${dim} rounded-xl border object-cover shadow-sm`}
-      />
-    );
-  }
-  return (
-    <div className={`${dim} flex items-center justify-center rounded-xl border bg-muted shadow-sm`}>
-      <User className="h-10 w-10 text-muted-foreground" />
-    </div>
-  );
-}
-
-function StatPill({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string | number;
-  accent?: string;
-}) {
-  return (
-    <div className="rounded-xl border bg-card px-4 py-2.5 shadow-sm">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className={cn('text-xl font-bold tabular-nums', accent)}>{value}</p>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-3 border-b border-dashed py-2 text-sm last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium">{value}</span>
-    </div>
-  );
+function accessionOf(loan: LibraryLoan) {
+  const copy = loan.copy as {
+    accessionNumber?: string | null;
+    barcode: string;
+    book: { accessionNo: string; title: string };
+  };
+  return copy.accessionNumber || copy.book.accessionNo || copy.barcode;
 }
 
 export function LibraryCirculationDesk() {
-  const qc = useQueryClient();
   const enabled = useAuthQueryEnabled();
-  const scanRef = useRef<HTMLInputElement>(null);
-  const [scanBuffer, setScanBuffer] = useState('');
-  const [mode, setMode] = useState<DeskMode>('issue');
-  const [message, setMessage] = useState('');
-  const [memberScan, setMemberScan] = useState('');
-  const [copyBarcode, setCopyBarcode] = useState('');
+  const qc = useQueryClient();
+  const memberRef = useRef<HTMLInputElement>(null);
+  const bookRef = useRef<HTMLInputElement>(null);
+  const returnRef = useRef<HTMLInputElement>(null);
+  const renewRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<Tab>('issue');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [memberQuery, setMemberQuery] = useState('');
+  const [bookQuery, setBookQuery] = useState('');
   const [member, setMember] = useState<LibraryMemberSummary | null>(null);
   const [book, setBook] = useState<LibraryBookPreview | null>(null);
-  const [issuePreview, setIssuePreview] = useState<LibraryIssuePreview | null>(null);
-  const [issueBlock, setIssueBlock] = useState<string | null>(null);
+  const [cart, setCart] = useState<IssueLine[]>([]);
+  const [confirmIssue, setConfirmIssue] = useState(false);
+  const [returnCode, setReturnCode] = useState('');
   const [returnPreview, setReturnPreview] = useState<LibraryReturnPreview | null>(null);
+  const [condition, setCondition] = useState<'GOOD' | 'DAMAGED' | 'LOST'>('GOOD');
+  const [conditionNote, setConditionNote] = useState('');
+  const [damageCharge, setDamageCharge] = useState('');
+  const [renewCode, setRenewCode] = useState('');
   const [renewPreview, setRenewPreview] = useState<LibraryRenewPreview | null>(null);
-  const [quickSearch, setQuickSearch] = useState('');
-  const [searchKind, setSearchKind] = useState<'book' | 'member' | 'accession' | 'barcode'>('book');
-  const [recentTx, setRecentTx] = useState<LibraryActivityItem[]>([]);
+  const [showOverdue, setShowOverdue] = useState(false);
+  const [showDueWeek, setShowDueWeek] = useState(false);
 
-  const deskContext = useQuery({
+  const desk = useQuery({
     queryKey: ['library', 'circulation', 'desk-context'],
     queryFn: fetchLibraryDeskContext,
     enabled,
-    refetchInterval: 30_000,
   });
-
-  const activity = useQuery({
-    queryKey: ['library', 'dashboard', 'activity', 'desk'],
-    queryFn: () => fetchLibraryDashboardActivity(10),
-    enabled,
-    refetchInterval: 10_000,
+  const overdue = useQuery({
+    queryKey: ['library', 'circulation', 'overdue'],
+    queryFn: fetchOverdueLoans,
+    enabled: enabled && showOverdue,
   });
-
-  const reservationQueue = useQuery({
-    queryKey: ['library', 'reservations', 'queue'],
-    queryFn: fetchLibraryReservationQueue,
-    enabled,
+  const active = useQuery({
+    queryKey: ['library', 'circulation', 'active'],
+    queryFn: fetchActiveLoans,
+    enabled: enabled && (tab === 'issue' || showDueWeek),
   });
-
-  const memberFines = useQuery({
-    queryKey: ['library', 'fines', 'member', member?.profile.studentId],
-    queryFn: () => fetchLibraryFines('UNPAID'),
-    enabled: enabled && Boolean(member),
+  const memberHits = useQuery({
+    queryKey: ['library', 'members', 'search', memberQuery],
+    queryFn: () => fetchLibraryMembers({ search: memberQuery, limit: 6 }),
+    enabled: enabled && memberQuery.trim().length > 2 && !member,
+  });
+  const bookHits = useQuery({
+    queryKey: ['library', 'books', 'search', bookQuery],
+    queryFn: () => fetchLibraryBooks({ search: bookQuery, limit: 6 }),
+    enabled: enabled && tab === 'issue' && bookQuery.trim().length > 2 && !book,
   });
 
   useEffect(() => {
-    if (activity.data?.length) setRecentTx(activity.data);
-  }, [activity.data]);
+    const node =
+      tab === 'issue'
+        ? memberRef.current
+        : tab === 'return'
+          ? returnRef.current
+          : tab === 'renew'
+            ? renewRef.current
+            : memberRef.current;
+    node?.focus();
+  }, [tab]);
 
-  useLibraryRealtime({
-    onCirculationActivity: (item) => {
-      setRecentTx((prev) => [item, ...prev.filter((p) => p.at !== item.at)].slice(0, 10));
-      void qc.invalidateQueries({ queryKey: ['library', 'circulation', 'desk-context'] });
-    },
+  const stats = desk.data?.stats;
+  const rules = desk.data?.rules;
+  const dueThisWeek = (active.data ?? []).filter((loan) => {
+    const due = new Date(loan.dueAt).getTime();
+    return loan.status === 'ACTIVE' && due >= Date.now() && due <= Date.now() + 7 * 86_400_000;
   });
+  const nextDue = member?.activeLoans.map((loan) => loan.dueAt).sort()[0];
 
-  const bookReservation = useMemo(() => {
-    if (!book?.book.id || !reservationQueue.data) return null;
-    return reservationQueue.data.find((g) => g.bookId === book.book.id) ?? null;
-  }, [book?.book.id, reservationQueue.data]);
+  async function loadMember(code: string) {
+    const scan = code.trim();
+    if (!scan) return;
+    setBusy(true);
+    setNotice('');
+    try {
+      const summary = await fetchLibraryMemberSummary(scan);
+      setMember(summary);
+      setMemberQuery(summary.profile.fullName);
+      bookRef.current?.focus();
+    } catch (error) {
+      setMember(null);
+      setNotice(apiErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  const filteredFines = useMemo(() => {
-    if (!member?.profile.studentId) return memberFines.data ?? [];
-    return (memberFines.data ?? []).filter((f) => f.loan?.studentId === member.profile.studentId);
-  }, [member?.profile.studentId, memberFines.data]);
-
-  const loadMember = useMutation({
-    mutationFn: (code: string) => fetchLibraryMemberSummary(code),
-    onSuccess: (data) => {
-      setMember(data);
-      setMemberScan(data.profile.registrationNumber ?? data.profile.memberId);
-      playBeep();
-      setMessage('');
-      setIssueBlock(null);
-    },
-    onError: (e) => setMessage(apiErrorMessage(e)),
-  });
-
-  const loadBook = useMutation({
-    mutationFn: async (barcode: string) => {
-      const preview = await fetchLibraryBookPreview(barcode);
-      if (mode === 'return') {
-        const ret = await fetchLibraryReturnPreview(barcode);
-        return { preview, ret, ren: null as LibraryRenewPreview | null };
-      }
-      if (mode === 'renew') {
-        const ren = await fetchLibraryRenewPreview(barcode);
-        return { preview, ret: null as LibraryReturnPreview | null, ren };
-      }
-      return { preview, ret: null, ren: null };
-    },
-    onSuccess: async ({ preview, ret, ren }) => {
+  async function loadBook(code: string) {
+    const scan = code.trim();
+    if (!scan) return;
+    setBusy(true);
+    setNotice('');
+    try {
+      const preview = await fetchLibraryBookPreview(scan);
       setBook(preview);
-      setCopyBarcode(preview.copy.barcode);
-      setReturnPreview(ret);
-      setRenewPreview(ren);
-      playBeep();
-      if (ret?.member?.registrationNumber && mode === 'return') {
-        void loadMember.mutate(ret.member.registrationNumber);
-      }
-      if (mode === 'issue' && memberScan) {
-        try {
-          const ip = await fetchLibraryIssuePreview(memberScan, preview.copy.barcode);
-          setIssuePreview(ip);
-          setIssueBlock(null);
-        } catch (e) {
-          setIssuePreview(null);
-          setIssueBlock(apiErrorMessage(e));
-        }
-      }
-    },
-    onError: (e) => setMessage(apiErrorMessage(e)),
-  });
-
-  const issueMut = useMutation({
-    mutationFn: () => issueLibraryBook(memberScan, copyBarcode),
-    onSuccess: () => {
-      setMessage('Book issued successfully');
-      resetBook();
-      void qc.invalidateQueries({ queryKey: ['library'] });
-      if (memberScan) void loadMember.mutate(memberScan);
-    },
-    onError: (e) => setMessage(apiErrorMessage(e)),
-  });
-
-  const returnMut = useMutation({
-    mutationFn: () => returnLibraryBook(copyBarcode),
-    onSuccess: (result) => {
-      const fine = (result as { fine?: { id: string; amount: number } | null })?.fine;
-      setMessage(
-        fine && Number(fine.amount) > 0
-          ? `Returned — overdue fine ₹${Number(fine.amount).toFixed(2)} created`
-          : 'Book returned successfully',
-      );
-      resetBook();
-      resetMember();
-      void qc.invalidateQueries({ queryKey: ['library'] });
-    },
-    onError: (e) => setMessage(apiErrorMessage(e)),
-  });
-
-  const renewMut = useMutation({
-    mutationFn: () => renewLibraryLoan(copyBarcode),
-    onSuccess: () => {
-      setMessage('Loan renewed');
-      resetBook();
-      void qc.invalidateQueries({ queryKey: ['library'] });
-    },
-    onError: (e) => setMessage(apiErrorMessage(e)),
-  });
-
-  const quickSearchMut = useMutation({
-    mutationFn: async () => {
-      const q = quickSearch.trim();
-      if (!q) return;
-      if (searchKind === 'barcode') {
-        await loadBook.mutateAsync(q);
-        return;
-      }
-      if (searchKind === 'member') {
-        await loadMember.mutateAsync(q);
-        return;
-      }
-      const list = await fetchLibraryBooks({ search: q, limit: 8 });
-      const item =
-        searchKind === 'accession'
-          ? (list.items.find((b) => b.accessionNo.toLowerCase() === q.toLowerCase()) ??
-            list.items[0])
-          : list.items[0];
-      if (!item) throw new Error('No book found');
-      const barcode = item.copies?.[0]?.barcode ?? item.accessionNo;
-      await loadBook.mutateAsync(barcode);
-    },
-    onSuccess: () => setQuickSearch(''),
-    onError: (e) => setMessage(apiErrorMessage(e)),
-  });
-
-  function resetBook() {
-    setCopyBarcode('');
-    setBook(null);
-    setIssuePreview(null);
-    setIssueBlock(null);
-    setReturnPreview(null);
-    setRenewPreview(null);
+      setBookQuery(preview.book.title);
+    } catch (error) {
+      setBook(null);
+      setNotice(apiErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function resetMember() {
-    setMember(null);
-    setMemberScan('');
-  }
-
-  const processScan = useCallback(
-    (raw: string) => {
-      const code = raw.trim();
-      if (!code) return;
-      setScanBuffer('');
-
-      if (mode === 'issue') {
-        if (!member) {
-          void loadMember.mutate(code);
-          return;
-        }
-        if (code === memberScan || code.includes(memberScan)) {
-          return;
-        }
-        void loadBook.mutate(code);
-        return;
-      }
-
-      void loadBook.mutate(code);
-    },
-    [loadBook, loadMember, member, memberScan, mode],
-  );
-
-  useEffect(() => {
-    scanRef.current?.focus();
-  }, [mode]);
-
-  useEffect(() => {
-    resetBook();
-    setMessage('');
-  }, [mode]);
-
-  useEffect(() => {
-    if (mode !== 'issue' || !memberScan || !copyBarcode) {
-      setIssuePreview(null);
-      setIssueBlock(null);
+  async function addBook() {
+    if (!member || !book) {
+      setNotice('Select a member and an available copy first.');
       return;
     }
-    void fetchLibraryIssuePreview(memberScan, copyBarcode)
-      .then((p) => {
-        setIssuePreview(p);
-        setIssueBlock(null);
-      })
-      .catch((e) => {
-        setIssuePreview(null);
-        setIssueBlock(apiErrorMessage(e));
-      });
-  }, [mode, memberScan, copyBarcode]);
+    if (book.copy.status !== 'AVAILABLE') {
+      setNotice(
+        `This copy is ${book.copy.status.replaceAll('_', ' ').toLowerCase()} and cannot be issued.`,
+      );
+      return;
+    }
+    if (cart.some((line) => line.barcode === book.copy.barcode)) {
+      setNotice('That copy is already in the issue list.');
+      return;
+    }
+    if (member.borrowedCount + cart.length >= member.maxBooks) {
+      setNotice(`Borrowing limit reached (${member.borrowedCount} of ${member.maxBooks}).`);
+      return;
+    }
+    const scan = member.profile.registrationNumber || member.profile.memberId;
+    try {
+      const preview = await fetchLibraryIssuePreview(scan, book.copy.barcode);
+      setCart((current) => [
+        ...current,
+        {
+          barcode: book.copy.barcode,
+          accession: book.book.accessionNo,
+          title: book.book.title,
+          dueAt: preview.dueAt,
+        },
+      ]);
+      setBook(null);
+      setBookQuery('');
+      bookRef.current?.focus();
+    } catch (error) {
+      setNotice(apiErrorMessage(error));
+    }
+  }
 
-  const ctx = deskContext.data;
-  const stats = ctx?.stats;
-  const rules = ctx?.rules;
-  const fineSummary = ctx?.fineSummary;
-
-  const alerts = useMemo(() => {
-    const items: { text: string; tone: 'warn' | 'error' }[] = [];
-    if (member) {
-      if (!member.profile.active || member.membershipStatus !== 'ACTIVE') {
-        items.push({ text: 'Membership is not active', tone: 'error' });
+  async function issueCart() {
+    if (!member || !cart.length) return;
+    const scan = member.profile.registrationNumber || member.profile.memberId;
+    setBusy(true);
+    setNotice('');
+    const issued: string[] = [];
+    try {
+      for (const line of cart) {
+        await issueLibraryBook(scan, line.barcode);
+        issued.push(line.accession);
       }
-      if (mode === 'issue' && member.borrowedCount >= member.maxBooks) {
-        items.push({
-          text: `Student reached borrowing limit (${member.borrowedCount}/${member.maxBooks})`,
-          tone: 'warn',
+      setNotice(
+        `Issued ${issued.length} ${issued.length === 1 ? 'book' : 'books'} to ${member.profile.fullName}: ${issued.join(', ')}.`,
+      );
+      setCart([]);
+      setBook(null);
+      setConfirmIssue(false);
+      await loadMember(scan);
+      void qc.invalidateQueries({ queryKey: ['library', 'circulation'] });
+    } catch (error) {
+      setNotice(
+        `${issued.length ? `Issued ${issued.join(', ')} before the next copy failed. ` : ''}${apiErrorMessage(error)}`,
+      );
+      setCart((current) => current.filter((line) => !issued.includes(line.accession)));
+      setConfirmIssue(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadReturn(code: string) {
+    setBusy(true);
+    setNotice('');
+    try {
+      setReturnPreview(await fetchLibraryReturnPreview(code.trim()));
+    } catch (error) {
+      setReturnPreview(null);
+      setNotice(apiErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmReturn(action: 'return' | 'pay' | 'waive') {
+    if (!returnPreview) return;
+    setBusy(true);
+    setNotice('');
+    try {
+      const charge = damageCharge.trim() ? Number(damageCharge) : 0;
+      if (condition !== 'GOOD' && charge > 0) {
+        await reportLibraryCopyIncident({
+          copyBarcode: returnPreview.book.barcode,
+          incidentType: condition,
+          notes: conditionNote || undefined,
+          chargeAmount: charge,
         });
+        setNotice(
+          `Closed the loan for ${returnPreview.book.title} and recorded a ${condition.toLowerCase()} charge of ${money(charge)}.`,
+        );
+      } else {
+        const result = await returnLibraryBook(returnPreview.book.barcode);
+        const fineId = result.fine?.id;
+        if (condition === 'GOOD' && action === 'pay' && fineId)
+          await payLibraryFine(fineId, 'Collected at return');
+        if (condition === 'GOOD' && action === 'waive' && fineId)
+          await waiveLibraryFine(fineId, 'Waived at return');
+        if (condition !== 'GOOD') {
+          await reportLibraryCopyIncident({
+            copyBarcode: returnPreview.book.barcode,
+            incidentType: condition,
+            notes: conditionNote || undefined,
+            chargeAmount: 0,
+          });
+        }
+        setNotice(
+          condition !== 'GOOD'
+            ? `Returned ${returnPreview.book.title} as ${condition.toLowerCase()}. ${result.fine ? 'The overdue fine stays pending.' : 'No overdue fine was due.'}`
+            : action === 'pay'
+              ? `Returned ${returnPreview.book.title} and recorded the fine payment.`
+              : action === 'waive'
+                ? `Returned ${returnPreview.book.title}. The overdue fine was waived.`
+                : `Returned ${returnPreview.book.title}. ${result.fine ? 'The fine stays pending.' : 'No fine was due.'}`,
+        );
       }
-      if (mode === 'issue' && member.outstandingFine > 0 && rules?.blockIssueOnUnpaidFines) {
-        items.push({
-          text: `Outstanding fine ₹${member.outstandingFine.toFixed(2)} — issue blocked`,
-          tone: 'error',
-        });
-      }
+      setReturnPreview(null);
+      setReturnCode('');
+      setCondition('GOOD');
+      setConditionNote('');
+      setDamageCharge('');
+      void qc.invalidateQueries({ queryKey: ['library', 'circulation'] });
+    } catch (error) {
+      setNotice(apiErrorMessage(error));
+    } finally {
+      setBusy(false);
     }
-    if (book && mode === 'issue' && book.copy.status !== 'AVAILABLE') {
-      items.push({ text: `Book already ${book.copy.status.toLowerCase()}`, tone: 'error' });
-    }
-    if (issueBlock) items.push({ text: issueBlock, tone: 'error' });
-    if (renewPreview && !renewPreview.canRenew && renewPreview.blockReason) {
-      items.push({ text: renewPreview.blockReason, tone: 'warn' });
-    }
-    return items;
-  }, [member, mode, book, issueBlock, renewPreview, rules?.blockIssueOnUnpaidFines]);
+  }
 
-  const displayLoans = member?.activeLoans?.length ? member.activeLoans : [];
+  async function loadRenew(code: string) {
+    setBusy(true);
+    setNotice('');
+    try {
+      setRenewPreview(await fetchLibraryRenewPreview(code.trim()));
+    } catch (error) {
+      setRenewPreview(null);
+      setNotice(apiErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  const step = !member && mode === 'issue' ? 1 : !book ? 2 : 3;
+  async function confirmRenew() {
+    if (!renewPreview?.canRenew) return;
+    setBusy(true);
+    try {
+      const loan = await renewLibraryLoan(renewPreview.barcode);
+      setNotice(`Renewed ${renewPreview.bookTitle}. New due date ${fmtDate(loan.dueAt)}.`);
+      setRenewPreview(null);
+      setRenewCode('');
+      void qc.invalidateQueries({ queryKey: ['library', 'circulation'] });
+    } catch (error) {
+      setNotice(apiErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const blockReason = member
+    ? !member.profile.active
+      ? 'This membership is not active.'
+      : member.borrowedCount >= member.maxBooks
+        ? `Borrowing limit reached (${member.borrowedCount} of ${member.maxBooks}).`
+        : rules?.blockIssueOnUnpaidFines && member.outstandingFine > 0
+          ? `Unpaid library fine of ${money(member.outstandingFine)} blocks new issues.`
+          : null
+    : null;
 
   return (
-    <div className="space-y-5">
-      <input
-        ref={scanRef}
-        type="text"
-        className="sr-only"
-        value={scanBuffer}
-        onChange={(e) => setScanBuffer(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            processScan(scanBuffer);
-          }
-        }}
-        aria-label="Scanner input"
-      />
-
-      {/* Header + today's stats */}
-      <div className="rounded-2xl border bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 p-5 text-white shadow-lg">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
-              Library Operations
-            </p>
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold">
-              <ClipboardList className="h-7 w-7" />
-              Circulation Desk
-            </h1>
-            <p className="mt-1 text-sm text-white/70">
-              Scan member → scan book → choose action → confirm
-            </p>
-          </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-500">Library / Circulation</p>
+          <h1 className="text-2xl font-semibold text-slate-900">Library Circulation</h1>
+          <p className="text-sm text-slate-500">
+            Issue, return and renew books for library members.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" asChild>
+            <Link href="/admin/library/settings">
+              <Settings className="mr-1 h-4 w-4" /> Circulation Rules
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" asChild>
+            <Link href="/admin/library/settings">
+              <RotateCcw className="mr-1 h-4 w-4" /> Renewal Settings
+            </Link>
+          </Button>
+          <Button type="button" asChild>
+            <Link href="/admin/library/members">
+              <UserPlus className="mr-1 h-4 w-4" /> Add Member
+            </Link>
+          </Button>
           <Button
-            variant="secondary"
-            size="sm"
-            className="shrink-0"
+            type="button"
+            variant="outline"
             onClick={() => {
-              void deskContext.refetch();
-              void activity.refetch();
+              setTab('history');
+              memberRef.current?.focus();
             }}
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
+            <Search className="mr-1 h-4 w-4" /> Member Search
           </Button>
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatPill
-            label="Today's Issues"
-            value={stats?.issuedToday ?? '—'}
-            accent="text-sky-300"
-          />
-          <StatPill
-            label="Today's Returns"
-            value={stats?.returnedToday ?? '—'}
-            accent="text-emerald-300"
-          />
-          <StatPill label="Renewals" value={stats?.renewalsToday ?? '—'} accent="text-violet-300" />
-          <StatPill label="Overdue" value={stats?.overdueLoans ?? '—'} accent="text-amber-300" />
-          <StatPill
-            label="Fine Collection"
-            value={stats ? `₹${stats.fineCollectedToday.toFixed(0)}` : '—'}
-            accent="text-rose-300"
-          />
         </div>
       </div>
 
-      {/* Workflow steps */}
-      <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
-        {[
-          { n: 1, label: 'Scan member', done: Boolean(member) || mode !== 'issue' },
-          { n: 2, label: 'Scan book', done: Boolean(book) },
-          { n: 3, label: 'Choose action', done: Boolean(book) },
-          { n: 4, label: 'Confirm', done: false },
-        ].map((s, i) => (
-          <div key={s.n} className="flex items-center gap-2">
-            {i > 0 ? <span className="text-muted-foreground">→</span> : null}
-            <span
-              className={cn(
-                'rounded-full px-3 py-1',
-                step === s.n
-                  ? 'bg-primary text-primary-foreground'
-                  : s.done
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-muted text-muted-foreground',
-              )}
-            >
-              {s.n}. {s.label}
-            </span>
-          </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <Stat
+          href="/admin/library/catalogue"
+          icon={<Library className="h-4 w-4" />}
+          label="Total Books"
+          value={stats?.totalCopies}
+        />
+        <Stat
+          href="/admin/library/members"
+          icon={<Users className="h-4 w-4" />}
+          label="Total Members"
+          value={stats?.totalMembers}
+        />
+        <Stat
+          icon={<BookOpen className="h-4 w-4" />}
+          label="Issued Books"
+          value={stats?.issuedNow}
+          hint={`Today: ${stats?.issuedToday ?? 0}`}
+        />
+        <Stat
+          icon={<RotateCcw className="h-4 w-4" />}
+          label="Returned Today"
+          value={stats?.returnedToday}
+        />
+        <button type="button" className="text-left" onClick={() => setShowOverdue((open) => !open)}>
+          <Stat
+            icon={<CalendarClock className="h-4 w-4" />}
+            label="Overdue Books"
+            value={stats?.overdueLoans}
+            warn
+          />
+        </button>
+        <button type="button" className="text-left" onClick={() => setShowDueWeek((open) => !open)}>
+          <Stat
+            icon={<CalendarClock className="h-4 w-4" />}
+            label="Due This Week"
+            value={stats?.dueThisWeek}
+          />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 md:grid-cols-4">
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={
+              item.id === tab
+                ? 'rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white'
+                : 'rounded-lg px-3 py-2 text-sm text-slate-600'
+            }
+            onClick={() => setTab(item.id)}
+          >
+            {item.label}
+          </button>
         ))}
       </div>
 
-      {message ? (
-        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          {message}
+      {notice ? (
+        <p className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+          {notice}
         </p>
       ) : null}
+      {busy ? <p className="text-sm text-slate-500">Working…</p> : null}
 
-      {alerts.length ? (
-        <div className="space-y-2">
-          {alerts.map((a) => (
-            <div
-              key={a.text}
-              className={cn(
-                'flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm',
-                a.tone === 'error'
-                  ? 'border-red-200 bg-red-50 text-red-900'
-                  : 'border-amber-200 bg-amber-50 text-amber-900',
-              )}
-            >
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              {a.text}
-            </div>
-          ))}
-        </div>
-      ) : null}
+      {showOverdue ? <LoanList title="Overdue books" loans={overdue.data ?? []} /> : null}
+      {showDueWeek ? <LoanList title="Due within seven days" loans={dueThisWeek} /> : null}
 
-      {/* Quick search */}
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3 shadow-sm">
-        <div className="flex flex-wrap gap-1">
-          {(
-            [
-              ['book', 'Search book'],
-              ['member', 'Search member'],
-              ['accession', 'Accession no'],
-              ['barcode', 'Barcode'],
-            ] as const
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setSearchKind(k)}
-              className={cn(
-                'rounded-full px-3 py-1 text-xs font-medium',
-                searchKind === k ? 'bg-primary text-primary-foreground' : 'bg-muted',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex min-w-[240px] flex-1 gap-2">
-          <Input
-            placeholder="Quick search…"
-            value={quickSearch}
-            onChange={(e) => setQuickSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') quickSearchMut.mutate();
-            }}
-          />
-          <Button
-            variant="outline"
-            disabled={!quickSearch.trim() || quickSearchMut.isPending}
-            onClick={() => quickSearchMut.mutate()}
-          >
-            <Search className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
-        <div className="space-y-5">
-          {/* Mode selector — large center buttons */}
-          <div className="grid grid-cols-3 gap-3">
-            {(
-              [
-                {
-                  m: 'issue' as const,
-                  label: 'Issue',
-                  icon: ArrowUpRight,
-                  color: 'from-sky-500 to-blue-600',
-                },
-                {
-                  m: 'return' as const,
-                  label: 'Return',
-                  icon: ArrowDownLeft,
-                  color: 'from-emerald-500 to-green-600',
-                },
-                {
-                  m: 'renew' as const,
-                  label: 'Renew',
-                  icon: RotateCw,
-                  color: 'from-violet-500 to-purple-600',
-                },
-              ] as const
-            ).map(({ m, label, icon: Icon, color }) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                className={cn(
-                  'rounded-2xl border-2 p-4 text-center transition-all',
-                  mode === m
-                    ? `border-transparent bg-gradient-to-br ${color} text-white shadow-lg scale-[1.02]`
-                    : 'border-dashed bg-card hover:border-primary/40',
-                )}
-              >
-                <Icon
-                  className={cn('mx-auto mb-2 h-7 w-7', mode === m ? 'text-white' : 'text-primary')}
-                />
-                <span className="text-lg font-bold uppercase tracking-wide">{label}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            {/* Member card */}
-            <section className="rounded-2xl border bg-card p-4 shadow-sm">
-              <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Step 1 · Member information
-              </h2>
-              {mode === 'issue' ? (
+      {tab === 'issue' ? (
+        <div className="space-y-4">
+          <div className="grid gap-4 xl:grid-cols-2">
+            <section className="rounded-xl border bg-white p-4 shadow-sm">
+              <h2 className="text-sm font-semibold">1. Select Member</h2>
+              <div className="mt-3 flex gap-2">
                 <Input
-                  className="mb-3"
-                  placeholder="Scan member card / enrollment / RFID"
-                  value={memberScan}
-                  onChange={(e) => setMemberScan(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void loadMember.mutate(memberScan);
+                  ref={memberRef}
+                  placeholder="Scan member card or search name, enrolment no."
+                  value={memberQuery}
+                  onChange={(event) => {
+                    setMemberQuery(event.target.value);
+                    setMember(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void loadMember(memberQuery);
                   }}
                 />
+                <Button type="button" onClick={() => void loadMember(memberQuery)}>
+                  Search
+                </Button>
+              </div>
+              {(memberHits.data?.items ?? []).length && !member ? (
+                <ul className="mt-2 divide-y rounded-lg border text-sm">
+                  {memberHits.data?.items.map((item) => (
+                    <li key={`${item.memberType}-${item.memberId}`}>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left hover:bg-slate-50"
+                        onClick={() =>
+                          item.registrationNumber && void loadMember(item.registrationNumber)
+                        }
+                      >
+                        {item.fullName} · {item.registrationNumber || item.memberType}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {member ? (
+                <MemberCard member={member} />
               ) : (
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Member loads automatically when you scan an issued book in return/renew mode.
+                <p className="mt-4 text-sm text-slate-500">
+                  Scan a card or search to load a member.
                 </p>
               )}
-              {member ? (
-                <div className="flex gap-4">
-                  <MemberPhoto name={member.profile.fullName} photoUrl={member.profile.photoUrl} />
-                  <div className="min-w-0 flex-1">
-                    <InfoRow label="Name" value={member.profile.fullName} />
-                    <InfoRow label="Enrollment" value={member.profile.registrationNumber ?? '—'} />
-                    <InfoRow label="Department" value={member.profile.department ?? '—'} />
-                    <InfoRow label="Semester" value={member.profile.semester ?? '—'} />
-                    <InfoRow
-                      label="Books issued"
-                      value={`${member.borrowedCount} / ${member.maxBooks}`}
-                    />
-                    <InfoRow
-                      label="Outstanding fine"
-                      value={`₹${member.outstandingFine.toFixed(2)}`}
-                    />
-                    <InfoRow
-                      label="Membership"
-                      value={
-                        <span
-                          className={cn(
-                            'rounded-full px-2 py-0.5 text-xs font-semibold',
-                            member.membershipStatus === 'ACTIVE'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-red-100 text-red-800',
-                          )}
-                        >
-                          {member.membershipStatus}
-                        </span>
-                      }
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-                  <User className="mb-2 h-10 w-10 opacity-40" />
-                  Scan member to begin issue flow
-                </div>
-              )}
-              {member && mode === 'issue' ? (
-                <Button variant="ghost" size="sm" className="mt-2" onClick={resetMember}>
-                  Clear member
-                </Button>
+              {blockReason ? (
+                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {blockReason}
+                </p>
               ) : null}
             </section>
-
-            {/* Book card */}
-            <section className="rounded-2xl border bg-card p-4 shadow-sm">
-              <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Step 2 · Book information
-              </h2>
-              <Input
-                className="mb-3"
-                placeholder="Scan book barcode or LIB:C QR"
-                value={copyBarcode}
-                onChange={(e) => setCopyBarcode(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void loadBook.mutate(copyBarcode);
-                }}
-              />
-              {book ? (
-                <div className="flex gap-4">
-                  <BookCover title={book.book.title} />
-                  <div className="min-w-0 flex-1">
-                    <InfoRow label="Title" value={book.book.title} />
-                    <InfoRow label="Author" value={book.book.author ?? 'Unknown'} />
-                    <InfoRow label="Accession" value={book.book.accessionNo} />
-                    <InfoRow label="Barcode" value={book.copy.barcode} />
-                    <InfoRow
-                      label="Available"
-                      value={
-                        <span
-                          className={cn(
-                            'font-semibold',
-                            book.copy.status === 'AVAILABLE'
-                              ? 'text-emerald-600'
-                              : 'text-amber-600',
-                          )}
-                        >
-                          {book.copy.status === 'AVAILABLE' ? 'YES' : book.copy.status}
-                        </span>
-                      }
-                    />
-                    <InfoRow
-                      label="Rack"
-                      value={
-                        [book.book.section, book.book.rack, book.book.shelf, book.book.location]
-                          .filter(Boolean)
-                          .join(' · ') ||
-                        book.book.location ||
-                        '—'
-                      }
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-                  <BookOpen className="mb-2 h-10 w-10 opacity-40" />
-                  Scan a copy to preview
-                </div>
-              )}
-              {book ? (
-                <Button variant="ghost" size="sm" className="mt-2" onClick={resetBook}>
-                  Clear book
+            <section className="rounded-xl border bg-white p-4 shadow-sm">
+              <h2 className="text-sm font-semibold">2. Select Book</h2>
+              <div className="mt-3 flex gap-2">
+                <Input
+                  ref={bookRef}
+                  placeholder="Scan book barcode or search title, author, accession no."
+                  value={bookQuery}
+                  onChange={(event) => {
+                    setBookQuery(event.target.value);
+                    setBook(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void loadBook(bookQuery);
+                  }}
+                />
+                <Button type="button" variant="outline" onClick={() => void loadBook(bookQuery)}>
+                  Search
                 </Button>
+              </div>
+              {(bookHits.data?.items ?? []).length && !book ? (
+                <ul className="mt-2 divide-y rounded-lg border text-sm">
+                  {bookHits.data?.items.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left hover:bg-slate-50"
+                        onClick={() => void loadBook(item.copies?.[0]?.barcode || item.accessionNo)}
+                      >
+                        {item.title} · {item.accessionNo}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
+              {book ? (
+                <BookCard book={book} />
+              ) : (
+                <p className="mt-4 text-sm text-slate-500">
+                  Scan a barcode or search the catalogue.
+                </p>
+              )}
+              <div className="mt-3 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setBook(null);
+                    setBookQuery('');
+                  }}
+                >
+                  Clear
+                </Button>
+                <Button
+                  type="button"
+                  disabled={!book || book.copy.status !== 'AVAILABLE' || Boolean(blockReason)}
+                  onClick={() => void addBook()}
+                >
+                  Add to Issue List
+                </Button>
+              </div>
             </section>
           </div>
-
-          {/* Step 3 — Action panel */}
-          <section className="rounded-2xl border bg-card p-5 shadow-sm">
-            <h2 className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Step 3 · Circulation action — {mode}
-            </h2>
-
-            {mode === 'issue' && issuePreview ? (
-              <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-xl bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Issue date</p>
-                  <p className="font-semibold">{fmtDate(new Date().toISOString())}</p>
-                </div>
-                <div className="rounded-xl bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Due date</p>
-                  <p className="font-semibold">{fmtDate(issuePreview.dueAt)}</p>
-                </div>
-                <div className="rounded-xl bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Loan period</p>
-                  <p className="font-semibold">{issuePreview.loanDays} days</p>
-                </div>
-                <div className="rounded-xl bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Fine</p>
-                  <p className="font-semibold">
-                    ₹{issuePreview.finePerDay}/day after {issuePreview.graceDays} grace days
-                  </p>
-                </div>
-              </div>
-            ) : null}
-
-            {mode === 'return' && returnPreview ? (
-              <div className="mb-4 space-y-2">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="rounded-xl bg-muted/40 p-3">
-                    <p className="text-xs text-muted-foreground">Issued</p>
-                    <p className="font-semibold">{fmtDate(returnPreview.loan.issuedAt)}</p>
-                  </div>
-                  <div className="rounded-xl bg-muted/40 p-3">
-                    <p className="text-xs text-muted-foreground">Due</p>
-                    <p className="font-semibold">{fmtDate(returnPreview.loan.dueAt)}</p>
-                  </div>
-                  <div className="rounded-xl bg-muted/40 p-3">
-                    <p className="text-xs text-muted-foreground">Returned</p>
-                    <p className="font-semibold">{fmtDate(returnPreview.returnedAt)}</p>
-                  </div>
-                </div>
-                {returnPreview.overdueDays > 0 ? (
-                  <p className="text-sm text-amber-800">
-                    Overdue: <strong>{returnPreview.overdueDays} day(s)</strong> · Projected fine:{' '}
-                    <strong>₹{returnPreview.projectedFine.toFixed(2)}</strong>
-                  </p>
-                ) : (
-                  <p className="text-sm text-emerald-700">Returned on time — no overdue fine</p>
-                )}
-              </div>
-            ) : null}
-
-            {mode === 'renew' && renewPreview ? (
-              <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-xl bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Current due</p>
-                  <p className="font-semibold">{fmtDate(renewPreview.currentDueAt)}</p>
-                </div>
-                <div className="rounded-xl bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Renew count</p>
-                  <p className="font-semibold">
-                    {renewPreview.renewalCount}/{renewPreview.maxRenewals}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">New due</p>
-                  <p className="font-semibold">{fmtDate(renewPreview.newDueAt)}</p>
-                </div>
-                <div className="rounded-xl bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Extension</p>
-                  <p className="font-semibold">+{renewPreview.loanDays} days</p>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap gap-3">
-              {mode === 'issue' ? (
-                <Button
-                  size="lg"
-                  className="min-w-[180px] rounded-xl bg-sky-600 hover:bg-sky-700"
-                  disabled={
-                    !memberScan ||
-                    !copyBarcode ||
-                    issueMut.isPending ||
-                    Boolean(issueBlock) ||
-                    book?.copy.status !== 'AVAILABLE'
-                  }
-                  onClick={() => issueMut.mutate()}
-                >
-                  Confirm issue
-                </Button>
-              ) : null}
-
-              {mode === 'return' ? (
-                <>
-                  <Button
-                    size="lg"
-                    className="min-w-[180px] rounded-xl bg-emerald-600 hover:bg-emerald-700"
-                    disabled={!copyBarcode || returnMut.isPending}
-                    onClick={() => returnMut.mutate()}
-                  >
-                    Complete return
-                  </Button>
-                  {returnPreview?.existingFineId ? (
-                    <>
-                      <Button
-                        size="lg"
-                        variant="outline"
-                        disabled={!returnPreview.existingFineId}
-                        onClick={async () => {
-                          if (!returnPreview.existingFineId) return;
-                          try {
-                            await payLibraryFine(returnPreview.existingFineId);
-                            setMessage('Fine collected');
-                            void qc.invalidateQueries({ queryKey: ['library'] });
-                          } catch (e) {
-                            setMessage(apiErrorMessage(e));
-                          }
-                        }}
+          <section className="rounded-xl border bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold">3. Books to Issue</h2>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setCart([])}>
+                Clear selected books
+              </Button>
+            </div>
+            <table className="mt-3 w-full text-left text-sm">
+              <thead className="text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="py-2">#</th>
+                  <th>Accession no.</th>
+                  <th>Book title</th>
+                  <th>Due date</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {cart.map((line, index) => (
+                  <tr key={line.barcode} className="border-t">
+                    <td className="py-2">{index + 1}</td>
+                    <td className="font-mono text-xs">{line.accession}</td>
+                    <td>{line.title}</td>
+                    <td>{fmtDate(line.dueAt)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="text-red-600"
+                        onClick={() =>
+                          setCart((current) =>
+                            current.filter((item) => item.barcode !== line.barcode),
+                          )
+                        }
                       >
-                        Collect fine
-                      </Button>
-                      <Button
-                        size="lg"
-                        variant="outline"
-                        onClick={async () => {
-                          if (!returnPreview.existingFineId) return;
-                          try {
-                            await waiveLibraryFine(returnPreview.existingFineId, 'Waived at desk');
-                            setMessage('Fine waived');
-                            void qc.invalidateQueries({ queryKey: ['library'] });
-                          } catch (e) {
-                            setMessage(apiErrorMessage(e));
-                          }
-                        }}
-                      >
-                        Waive fine
-                      </Button>
-                    </>
-                  ) : null}
-                </>
-              ) : null}
-
-              {mode === 'renew' ? (
-                <Button
-                  size="lg"
-                  className="min-w-[180px] rounded-xl bg-violet-600 hover:bg-violet-700"
-                  disabled={!copyBarcode || renewMut.isPending || !renewPreview?.canRenew}
-                  onClick={() => renewMut.mutate()}
-                >
-                  Confirm renewal
-                </Button>
-              ) : null}
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!cart.length ? (
+              <p className="py-4 text-sm text-slate-500">No books selected.</p>
+            ) : null}
+            <div className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                disabled={!cart.length || Boolean(blockReason) || busy}
+                onClick={() => setConfirmIssue(true)}
+              >
+                Issue Books to Member ({cart.length})
+              </Button>
             </div>
           </section>
-
-          {/* Active loans */}
-          <section className="rounded-2xl border bg-card p-4 shadow-sm">
-            <h2 className="mb-3 font-semibold">
-              Active loans {member ? `— ${member.profile.fullName}` : ''} ({displayLoans.length})
-            </h2>
-            {displayLoans.length ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                      <th className="p-2">Book</th>
-                      <th className="p-2">Issue date</th>
-                      <th className="p-2">Due date</th>
-                      <th className="p-2">Days left</th>
-                      <th className="p-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayLoans.map((l) => {
-                      const st = loanStatusLabel(l.dueAt);
-                      return (
-                        <tr key={l.id} className="border-b">
-                          <td className="p-2 font-medium">{l.copy.book.title}</td>
-                          <td className="p-2">{fmtDate(l.issuedAt)}</td>
-                          <td className="p-2">{fmtDate(l.dueAt)}</td>
-                          <td className="p-2 tabular-nums">{daysLeft(l.dueAt)}</td>
-                          <td className="p-2">
-                            <span
-                              className={cn(
-                                'rounded-full px-2 py-0.5 text-xs font-medium',
-                                st.tone,
-                              )}
-                            >
-                              {st.label}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="rounded-xl border border-dashed py-8 text-center text-sm text-muted-foreground">
-                {member ? 'No active loans for this member' : 'Scan a member to view their loans'}
-              </p>
-            )}
-          </section>
-
-          {/* Reservations + recent transactions */}
-          {bookReservation ? (
-            <section className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
-              <h2 className="mb-2 font-semibold text-amber-900">Reservation queue</h2>
-              <p className="text-sm">
-                <strong>{bookReservation.bookTitle}</strong> — waiting:{' '}
-                <strong>{bookReservation.queue.filter((r) => r.status === 'ACTIVE').length}</strong>{' '}
-                student(s)
-              </p>
-            </section>
-          ) : null}
-
-          <section className="rounded-2xl border bg-card p-4 shadow-sm">
-            <h2 className="mb-3 font-semibold">Recent transactions</h2>
-            {recentTx.length ? (
-              <ul className="space-y-2">
-                {recentTx.map((tx, i) => (
-                  <li
-                    key={`${tx.at}-${i}`}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                  >
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(tx.at).toLocaleTimeString('en-IN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                    <span className="font-medium">{tx.memberName}</span>
-                    <span
-                      className={cn(
-                        'rounded-full px-2 py-0.5 text-xs font-semibold',
-                        tx.action === 'ISSUE'
-                          ? 'bg-sky-100 text-sky-800'
-                          : tx.action === 'RETURN'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-violet-100 text-violet-800',
-                      )}
-                    >
-                      {tx.action === 'ISSUE'
-                        ? 'Issued'
-                        : tx.action === 'RETURN'
-                          ? 'Returned'
-                          : 'Renewed'}
-                    </span>
-                    <span className="text-muted-foreground">{tx.bookTitle}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">No circulation activity yet today.</p>
-            )}
-          </section>
         </div>
-
-        {/* Right sidebar */}
-        <aside className="space-y-4">
-          <RulesPanel rules={rules} />
-          <FinePanel
-            summary={fineSummary}
-            fines={filteredFines}
-            onPay={async (id) => {
-              await payLibraryFine(id);
-              setMessage('Fine collected');
-              void qc.invalidateQueries({ queryKey: ['library'] });
-            }}
-            onWaive={async (id) => {
-              await waiveLibraryFine(id, 'Waived at desk');
-              setMessage('Fine waived');
-              void qc.invalidateQueries({ queryKey: ['library'] });
-            }}
-            onMessage={setMessage}
-          />
-        </aside>
-      </div>
-    </div>
-  );
-}
-
-function RulesPanel({ rules }: { rules: LibraryCirculationDeskContext['rules'] | undefined }) {
-  if (!rules) {
-    return (
-      <div className="rounded-2xl border bg-card p-4 shadow-sm">
-        <h3 className="font-semibold">Library rules</h3>
-        <p className="mt-2 text-sm text-muted-foreground">Loading…</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <h3 className="mb-3 font-semibold">Library rules</h3>
-      <dl className="space-y-2 text-sm">
-        <InfoRow label="Student books" value={rules.studentMaxBooks} />
-        <InfoRow label="Faculty books" value={rules.facultyMaxBooks} />
-        <InfoRow label="Staff books" value={rules.staffMaxBooks} />
-        <InfoRow label="Student loan period" value={`${rules.studentLoanDays} days`} />
-        <InfoRow label="Faculty loan period" value={`${rules.facultyLoanDays} days`} />
-        <InfoRow label="Renewals (student)" value={rules.studentMaxRenewals} />
-        <InfoRow label="Fine" value={`₹${rules.finePerDay}/day`} />
-        <InfoRow label="Grace days" value={rules.graceDays} />
-        <InfoRow label="Max fine" value={`₹${rules.maxFine}`} />
-      </dl>
-    </div>
-  );
-}
-
-function FinePanel({
-  summary,
-  fines,
-  onPay,
-  onWaive,
-  onMessage,
-}: {
-  summary: LibraryCirculationDeskContext['fineSummary'] | undefined;
-  fines: Array<{ id: string; amount: number; loan?: { copy: { book: { title: string } } } }>;
-  onPay: (id: string) => Promise<void>;
-  onWaive: (id: string) => Promise<void>;
-  onMessage: (msg: string) => void;
-}) {
-  return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <h3 className="mb-3 font-semibold">Fine summary</h3>
-      {summary ? (
-        <dl className="mb-4 space-y-2 text-sm">
-          <InfoRow label="Pending fine" value={`₹${summary.pending.toFixed(2)}`} />
-          <InfoRow label="Collected today" value={`₹${summary.collectedToday.toFixed(2)}`} />
-          <InfoRow label="Paid (total)" value={`₹${summary.paidTotal.toFixed(2)}`} />
-          <InfoRow label="Waived (total)" value={`₹${summary.waivedTotal.toFixed(2)}`} />
-        </dl>
       ) : null}
 
-      {fines.length ? (
-        <>
-          <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-            Member unpaid fines
-          </p>
-          <ul className="max-h-64 space-y-2 overflow-y-auto">
-            {fines.map((fine) => (
-              <li key={fine.id} className="rounded-lg border p-2 text-sm">
-                <p className="font-medium">{fine.loan?.copy.book.title ?? 'Fine'}</p>
-                <p className="text-muted-foreground">₹{Number(fine.amount).toFixed(2)}</p>
-                <div className="mt-2 flex gap-2">
-                  <Button
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => onPay(fine.id).catch((e) => onMessage(apiErrorMessage(e)))}
+      {tab === 'return' ? (
+        <section className="rounded-xl border bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold">Scan the returned book</h2>
+          <div className="mt-3 flex gap-2">
+            <Input
+              ref={returnRef}
+              placeholder="Book barcode or accession number"
+              value={returnCode}
+              onChange={(event) => setReturnCode(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void loadReturn(returnCode);
+              }}
+            />
+            <Button type="button" onClick={() => void loadReturn(returnCode)}>
+              Find loan
+            </Button>
+          </div>
+          {returnPreview ? (
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
+              <div className="space-y-2 text-sm">
+                <p className="text-lg font-semibold">{returnPreview.book.title}</p>
+                <p>
+                  Accession {returnPreview.book.accessionNo} ·{' '}
+                  {returnPreview.book.author || 'Author not recorded'}
+                </p>
+                <p>
+                  Member {returnPreview.member?.fullName || 'Not recorded'} ·{' '}
+                  {returnPreview.member?.registrationNumber || 'No ID'}
+                </p>
+                <p>
+                  Issued {fmtDate(returnPreview.loan.issuedAt)} · Due{' '}
+                  {fmtDate(returnPreview.loan.dueAt)}
+                </p>
+                <p>Overdue days after grace: {returnPreview.overdueDays}</p>
+                <p>
+                  Fine rate {money(returnPreview.finePerDay)} per day · Grace{' '}
+                  {returnPreview.graceDays} days · Projected fine{' '}
+                  {money(returnPreview.projectedFine)}
+                </p>
+                <label className="block">
+                  Condition
+                  <select
+                    className="mt-1 h-10 w-full rounded-md border px-3"
+                    value={condition}
+                    onChange={(event) =>
+                      setCondition(event.target.value as 'GOOD' | 'DAMAGED' | 'LOST')
+                    }
                   >
-                    Pay
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={() => onWaive(fine.id).catch((e) => onMessage(apiErrorMessage(e)))}
-                  >
-                    Waive
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : (
-        <p className="text-xs text-muted-foreground">No unpaid fines for scanned member</p>
-      )}
+                    <option value="GOOD">Good</option>
+                    <option value="DAMAGED">Damaged</option>
+                    <option value="LOST">Lost or incomplete</option>
+                  </select>
+                </label>
+                {condition !== 'GOOD' ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input
+                      placeholder="Condition note"
+                      value={conditionNote}
+                      onChange={(event) => setConditionNote(event.target.value)}
+                    />
+                    <Input
+                      placeholder="Damage charge, leave blank for none"
+                      value={damageCharge}
+                      onChange={(event) => setDamageCharge(event.target.value)}
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button type="button" disabled={busy} onClick={() => void confirmReturn('return')}>
+                  Confirm Return
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy || returnPreview.projectedFine <= 0 || condition !== 'GOOD'}
+                  onClick={() => void confirmReturn('pay')}
+                >
+                  Return and Collect Fine
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy || returnPreview.projectedFine <= 0 || condition !== 'GOOD'}
+                  onClick={() => void confirmReturn('return')}
+                >
+                  Record Fine as Pending
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={busy || returnPreview.projectedFine <= 0 || condition !== 'GOOD'}
+                  onClick={() => void confirmReturn('waive')}
+                >
+                  Mark Fine Waived
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setReturnPreview(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-slate-500">
+              Scan the barcode on the physical book. If it was already returned, the desk shows its
+              current status.
+            </p>
+          )}
+        </section>
+      ) : null}
+
+      {tab === 'renew' ? (
+        <section className="rounded-xl border bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold">Find the active loan</h2>
+          <div className="mt-3 flex gap-2">
+            <Input
+              ref={renewRef}
+              placeholder="Book barcode or accession number"
+              value={renewCode}
+              onChange={(event) => setRenewCode(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void loadRenew(renewCode);
+              }}
+            />
+            <Button type="button" onClick={() => void loadRenew(renewCode)}>
+              Check renewal
+            </Button>
+          </div>
+          {renewPreview ? (
+            <div className="mt-4 space-y-2 text-sm">
+              <p className="text-lg font-semibold">{renewPreview.bookTitle}</p>
+              <p>Barcode {renewPreview.barcode}</p>
+              <p>
+                Renewals used {renewPreview.renewalCount} of {renewPreview.maxRenewals}
+              </p>
+              <p>Current due {fmtDate(renewPreview.currentDueAt)}</p>
+              <p>Proposed due {fmtDate(renewPreview.newDueAt)}</p>
+              {renewPreview.blockReason ? (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
+                  {renewPreview.blockReason}
+                </p>
+              ) : null}
+              <Button
+                type="button"
+                disabled={!renewPreview.canRenew || busy}
+                onClick={() => void confirmRenew()}
+              >
+                Confirm Renewal
+              </Button>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-slate-500">
+              Renewal limits, overdue blocks and the new due date come from the circulation rules.
+            </p>
+          )}
+        </section>
+      ) : null}
+
+      {tab === 'history' ? (
+        <section className="space-y-4">
+          <div className="rounded-xl border bg-white p-4 shadow-sm">
+            <div className="flex gap-2">
+              <Input
+                ref={memberRef}
+                placeholder="Member ID, enrolment number or card"
+                value={memberQuery}
+                onChange={(event) => setMemberQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void loadMember(memberQuery);
+                }}
+              />
+              <Button type="button" onClick={() => void loadMember(memberQuery)}>
+                Search
+              </Button>
+            </div>
+            {member ? <MemberCard member={member} /> : null}
+          </div>
+          {member ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <LoanList title="Currently issued" loans={member.activeLoans} />
+              <LoanList title="Returned" loans={member.returnedLoans ?? []} />
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {member && tab !== 'history' ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Summary
+            title="Member Summary"
+            rows={[
+              ['Books issued', `${member.borrowedCount} / ${member.maxBooks}`],
+              [
+                'Overdue books',
+                String(
+                  member.activeLoans.filter((loan) => new Date(loan.dueAt) < new Date()).length,
+                ),
+              ],
+              ['Outstanding fines', money(member.outstandingFine)],
+              ['Membership', member.membershipStatus],
+            ]}
+          />
+          <Summary
+            title="Important Dates"
+            rows={[
+              ['Next due date', nextDue ? fmtDate(nextDue) : 'No active loans'],
+              ['Last visit', member.lastVisitAt ? fmtDate(member.lastVisitAt) : 'Not applicable'],
+            ]}
+          />
+        </div>
+      ) : null}
+
+      {confirmIssue && member ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-semibold">Confirm issue</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {member.profile.fullName} · {member.profile.registrationNumber}
+            </p>
+            <ul className="mt-3 space-y-1 text-sm">
+              {cart.map((line) => (
+                <li key={line.barcode}>
+                  {line.accession} · {line.title} · due {fmtDate(line.dueAt)}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-sm">
+              Books after this issue: {member.borrowedCount + cart.length} of {member.maxBooks}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setConfirmIssue(false)}>
+                Cancel
+              </Button>
+              <Button type="button" disabled={busy} onClick={() => void issueCart()}>
+                Confirm issue
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  hint,
+  warn,
+  icon,
+  href,
+}: {
+  label: string;
+  value?: number;
+  hint?: string;
+  warn?: boolean;
+  icon: ReactNode;
+  href?: string;
+}) {
+  const body = (
+    <div className={`rounded-xl border bg-white p-3 shadow-sm ${warn ? 'border-red-200' : ''}`}>
+      <p className="flex items-center gap-2 text-xs text-slate-500">
+        {icon}
+        {label}
+      </p>
+      <p className="mt-1 text-2xl font-semibold">{value ?? '…'}</p>
+      {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
+    </div>
+  );
+  return href ? <Link href={href}>{body}</Link> : body;
+}
+
+function MemberCard({ member }: { member: LibraryMemberSummary }) {
+  const profile = member.profile;
+  return (
+    <div className="mt-4 flex gap-3 rounded-xl border p-3">
+      {profile.photoUrl ? (
+        <img src={profile.photoUrl} alt="" className="h-16 w-16 rounded-full object-cover" />
+      ) : (
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-xs">
+          Photo
+        </div>
+      )}
+      <div className="text-sm">
+        <p className="font-semibold">
+          {profile.fullName}{' '}
+          <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">
+            {profile.active ? 'Active' : profile.status}
+          </span>
+        </p>
+        <p>
+          {profile.registrationNumber || 'No enrolment number'} · {profile.memberType}
+        </p>
+        <p>
+          {profile.programme || 'Course not recorded'} ·{' '}
+          {profile.department || 'Department not recorded'}
+        </p>
+        <p>
+          Issued {member.borrowedCount} / {member.maxBooks} · Overdue{' '}
+          {member.activeLoans.filter((loan) => new Date(loan.dueAt) < new Date()).length} · Fine{' '}
+          {money(member.outstandingFine)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function BookCard({ book }: { book: LibraryBookPreview }) {
+  const available = book.copy.status === 'AVAILABLE';
+  return (
+    <div className="mt-4 rounded-xl border p-3 text-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">{book.book.title}</p>
+          <p>{book.book.author || 'Author not recorded'}</p>
+          <p>
+            Accession {book.book.accessionNo} · Barcode {book.copy.barcode}
+          </p>
+          <p>
+            Call no. {book.book.callNumber || 'Not recorded'} ·{' '}
+            {book.book.category || 'No category'}
+          </p>
+          <p>
+            ISBN {book.book.isbn || 'Not recorded'} ·{' '}
+            {book.book.publisher || 'Publisher not recorded'} ·{' '}
+            {book.book.edition || 'Edition not recorded'}
+          </p>
+          <p>Location {book.book.location || 'Not recorded'}</p>
+        </div>
+        <span
+          className={
+            available
+              ? 'rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-800'
+              : 'rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-900'
+          }
+        >
+          {book.copy.status}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function LoanList({ title, loans }: { title: string; loans: LibraryLoan[] }) {
+  return (
+    <section className="rounded-xl border bg-white p-4 shadow-sm">
+      <h2 className="text-sm font-semibold">{title}</h2>
+      {loans.length ? (
+        <table className="mt-2 w-full text-left text-sm">
+          <thead className="text-xs uppercase text-slate-500">
+            <tr>
+              <th className="py-2">Accession</th>
+              <th>Title</th>
+              <th>Due</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loans.map((loan) => (
+              <tr key={loan.id} className="border-t">
+                <td className="py-2 font-mono text-xs">{accessionOf(loan)}</td>
+                <td>{loan.copy.book.title}</td>
+                <td>{fmtDate(loan.dueAt)}</td>
+                <td>
+                  {loan.returnedAt
+                    ? `Returned ${fmtDate(loan.returnedAt)}`
+                    : new Date(loan.dueAt) < new Date()
+                      ? 'Overdue'
+                      : 'On time'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="py-4 text-sm text-slate-500">No loans in this list.</p>
+      )}
+    </section>
+  );
+}
+
+function Summary({ title, rows }: { title: string; rows: [string, string][] }) {
+  return (
+    <section className="rounded-xl border bg-white p-4 text-sm shadow-sm">
+      <h2 className="font-semibold">{title}</h2>
+      <dl className="mt-2 space-y-1">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex justify-between gap-3">
+            <dt className="text-slate-500">{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }

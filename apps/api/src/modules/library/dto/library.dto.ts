@@ -855,16 +855,119 @@ export class MemberDetailQueryDto {
   memberType!: string;
 }
 
-export class CreateAccessionBookDto extends OmitType(CreateBookDto, [
-  'accessionNo',
-] as const) {
-  @IsOptional()
+export class CreateAccessionBookDto {
   @IsString()
-  accessionNo?: string;
+  @IsNotEmpty()
+  title!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  author!: string;
 
   @IsOptional()
   @IsString()
-  accessionStatus?: string;
+  isbn?: string;
+
+  @IsOptional()
+  @IsString()
+  edition?: string;
+
+  @IsOptional()
+  @IsString()
+  publisher?: string;
+
+  @IsOptional()
+  @IsString()
+  publicationYear?: string;
+
+  @IsOptional()
+  @IsString()
+  language?: string;
+
+  @IsUUID()
+  categoryId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  bookType!: string;
+
+  @IsOptional()
+  @IsString()
+  keywords?: string;
+
+  @IsUUID()
+  departmentId!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  departmentIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  classificationNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @IsOptional()
+  @IsString()
+  subjectClassification?: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  totalCopies!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  dateReceived!: string;
+
+  @IsOptional()
+  @IsIn(['NEW', 'GOOD', 'FAIR', 'DAMAGED'])
+  condition?: string;
+
+  @IsOptional()
+  @IsIn([
+    'RECEIVED',
+    'CATALOGUED',
+    'ON_SHELF',
+    'ISSUED',
+    'LOST',
+    'DAMAGED',
+    'WITHDRAWN',
+  ])
+  availability?: string;
+
+  @IsIn(['PURCHASE', 'DONATION', 'GIFT', 'OTHER'])
+  acquisitionType!: string;
+
+  @IsOptional()
+  @IsString()
+  supplierName?: string;
+
+  @IsOptional()
+  @IsString()
+  invoiceNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  purchaseDate?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  price?: number;
+
+  @IsOptional()
+  @IsString()
+  fundingSource?: string;
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
 }
 
 export class UpdateAccessionWorkflowDto {
