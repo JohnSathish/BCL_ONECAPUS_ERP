@@ -93,6 +93,29 @@ describe('Koha catalogue mapping', () => {
     expect(validationStatus(missing?.issues ?? [])).toBe('INVALID');
   });
 
+  it('reads the prepared workbook headers and keeps a withdrawn status', () => {
+    const headers = indexHeaders([
+      'Koha item ID',
+      'Koha bibliographic ID',
+      'Barcode',
+      'Accession number',
+      'Department or collection code',
+      'Source item status',
+    ]);
+    const copy = mapCopyRecord(
+      ['88', '15', '0001', '0001', 'Zoology', 'WITHDRAWN'],
+      headers,
+    );
+    expect(copy).toMatchObject({
+      sourceItemId: '88',
+      sourceBibliographicId: '15',
+      barcode: '0001',
+      accessionNumber: '0001',
+      collectionCode: 'Zoology',
+      copyStatus: 'WITHDRAWN',
+    });
+  });
+
   it('requires a title and bibliographic id', () => {
     const headers = indexHeaders([
       'biblionumber',

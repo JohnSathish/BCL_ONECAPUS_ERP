@@ -980,6 +980,8 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
     name: 'Principal Workspace',
     description: 'Broad read access and institutional reports',
     permissions: [
+      'library:read',
+      'library:reports',
       'students:read',
       'staff:read',
       'academic:read',
@@ -1006,6 +1008,8 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
     name: 'Vice Principal Workspace',
     description: 'Principal command center and institutional oversight',
     permissions: [
+      'library:read',
+      'library:reports',
       'students:read',
       'staff:read',
       'academic:read',

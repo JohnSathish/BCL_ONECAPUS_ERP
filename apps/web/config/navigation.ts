@@ -1636,6 +1636,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['library:reports', 'library:manage'],
           },
           {
+            label: 'Collection Reports',
+            href: '/admin/library/collection-reports',
+            permissions: ['library:reports', 'library:manage', 'library:read'],
+          },
+          {
             label: 'NAAC Reports',
             href: '/admin/library/naac-reports',
             permissions: ['library:reports', 'library:manage'],

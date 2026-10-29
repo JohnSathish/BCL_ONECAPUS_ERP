@@ -10,6 +10,8 @@ import { StorageModule } from '../../shared/storage/storage.module';
 import { LibraryController } from './library.controller';
 import { KohaImportController } from './koha/koha-import.controller';
 import { KohaImportService } from './koha/koha-import.service';
+import { LibraryCatalogueReportsController } from './reports/library-catalogue-reports.controller';
+import { LibraryCatalogueReportsService } from './reports/library-catalogue-reports.service';
 
 import { LibraryAccessService } from './services/library-access.service';
 
@@ -65,7 +67,11 @@ import { ResearchRepositoryService } from './services/research-repository.servic
 
 @Module({
   imports: [RealtimeModule, CommunicationModule, NaacIqacModule, StorageModule],
-  controllers: [LibraryController, KohaImportController],
+  controllers: [
+    LibraryController,
+    KohaImportController,
+    LibraryCatalogueReportsController,
+  ],
 
   providers: [
     LibrarySettingsService,
@@ -89,6 +95,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
     LibraryCatalogueService,
 
     KohaImportService,
+    LibraryCatalogueReportsService,
 
     LibraryFinesService,
 

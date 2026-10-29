@@ -348,13 +348,18 @@ export function mapBookRecord(
   row: unknown[],
   headers: Map<string, number>,
 ): MappedBook | null {
-  const sourceBibliographicId = readCell(row, headers, 'biblionumber');
-  const title = readCell(row, headers, 'title');
+  const sourceBibliographicId = readCell(
+    row,
+    headers,
+    'biblionumber',
+    'kohabibliographicid',
+  );
+  const title = readCell(row, headers, 'title', 'booktitle');
   if (!sourceBibliographicId && !title) return null;
   const isbnRaw = readCell(row, headers, 'isbn');
   const isbn = parseIsbnList(isbnRaw);
   const publisherBits = splitPlaceAndPublisher(
-    readCell(row, headers, 'publishercode'),
+    readCell(row, headers, 'publishercode', 'publisher'),
     readCell(row, headers, 'place'),
   );
   const year = parseYear(
@@ -394,7 +399,7 @@ export function mapBookRecord(
     sourceBibliographicId,
     title: title || '(missing title)',
     subtitle: readCell(row, headers, 'subtitle'),
-    author: readCell(row, headers, 'author'),
+    author: readCell(row, headers, 'author', 'primaryauthor'),
     isbnRaw,
     isbn10: isbn.isbn10,
     isbn13: isbn.isbn13,
@@ -404,8 +409,14 @@ export function mapBookRecord(
     publicationPlace: publisherBits.publicationPlace,
     edition: readCell(row, headers, 'editionstatement', 'edition'),
     series: readCell(row, headers, 'seriestitle', 'series'),
-    pages: readCell(row, headers, 'pages'),
-    classificationNumber: readCell(row, headers, 'cn_class', 'classification'),
+    pages: readCell(row, headers, 'pages', 'description'),
+    classificationNumber: readCell(
+      row,
+      headers,
+      'cn_class',
+      'classification',
+      'classificationnumber',
+    ),
     itemTypeCode: readCell(row, headers, 'itemtype', 'itype'),
     sourceUrl: readCell(row, headers, 'url'),
     issues,
@@ -416,19 +427,52 @@ export function mapCopyRecord(
   row: unknown[],
   headers: Map<string, number>,
 ): MappedCopy | null {
-  const sourceItemId = readCell(row, headers, 'itemnumber');
-  const sourceBibliographicId = readCell(row, headers, 'biblionumber');
+  const sourceItemId = readCell(row, headers, 'itemnumber', 'kohaitemid');
+  const sourceBibliographicId = readCell(
+    row,
+    headers,
+    'biblionumber',
+    'kohabibliographicid',
+  );
   const barcode = readCell(row, headers, 'barcode');
   if (!sourceItemId && !sourceBibliographicId && !barcode) return null;
-  const stock = readCell(row, headers, 'stocknumber');
+  const stock = readCell(row, headers, 'stocknumber', 'accessionnumber');
   const accessionNumber = stock || barcode;
   const withdrawn = readCell(row, headers, 'withdrawn');
   const itemLost = readCell(row, headers, 'itemlost');
   const damaged = readCell(row, headers, 'damaged');
   const notForLoan = readCell(row, headers, 'notforloan');
-  const status = mapCopyStatus({ withdrawn, itemLost, damaged, notForLoan });
-  const price = parsePrice(readCell(row, headers, 'price'));
-  const acquired = parseIsoDate(readCell(row, headers, 'dateaccessioned'));
+  const explicitStatus = readCell(
+    row,
+    headers,
+    'sourceitemstatus',
+  ).toUpperCase();
+  const flagsPresent = [withdrawn, itemLost, damaged, notForLoan].some(
+    (value) => flagOn(value),
+  );
+  const status =
+    !flagsPresent &&
+    ['AVAILABLE', 'WITHDRAWN', 'LOST', 'DAMAGED', 'NOT_FOR_LOAN'].includes(
+      explicitStatus,
+    )
+      ? {
+          status: explicitStatus,
+          issues:
+            explicitStatus === 'AVAILABLE'
+              ? []
+              : [
+                  {
+                    code: explicitStatus,
+                    severity: 'warning' as const,
+                    message: `Copy status is ${explicitStatus}.`,
+                  },
+                ],
+        }
+      : mapCopyStatus({ withdrawn, itemLost, damaged, notForLoan });
+  const price = parsePrice(readCell(row, headers, 'price', 'acquisitionprice'));
+  const acquired = parseIsoDate(
+    readCell(row, headers, 'dateaccessioned', 'acquisitiondate'),
+  );
   const issues = [...status.issues];
   if (!sourceItemId) {
     issues.push({
@@ -460,7 +504,9 @@ export function mapCopyRecord(
         'Koha stocknumber is empty. The barcode is preserved as the accession number.',
     });
   }
-  if (!readCell(row, headers, 'location', 'permanent_location')) {
+  if (
+    !readCell(row, headers, 'location', 'permanent_location', 'shelflocation')
+  ) {
     issues.push({
       code: 'MISSING_LOCATION',
       severity: 'warning',
@@ -487,9 +533,20 @@ export function mapCopyRecord(
     barcode,
     accessionNumber,
     callNumber: readCell(row, headers, 'itemcallnumber', 'callnumber'),
-    collectionCode: readCell(row, headers, 'ccode'),
-    homeBranchCode: readCell(row, headers, 'homebranch'),
-    shelvingLocation: readCell(row, headers, 'location', 'permanent_location'),
+    collectionCode: readCell(
+      row,
+      headers,
+      'ccode',
+      'departmentorcollectioncode',
+    ),
+    homeBranchCode: readCell(row, headers, 'homebranch', 'branch'),
+    shelvingLocation: readCell(
+      row,
+      headers,
+      'location',
+      'permanent_location',
+      'shelflocation',
+    ),
     itemTypeCode: readCell(row, headers, 'itype', 'itemtype'),
     acquisitionDate: acquired.iso,
     acquisitionPrice: price.price,
@@ -519,9 +576,18 @@ export function requiredColumnsPresent(
   headers: Map<string, number>,
   kind: 'books' | 'copies',
 ) {
-  const required =
+  const groups =
     kind === 'books'
-      ? ['biblionumber', 'title']
-      : ['itemnumber', 'biblionumber', 'barcode'];
-  return required.filter((name) => !headers.has(headerKey(name)));
+      ? [
+          ['biblionumber', 'kohabibliographicid'],
+          ['title', 'booktitle'],
+        ]
+      : [
+          ['itemnumber', 'kohaitemid'],
+          ['biblionumber', 'kohabibliographicid'],
+          ['barcode'],
+        ];
+  return groups
+    .filter((names) => !names.some((name) => headers.has(headerKey(name))))
+    .map((names) => names[0]);
 }

@@ -588,6 +588,87 @@ export const downloadKohaReport = (id: string, kind: 'validation' | 'errors') =>
     .get(`${kohaBase}/${id}/report`, { params: { kind }, responseType: 'blob' })
     .then((r) => r.data as Blob);
 
+const catalogueReports = `${base}/catalogue-reports`;
+
+export type CatalogueReportDefinition = {
+  key: string;
+  title: string;
+  group: string;
+  sensitive: boolean;
+  formal: boolean;
+  unavailableReason: string | null;
+};
+
+export type CatalogueReportPayload = {
+  key: string;
+  title: string;
+  institutionName: string;
+  generatedAt: string;
+  filters: string;
+  notes: string[];
+  columns: { key: string; label: string }[];
+  rows: Record<string, string | number | null>[];
+  total: number;
+  page: number;
+  limit: number;
+  totals: Record<string, number>;
+  unavailable?: string;
+};
+
+export type CatalogueDashboard = {
+  distinctTitles: number;
+  physicalCopies: number;
+  availableCopies: number;
+  issuedCopies: number;
+  overdueCopies: number;
+  lostCopies: number;
+  damagedCopies: number;
+  withdrawnCopies: number;
+  titlesWithoutDepartment: number;
+  recentlyAcquiredCopies: number;
+  departments: {
+    department: string;
+    titles: number;
+    copies: number;
+    available: number;
+    issued: number;
+  }[];
+};
+
+export const fetchCatalogueReportDefinitions = () =>
+  api.get<{ reports: CatalogueReportDefinition[] }>(catalogueReports).then((r) => r.data);
+
+export const fetchCatalogueReportOptions = () =>
+  api
+    .get<{
+      departments: { id: string; name: string; code: string }[];
+      categories: { id: string; name: string; code: string }[];
+      collections: { code: string; copies: number }[];
+      statuses: string[];
+    }>(`${catalogueReports}/options`)
+    .then((r) => r.data);
+
+export const fetchCatalogueDashboard = () =>
+  api.get<CatalogueDashboard>(`${catalogueReports}/dashboard`).then((r) => r.data);
+
+export const fetchCatalogueReport = (
+  key: string,
+  params: Record<string, string | number | undefined>,
+) => api.get<CatalogueReportPayload>(`${catalogueReports}/${key}`, { params }).then((r) => r.data);
+
+export const downloadCatalogueReport = (
+  key: string,
+  format: 'xlsx' | 'csv' | 'pdf',
+  params: Record<string, string | number | undefined>,
+) =>
+  api
+    .get(`${catalogueReports}/${key}/export`, {
+      params: { ...params, format },
+      responseType: 'blob',
+      timeout: 600_000,
+    })
+    .then((r) => r.data as Blob);
+
 export const downloadEntryExitExport = (
   format: 'xlsx' | 'csv' | 'pdf',
   params?: Record<string, string | number | undefined>,

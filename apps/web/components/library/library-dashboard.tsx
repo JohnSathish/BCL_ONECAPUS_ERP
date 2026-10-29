@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -128,7 +129,12 @@ export function LibraryDashboard() {
           <BookOpen className="h-6 w-6" />
           <div>
             <h1 className="text-xl font-semibold">Smart Library Dashboard</h1>
-            <p className="text-sm text-muted-foreground">NAAC-ready knowledge center overview</p>
+            <p className="text-sm text-muted-foreground">
+              NAAC-ready knowledge center overview.{' '}
+              <Link className="underline" href="/admin/library/collection-reports">
+                Open collection reports
+              </Link>
+            </p>
           </div>
         </div>
         <Button
