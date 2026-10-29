@@ -384,6 +384,49 @@ export class DeliveryLogQueryDto {
   limit?: number;
 }
 
+export class CampaignDeskQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 50;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  audience?: string;
+
+  @IsOptional()
+  @IsIn(['all', 'automated', 'manual'])
+  kind?: 'all' | 'automated' | 'manual' = 'all';
+
+  @IsOptional()
+  @IsIn(['security', 'academic', 'events', 'notice'])
+  noticeType?: 'security' | 'academic' | 'events' | 'notice';
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+}
+
 export const INBOX_CLEAR_AUDIENCES = ['STUDENTS', 'STAFF', 'ALL'] as const;
 
 export class ClearNotificationHistoryDto {

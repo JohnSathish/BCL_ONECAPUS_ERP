@@ -128,6 +128,30 @@ export const fetchCommunicationCampaigns = (status?: string) =>
     .get<CommunicationCampaign[]>(`${base}/campaigns`, { params: status ? { status } : undefined })
     .then((res) => res.data);
 
+export type CampaignDesk = {
+  page: number;
+  limit: number;
+  total: number;
+  summary: {
+    campaigns: number;
+    campaignsGrowth: number | null;
+    recipients: number;
+    recipientsGrowth: number | null;
+    delivered: number;
+    pending: number;
+    failed: number;
+    deliveredShare: number | null;
+    pendingShare: number | null;
+    failedShare: number | null;
+    automated: number;
+    manual: number;
+  };
+  items: CommunicationCampaign[];
+};
+
+export const fetchCampaignDesk = (params: Record<string, string | number | undefined>) =>
+  api.get<CampaignDesk>(`${base}/campaigns/desk`, { params }).then((res) => res.data);
+
 export const createCommunicationCampaign = (payload: Record<string, unknown>) =>
   api
     .post<CommunicationCampaign>(`${base}/campaigns`, payload, { timeout: 60_000 })

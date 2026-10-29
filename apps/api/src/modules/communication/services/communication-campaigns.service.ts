@@ -8,6 +8,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { QueueService } from '../../../shared/queue/queue.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import type {
+  CampaignDeskQueryDto,
   CommunicationCampaignDto,
   PreviewAudienceDto,
 } from '../dto/communication.dto';
@@ -83,6 +84,156 @@ export class CommunicationCampaignsService {
     }
 
     return rows;
+  }
+
+  async desk(tenantId: string, query: CampaignDeskQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const kind = query.kind ?? 'all';
+    const filters = [Prisma.sql`c.tenant_id = CAST(${tenantId} AS uuid)`];
+    if (query.status) filters.push(Prisma.sql`c.status = ${query.status}`);
+    if (query.audience)
+      filters.push(Prisma.sql`c.audience_type = ${query.audience}`);
+    if (query.from)
+      filters.push(
+        Prisma.sql`COALESCE(c.sent_at, c.created_at) >= ${new Date(`${query.from}T00:00:00`)}`,
+      );
+    if (query.to)
+      filters.push(
+        Prisma.sql`COALESCE(c.sent_at, c.created_at) <= ${new Date(`${query.to}T23:59:59`)}`,
+      );
+    if (query.search?.trim()) {
+      const pattern = `%${query.search.trim()}%`;
+      filters.push(
+        Prisma.sql`(c.name ILIKE ${pattern} OR c.id::text ILIKE ${pattern} OR COALESCE(t.code, '') ILIKE ${pattern})`,
+      );
+    }
+    if (kind === 'automated')
+      filters.push(Prisma.sql`COALESCE(c.metadata->>'trigger', '') <> ''`);
+    if (kind === 'manual')
+      filters.push(Prisma.sql`COALESCE(c.metadata->>'trigger', '') = ''`);
+    if (query.noticeType === 'security') {
+      filters.push(
+        Prisma.sql`(COALESCE(t.code, '') ILIKE '%SECURITY%' OR c.name ILIKE '%PASSWORD%' OR c.name ILIKE '%DEVICE%' OR c.name ILIKE '%SECURITY%')`,
+      );
+    }
+    if (query.noticeType === 'academic') {
+      filters.push(
+        Prisma.sql`(c.name ILIKE '%EXAM%' OR c.name ILIKE '%FEE%' OR c.name ILIKE '%ATTEND%' OR c.name ILIKE '%RESULT%' OR COALESCE(t.code, '') ILIKE '%EXAM%' OR COALESCE(t.code, '') ILIKE '%FEE%')`,
+      );
+    }
+    if (query.noticeType === 'events') {
+      filters.push(
+        Prisma.sql`(c.name ILIKE '%EVENT%' OR COALESCE(t.code, '') ILIKE '%EVENT%')`,
+      );
+    }
+    if (query.noticeType === 'notice') {
+      filters.push(Prisma.sql`NOT (
+        COALESCE(t.code, '') ILIKE '%SECURITY%' OR c.name ILIKE '%PASSWORD%' OR c.name ILIKE '%DEVICE%' OR c.name ILIKE '%SECURITY%'
+        OR c.name ILIKE '%EXAM%' OR c.name ILIKE '%FEE%' OR c.name ILIKE '%ATTEND%' OR c.name ILIKE '%RESULT%'
+        OR c.name ILIKE '%EVENT%' OR COALESCE(t.code, '') ILIKE '%EVENT%' OR COALESCE(t.code, '') ILIKE '%EXAM%' OR COALESCE(t.code, '') ILIKE '%FEE%'
+      )`);
+    }
+    const where = Prisma.join(filters, ' AND ');
+    const [idRows, countRows, summary] = await Promise.all([
+      this.prisma.$queryRaw<{ id: string }[]>`
+        SELECT c.id
+        FROM platform.communication_campaigns c
+        LEFT JOIN platform.communication_templates t ON t.id = c.template_id
+        WHERE ${where}
+        ORDER BY COALESCE(c.sent_at, c.created_at) DESC
+        LIMIT ${limit} OFFSET ${(page - 1) * limit}
+      `,
+      this.prisma.$queryRaw<{ total: number }[]>`
+        SELECT COUNT(*)::int AS total
+        FROM platform.communication_campaigns c
+        LEFT JOIN platform.communication_templates t ON t.id = c.template_id
+        WHERE ${where}
+      `,
+      this.campaignSummary(tenantId),
+    ]);
+    const ids = idRows.map((row) => row.id);
+    const found = ids.length
+      ? await this.prisma.communicationCampaign.findMany({
+          where: { id: { in: ids } },
+          include: {
+            template: { select: { id: true, name: true, code: true } },
+            _count: {
+              select: {
+                recipients: true,
+                deliveryLogs: true,
+                notifications: true,
+              },
+            },
+          },
+        })
+      : [];
+    const order = new Map(ids.map((id, index) => [id, index]));
+    found.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    return {
+      page,
+      limit,
+      total: Number(countRows[0]?.total ?? 0),
+      summary,
+      items: found,
+    };
+  }
+
+  private async campaignSummary(tenantId: string) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const [
+      campaigns,
+      campaignsThen,
+      recipients,
+      recipientsThen,
+      delivered,
+      pending,
+      failed,
+      split,
+    ] = await Promise.all([
+      this.prisma.communicationCampaign.count({ where: { tenantId } }),
+      this.prisma.communicationCampaign.count({
+        where: { tenantId, createdAt: { lt: cutoff } },
+      }),
+      this.prisma.communicationRecipient.count({ where: { tenantId } }),
+      this.prisma.communicationRecipient.count({
+        where: { tenantId, createdAt: { lt: cutoff } },
+      }),
+      this.prisma.communicationDeliveryLog.count({
+        where: { tenantId, status: { in: ['SENT', 'DELIVERED'] } },
+      }),
+      this.prisma.communicationDeliveryLog.count({
+        where: { tenantId, status: 'PENDING' },
+      }),
+      this.prisma.communicationDeliveryLog.count({
+        where: { tenantId, status: 'FAILED' },
+      }),
+      this.prisma.$queryRaw<{ automated: number; manual: number }[]>`
+        SELECT
+          COUNT(*) FILTER (WHERE COALESCE(metadata->>'trigger', '') <> '')::int AS automated,
+          COUNT(*) FILTER (WHERE COALESCE(metadata->>'trigger', '') = '')::int AS manual
+        FROM platform.communication_campaigns
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+      `,
+    ]);
+    const outcomes = delivered + pending + failed;
+    const share = (value: number) =>
+      outcomes ? Math.round((value / outcomes) * 1000) / 10 : null;
+    return {
+      campaigns,
+      campaignsGrowth: growth(campaigns, campaignsThen),
+      recipients,
+      recipientsGrowth: growth(recipients, recipientsThen),
+      delivered,
+      pending,
+      failed,
+      deliveredShare: share(delivered),
+      pendingShare: share(pending),
+      failedShare: share(failed),
+      automated: Number(split[0]?.automated ?? 0),
+      manual: Number(split[0]?.manual ?? 0),
+    };
   }
 
   async get(tenantId: string, id: string) {
@@ -444,4 +595,9 @@ export class CommunicationCampaignsService {
       recentCampaigns,
     };
   }
+}
+
+function growth(current: number, previous: number) {
+  if (previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
 }

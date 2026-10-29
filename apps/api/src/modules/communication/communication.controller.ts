@@ -25,6 +25,7 @@ import {
   RequirePermissions,
 } from '../../common/decorators/require-permissions.decorator';
 import {
+  CampaignDeskQueryDto,
   ClearNotificationHistoryDto,
   CommunicationCampaignDto,
   CommunicationTemplateDto,
@@ -387,6 +388,15 @@ export class CommunicationController {
     @Query('status') status?: string,
   ) {
     return this.campaigns.list(user.tid, status);
+  }
+
+  @Get('campaigns/desk')
+  @RequireAnyPermission('communication:read', 'communication:manage')
+  campaignDesk(
+    @CurrentUser() user: JwtUser,
+    @Query() query: CampaignDeskQueryDto,
+  ) {
+    return this.campaigns.desk(user.tid, query);
   }
 
   @Post('campaigns')
