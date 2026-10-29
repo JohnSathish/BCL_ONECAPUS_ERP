@@ -8,6 +8,8 @@ import { RealtimeModule } from '../realtime/realtime.module';
 
 import { StorageModule } from '../../shared/storage/storage.module';
 import { LibraryController } from './library.controller';
+import { KohaImportController } from './koha/koha-import.controller';
+import { KohaImportService } from './koha/koha-import.service';
 
 import { LibraryAccessService } from './services/library-access.service';
 
@@ -63,7 +65,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
 
 @Module({
   imports: [RealtimeModule, CommunicationModule, NaacIqacModule, StorageModule],
-  controllers: [LibraryController],
+  controllers: [LibraryController, KohaImportController],
 
   providers: [
     LibrarySettingsService,
@@ -85,6 +87,8 @@ import { ResearchRepositoryService } from './services/research-repository.servic
     LibraryAnalyticsService,
 
     LibraryCatalogueService,
+
+    KohaImportService,
 
     LibraryFinesService,
 

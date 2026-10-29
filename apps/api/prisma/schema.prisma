@@ -9946,6 +9946,19 @@ model LibraryBook {
   section        String?
   row            String?
   location       String?
+  subtitle       String?
+  publicationYear String?  @map("publication_year")
+  publicationPlace String? @map("publication_place")
+  language       String?
+  subject        String?
+  series         String?
+  classificationNumber String? @map("classification_number")
+  description    String?
+  sourceSystem   String?   @map("source_system")
+  sourceBibliographicId String? @map("source_bibliographic_id")
+  additionalAuthors String? @map("additional_authors")
+  issn           String?
+  coverImageUrl  String?   @map("cover_image_url")
   accessionStatus String  @default("ON_SHELF") @map("accession_status")
   status         String    @default("ACTIVE")
   totalCopies    Int       @default(1) @map("total_copies")
@@ -9956,8 +9969,10 @@ model LibraryBook {
   category     LibraryCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   copies       LibraryBookCopy[]
   reservations LibraryReservation[]
+  departments  LibraryBookDepartment[]
 
   @@unique([tenantId, accessionNo])
+  @@unique([tenantId, sourceSystem, sourceBibliographicId])
   @@index([tenantId, status])
   @@index([tenantId, categoryId])
   @@index([tenantId, departmentId])
@@ -9967,14 +9982,24 @@ model LibraryBook {
 }
 
 model LibraryBookCopy {
-  id         String   @id @default(uuid()) @db.Uuid
-  tenantId   String   @map("tenant_id") @db.Uuid
-  bookId     String   @map("book_id") @db.Uuid
-  copyNumber Int      @default(1) @map("copy_number")
-  barcode    String
-  status     String   @default("AVAILABLE")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  bookId           String    @map("book_id") @db.Uuid
+  copyNumber       Int       @default(1) @map("copy_number")
+  barcode          String
+  accessionNumber  String?   @map("accession_number")
+  status           String    @default("AVAILABLE")
+  sourceSystem     String?   @map("source_system")
+  sourceItemId     String?   @map("source_item_id")
+  collectionCode   String?   @map("collection_code")
+  shelvingLocation String?   @map("shelving_location")
+  callNumber       String?   @map("call_number")
+  acquisitionDate  DateTime? @map("acquisition_date") @db.Date
+  acquisitionPrice Decimal?  @map("acquisition_price") @db.Decimal(12, 2)
+  homeBranchCode   String?   @map("home_branch_code")
+  itemTypeCode     String?   @map("item_type_code")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   book  LibraryBook   @relation(fields: [bookId], references: [id], onDelete: Cascade)
   loans LibraryLoan[]
@@ -9984,8 +10009,147 @@ model LibraryBookCopy {
 
   @@unique([tenantId, barcode])
   @@unique([tenantId, bookId, copyNumber])
+  @@unique([tenantId, sourceSystem, sourceItemId])
+  @@unique([tenantId, accessionNumber])
   @@index([tenantId, status])
+  @@index([tenantId, collectionCode])
   @@map("library_book_copies")
+  @@schema("library")
+}
+
+model LibraryBookDepartment {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  bookId       String   @map("book_id") @db.Uuid
+  departmentId String   @map("department_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  book LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, departmentId])
+  @@index([tenantId, departmentId])
+  @@map("library_book_departments")
+  @@schema("library")
+}
+
+model LibraryCollectionDepartmentMapping {
+  id                          String    @id @default(uuid()) @db.Uuid
+  tenantId                    String    @map("tenant_id") @db.Uuid
+  sourceCollectionCode        String    @map("source_collection_code")
+  sourceCollectionDescription String?   @map("source_collection_description")
+  departmentId                String?   @map("department_id") @db.Uuid
+  mappingStatus               String    @default("UNMAPPED") @map("mapping_status")
+  mappingMethod               String    @default("NONE") @map("mapping_method")
+  verifiedById                String?   @map("verified_by_id") @db.Uuid
+  verifiedAt                  DateTime? @map("verified_at")
+  createdAt                   DateTime  @default(now()) @map("created_at")
+  updatedAt                   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, sourceCollectionCode])
+  @@index([tenantId, mappingStatus])
+  @@map("library_collection_department_mappings")
+  @@schema("library")
+}
+
+model LibraryKohaImportBatch {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  importName          String    @map("import_name")
+  sourceSystem        String    @default("KOHA") @map("source_system")
+  uploadedFileName    String    @map("uploaded_file_name")
+  storedFilePath      String?   @map("stored_file_path")
+  uploadedById        String?   @map("uploaded_by_id") @db.Uuid
+  status              String    @default("UPLOADED")
+  totalSourceRecords  Int       @default(0) @map("total_source_records")
+  totalCopies         Int       @default(0) @map("total_copies")
+  validRecords        Int       @default(0) @map("valid_records")
+  importedBooks       Int       @default(0) @map("imported_books")
+  importedCopies      Int       @default(0) @map("imported_copies")
+  skippedRecords      Int       @default(0) @map("skipped_records")
+  duplicateRecords    Int       @default(0) @map("duplicate_records")
+  failedRecords       Int       @default(0) @map("failed_records")
+  errorReportPath     String?   @map("error_report_path")
+  summary             Json      @default("{}")
+  startedAt           DateTime? @map("started_at")
+  completedAt         DateTime? @map("completed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  books  LibraryKohaStagedBook[]
+  copies LibraryKohaStagedCopy[]
+
+  @@index([tenantId, createdAt])
+  @@map("library_koha_import_batches")
+  @@schema("library")
+}
+
+model LibraryKohaStagedBook {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tenantId              String   @map("tenant_id") @db.Uuid
+  batchId               String   @map("batch_id") @db.Uuid
+  sourceBibliographicId String   @map("source_bibliographic_id")
+  title                 String
+  subtitle              String?
+  author                String?
+  isbnRaw               String?  @map("isbn_raw")
+  isbn10                String?  @map("isbn10")
+  isbn13                String?  @map("isbn13")
+  publisher             String?
+  publicationYear       String?  @map("publication_year")
+  publicationPlace      String?  @map("publication_place")
+  edition               String?
+  series                String?
+  pages                 String?
+  classificationNumber  String?  @map("classification_number")
+  itemTypeCode          String?  @map("item_type_code")
+  sourceUrl             String?  @map("source_url")
+  validationStatus      String   @default("PENDING") @map("validation_status")
+  issues                Json     @default("[]")
+  bookId                String?  @map("book_id") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  batch LibraryKohaImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, sourceBibliographicId])
+  @@index([batchId, validationStatus])
+  @@map("library_koha_staged_books")
+  @@schema("library")
+}
+
+model LibraryKohaStagedCopy {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @map("tenant_id") @db.Uuid
+  batchId                String   @map("batch_id") @db.Uuid
+  sourceItemId           String   @map("source_item_id")
+  sourceBibliographicId  String   @map("source_bibliographic_id")
+  barcode                String?
+  accessionNumber        String?  @map("accession_number")
+  callNumber             String?  @map("call_number")
+  collectionCode         String?  @map("collection_code")
+  homeBranchCode         String?  @map("home_branch_code")
+  shelvingLocation       String?  @map("shelving_location")
+  itemTypeCode           String?  @map("item_type_code")
+  acquisitionDate        String?  @map("acquisition_date")
+  acquisitionPrice       String?  @map("acquisition_price")
+  withdrawn              String?
+  itemLost               String?  @map("item_lost")
+  damaged                String?
+  notForLoan             String?  @map("not_for_loan")
+  copyStatus             String?  @map("copy_status")
+  validationStatus       String   @default("PENDING") @map("validation_status")
+  issues                 Json     @default("[]")
+  copyId                 String?  @map("copy_id") @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  batch LibraryKohaImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, sourceItemId])
+  @@index([batchId, sourceBibliographicId])
+  @@index([batchId, validationStatus])
+  @@index([batchId, collectionCode])
+  @@map("library_koha_staged_copies")
   @@schema("library")
 }
 

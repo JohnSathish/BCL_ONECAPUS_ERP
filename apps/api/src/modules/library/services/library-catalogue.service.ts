@@ -66,6 +66,26 @@ export class LibraryCatalogueService {
                 accessionNo: { contains: search, mode: 'insensitive' as const },
               },
               { isbn: { contains: search, mode: 'insensitive' as const } },
+              {
+                copies: {
+                  some: {
+                    OR: [
+                      {
+                        barcode: {
+                          contains: search,
+                          mode: 'insensitive' as const,
+                        },
+                      },
+                      {
+                        accessionNumber: {
+                          contains: search,
+                          mode: 'insensitive' as const,
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
             ],
           }
         : {}),
@@ -77,7 +97,13 @@ export class LibraryCatalogueService {
         include: {
           category: true,
           copies: {
-            select: { id: true, status: true, barcode: true, copyNumber: true },
+            select: {
+              id: true,
+              status: true,
+              barcode: true,
+              copyNumber: true,
+              accessionNumber: true,
+            },
           },
         },
         orderBy: { accessionNo: 'asc' },

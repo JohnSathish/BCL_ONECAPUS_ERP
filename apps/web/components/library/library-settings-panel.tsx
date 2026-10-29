@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Settings } from 'lucide-react';
@@ -224,6 +225,16 @@ export function LibrarySettingsPanel() {
         <h1 className="text-lg font-semibold">Library Settings</h1>
       </div>
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+      <section className="rounded-lg border p-4">
+        <h2 className="text-sm font-medium">Data migration</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Bring the Koha catalogue into this library. Physical copies, barcodes, and collection
+          codes stay intact, and department links are confirmed before import.
+        </p>
+        <Button asChild className="mt-3" variant="outline">
+          <Link href="/admin/library/koha-import">Import from Koha</Link>
+        </Button>
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium">Circulation rules (by member type)</h2>

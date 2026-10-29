@@ -496,6 +496,98 @@ export const fetchEntryExitStudentHistory = (
     })
     .then((r) => r.data);
 
+const kohaBase = `${base}/koha-import`;
+const kohaTimeout = 600_000;
+
+export type KohaImportBatch = {
+  id: string;
+  importName: string;
+  sourceSystem: string;
+  uploadedFileName: string;
+  status: string;
+  totalBibliographicRecords: number;
+  totalPhysicalCopies: number;
+  validRecords: number;
+  invalidRecords: number;
+  duplicateCandidates: number;
+  missingAccessionNumbers: number;
+  missingBarcodes: number;
+  mappedDepartments: number;
+  unmappedCollectionCodes: number;
+  needsReview: number;
+  notApplicable: number;
+  importedBooks: number;
+  importedCopies: number;
+  skippedRecords: number;
+  failedRecords: number;
+  progress: number | null;
+  notes: string[];
+  fieldMap: { source: string; destination: string }[];
+  detectedBookHeaders: string[];
+  detectedCopyHeaders: string[];
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+};
+
+export type KohaCollectionMapping = {
+  id: string | null;
+  sourceCollectionCode: string;
+  sourceCollectionDescription: string;
+  copyCount: number;
+  departmentId: string | null;
+  mappingStatus: 'MAPPED' | 'NEEDS_REVIEW' | 'UNMAPPED' | 'NOT_APPLICABLE';
+  mappingMethod: string;
+  verifiedAt: string | null;
+};
+
+export const fetchKohaImportBatches = () =>
+  api.get<{ items: KohaImportBatch[] }>(`${kohaBase}/batches`).then((r) => r.data);
+
+export const fetchKohaImportBatch = (id: string) =>
+  api.get<KohaImportBatch>(`${kohaBase}/${id}`).then((r) => r.data);
+
+export const uploadKohaCatalogue = (file: File, importName?: string) => {
+  const body = new FormData();
+  body.append('file', file);
+  if (importName?.trim()) body.append('importName', importName.trim());
+  return api
+    .post<KohaImportBatch>(`${kohaBase}/upload`, body, { timeout: kohaTimeout })
+    .then((r) => r.data);
+};
+
+export const fetchKohaMappings = (id: string) =>
+  api
+    .get<{
+      departments: { id: string; name: string; code: string }[];
+      items: KohaCollectionMapping[];
+    }>(`${kohaBase}/${id}/mappings`)
+    .then((r) => r.data);
+
+export const updateKohaMapping = (
+  id: string,
+  payload: { mappingStatus: KohaCollectionMapping['mappingStatus']; departmentId?: string | null },
+) => api.patch(`${kohaBase}/mappings/${id}`, payload).then((r) => r.data);
+
+export const dryRunKohaImport = (id: string) =>
+  api.post<KohaImportBatch>(`${kohaBase}/${id}/dry-run`).then((r) => r.data);
+
+export const sampleKohaImport = (id: string) =>
+  api
+    .post<KohaImportBatch>(`${kohaBase}/${id}/sample`, undefined, { timeout: kohaTimeout })
+    .then((r) => r.data);
+
+export const startKohaImport = (id: string) =>
+  api.post<KohaImportBatch>(`${kohaBase}/${id}/import`, { approved: true }).then((r) => r.data);
+
+export const retryKohaImport = (id: string) =>
+  api.post<KohaImportBatch>(`${kohaBase}/${id}/retry`, { approved: true }).then((r) => r.data);
+
+export const downloadKohaReport = (id: string, kind: 'validation' | 'errors') =>
+  api
+    .get(`${kohaBase}/${id}/report`, { params: { kind }, responseType: 'blob' })
+    .then((r) => r.data as Blob);
+
 export const downloadEntryExitExport = (
   format: 'xlsx' | 'csv' | 'pdf',
   params?: Record<string, string | number | undefined>,

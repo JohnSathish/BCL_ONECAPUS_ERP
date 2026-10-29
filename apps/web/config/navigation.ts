@@ -1645,6 +1645,11 @@ export const ADMIN_NAV: NavGroup[] = [
             href: '/admin/library/settings',
             permissions: ['library:settings', 'library:manage'],
           },
+          {
+            label: 'Import from Koha',
+            href: '/admin/library/koha-import',
+            permissions: ['library:settings', 'library:manage'],
+          },
         ],
       },
     ],

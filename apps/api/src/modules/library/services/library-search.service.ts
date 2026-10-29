@@ -94,6 +94,21 @@ export class LibrarySearchService {
                 { accessionNo: { contains: term, mode: 'insensitive' } },
 
                 { isbn: { contains: term, mode: 'insensitive' } },
+                {
+                  copies: {
+                    some: {
+                      OR: [
+                        { barcode: { contains: term, mode: 'insensitive' } },
+                        {
+                          accessionNumber: {
+                            contains: term,
+                            mode: 'insensitive',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
               ],
             },
 
