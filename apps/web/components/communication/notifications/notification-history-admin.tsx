@@ -39,6 +39,7 @@ export function NotificationHistoryAdmin({
   const enabled = useAuthQueryEnabled();
   const qc = useQueryClient();
   const [audience, setAudience] = useState<AudienceId>('STUDENTS');
+  const [lookup, setLookup] = useState('');
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,30 +94,36 @@ export function NotificationHistoryAdmin({
     .slice(0, 8);
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-2xl border border-border/80 bg-card p-4">
-        <h2 className="text-base font-semibold">Clear notification history</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <div className="grid gap-4 lg:grid-cols-2">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-semibold text-rose-700">Clear notification history</h2>
+        <p className="mt-1 text-sm text-slate-500">
           Deletes messages already stored in the app, including older notices and sign-in alerts.
-          People see the shorter list the next time they open Notifications. A banner already on a
-          lock screen can remain until they dismiss it.
+          People see a shorter list the next time they open Notifications.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {AUDIENCES.map((option) => (
-            <Button
-              key={option.id}
-              size="sm"
-              variant={audience === option.id ? 'default' : 'outline'}
-              onClick={() => setAudience(option.id)}
-            >
-              {option.label}
-              {counts
-                ? ` (${(option.id === 'STUDENTS' ? counts.students : option.id === 'STAFF' ? counts.staff : counts.all).toLocaleString('en-IN')})`
-                : ''}
-            </Button>
-          ))}
+          {AUDIENCES.map((option) => {
+            const count = counts
+              ? option.id === 'STUDENTS'
+                ? counts.students
+                : option.id === 'STAFF'
+                  ? counts.staff
+                  : counts.all
+              : null;
+            return (
+              <Button
+                key={option.id}
+                size="sm"
+                variant={audience === option.id ? 'default' : 'outline'}
+                onClick={() => setAudience(option.id)}
+              >
+                {option.label}
+                {count == null ? '' : ` (${count.toLocaleString('en-IN')})`}
+              </Button>
+            );
+          })}
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-xs text-slate-500">
           {AUDIENCES.find((option) => option.id === audience)?.hint}
         </p>
         <Button
@@ -138,8 +145,38 @@ export function NotificationHistoryAdmin({
         </Button>
       </section>
 
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-semibold text-amber-700">Revoke a sent campaign</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Use this when one notice was sent by mistake. It removes that campaign from every
+          recipient&apos;s notification list and stops a send that is still going out.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <input
+            className="h-9 flex-1 rounded-md border bg-background px-3 text-sm"
+            placeholder="Paste campaign ID"
+            value={lookup}
+            onChange={(event) => setLookup(event.target.value)}
+          />
+          <Button
+            variant="outline"
+            disabled={revoke.isPending || !lookup.trim()}
+            onClick={() => {
+              const id = lookup.trim();
+              if (!confirmRevokeCampaign(id)) return;
+              revoke.mutate(id);
+            }}
+          >
+            Revoke
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-sky-700">
+          Only a sent or in-progress campaign can be revoked. This cannot be undone.
+        </p>
+      </section>
+
       {showRecentCampaigns ? (
-        <section className="rounded-2xl border border-border/80 bg-card p-4">
+        <section className="rounded-2xl border border-border/80 bg-card p-4 lg:col-span-2">
           <h2 className="text-base font-semibold">Revoke a sent campaign</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Use this when one notice was sent by mistake. It removes that campaign from every
@@ -185,12 +222,12 @@ export function NotificationHistoryAdmin({
       ) : null}
 
       {note ? (
-        <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
+        <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200 lg:col-span-2">
           {note}
         </p>
       ) : null}
       {error ? (
-        <p className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <p className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive lg:col-span-2">
           {error}
         </p>
       ) : null}
