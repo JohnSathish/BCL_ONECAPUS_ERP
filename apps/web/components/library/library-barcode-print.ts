@@ -182,18 +182,28 @@ export function barcodeLabelDocument(
   settings: LibraryBarcodeLabelSettings,
   options?: { autoPrint?: boolean; jobId?: string },
 ) {
-  const perPage = Math.max(settings.columns * settings.rows, 1);
-  const pages: LibraryBarcodeLabelPayload[][] = [];
-  for (let index = 0; index < labels.length; index += perPage) {
-    pages.push(labels.slice(index, index + perPage));
+  const zebra = isZebraPair(settings);
+  const copies = zebra ? labels.flatMap((label) => [label, label]) : labels;
+  const perPage = zebra ? 2 : Math.max(settings.columns * settings.rows, 1);
+  const pages: Array<Array<LibraryBarcodeLabelPayload | null>> = [];
+  for (let index = 0; index < copies.length; index += perPage) {
+    const page = copies.slice(index, index + perPage);
+    pages.push(zebra ? [page[0] ?? null, page[1] ?? null] : page);
   }
   const logo =
     typeof window === 'undefined' ? '' : `${window.location.origin}/branding/college-logo.png`;
   const sheets = pages
-    .map(
-      (page) =>
-        `<section class="sheet">${page.map((label) => labelMarkup(label, settings, logo)).join('')}</section>`,
-    )
+    .map((page, index) => {
+      const slots = page
+        .map((label, slot) =>
+          label
+            ? labelMarkup(label, settings, logo, zebra ? (slot === 0 ? 'slot-a' : 'slot-b') : '')
+            : `<article class="label compact ${slot === 0 ? 'slot-a' : 'slot-b'}"></article>`,
+        )
+        .join('');
+      const last = index === pages.length - 1 ? ' last' : '';
+      return `<section class="sheet${zebra ? ' zebra' : ''}${last}">${slots}</section>`;
+    })
     .join('');
   const jobScript = options?.jobId
     ? `<script>
@@ -207,7 +217,6 @@ export function barcodeLabelDocument(
     : options?.autoPrint === false
       ? ''
       : '<script>window.addEventListener("load", function () { window.print(); });</script>';
-  const zebra = settings.preset === 'ZEBRA_2UP' && settings.columns === 2 && settings.rows === 1;
   const pageWidth = zebra ? '4in' : `${settings.pageWidthMm}mm`;
   const pageHeight = zebra ? '0.98in' : `${settings.pageHeightMm}mm`;
   return `<!DOCTYPE html>
@@ -218,7 +227,7 @@ export function barcodeLabelDocument(
   <style>
     @page { size: ${pageWidth} ${pageHeight}; margin: 0; }
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+    html, body { margin: 0; padding: 0; background: #fff; color: #000; ${zebra ? 'width: 4in;' : ''} }
     .sheet {
       width: ${pageWidth};
       height: ${pageHeight};
@@ -307,9 +316,47 @@ export function barcodeLabelDocument(
       text-overflow: ellipsis;
     }
     @media screen { .label.compact { box-shadow: inset 0 0 0 0.15mm #e5e7eb; } }
+    .sheet.zebra {
+      display: block;
+      position: relative;
+      width: 4in;
+      height: 0.98in;
+      padding: 0;
+      overflow: hidden;
+    }
+    .sheet.zebra .label {
+      position: absolute;
+      top: 0;
+      width: 1.968in;
+      height: 0.98in;
+      margin: 0;
+      border: 0;
+      padding: 0.04in 0.06in 0.03in;
+      overflow: hidden;
+    }
+    .sheet.zebra .slot-a { left: 0; }
+    .sheet.zebra .slot-b { left: 2.032in; }
+    .sheet.zebra .label.compact .bars {
+      width: 1.84in;
+      height: 0.46in;
+      padding: 0;
+    }
+    .sheet.zebra .label.compact .bars svg {
+      width: 1.84in;
+      height: 0.44in;
+    }
+    .sheet.zebra .label.compact .foot {
+      height: auto;
+      margin-top: 0.03in;
+      align-items: flex-end;
+    }
+    .sheet.zebra .label.compact .acc { font-size: 12pt; }
+    .sheet.last { page-break-after: auto; break-after: auto; }
     @media print {
-      .sheet { page-break-after: always; }
+      .sheet { page-break-after: always; break-after: page; }
+      .sheet.last { page-break-after: auto; break-after: auto; }
       .label.compact { box-shadow: none; }
+      .sheet.zebra, .sheet.zebra .label { overflow: hidden; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
@@ -321,12 +368,17 @@ export function barcodeLabelDocument(
 </html>`;
 }
 
+function isZebraPair(settings: LibraryBarcodeLabelSettings) {
+  return settings.preset === 'ZEBRA_2UP' && settings.columns === 2 && settings.rows === 1;
+}
+
 function labelMarkup(
   label: LibraryBarcodeLabelPayload,
   settings: LibraryBarcodeLabelSettings,
   logo: string,
+  slot = '',
 ) {
-  if (isCompactBarcodeLabel(settings)) return compactLabelMarkup(label, settings);
+  if (isCompactBarcodeLabel(settings)) return compactLabelMarkup(label, settings, slot);
   const header = `<header>
     ${settings.showLogo && logo ? `<img src="${esc(logo)}" alt="" />` : ''}
     <div class="head-copy">
@@ -347,6 +399,7 @@ function labelMarkup(
 function compactLabelMarkup(
   label: LibraryBarcodeLabelPayload,
   settings: LibraryBarcodeLabelSettings,
+  slot = '',
 ) {
   const call = label.callNumber.trim();
   const code = settings.headerCode.trim();
@@ -355,7 +408,7 @@ function compactLabelMarkup(
   const mark = `${code ? `<div class="code">${esc(code)}</div>` : ''}${
     settings.showCallNumber && call ? `<div class="call">${esc(call)}</div>` : ''
   }`;
-  return `<article class="label compact"><div class="bars">${barcodeSvg(label.encodedValue, settings)}</div><div class="foot">${
+  return `<article class="label compact${slot ? ` ${slot}` : ''}"><div class="bars">${barcodeSvg(label.encodedValue, settings)}</div><div class="foot">${
     settings.showAccession ? `<div class="${accClass}">${esc(accession)}</div>` : '<div></div>'
   }${mark ? `<div class="markbox">${mark}</div>` : ''}</div></article>`;
 }
