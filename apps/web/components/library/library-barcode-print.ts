@@ -11,7 +11,37 @@ function esc(value: string) {
     .replace(/"/g, '&quot;');
 }
 
-export function defaultBarcodeLabelSettings(): LibraryBarcodeLabelSettings {
+export function zebraBarcodeLabelSettings(headerCode = 'DBCL'): LibraryBarcodeLabelSettings {
+  return {
+    preset: 'ZEBRA_2UP',
+    pageWidthMm: 104,
+    pageHeightMm: 25,
+    columns: 2,
+    rows: 1,
+    marginTopMm: 0,
+    marginRightMm: 0,
+    marginBottomMm: 0,
+    marginLeftMm: 0,
+    gapXMm: 4,
+    gapYMm: 0,
+    labelWidthMm: 50,
+    labelHeightMm: 25,
+    barcodeHeightMm: 14,
+    moduleWidth: 1.15,
+    fontSizePt: 8,
+    showLogo: false,
+    showTitle: false,
+    showAuthor: false,
+    showDepartment: false,
+    showCallNumber: true,
+    showAccession: true,
+    headerTitle: '',
+    headerSubtitle: '',
+    headerCode,
+  };
+}
+
+function a4BarcodeLabelSettings(): LibraryBarcodeLabelSettings {
   const pageWidthMm = 210;
   const pageHeightMm = 297;
   const columns = 2;
@@ -44,18 +74,30 @@ export function defaultBarcodeLabelSettings(): LibraryBarcodeLabelSettings {
     showDepartment: true,
     showCallNumber: true,
     showAccession: true,
-    headerTitle: 'DON BOSCO COLLEGE, TURA',
-    headerSubtitle: 'LIBRARY',
+    headerTitle: '',
+    headerSubtitle: '',
     headerCode: 'DBCL',
   };
+}
+
+export function defaultBarcodeLabelSettings(): LibraryBarcodeLabelSettings {
+  return zebraBarcodeLabelSettings();
 }
 
 export function applyBarcodePreset(
   template: LibraryBarcodeLabelSettings,
   preset: LibraryBarcodeLabelSettings['preset'],
 ): LibraryBarcodeLabelSettings {
+  if (preset === 'ZEBRA_2UP') {
+    const stock = zebraBarcodeLabelSettings(template.headerCode || 'DBCL');
+    return {
+      ...stock,
+      showCallNumber: template.showCallNumber,
+      showAccession: template.showAccession,
+    };
+  }
   if (preset === 'A4_2X4') {
-    const fitted = defaultBarcodeLabelSettings();
+    const fitted = a4BarcodeLabelSettings();
     return {
       ...fitted,
       showLogo: template.showLogo,
@@ -106,6 +148,33 @@ export function applyBarcodePreset(
     };
   }
   return { ...template, preset: 'CUSTOM' };
+}
+
+export function preferPrinterStock(
+  template: LibraryBarcodeLabelSettings,
+): LibraryBarcodeLabelSettings {
+  const legacySheet =
+    template.preset === 'A4_2X4' &&
+    template.pageWidthMm === 210 &&
+    template.pageHeightMm === 297 &&
+    template.columns === 2 &&
+    template.rows === 4 &&
+    template.marginTopMm === 10 &&
+    template.showLogo &&
+    template.showTitle &&
+    template.headerSubtitle.trim().toUpperCase() === 'LIBRARY';
+  if (!legacySheet) return template;
+  return applyBarcodePreset(template, 'ZEBRA_2UP');
+}
+
+export function isCompactBarcodeLabel(settings: LibraryBarcodeLabelSettings) {
+  return (
+    settings.preset === 'ZEBRA_2UP' ||
+    (settings.labelWidthMm <= 60 &&
+      settings.labelHeightMm <= 32 &&
+      !settings.showLogo &&
+      !settings.showTitle)
+  );
 }
 
 export function barcodeLabelDocument(
@@ -188,7 +257,58 @@ export function barcodeLabelDocument(
     .bars { width: 42%; display: flex; flex-direction: column; align-items: center; justify-content: center; border-left: 0.2mm solid #e5e7eb; padding-left: 1.4mm; }
     .bars svg { width: 100%; height: ${settings.barcodeHeightMm}mm; }
     .acc { margin-top: 0.6mm; font-weight: 800; font-size: ${settings.fontSizePt + 2}pt; letter-spacing: 0.03em; }
-    @media print { .sheet { page-break-after: always; } }
+    .label.compact {
+      border: none;
+      padding: 1mm 1.5mm 0.9mm;
+      justify-content: flex-start;
+    }
+    .label.compact .bars {
+      width: 100%;
+      height: ${Math.min(settings.barcodeHeightMm, 15)}mm;
+      flex: none;
+      border: none;
+      padding: 0.4mm 0.6mm 0;
+      align-items: stretch;
+    }
+    .label.compact .bars svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .label.compact .foot {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1.4mm;
+      margin-top: auto;
+      padding-top: 0.45mm;
+      line-height: 1;
+    }
+    .label.compact .acc {
+      margin: 0;
+      min-width: 0;
+      font-weight: 700;
+      font-size: 13.5pt;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .label.compact .acc.long { font-size: 8pt; letter-spacing: 0; }
+    .label.compact .markbox { margin-left: auto; max-width: 62%; min-width: 0; text-align: right; }
+    .label.compact .code { font-size: 8pt; font-weight: 800; letter-spacing: 0.08em; }
+    .label.compact .call {
+      margin-top: 0.4mm;
+      font-size: 7pt;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    @media screen { .label.compact { box-shadow: inset 0 0 0 0.15mm #e5e7eb; } }
+    @media print {
+      .sheet { page-break-after: always; }
+      .label.compact { box-shadow: none; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
   </style>
 </head>
 <body>
@@ -203,6 +323,7 @@ function labelMarkup(
   settings: LibraryBarcodeLabelSettings,
   logo: string,
 ) {
+  if (isCompactBarcodeLabel(settings)) return compactLabelMarkup(label, settings);
   const header = `<header>
     ${settings.showLogo && logo ? `<img src="${esc(logo)}" alt="" />` : ''}
     <div class="head-copy">
@@ -220,6 +341,22 @@ function labelMarkup(
   return `<article class="label">${header}<div class="body">${meta}<div class="bars">${barcodeSvg(label.encodedValue, settings)}<div class="acc">${settings.showAccession ? esc(label.accessionNumber) : ''}</div></div></div></article>`;
 }
 
+function compactLabelMarkup(
+  label: LibraryBarcodeLabelPayload,
+  settings: LibraryBarcodeLabelSettings,
+) {
+  const call = label.callNumber.trim();
+  const code = settings.headerCode.trim();
+  const accession = label.accessionNumber.trim();
+  const accClass = accession.length > 10 ? 'acc long' : 'acc';
+  const mark = `${code ? `<div class="code">${esc(code)}</div>` : ''}${
+    settings.showCallNumber && call ? `<div class="call">${esc(call)}</div>` : ''
+  }`;
+  return `<article class="label compact"><div class="bars">${barcodeSvg(label.encodedValue, settings)}</div><div class="foot">${
+    settings.showAccession ? `<div class="${accClass}">${esc(accession)}</div>` : '<div></div>'
+  }${mark ? `<div class="markbox">${mark}</div>` : ''}</div></article>`;
+}
+
 function barcodeSvg(value: string, settings: LibraryBarcodeLabelSettings) {
   const code = value.trim();
   if (!code || typeof document === 'undefined') return `<div>${esc(code)}</div>`;
@@ -234,6 +371,8 @@ function barcodeSvg(value: string, settings: LibraryBarcodeLabelSettings) {
       background: '#ffffff',
       lineColor: '#000000',
     });
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('shape-rendering', 'crispEdges');
     return svg.outerHTML;
   } catch {
     return `<div>${esc(code)}</div>`;

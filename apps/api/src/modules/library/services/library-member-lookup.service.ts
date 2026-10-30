@@ -1,9 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
+import {
+  programmeKind,
+  staffKind,
+} from '../domain/library-member-status.logic';
 import { LibraryQrService } from './library-qr.service';
 
-export type LibraryMemberType = 'STUDENT' | 'STAFF' | 'FACULTY' | 'VISITOR';
+export type LibraryMemberType =
+  | 'STUDENT'
+  | 'STAFF'
+  | 'FACULTY'
+  | 'VISITOR'
+  | 'RESEARCH_SCHOLAR';
 
 export type LibraryMemberProfile = {
   memberType: LibraryMemberType;
@@ -51,6 +60,7 @@ export class LibraryMemberLookupService {
         deletedAt: null,
         OR: [
           { rfidNumber: code },
+          { libraryCardNumber: { equals: code, mode: 'insensitive' } },
           { enrollmentNumber: { equals: code, mode: 'insensitive' } },
           { rollNumber: { equals: code, mode: 'insensitive' } },
           { applicationNumber: { equals: code, mode: 'insensitive' } },
@@ -68,7 +78,9 @@ export class LibraryMemberLookupService {
         masterProfile: true,
         department: { select: { name: true } },
         programVersion: {
-          include: { program: { select: { name: true, code: true } } },
+          include: {
+            program: { select: { name: true, code: true, level: true } },
+          },
         },
         academicStanding: {
           select: { currentSemesterSequence: true, lifecycleState: true },
@@ -86,7 +98,11 @@ export class LibraryMemberLookupService {
     if (student) {
       const lifecycle = student.academicStanding?.lifecycleState ?? 'ACTIVE';
       return {
-        memberType: 'STUDENT',
+        memberType: programmeKind(
+          student.programVersion?.program?.level,
+          student.programVersion?.program?.name,
+          student.programVersion?.program?.code,
+        ),
         memberId: student.id,
         studentId: student.id,
         fullName: student.masterProfile?.fullName ?? student.enrollmentNumber,
@@ -124,9 +140,8 @@ export class LibraryMemberLookupService {
     });
 
     if (staff) {
-      const isFaculty = staff.staffType === 'TEACHING';
       return {
-        memberType: isFaculty ? 'FACULTY' : 'STAFF',
+        memberType: staffKind(staff.staffType, staff.designation?.label),
         memberId: staff.id,
         staffProfileId: staff.id,
         fullName: staff.fullName,

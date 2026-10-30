@@ -5,9 +5,20 @@ import {
 } from '@nestjs/common';
 import { createReadStream, existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
-import { basename, extname, join, normalize, resolve } from 'path';
+import {
+  basename,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'path';
 import { randomUUID } from 'crypto';
-import { resolveTenantUploadRoot } from '../../../common/uploads/upload-paths';
+import {
+  resolvePublicUploadFsPath,
+  resolveTenantUploadRoot,
+} from '../../../common/uploads/upload-paths';
 
 export const DEFAULT_LIBRARY_MIME_TYPES = [
   'application/pdf',
@@ -84,11 +95,9 @@ export class LibraryAssetsService {
     if (!filePath?.startsWith(prefix)) {
       throw new BadRequestException('Invalid file path');
     }
-    const abs = normalize(resolve(process.cwd(), filePath.slice(1)));
-    const expectedRoot = normalize(
-      resolve(this.uploadRoot, tenantId, 'library', segment),
-    );
-    if (!abs.startsWith(expectedRoot)) {
+    const abs = resolve(resolvePublicUploadFsPath(filePath));
+    const expectedRoot = resolve(this.uploadRoot, tenantId, 'library', segment);
+    if (!isInsideRoot(expectedRoot, abs)) {
       throw new BadRequestException('Path traversal blocked');
     }
     if (!existsSync(abs)) throw new NotFoundException('File not found');
@@ -112,9 +121,9 @@ export class LibraryAssetsService {
     if (!filePath?.startsWith(`/uploads/tenants/${tenantId}/`)) {
       throw new BadRequestException('Invalid file path');
     }
-    const abs = normalize(resolve(process.cwd(), filePath.slice(1)));
-    const expectedRoot = normalize(resolve(this.uploadRoot, tenantId));
-    if (!abs.startsWith(expectedRoot)) {
+    const abs = resolve(resolvePublicUploadFsPath(filePath));
+    const expectedRoot = resolve(this.uploadRoot, tenantId);
+    if (!isInsideRoot(expectedRoot, abs)) {
       throw new BadRequestException('Path traversal blocked');
     }
     if (!existsSync(abs)) throw new NotFoundException('File not found');
@@ -129,4 +138,14 @@ export class LibraryAssetsService {
     if (filePath.includes('/library/research/')) return 'research';
     throw new BadRequestException('Unknown library file path');
   }
+}
+
+function isInsideRoot(root: string, target: string) {
+  const rel = relative(root, target);
+  return (
+    rel.length > 0 &&
+    rel !== '..' &&
+    !rel.startsWith(`..${sep}`) &&
+    !isAbsolute(rel)
+  );
 }

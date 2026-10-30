@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../database/prisma.service';
 import { LibraryFinesService } from './library-fines.service';
+import { LibraryMembersService } from './library-members.service';
 import { LibraryNotificationsService } from './library-notifications.service';
 
 @Injectable()
@@ -12,9 +13,10 @@ export class LibrarySchedulerService {
     private readonly prisma: PrismaService,
     private readonly notifications: LibraryNotificationsService,
     private readonly fines: LibraryFinesService,
+    private readonly members: LibraryMembersService,
   ) {}
 
-  /** Daily 9:00 — accrue running fines and send deduplicated overdue reminders. */
+  /** Daily 9:00 — fines, overdue reminders, and library membership sync. */
   @Cron('0 9 * * *')
   async runDailyLibraryJobs() {
     this.logger.log('Running daily library fine + overdue reminder jobs');
@@ -28,6 +30,7 @@ export class LibrarySchedulerService {
         await this.fines.accrueDailyRunningFines(tenant.id);
         await this.notifications.processDueTomorrowReminders(tenant.id);
         await this.notifications.processOverdueReminders(tenant.id);
+        await this.members.sync(tenant.id, 'ALL', null);
       } catch (err) {
         this.logger.warn(
           `Library daily job failed for tenant ${tenant.id}: ${String(err)}`,

@@ -35,6 +35,7 @@ export class LibraryPolicyService {
     policy: CirculationPolicy,
     memberType: string,
     categoryCode?: string | null,
+    overrideDays?: number | null,
   ): number {
     const code = categoryCode?.toUpperCase() ?? '';
     if (code === 'REFERENCE' || code.includes('REFERENCE')) {
@@ -43,13 +44,19 @@ export class LibraryPolicyService {
     if (code === 'RARE' || code.includes('RARE')) {
       return policy.rare.allowIssue ? policy.rare.loanDays : 0;
     }
+    if (overrideDays != null) return overrideDays;
     const role = this.memberRoleKey(memberType);
     const rolePolicy = policy[role];
     if ('loanDays' in rolePolicy) return rolePolicy.loanDays;
     return 14;
   }
 
-  resolveMaxBooks(policy: CirculationPolicy, memberType: string): number {
+  resolveMaxBooks(
+    policy: CirculationPolicy,
+    memberType: string,
+    overrideBooks?: number | null,
+  ): number {
+    if (overrideBooks != null) return overrideBooks;
     const role = this.memberRoleKey(memberType);
     const rolePolicy = policy[role];
     if ('maxBooks' in rolePolicy) return rolePolicy.maxBooks;
@@ -60,13 +67,62 @@ export class LibraryPolicyService {
     policy: CirculationPolicy,
     memberType: string,
     settingsMaxRenewals: number,
+    overrideRenewals?: number | null,
   ): number {
+    if (overrideRenewals != null) return overrideRenewals;
     const role = this.memberRoleKey(memberType);
     const rolePolicy = policy[role];
     if ('maxRenewals' in rolePolicy && rolePolicy.maxRenewals > 0) {
       return rolePolicy.maxRenewals;
     }
     return settingsMaxRenewals;
+  }
+
+  async loadBorrowRules(
+    tenantId: string,
+    person: { studentId?: string | null; staffProfileId?: string | null },
+  ) {
+    const membership = person.studentId
+      ? await this.prisma.libraryMembership.findFirst({
+          where: { tenantId, studentId: person.studentId },
+        })
+      : person.staffProfileId
+        ? await this.prisma.libraryMembership.findFirst({
+            where: { tenantId, staffProfileId: person.staffProfileId },
+          })
+        : null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expires = membership?.expiresAt
+      ? new Date(membership.expiresAt)
+      : null;
+    if (expires) expires.setHours(0, 0, 0, 0);
+    return {
+      blocked: membership?.status === 'BLOCKED',
+      blockReason: membership?.blockReason ?? null,
+      expired: Boolean(expires && expires < today),
+      fineExempt: membership?.fineExempt ?? false,
+      loanLimit: membership?.loanLimit ?? null,
+      loanDays: membership?.loanDays ?? null,
+      maxRenewals: membership?.maxRenewals ?? null,
+    };
+  }
+
+  assertCanBorrow(rules: {
+    blocked: boolean;
+    blockReason: string | null;
+    expired: boolean;
+  }) {
+    if (rules.blocked) {
+      throw new BadRequestException(
+        rules.blockReason
+          ? `Borrowing is blocked: ${rules.blockReason.replaceAll('_', ' ').toLowerCase()}.`
+          : 'Borrowing is blocked for this member.',
+      );
+    }
+    if (rules.expired) {
+      throw new BadRequestException('This library membership has expired.');
+    }
   }
 
   async validateIssue(
@@ -89,7 +145,13 @@ export class LibraryPolicyService {
       }
     }
 
-    const maxBooks = this.resolveMaxBooks(policy, profile.memberType);
+    const rules = await this.loadBorrowRules(tenantId, profile);
+    this.assertCanBorrow(rules);
+    const maxBooks = this.resolveMaxBooks(
+      policy,
+      profile.memberType,
+      rules.loanLimit,
+    );
     const activeCount = await this.countActiveLoans(tenantId, profile);
     if (activeCount >= maxBooks) {
       throw new BadRequestException(

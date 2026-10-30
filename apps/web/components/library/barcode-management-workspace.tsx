@@ -30,6 +30,7 @@ import { apiErrorMessage } from '@/utils/api-error';
 import {
   applyBarcodePreset,
   barcodeLabelDocument,
+  preferPrinterStock,
   writeBarcodeSheet,
 } from './library-barcode-print';
 
@@ -116,7 +117,7 @@ export function BarcodeManagementWorkspace() {
   });
 
   useEffect(() => {
-    if (settings.data?.template) setTemplate(settings.data.template);
+    if (settings.data?.template) setTemplate(preferPrinterStock(settings.data.template));
   }, [settings.data]);
 
   useEffect(() => {
@@ -539,11 +540,16 @@ export function BarcodeManagementWorkspace() {
         <aside className="space-y-4">
           <section className="rounded-xl border bg-white p-4">
             <h2 className="text-sm font-semibold">Label preview</h2>
+            {template?.preset === 'ZEBRA_2UP' ? (
+              <p className="mt-1 text-xs text-slate-500">
+                50 × 25 mm, two labels across a 104 mm roll. Print at 100% scale.
+              </p>
+            ) : null}
             {preview && template ? (
               <iframe
                 title="Barcode label preview"
-                className="mt-3 w-full border bg-slate-50"
-                style={{ height: '220px' }}
+                className="mt-3 w-full border bg-white"
+                style={{ height: template.preset === 'ZEBRA_2UP' ? '150px' : '220px' }}
                 srcDoc={barcodeLabelDocument(
                   [preview],
                   {
@@ -696,7 +702,7 @@ function SettingsPanel({
     <section className="rounded-xl border bg-white p-4 text-sm">
       <h2 className="font-semibold">Print settings</h2>
       <div className="mt-3 flex flex-wrap gap-2">
-        {(['A4_2X4', 'SINGLE', 'ROLL', 'CUSTOM'] as const).map((preset) => (
+        {(['ZEBRA_2UP', 'A4_2X4', 'SINGLE', 'ROLL', 'CUSTOM'] as const).map((preset) => (
           <Button
             key={preset}
             type="button"
@@ -704,16 +710,24 @@ function SettingsPanel({
             variant={template.preset === preset ? 'default' : 'outline'}
             onClick={() => onChange(applyBarcodePreset(template, preset))}
           >
-            {preset === 'A4_2X4'
-              ? 'A4 2×4'
-              : preset === 'SINGLE'
-                ? 'Single label'
-                : preset === 'ROLL'
-                  ? 'Label roll'
-                  : 'Custom'}
+            {preset === 'ZEBRA_2UP'
+              ? 'Zebra 50×25'
+              : preset === 'A4_2X4'
+                ? 'A4 2×4'
+                : preset === 'SINGLE'
+                  ? 'Single label'
+                  : preset === 'ROLL'
+                    ? 'Label roll'
+                    : 'Custom'}
           </Button>
         ))}
       </div>
+      {template.preset === 'ZEBRA_2UP' ? (
+        <p className="mt-3 text-xs leading-5 text-slate-500">
+          Zebra GT800, two 50 × 25 mm stickers on a 104 mm roll. Each row is one page. The sticker
+          prints the barcode, accession number, library code, and call number.
+        </p>
+      ) : null}
       <div className="mt-3 grid grid-cols-2 gap-2">
         <NumberField
           label="Label width mm"
@@ -781,31 +795,48 @@ function SettingsPanel({
           onChange={(value) => setNumber('fontSizePt', value)}
         />
       </div>
+      {template.preset === 'ZEBRA_2UP' ? (
+        <label className="mt-3 block text-xs text-slate-500">
+          Library code
+          <Input
+            className="mt-1 uppercase"
+            maxLength={12}
+            value={template.headerCode}
+            onChange={(event) =>
+              onChange({ ...template, headerCode: event.target.value.toUpperCase() })
+            }
+          />
+        </label>
+      ) : null}
       <div className="mt-3 space-y-1">
-        <Check
-          label="College logo"
-          checked={template.showLogo}
-          onChange={(checked) => onChange({ ...template, showLogo: checked })}
-        />
-        <Check
-          label="Book title"
-          checked={template.showTitle}
-          onChange={(checked) => onChange({ ...template, showTitle: checked })}
-        />
-        <Check
-          label="Author"
-          checked={template.showAuthor}
-          onChange={(checked) => onChange({ ...template, showAuthor: checked })}
-        />
+        {template.preset === 'ZEBRA_2UP' ? null : (
+          <>
+            <Check
+              label="College logo"
+              checked={template.showLogo}
+              onChange={(checked) => onChange({ ...template, showLogo: checked })}
+            />
+            <Check
+              label="Book title"
+              checked={template.showTitle}
+              onChange={(checked) => onChange({ ...template, showTitle: checked })}
+            />
+            <Check
+              label="Author"
+              checked={template.showAuthor}
+              onChange={(checked) => onChange({ ...template, showAuthor: checked })}
+            />
+            <Check
+              label="Department"
+              checked={template.showDepartment}
+              onChange={(checked) => onChange({ ...template, showDepartment: checked })}
+            />
+          </>
+        )}
         <Check
           label="Call number"
           checked={template.showCallNumber}
           onChange={(checked) => onChange({ ...template, showCallNumber: checked })}
-        />
-        <Check
-          label="Department"
-          checked={template.showDepartment}
-          onChange={(checked) => onChange({ ...template, showDepartment: checked })}
         />
         <Check
           label="Accession number"

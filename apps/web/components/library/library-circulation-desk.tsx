@@ -426,13 +426,19 @@ export function LibraryCirculationDesk() {
   }
 
   const blockReason = member
-    ? !member.profile.active
-      ? 'This membership is not active.'
-      : member.borrowedCount >= member.maxBooks
-        ? `Borrowing limit reached (${member.borrowedCount} of ${member.maxBooks}).`
-        : rules?.blockIssueOnUnpaidFines && member.outstandingFine > 0
-          ? `Unpaid library fine of ${money(member.outstandingFine)} blocks new issues.`
-          : null
+    ? member.membershipStatus === 'BLOCKED'
+      ? member.blockReason
+        ? `Borrowing is blocked: ${member.blockReason.replaceAll('_', ' ').toLowerCase()}.`
+        : 'Borrowing is blocked for this member.'
+      : member.membershipStatus === 'EXPIRED'
+        ? 'This library membership has expired.'
+        : !member.profile.active
+          ? 'This membership is not active.'
+          : member.borrowedCount >= member.maxBooks
+            ? `Borrowing limit reached (${member.borrowedCount} of ${member.maxBooks}).`
+            : rules?.blockIssueOnUnpaidFines && !member.fineExempt && member.outstandingFine > 0
+              ? `Unpaid library fine of ${money(member.outstandingFine)} blocks new issues.`
+              : null
     : null;
 
   const bookChoices =

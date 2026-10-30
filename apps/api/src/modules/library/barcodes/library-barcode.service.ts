@@ -20,6 +20,7 @@ import {
   labelSheetFits,
   mergeLabelSettings,
   prepareBarcodeLabels,
+  upgradeLegacyLabelStock,
 } from './library-barcode.logic';
 
 const JOB_STATUS = ['PREPARED', 'DIALOG_OPENED', 'USER_CONFIRMED'] as const;
@@ -232,8 +233,8 @@ export class LibraryBarcodeService {
       }),
       this.institution(tenantId),
     ]);
-    const template = mergeLabelSettings(
-      settings?.barcodeLabelSettings,
+    const template = upgradeLegacyLabelStock(
+      mergeLabelSettings(settings?.barcodeLabelSettings, institution),
       institution,
     );
     return {

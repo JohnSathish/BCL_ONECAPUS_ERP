@@ -77,9 +77,11 @@ export class LibraryCirculationService {
   async memberSummary(tenantId: string, scanCode: string) {
     const profile = await this.lookup.lookup(tenantId, scanCode);
     const policies = await this.policy.getPolicies(tenantId);
+    const rules = await this.policy.loadBorrowRules(tenantId, profile);
     const maxBooks = this.policy.resolveMaxBooks(
       policies.circulation,
       profile.memberType,
+      rules.loanLimit,
     );
     const activeLoans = await this.policy.countActiveLoans(tenantId, profile);
     const unpaid = profile.studentId
@@ -157,7 +159,19 @@ export class LibraryCirculationService {
       lastVisitAt: lastVisit?.entryAt ?? null,
       visitCount,
       readingScore,
-      membershipStatus: profile.active ? 'ACTIVE' : profile.status,
+      membershipStatus: rules.blocked
+        ? 'BLOCKED'
+        : rules.expired
+          ? 'EXPIRED'
+          : profile.active
+            ? 'ACTIVE'
+            : profile.status,
+      blockReason: rules.blocked
+        ? rules.blockReason
+        : rules.expired
+          ? 'Membership expired'
+          : null,
+      fineExempt: rules.fineExempt,
     };
   }
 
@@ -211,6 +225,7 @@ export class LibraryCirculationService {
     const profile = await this.lookup.lookup(tenantId, memberScan);
     const barcode = this.resolveCopyBarcode(copyBarcode);
     const copy = await this.catalogue.findCopyByBarcode(tenantId, barcode);
+    const rules = await this.policy.loadBorrowRules(tenantId, profile);
     await this.policy.validateIssue(
       tenantId,
       profile,
@@ -221,6 +236,7 @@ export class LibraryCirculationService {
       policies.circulation,
       profile.memberType,
       copy.book.category?.code,
+      rules.loanDays,
     );
     const dueAt = this.policy.computeDueDate(loanDays);
     const settings = await this.settings.getSettings(tenantId);
@@ -246,7 +262,12 @@ export class LibraryCirculationService {
 
     const libSettings = await this.settings.getSettings(user.tid);
 
-    if (libSettings.blockIssueOnUnpaidFines && profile.studentId) {
+    const issueRules = await this.policy.loadBorrowRules(user.tid, profile);
+    if (
+      libSettings.blockIssueOnUnpaidFines &&
+      profile.studentId &&
+      !issueRules.fineExempt
+    ) {
       const unpaid = await this.fines.getUnpaidTotal(
         user.tid,
         profile.studentId,
@@ -277,6 +298,7 @@ export class LibraryCirculationService {
       policies.circulation,
       profile.memberType,
       copy.book.category?.code,
+      issueRules.loanDays,
     );
     const dueAt = this.policy.computeDueDate(loanDays);
 
@@ -416,10 +438,16 @@ export class LibraryCirculationService {
 
     const settings = await this.settings.getSettings(user.tid);
     const policies = mergeCirculationPolicy(settings.circulationPolicy);
+    const renewRules = await this.policy.loadBorrowRules(user.tid, {
+      studentId: loan.studentId,
+      staffProfileId: loan.staffProfileId,
+    });
+    this.policy.assertCanBorrow(renewRules);
     const maxRenewals = this.policy.resolveMaxRenewals(
       policies,
       loan.memberType,
       settings.maxRenewals,
+      renewRules.maxRenewals,
     );
 
     if (loan.renewalCount >= maxRenewals) {
@@ -440,6 +468,7 @@ export class LibraryCirculationService {
       policies,
       loan.memberType,
       copy.book.category?.code,
+      renewRules.loanDays,
     );
     const base = loan.dueAt > now ? loan.dueAt : now;
     const newDue = this.policy.computeDueDate(loanDays, base);
@@ -748,10 +777,15 @@ export class LibraryCirculationService {
 
     const settings = await this.settings.getSettings(tenantId);
     const policies = mergeCirculationPolicy(settings.circulationPolicy);
+    const renewRules = await this.policy.loadBorrowRules(tenantId, {
+      studentId: loan.studentId,
+      staffProfileId: loan.staffProfileId,
+    });
     const maxRenewals = this.policy.resolveMaxRenewals(
       policies,
       loan.memberType,
       settings.maxRenewals,
+      renewRules.maxRenewals,
     );
     const now = new Date();
     const overdueFine = calculateOverdueFine(loan.dueAt, now, settings);
@@ -759,12 +793,19 @@ export class LibraryCirculationService {
       policies,
       loan.memberType,
       copy.book.category?.code,
+      renewRules.loanDays,
     );
     const base = loan.dueAt > now ? loan.dueAt : now;
     const newDueAt = this.policy.computeDueDate(loanDays, base);
 
     let blockReason: string | null = null;
-    if (loan.renewalCount >= maxRenewals) {
+    if (renewRules.blocked) {
+      blockReason = renewRules.blockReason
+        ? `Borrowing is blocked: ${renewRules.blockReason.replaceAll('_', ' ').toLowerCase()}.`
+        : 'Borrowing is blocked for this member.';
+    } else if (renewRules.expired) {
+      blockReason = 'This library membership has expired.';
+    } else if (loan.renewalCount >= maxRenewals) {
       blockReason = `Maximum renewals (${maxRenewals}) reached`;
     } else if (overdueFine > 0) {
       blockReason = 'Overdue books cannot be renewed';

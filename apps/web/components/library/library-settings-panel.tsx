@@ -367,24 +367,32 @@ export function LibrarySettingsPanel() {
         <div className="grid gap-4 xl:grid-cols-2">
           <Card
             title="Library information"
-            hint="The name on barcode labels. College contact details and the college logo stay on the institution profile."
+            hint={
+              labels?.preset === 'ZEBRA_2UP'
+                ? 'Zebra stickers print this library code with the accession number and call number. The college name and logo stay off the label.'
+                : 'The name on barcode labels. College contact details and the college logo stay on the institution profile.'
+            }
           >
-            <Field label="Name on labels">
-              <Input
-                value={labels?.headerTitle ?? ''}
-                onChange={(event) =>
-                  setLabels(labels ? { ...labels, headerTitle: event.target.value } : labels)
-                }
-              />
-            </Field>
-            <Field label="Label subtitle">
-              <Input
-                value={labels?.headerSubtitle ?? ''}
-                onChange={(event) =>
-                  setLabels(labels ? { ...labels, headerSubtitle: event.target.value } : labels)
-                }
-              />
-            </Field>
+            {labels?.preset === 'ZEBRA_2UP' ? null : (
+              <>
+                <Field label="Name on labels">
+                  <Input
+                    value={labels?.headerTitle ?? ''}
+                    onChange={(event) =>
+                      setLabels(labels ? { ...labels, headerTitle: event.target.value } : labels)
+                    }
+                  />
+                </Field>
+                <Field label="Label subtitle">
+                  <Input
+                    value={labels?.headerSubtitle ?? ''}
+                    onChange={(event) =>
+                      setLabels(labels ? { ...labels, headerSubtitle: event.target.value } : labels)
+                    }
+                  />
+                </Field>
+              </>
+            )}
             <Field label="Library code">
               <Input
                 value={labels?.headerCode ?? ''}
@@ -394,8 +402,9 @@ export function LibrarySettingsPanel() {
               />
             </Field>
             <p className="text-xs text-slate-500">
-              Institution on the current label template:{' '}
-              {barcode.data?.institutionName || 'Loading…'}
+              {labels?.preset === 'ZEBRA_2UP'
+                ? 'The college name and logo are not printed on this sticker.'
+                : `Institution on the current label template: ${barcode.data?.institutionName || 'Loading…'}`}
             </p>
           </Card>
           <Card
@@ -626,18 +635,30 @@ export function LibrarySettingsPanel() {
           </Card>
           <Card
             title="Barcode labels"
-            hint="Sheet size and columns are edited in Barcode Management. These switches change the same label template."
+            hint={
+              labels?.preset === 'ZEBRA_2UP'
+                ? 'Zebra GT800 stock: 50 × 25 mm, two labels across a 104 mm roll. Size is set in Barcode Management.'
+                : 'Sheet size and columns are edited in Barcode Management. These switches change the same label template.'
+            }
           >
-            <Toggle
-              label="Show the college logo"
-              checked={Boolean(labels?.showLogo)}
-              onChange={(checked) => setLabels(labels ? { ...labels, showLogo: checked } : labels)}
-            />
-            <Toggle
-              label="Show title"
-              checked={Boolean(labels?.showTitle)}
-              onChange={(checked) => setLabels(labels ? { ...labels, showTitle: checked } : labels)}
-            />
+            {labels?.preset === 'ZEBRA_2UP' ? null : (
+              <>
+                <Toggle
+                  label="Show the college logo"
+                  checked={Boolean(labels?.showLogo)}
+                  onChange={(checked) =>
+                    setLabels(labels ? { ...labels, showLogo: checked } : labels)
+                  }
+                />
+                <Toggle
+                  label="Show title"
+                  checked={Boolean(labels?.showTitle)}
+                  onChange={(checked) =>
+                    setLabels(labels ? { ...labels, showTitle: checked } : labels)
+                  }
+                />
+              </>
+            )}
             <Toggle
               label="Show accession number"
               checked={Boolean(labels?.showAccession)}

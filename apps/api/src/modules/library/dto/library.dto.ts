@@ -1,7 +1,9 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { OmitType } from '@nestjs/mapped-types';
 import {
+  ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -11,7 +13,10 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
+  ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 import type {
   CirculationPolicy,
@@ -1041,17 +1046,196 @@ export class LibraryMemberQueryDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   search?: string;
 
   @IsOptional()
   @IsString()
   memberType?: string;
+
+  @IsOptional()
+  @IsIn([
+    'ALL',
+    'STUDENT',
+    'FACULTY',
+    'STAFF',
+    'RESEARCH_SCHOLAR',
+    'INACTIVE',
+    'BLOCKED',
+  ])
+  tab?: string;
+
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  semester?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  academicYear?: string;
+
+  @IsOptional()
+  @IsIn(['ACTIVE', 'INACTIVE', 'BLOCKED'])
+  status?: string;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  hasOverdue?: string;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  hasFine?: string;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  hasActiveLoans?: string;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  hasBorrowed?: string;
+
+  @IsOptional()
+  @IsIn(['name', 'department', 'loans', 'fines', 'score'])
+  sort?: string;
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortDir?: string;
+
+  @IsOptional()
+  @IsIn(['csv', 'xlsx', 'pdf'])
+  format?: 'csv' | 'xlsx' | 'pdf';
 }
 
 export class MemberDetailQueryDto {
   @IsString()
   @IsNotEmpty()
   memberType!: string;
+
+  @IsOptional()
+  @IsIn(['recent', 'all'])
+  loans?: 'recent' | 'all';
+}
+
+export class MemberSyncDto {
+  @IsIn(['ALL', 'STUDENTS', 'FACULTY', 'STAFF'])
+  scope!: 'ALL' | 'STUDENTS' | 'FACULTY' | 'STAFF';
+}
+
+export class MemberBlockDto {
+  @IsIn(['STUDENT', 'FACULTY', 'STAFF', 'RESEARCH_SCHOLAR'])
+  memberType!: string;
+
+  @IsIn([
+    'OVERDUE',
+    'UNPAID_FINES',
+    'LOST_BOOKS',
+    'DAMAGED_BOOKS',
+    'DISCIPLINARY',
+    'ADMINISTRATIVE',
+    'OTHER',
+  ])
+  reason!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}
+
+export class MemberUnblockDto {
+  @IsIn(['STUDENT', 'FACULTY', 'STAFF', 'RESEARCH_SCHOLAR'])
+  memberType!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(300)
+  reason!: string;
+}
+
+function nullableNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : value;
+}
+
+export class MemberPrivilegeDto {
+  @IsIn(['STUDENT', 'FACULTY', 'STAFF', 'RESEARCH_SCHOLAR'])
+  memberType!: string;
+
+  @IsOptional()
+  @Transform(({ value }) => nullableNumber(value))
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  loanLimit?: number | null;
+
+  @IsOptional()
+  @Transform(({ value }) => nullableNumber(value))
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  loanDays?: number | null;
+
+  @IsOptional()
+  @Transform(({ value }) => nullableNumber(value))
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  maxRenewals?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  fineExempt?: boolean;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  expiresAt?: string | null;
+}
+
+export class MemberRefDto {
+  @IsUUID()
+  memberId!: string;
+
+  @IsIn(['STUDENT', 'FACULTY', 'STAFF', 'RESEARCH_SCHOLAR'])
+  memberType!: string;
+}
+
+export class MemberBulkDto {
+  @IsIn(['ACTIVATE', 'BLOCK', 'UNBLOCK', 'EXPIRY', 'SYNC'])
+  action!: 'ACTIVATE' | 'BLOCK' | 'UNBLOCK' | 'EXPIRY' | 'SYNC';
+
+  @IsArray()
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => MemberRefDto)
+  members!: MemberRefDto[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  expiresAt?: string | null;
 }
 
 export class CreateAccessionBookDto {

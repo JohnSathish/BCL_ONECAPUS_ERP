@@ -1,9 +1,14 @@
 export const A4_WIDTH_MM = 210;
 export const A4_HEIGHT_MM = 297;
+export const ZEBRA_PAGE_WIDTH_MM = 104;
+export const ZEBRA_PAGE_HEIGHT_MM = 25;
+export const ZEBRA_LABEL_WIDTH_MM = 50;
+export const ZEBRA_LABEL_HEIGHT_MM = 25;
+export const ZEBRA_GAP_X_MM = 4;
 export const BARCODE_PREVIEW_LIMIT = 100;
 export const BARCODE_SELECT_LIMIT = 500;
 
-export type LabelPreset = 'A4_2X4' | 'SINGLE' | 'CUSTOM' | 'ROLL';
+export type LabelPreset = 'A4_2X4' | 'SINGLE' | 'CUSTOM' | 'ROLL' | 'ZEBRA_2UP';
 
 export type LabelSettings = {
   preset: LabelPreset;
@@ -59,53 +64,76 @@ export type RejectedCopy = {
   reason: string;
 };
 
-const PRESETS = new Set<LabelPreset>(['A4_2X4', 'SINGLE', 'CUSTOM', 'ROLL']);
+const PRESETS = new Set<LabelPreset>([
+  'A4_2X4',
+  'SINGLE',
+  'CUSTOM',
+  'ROLL',
+  'ZEBRA_2UP',
+]);
 
 export function defaultLabelSettings(institution?: {
   name?: string | null;
   code?: string | null;
 }): LabelSettings {
-  const name = institution?.name?.trim() || 'College Library';
+  const name = institution?.name?.trim() || '';
   const code =
     institution?.code?.trim() || (/don bosco/i.test(name) ? 'DBCL' : '');
-  const fitted = fitLabels({
-    pageWidthMm: A4_WIDTH_MM,
-    pageHeightMm: A4_HEIGHT_MM,
-    columns: 2,
-    rows: 4,
-    marginTopMm: 10,
-    marginRightMm: 10,
-    marginBottomMm: 10,
-    marginLeftMm: 10,
-    gapXMm: 4,
-    gapYMm: 4,
-  });
   return {
-    preset: 'A4_2X4',
-    pageWidthMm: A4_WIDTH_MM,
-    pageHeightMm: A4_HEIGHT_MM,
+    preset: 'ZEBRA_2UP',
+    pageWidthMm: ZEBRA_PAGE_WIDTH_MM,
+    pageHeightMm: ZEBRA_PAGE_HEIGHT_MM,
     columns: 2,
-    rows: 4,
-    marginTopMm: 10,
-    marginRightMm: 10,
-    marginBottomMm: 10,
-    marginLeftMm: 10,
-    gapXMm: 4,
-    gapYMm: 4,
-    labelWidthMm: fitted.widthMm,
-    labelHeightMm: fitted.heightMm,
+    rows: 1,
+    marginTopMm: 0,
+    marginRightMm: 0,
+    marginBottomMm: 0,
+    marginLeftMm: 0,
+    gapXMm: ZEBRA_GAP_X_MM,
+    gapYMm: 0,
+    labelWidthMm: ZEBRA_LABEL_WIDTH_MM,
+    labelHeightMm: ZEBRA_LABEL_HEIGHT_MM,
     barcodeHeightMm: 14,
-    moduleWidth: 1.4,
+    moduleWidth: 1.15,
     fontSizePt: 8,
-    showLogo: true,
-    showTitle: true,
-    showAuthor: true,
-    showDepartment: true,
+    showLogo: false,
+    showTitle: false,
+    showAuthor: false,
+    showDepartment: false,
     showCallNumber: true,
     showAccession: true,
-    headerTitle: name.toUpperCase(),
-    headerSubtitle: 'LIBRARY',
+    headerTitle: '',
+    headerSubtitle: '',
     headerCode: code,
+  };
+}
+
+export function upgradeLegacyLabelStock(
+  settings: LabelSettings,
+  institution?: { name?: string | null; code?: string | null },
+): LabelSettings {
+  const legacySheet =
+    settings.preset === 'A4_2X4' &&
+    settings.pageWidthMm === A4_WIDTH_MM &&
+    settings.pageHeightMm === A4_HEIGHT_MM &&
+    settings.columns === 2 &&
+    settings.rows === 4 &&
+    settings.marginTopMm === 10 &&
+    settings.marginRightMm === 10 &&
+    settings.marginBottomMm === 10 &&
+    settings.marginLeftMm === 10 &&
+    settings.showLogo &&
+    settings.showTitle &&
+    settings.headerSubtitle.trim().toUpperCase() === 'LIBRARY';
+  if (!legacySheet) return settings;
+  const zebra = defaultLabelSettings({
+    name: institution?.name,
+    code: settings.headerCode || institution?.code,
+  });
+  return {
+    ...zebra,
+    showCallNumber: settings.showCallNumber,
+    showAccession: settings.showAccession,
   };
 }
 
@@ -208,6 +236,27 @@ export function mergeLabelSettings(
     next.pageHeightMm = roundMm(
       next.labelHeightMm + next.marginTopMm + next.marginBottomMm,
     );
+  }
+  if (next.preset === 'ZEBRA_2UP') {
+    next.pageWidthMm = ZEBRA_PAGE_WIDTH_MM;
+    next.pageHeightMm = ZEBRA_PAGE_HEIGHT_MM;
+    next.columns = 2;
+    next.rows = 1;
+    next.marginTopMm = 0;
+    next.marginRightMm = 0;
+    next.marginBottomMm = 0;
+    next.marginLeftMm = 0;
+    next.gapXMm = ZEBRA_GAP_X_MM;
+    next.gapYMm = 0;
+    next.labelWidthMm = ZEBRA_LABEL_WIDTH_MM;
+    next.labelHeightMm = ZEBRA_LABEL_HEIGHT_MM;
+    next.showLogo = false;
+    next.showTitle = false;
+    next.showAuthor = false;
+    next.showDepartment = false;
+    next.headerTitle = '';
+    next.headerSubtitle = '';
+    next.barcodeHeightMm = clamp(next.barcodeHeightMm, 8, 16);
   }
   return next;
 }

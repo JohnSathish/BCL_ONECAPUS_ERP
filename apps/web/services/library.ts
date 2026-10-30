@@ -19,6 +19,8 @@ import type {
   LibraryMemberDetail,
   LibraryMemberListResponse,
   LibraryMemberSummary,
+  LibraryMemberSummaryCards,
+  LibraryMemberSyncResult,
   LibraryNaacReportBundle,
   LibraryNextAccession,
   LibraryReadingAnalytics,
@@ -524,14 +526,73 @@ export const fetchLibraryReadingAnalytics = (params: {
 }) => api.get<LibraryReadingAnalytics>(`${base}/analytics/reading`, { params }).then((r) => r.data);
 
 export const fetchLibraryMembers = (params?: Record<string, string | number | undefined>) =>
-  api.get<LibraryMemberListResponse>(`${base}/members`, { params }).then((r) => r.data);
+  api
+    .get<LibraryMemberListResponse>(`${base}/members`, { params: compactParams(params) })
+    .then((r) => r.data);
 
-export const fetchLibraryMemberDetail = (memberId: string, memberType: string) =>
+export const fetchLibraryMemberSummaryCards = () =>
+  api.get<LibraryMemberSummaryCards>(`${base}/members/summary`).then((r) => r.data);
+
+export const fetchLibraryMemberDetail = (
+  memberId: string,
+  memberType: string,
+  loans?: 'recent' | 'all',
+) =>
   api
     .get<LibraryMemberDetail>(`${base}/members/${memberId}`, {
-      params: { memberType },
+      params: compactParams({ memberType, loans }),
     })
     .then((r) => r.data);
+
+export const syncLibraryMembers = (scope: 'ALL' | 'STUDENTS' | 'FACULTY' | 'STAFF') =>
+  api.post<LibraryMemberSyncResult>(`${base}/members/sync`, { scope }).then((r) => r.data);
+
+export const blockLibraryMember = (
+  memberId: string,
+  payload: { memberType: string; reason: string; note?: string },
+) => api.post(`${base}/members/${memberId}/block`, payload).then((r) => r.data);
+
+export const unblockLibraryMember = (
+  memberId: string,
+  payload: { memberType: string; reason: string },
+) => api.post(`${base}/members/${memberId}/unblock`, payload).then((r) => r.data);
+
+export const updateLibraryMemberPrivileges = (
+  memberId: string,
+  payload: {
+    memberType: string;
+    loanLimit?: number | null;
+    loanDays?: number | null;
+    maxRenewals?: number | null;
+    fineExempt?: boolean;
+    expiresAt?: string | null;
+  },
+) => api.patch(`${base}/members/${memberId}/privileges`, payload).then((r) => r.data);
+
+export const bulkLibraryMembers = (payload: {
+  action: 'ACTIVATE' | 'BLOCK' | 'UNBLOCK' | 'EXPIRY' | 'SYNC';
+  members: { memberId: string; memberType: string }[];
+  reason?: string;
+  note?: string;
+  expiresAt?: string | null;
+}) =>
+  api
+    .post<
+      | LibraryMemberSyncResult
+      | { processed: number; failed: { memberId: string; message: string }[] }
+    >(`${base}/members/bulk`, payload)
+    .then((r) => r.data);
+
+export const downloadLibraryMemberRegister = (
+  format: 'csv' | 'xlsx' | 'pdf',
+  params?: Record<string, string | number | undefined>,
+) =>
+  api
+    .get(`${base}/members/export`, {
+      params: compactParams({ ...params, format }),
+      responseType: 'blob',
+    })
+    .then((r) => r.data as Blob);
 
 export const fetchNextAccessionNo = () =>
   api.get<LibraryNextAccession>(`${base}/accession/next`).then((r) => r.data);
@@ -821,7 +882,7 @@ export const downloadEntryExitExport = (
 const barcodeBase = `${base}/barcodes`;
 
 export type LibraryBarcodeLabelSettings = {
-  preset: 'A4_2X4' | 'SINGLE' | 'CUSTOM' | 'ROLL';
+  preset: 'A4_2X4' | 'SINGLE' | 'CUSTOM' | 'ROLL' | 'ZEBRA_2UP';
   pageWidthMm: number;
   pageHeightMm: number;
   columns: number;

@@ -1,4 +1,4 @@
-export type LibraryMemberType = 'STUDENT' | 'STAFF' | 'FACULTY' | 'VISITOR';
+export type LibraryMemberType = 'STUDENT' | 'STAFF' | 'FACULTY' | 'VISITOR' | 'RESEARCH_SCHOLAR';
 
 export type LibraryMemberProfile = {
   memberType: LibraryMemberType;
@@ -242,6 +242,8 @@ export type LibraryMemberSummary = {
   visitCount: number;
   readingScore: number;
   membershipStatus: string;
+  blockReason?: string | null;
+  fineExempt?: boolean;
 };
 
 export type LibraryBookPreview = {
@@ -1004,16 +1006,85 @@ export type LibraryMemberListItem = {
   staffProfileId?: string | null;
   fullName: string;
   registrationNumber?: string | null;
+  rollNumber?: string | null;
+  libraryCardNumber?: string | null;
   department?: string | null;
+  departmentId?: string | null;
   programme?: string | null;
+  designation?: string | null;
   semester?: number | null;
+  academicYear?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  photoPath?: string | null;
   loanCount: number;
   visitCount: number;
   activeLoans: number;
+  overdueLoans?: number;
   outstandingFine: number;
+  paidFine?: number;
+  waivedFine?: number;
   lastVisitAt: string | null;
   readingScore: number;
+  status?: string;
+  derivedStatus?: string;
+  blockReason?: string | null;
+  blockNote?: string | null;
+  blockedAt?: string | null;
+  fineExempt?: boolean;
+  loanLimit?: number | null;
+  loanDays?: number | null;
+  maxRenewals?: number | null;
+  expiresAt?: string | null;
+  recordCreatedAt?: string | null;
+  membershipSince?: string | null;
+  syncedAt?: string | null;
+  membershipId?: string | null;
 };
+
+export type LibraryMemberSummaryCards = {
+  total: number;
+  activeStudents: number;
+  activeFaculty: number;
+  activeStaff: number;
+  researchScholars: number;
+  inactive: number;
+  blocked: number;
+  overdueMembers: number;
+  fineMembers: number;
+  readers: number;
+  tabs: {
+    all: number;
+    students: number;
+    faculty: number;
+    staff: number;
+    researchScholars: number;
+    inactive: number;
+    blocked: number;
+  };
+  departments: { id: string; name: string }[];
+  academicYears: string[];
+  semesters: number[];
+  roleDefaults: {
+    student: { loanDays: number; maxBooks: number; maxRenewals: number };
+    faculty: { loanDays: number; maxBooks: number; maxRenewals: number };
+    staff: { loanDays: number; maxBooks: number; maxRenewals: number };
+    researchScholar: { loanDays: number; maxBooks: number; maxRenewals: number };
+  };
+  lastSync: {
+    id: string;
+    scope: string;
+    createdCount: number;
+    updatedCount: number;
+    skippedCount: number;
+    failedCount: number;
+    errors: unknown;
+    startedAt: string;
+    completedAt: string | null;
+  } | null;
+};
+
+export type LibraryMemberSyncResult = NonNullable<LibraryMemberSummaryCards['lastSync']>;
 
 export type LibraryMemberListResponse = {
   items: LibraryMemberListItem[];
@@ -1028,18 +1099,37 @@ export type LibraryMemberDetail = {
     visitCount: number;
     loanCount: number;
     activeLoans: number;
+    overdueLoans: number;
     outstandingFine: number;
+    paidFine: number;
+    waivedFine: number;
     readingScore: number;
   };
+  roleDefaults: { loanDays: number; maxBooks: number; maxRenewals: number } | null;
   recentLoans: {
     id: string;
     title: string;
     accessionNo: string;
     barcode: string;
+    subject: string | null;
     issuedAt: string;
     dueAt: string;
     returnedAt: string | null;
+    renewalCount: number;
     status: string;
+    overdue: boolean;
+  }[];
+  loansTruncated: boolean;
+  fines: {
+    id: string;
+    title: string;
+    amount: number;
+    reason: string | null;
+    status: string;
+    createdAt: string;
+    paidAt: string | null;
+    waivedAt: string | null;
+    waiveReason: string | null;
   }[];
   recentVisits: {
     id: string;
@@ -1047,6 +1137,17 @@ export type LibraryMemberDetail = {
     exitAt: string | null;
     durationMinutes?: number | null;
   }[];
+  subjects: { subject: string; count: number }[];
+  monthlyLoans: { month: string; count: number }[];
+  events: {
+    id: string;
+    action: string;
+    reason: string | null;
+    note: string | null;
+    actor: string | null;
+    createdAt: string;
+  }[];
+  blockedBy: string | null;
 };
 
 export type LibraryNextAccession = {

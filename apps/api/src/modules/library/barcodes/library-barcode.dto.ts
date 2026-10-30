@@ -84,8 +84,8 @@ export class UpdateBarcodeJobDto {
 }
 
 export class LabelSettingsDto {
-  @IsIn(['A4_2X4', 'SINGLE', 'CUSTOM', 'ROLL'])
-  preset!: 'A4_2X4' | 'SINGLE' | 'CUSTOM' | 'ROLL';
+  @IsIn(['A4_2X4', 'SINGLE', 'CUSTOM', 'ROLL', 'ZEBRA_2UP'])
+  preset!: 'A4_2X4' | 'SINGLE' | 'CUSTOM' | 'ROLL' | 'ZEBRA_2UP';
 
   @Type(() => Number)
   @IsNumber()

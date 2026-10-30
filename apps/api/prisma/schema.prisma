@@ -10338,6 +10338,76 @@ model LibraryAuditLog {
   @@schema("library")
 }
 
+/// Library-only state for a college student or staff record.
+/// Name, photo, department, and contact stay on the academic profile.
+model LibraryMembership {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  studentId      String?   @map("student_id") @db.Uuid
+  staffProfileId String?   @map("staff_profile_id") @db.Uuid
+  memberKind     String    @map("member_kind")
+  status         String    @default("ACTIVE")
+  blockReason    String?   @map("block_reason")
+  blockNote      String?   @map("block_note")
+  blockedAt      DateTime? @map("blocked_at")
+  blockedById    String?   @map("blocked_by_id") @db.Uuid
+  loanLimit      Int?      @map("loan_limit")
+  loanDays       Int?      @map("loan_days")
+  maxRenewals    Int?      @map("max_renewals")
+  fineExempt     Boolean   @default(false) @map("fine_exempt")
+  expiresAt      DateTime? @map("expires_at") @db.Date
+  syncedAt       DateTime? @map("synced_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  events LibraryMembershipEvent[]
+
+  @@unique([tenantId, studentId])
+  @@unique([tenantId, staffProfileId])
+  @@index([tenantId, status])
+  @@index([tenantId, memberKind])
+  @@map("library_memberships")
+  @@schema("library")
+}
+
+model LibraryMembershipEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  membershipId String   @map("membership_id") @db.Uuid
+  action       String
+  reason       String?
+  note         String?
+  actorId      String?  @map("actor_id") @db.Uuid
+  before       Json?
+  after        Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  membership LibraryMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, membershipId, createdAt])
+  @@index([tenantId, action, createdAt])
+  @@map("library_membership_events")
+  @@schema("library")
+}
+
+model LibraryMemberSyncRun {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  scope        String
+  actorId      String?   @map("actor_id") @db.Uuid
+  createdCount Int       @default(0) @map("created_count")
+  updatedCount Int       @default(0) @map("updated_count")
+  skippedCount Int       @default(0) @map("skipped_count")
+  failedCount  Int       @default(0) @map("failed_count")
+  errors       Json      @default("[]")
+  startedAt    DateTime  @default(now()) @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+
+  @@index([tenantId, startedAt])
+  @@map("library_member_sync_runs")
+  @@schema("library")
+}
+
 model LibraryDigitalAsset {
   id              String    @id @default(uuid()) @db.Uuid
   tenantId        String    @map("tenant_id") @db.Uuid

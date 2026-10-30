@@ -50,6 +50,11 @@ import {
   LibraryAssistantAskDto,
   LinkLibraryNaacEvidenceDto,
   LibraryMemberQueryDto,
+  MemberBlockDto,
+  MemberBulkDto,
+  MemberPrivilegeDto,
+  MemberSyncDto,
+  MemberUnblockDto,
   LibrarySettingsDto,
   LibrarySearchQueryDto,
   MemberDetailQueryDto,
@@ -604,6 +609,37 @@ export class LibraryController {
     return this.members.listMembers(user.tid, query);
   }
 
+  @Get('members/summary')
+  @RequireAnyPermission(...LIB_READ)
+  memberSummaryDesk(@CurrentUser() user: JwtUser) {
+    return this.members.summary(user.tid);
+  }
+
+  @Get('members/export')
+  @RequireAnyPermission(...LIB_REPORTS, ...LIB_CIRCULATE)
+  async exportMembers(
+    @CurrentUser() user: JwtUser,
+    @Query() query: LibraryMemberQueryDto,
+  ) {
+    const result = await this.members.exportRegister(user.tid, query);
+    return new StreamableFile(result.buffer, {
+      type: result.contentType,
+      disposition: `attachment; filename="${result.filename}"`,
+    });
+  }
+
+  @Post('members/sync')
+  @RequirePermissions('library:manage')
+  syncMembers(@CurrentUser() user: JwtUser, @Body() dto: MemberSyncDto) {
+    return this.members.sync(user.tid, dto.scope, user.sub);
+  }
+
+  @Post('members/bulk')
+  @RequirePermissions('library:manage')
+  bulkMembers(@CurrentUser() user: JwtUser, @Body() dto: MemberBulkDto) {
+    return this.members.bulk(user.tid, user.sub, dto);
+  }
+
   @Get('members/:memberId')
   @RequireAnyPermission(...LIB_READ)
   getMember(
@@ -611,7 +647,42 @@ export class LibraryController {
     @Param('memberId') memberId: string,
     @Query() query: MemberDetailQueryDto,
   ) {
-    return this.members.getMemberDetail(user.tid, memberId, query.memberType);
+    return this.members.getMemberDetail(
+      user.tid,
+      memberId,
+      query.memberType,
+      query.loans ?? 'recent',
+    );
+  }
+
+  @Post('members/:memberId/block')
+  @RequirePermissions('library:manage')
+  blockMember(
+    @CurrentUser() user: JwtUser,
+    @Param('memberId') memberId: string,
+    @Body() dto: MemberBlockDto,
+  ) {
+    return this.members.blockMember(user.tid, memberId, user.sub, dto);
+  }
+
+  @Post('members/:memberId/unblock')
+  @RequirePermissions('library:manage')
+  unblockMember(
+    @CurrentUser() user: JwtUser,
+    @Param('memberId') memberId: string,
+    @Body() dto: MemberUnblockDto,
+  ) {
+    return this.members.unblockMember(user.tid, memberId, user.sub, dto);
+  }
+
+  @Patch('members/:memberId/privileges')
+  @RequirePermissions('library:manage')
+  memberPrivileges(
+    @CurrentUser() user: JwtUser,
+    @Param('memberId') memberId: string,
+    @Body() dto: MemberPrivilegeDto,
+  ) {
+    return this.members.updatePrivileges(user.tid, memberId, user.sub, dto);
   }
 
   @Post('copies')
