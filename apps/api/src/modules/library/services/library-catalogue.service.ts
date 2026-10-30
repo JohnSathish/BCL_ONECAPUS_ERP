@@ -174,6 +174,7 @@ export class LibraryCatalogueService {
           },
         },
         orderBy: ranked ? undefined : orderBy,
+        ...(ranked ? {} : { skip, take: limit }),
       }),
       ranked
         ? Promise.resolve(ranked.total)
