@@ -1177,12 +1177,11 @@ export class LibraryController {
   async naacReportExport(
     @CurrentUser() user: JwtUser,
     @Query() query: NaacLibraryReportQueryDto,
-    @Query('format') format?: 'pdf' | 'xlsx' | 'csv',
   ) {
     const result = await this.naacReports.export(
       user.tid,
       query,
-      format ?? 'pdf',
+      query.format ?? 'pdf',
     );
     return new StreamableFile(result.buffer, {
       type: result.contentType,

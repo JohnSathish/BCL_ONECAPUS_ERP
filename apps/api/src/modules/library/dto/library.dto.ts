@@ -1562,6 +1562,10 @@ export class NaacLibraryReportQueryDto {
   @IsOptional()
   @IsIn(['ALL', 'PHYSICAL', 'DIGITAL'])
   medium?: 'ALL' | 'PHYSICAL' | 'DIGITAL';
+
+  @IsOptional()
+  @IsIn(['pdf', 'xlsx', 'csv'])
+  format?: 'pdf' | 'xlsx' | 'csv';
 }
 
 export class LibraryAssistantAskDto {
