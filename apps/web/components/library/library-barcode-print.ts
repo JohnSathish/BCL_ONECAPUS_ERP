@@ -331,26 +331,47 @@ export function barcodeLabelDocument(
       height: 0.98in;
       margin: 0;
       border: 0;
-      padding: 0.04in 0.06in 0.03in;
+      padding: 0.05in 0.08in 0.045in;
       overflow: hidden;
     }
     .sheet.zebra .slot-a { left: 0; }
     .sheet.zebra .slot-b { left: 2.032in; }
     .sheet.zebra .label.compact .bars {
-      width: 1.84in;
+      width: 1.8in;
       height: 0.46in;
-      padding: 0;
+      margin: 0 auto;
+      padding: 0 0.08in 0.03in;
+      border-bottom: 0.6pt solid #000;
     }
     .sheet.zebra .label.compact .bars svg {
-      width: 1.84in;
-      height: 0.44in;
+      width: 100%;
+      height: 0.42in;
     }
     .sheet.zebra .label.compact .foot {
       height: auto;
-      margin-top: 0.03in;
+      margin-top: 0.035in;
       align-items: flex-end;
     }
-    .sheet.zebra .label.compact .acc { font-size: 12pt; }
+    .sheet.zebra .label.compact .acc {
+      font-size: 14pt;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      line-height: 1;
+    }
+    .sheet.zebra .label.compact .acc.long {
+      font-size: 9pt;
+      letter-spacing: 0;
+    }
+    .sheet.zebra .label.compact .code {
+      font-size: 7.5pt;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+    }
+    .sheet.zebra .label.compact .call {
+      margin-top: 0.02in;
+      font-size: 8pt;
+      font-weight: 700;
+    }
     .sheet.last { page-break-after: auto; break-after: auto; }
     @media print {
       .sheet { page-break-after: always; break-after: page; }
