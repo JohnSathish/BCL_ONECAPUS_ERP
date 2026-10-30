@@ -14,18 +14,18 @@ function esc(value: string) {
 export function zebraBarcodeLabelSettings(headerCode = 'DBCL'): LibraryBarcodeLabelSettings {
   return {
     preset: 'ZEBRA_2UP',
-    pageWidthMm: 104,
-    pageHeightMm: 25,
+    pageWidthMm: 101.6,
+    pageHeightMm: 24.89,
     columns: 2,
     rows: 1,
     marginTopMm: 0,
     marginRightMm: 0,
     marginBottomMm: 0,
     marginLeftMm: 0,
-    gapXMm: 4,
+    gapXMm: 1.6,
     gapYMm: 0,
     labelWidthMm: 50,
-    labelHeightMm: 25,
+    labelHeightMm: 24.89,
     barcodeHeightMm: 14,
     moduleWidth: 1.15,
     fontSizePt: 8,
@@ -207,18 +207,21 @@ export function barcodeLabelDocument(
     : options?.autoPrint === false
       ? ''
       : '<script>window.addEventListener("load", function () { window.print(); });</script>';
+  const zebra = settings.preset === 'ZEBRA_2UP' && settings.columns === 2 && settings.rows === 1;
+  const pageWidth = zebra ? '4in' : `${settings.pageWidthMm}mm`;
+  const pageHeight = zebra ? '0.98in' : `${settings.pageHeightMm}mm`;
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>Library barcode labels</title>
   <style>
-    @page { size: ${settings.pageWidthMm}mm ${settings.pageHeightMm}mm; margin: 0; }
+    @page { size: ${pageWidth} ${pageHeight}; margin: 0; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #fff; color: #000; }
     .sheet {
-      width: ${settings.pageWidthMm}mm;
-      height: ${settings.pageHeightMm}mm;
+      width: ${pageWidth};
+      height: ${pageHeight};
       padding: ${settings.marginTopMm}mm ${settings.marginRightMm}mm ${settings.marginBottomMm}mm ${settings.marginLeftMm}mm;
       display: grid;
       grid-template-columns: repeat(${settings.columns}, ${settings.labelWidthMm}mm);

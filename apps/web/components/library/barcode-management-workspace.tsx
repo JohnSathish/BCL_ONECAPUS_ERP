@@ -542,7 +542,7 @@ export function BarcodeManagementWorkspace() {
             <h2 className="text-sm font-semibold">Label preview</h2>
             {template?.preset === 'ZEBRA_2UP' ? (
               <p className="mt-1 text-xs text-slate-500">
-                50 × 25 mm, two labels across a 104 mm roll. Print at 100% scale.
+                4.00 × 0.98 inch stock, two 50 mm labels. Print at 100% scale.
               </p>
             ) : null}
             {preview && template ? (
@@ -724,8 +724,8 @@ function SettingsPanel({
       </div>
       {template.preset === 'ZEBRA_2UP' ? (
         <p className="mt-3 text-xs leading-5 text-slate-500">
-          Zebra GT800, two 50 × 25 mm stickers on a 104 mm roll. Each row is one page. The sticker
-          prints the barcode, accession number, library code, and call number.
+          Zebra GT800 user-defined stock, 4.00 × 0.98 inch, portrait. Each page is one pair of 50 mm
+          stickers. The sticker prints the barcode, accession number, library code, and call number.
         </p>
       ) : null}
       <div className="mt-3 grid grid-cols-2 gap-2">

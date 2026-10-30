@@ -65,10 +65,10 @@ describe('library barcode labels', () => {
     expect(settings.columns).toBe(2);
     expect(settings.rows).toBe(1);
     expect(settings.labelWidthMm).toBe(50);
-    expect(settings.labelHeightMm).toBe(25);
-    expect(settings.pageWidthMm).toBe(104);
-    expect(settings.pageHeightMm).toBe(25);
-    expect(settings.gapXMm).toBe(4);
+    expect(settings.labelHeightMm).toBe(24.89);
+    expect(settings.pageWidthMm).toBe(101.6);
+    expect(settings.pageHeightMm).toBe(24.89);
+    expect(settings.gapXMm).toBe(1.6);
     expect(settings.showLogo).toBe(false);
     expect(settings.showTitle).toBe(false);
     expect(settings.headerTitle).toBe('');
@@ -88,8 +88,8 @@ describe('library barcode labels', () => {
       { name: 'Don Bosco College, Tura', code: 'DBCL' },
     );
     expect(merged.labelWidthMm).toBe(50);
-    expect(merged.labelHeightMm).toBe(25);
-    expect(merged.pageWidthMm).toBe(104);
+    expect(merged.labelHeightMm).toBe(24.89);
+    expect(merged.pageWidthMm).toBe(101.6);
     expect(merged.showLogo).toBe(false);
     expect(merged.headerTitle).toBe('');
     expect(merged.headerCode).toBe('DBCL');

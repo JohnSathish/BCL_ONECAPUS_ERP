@@ -1,10 +1,11 @@
 export const A4_WIDTH_MM = 210;
 export const A4_HEIGHT_MM = 297;
-export const ZEBRA_PAGE_WIDTH_MM = 104;
-export const ZEBRA_PAGE_HEIGHT_MM = 25;
+/** ZDesigner GT800 user-defined stock: 4.00 × 0.98 in. Two 50 mm labels fill that width. */
+export const ZEBRA_PAGE_WIDTH_MM = 101.6;
+export const ZEBRA_PAGE_HEIGHT_MM = 24.89;
 export const ZEBRA_LABEL_WIDTH_MM = 50;
-export const ZEBRA_LABEL_HEIGHT_MM = 25;
-export const ZEBRA_GAP_X_MM = 4;
+export const ZEBRA_LABEL_HEIGHT_MM = 24.89;
+export const ZEBRA_GAP_X_MM = 1.6;
 export const BARCODE_PREVIEW_LIMIT = 100;
 export const BARCODE_SELECT_LIMIT = 500;
 

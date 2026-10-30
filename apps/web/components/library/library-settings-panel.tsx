@@ -637,7 +637,7 @@ export function LibrarySettingsPanel() {
             title="Barcode labels"
             hint={
               labels?.preset === 'ZEBRA_2UP'
-                ? 'Zebra GT800 stock: 50 × 25 mm, two labels across a 104 mm roll. Size is set in Barcode Management.'
+                ? 'Zebra GT800 user-defined stock: 4.00 × 0.98 inch, two 50 mm labels. Size is set in Barcode Management.'
                 : 'Sheet size and columns are edited in Barcode Management. These switches change the same label template.'
             }
           >
