@@ -872,6 +872,143 @@ export const downloadCatalogueReport = (
     })
     .then((r) => r.data as Blob);
 
+const departmentInventory = `${base}/department-inventory`;
+
+export type DepartmentInventoryCards = {
+  departments: number;
+  titles: number;
+  copies: number;
+  available: number;
+  issued: number;
+  lost: number;
+  damaged: number;
+  unmapped: number;
+};
+
+export type DepartmentInventoryRow = {
+  id: string;
+  code: string;
+  name: string;
+  titles: number;
+  copies: number;
+  available: number;
+  issued: number;
+  lost: number;
+  damaged: number;
+};
+
+export type DepartmentBookRow = {
+  id: string;
+  title: string;
+  author: string;
+  isbn: string;
+  publisher: string;
+  publicationYear: string;
+  edition: string;
+  category: string;
+  location: string;
+  copies: number;
+  available: number;
+  issued: number;
+  lostDamaged: number;
+  callNumber: string;
+  collectionType: string;
+};
+
+export const fetchDepartmentInventory = (params: Record<string, string | number | undefined>) =>
+  api
+    .get<{
+      institutionName: string;
+      generatedAt: string;
+      cards: DepartmentInventoryCards;
+      departments: DepartmentInventoryRow[];
+      note: string;
+    }>(`${departmentInventory}/summary`, { params })
+    .then((r) => r.data);
+
+export const fetchDepartmentBooks = (params: Record<string, string | number | undefined>) =>
+  api
+    .get<{
+      page: number;
+      limit: number;
+      total: number;
+      rows: DepartmentBookRow[];
+    }>(`${departmentInventory}/books`, { params })
+    .then((r) => r.data);
+
+export const fetchDepartmentBookCopies = (bookId: string) =>
+  api
+    .get<
+      {
+        id: string;
+        accession: string;
+        barcode: string;
+        status: string;
+        callNumber: string;
+        collectionCode: string;
+        shelvingLocation: string;
+        onLoan: boolean;
+        displayStatus: string;
+      }[]
+    >(`${departmentInventory}/books/${bookId}/copies`)
+    .then((r) => r.data);
+
+export const fetchDepartmentRegister = (params: Record<string, string | number | undefined>) =>
+  api
+    .get<{
+      page: number;
+      limit: number;
+      total: number;
+      rows: {
+        accession: string;
+        title: string;
+        author: string;
+        isbn: string;
+        displayStatus: string;
+        department: string;
+      }[];
+    }>(`${departmentInventory}/register`, { params })
+    .then((r) => r.data);
+
+export const fetchUnmappedLibraryBooks = (params: Record<string, string | number | undefined>) =>
+  api
+    .get<{
+      page: number;
+      limit: number;
+      total: number;
+      rows: {
+        id: string;
+        title: string;
+        author: string;
+        accession: string;
+        collectionCode: string;
+        copies: number;
+      }[];
+    }>(`${departmentInventory}/unmapped`, { params })
+    .then((r) => r.data);
+
+export const assignLibraryBookDepartment = (payload: { departmentId: string; bookIds: string[] }) =>
+  api
+    .post<{
+      department: string;
+      linked: number;
+      primarySet: number;
+      skipped: number;
+    }>(`${departmentInventory}/assign`, payload)
+    .then((r) => r.data);
+
+export const downloadDepartmentInventory = (
+  format: 'xlsx' | 'csv' | 'pdf',
+  params: Record<string, string | number | undefined>,
+) =>
+  api
+    .get(`${departmentInventory}/export`, {
+      params: { ...params, format },
+      responseType: 'blob',
+      timeout: 600_000,
+    })
+    .then((r) => r.data as Blob);
+
 export const downloadEntryExitExport = (
   format: 'xlsx' | 'csv' | 'pdf',
   params?: Record<string, string | number | undefined>,

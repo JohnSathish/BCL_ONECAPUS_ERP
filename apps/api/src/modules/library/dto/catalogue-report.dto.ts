@@ -1,5 +1,15 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class CatalogueReportQueryDto {
   @IsOptional()
@@ -94,4 +104,18 @@ export class CatalogueReportQueryDto {
   @IsOptional()
   @IsIn(['xlsx', 'csv', 'pdf'])
   format?: 'xlsx' | 'csv' | 'pdf';
+
+  @IsOptional()
+  @IsIn(['stock', 'added'])
+  scope?: 'stock' | 'added';
+}
+
+export class AssignLibraryDepartmentDto {
+  @IsUUID()
+  departmentId!: string;
+
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('all', { each: true })
+  bookIds!: string[];
 }
