@@ -261,6 +261,8 @@ export type LibraryBookPreview = {
     publisher?: string | null;
     edition?: string | null;
     isbn?: string | null;
+    publicationYear?: string | null;
+    coverImageUrl?: string | null;
     accessionNo: string;
     callNumber?: string | null;
     category?: string | null;
@@ -485,7 +487,9 @@ export type LibraryLoan = {
   dueAt: string;
   returnedAt?: string | null;
   status: string;
-  copy: { barcode: string; book: LibraryBook };
+  receiptNo?: string | null;
+  issuedByName?: string | null;
+  copy: { barcode: string; book: LibraryBook; accessionNumber?: string | null };
   fines?: LibraryFine[];
   projectedFine?: number;
   daysOverdue?: number;

@@ -115,7 +115,10 @@ export class LibraryCirculationService {
       },
     });
 
-    const loans = await this.listMemberActiveLoans(tenantId, profile);
+    const loans = await this.attachIssuerNames(
+      tenantId,
+      await this.listMemberActiveLoans(tenantId, profile),
+    );
 
     const readingScore = computeReadingScore({
       visitCount,
@@ -135,19 +138,22 @@ export class LibraryCirculationService {
       activeMember: profile.active,
     }).overall;
 
-    const returnedLoans = await this.prisma.libraryLoan.findMany({
-      where: {
-        tenantId,
-        status: 'RETURNED',
-        ...(profile.studentId ? { studentId: profile.studentId } : {}),
-        ...(profile.staffProfileId
-          ? { staffProfileId: profile.staffProfileId }
-          : {}),
-      },
-      include: { copy: { include: { book: true } }, fines: true },
-      orderBy: { returnedAt: 'desc' },
-      take: 40,
-    });
+    const returnedLoans = await this.attachIssuerNames(
+      tenantId,
+      await this.prisma.libraryLoan.findMany({
+        where: {
+          tenantId,
+          status: 'RETURNED',
+          ...(profile.studentId ? { studentId: profile.studentId } : {}),
+          ...(profile.staffProfileId
+            ? { staffProfileId: profile.staffProfileId }
+            : {}),
+        },
+        include: { copy: { include: { book: true } }, fines: true },
+        orderBy: { returnedAt: 'desc' },
+        take: 40,
+      }),
+    );
 
     return {
       profile,
@@ -203,6 +209,8 @@ export class LibraryCirculationService {
         publisher: copy.book.publisher,
         edition: copy.book.edition,
         isbn: copy.book.isbn,
+        publicationYear: copy.book.publicationYear,
+        coverImageUrl: copy.book.coverImageUrl,
         accessionNo: copy.accessionNumber || copy.book.accessionNo,
         callNumber: copy.callNumber || copy.book.classificationNumber,
         category: copy.book.category?.name ?? null,
@@ -312,9 +320,10 @@ export class LibraryCirculationService {
           'This copy was just issued to someone else.',
         );
       }
+      const loanId = randomUUID();
       return tx.libraryLoan.create({
         data: {
-          id: randomUUID(),
+          id: loanId,
           tenantId: user.tid,
           copyId: copy.id,
           memberType: profile.memberType,
@@ -323,6 +332,7 @@ export class LibraryCirculationService {
           dueAt,
           issuedById: user.sub,
           status: 'ACTIVE',
+          receiptNo: this.receiptNumber(dto.receiptNo, loanId),
         },
         include: { copy: { include: { book: true } } },
       });
@@ -495,6 +505,50 @@ export class LibraryCirculationService {
     });
 
     return updated;
+  }
+
+  private receiptNumber(supplied: string | undefined, loanId: string) {
+    const cleaned = supplied
+      ?.toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 20);
+    if (cleaned && cleaned.length >= 8) return cleaned;
+    const stamp = new Date();
+    const year = String(stamp.getFullYear()).slice(2);
+    const month = String(stamp.getMonth() + 1).padStart(2, '0');
+    const day = String(stamp.getDate()).padStart(2, '0');
+    return `IR${year}${month}${day}${loanId.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+  }
+
+  private async attachIssuerNames<T extends { issuedById: string | null }>(
+    tenantId: string,
+    loans: T[],
+  ) {
+    const ids = [
+      ...new Set(
+        loans
+          .map((loan) => loan.issuedById)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (!ids.length)
+      return loans.map((loan) => ({
+        ...loan,
+        issuedByName: null as string | null,
+      }));
+    const users = await this.prisma.user.findMany({
+      where: { tenantId, id: { in: ids } },
+      select: { id: true, displayName: true, email: true },
+    });
+    const names = new Map(
+      users.map((user) => [user.id, user.displayName?.trim() || user.email]),
+    );
+    return loans.map((loan) => ({
+      ...loan,
+      issuedByName: loan.issuedById
+        ? (names.get(loan.issuedById) ?? null)
+        : null,
+    }));
   }
 
   private async listMemberActiveLoans(

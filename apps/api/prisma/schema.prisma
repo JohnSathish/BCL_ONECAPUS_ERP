@@ -10215,6 +10215,7 @@ model LibraryLoan {
   issuedById     String?   @map("issued_by_id") @db.Uuid
   returnedById   String?   @map("returned_by_id") @db.Uuid
   renewalCount   Int       @default(0) @map("renewal_count")
+  receiptNo      String?   @map("receipt_no")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -10225,6 +10226,7 @@ model LibraryLoan {
   @@index([tenantId, studentId, status])
   @@index([tenantId, staffProfileId, status])
   @@index([tenantId, dueAt])
+  @@index([tenantId, receiptNo])
   @@map("library_loans")
   @@schema("library")
 }

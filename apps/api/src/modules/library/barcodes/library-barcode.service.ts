@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   Injectable,
@@ -8,6 +9,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import type { ReportPayload } from '../reports/library-catalogue-report.logic';
 import type {
+  AlignBarcodesDto,
   BarcodeCopyQueryDto,
   CreateBarcodeJobDto,
   LabelSettingsDto,
@@ -35,7 +37,7 @@ export class LibraryBarcodeService {
   constructor(private readonly prisma: PrismaService) {}
 
   async summary(tenantId: string) {
-    const [counts, duplicates, confirmed] = await Promise.all([
+    const [counts, duplicates, confirmed, readyRows] = await Promise.all([
       this.prisma.$queryRaw<
         {
           total: number;
@@ -61,6 +63,31 @@ export class LibraryBarcodeService {
         distinct: ['copyId'],
         select: { copyId: true },
       }),
+      this.prisma.$queryRaw<{ ready: number }[]>`
+        SELECT COUNT(*)::int AS ready
+        FROM library.library_book_copies c
+        JOIN library.library_books b ON b.id = c.book_id
+        WHERE c.tenant_id = CAST(${tenantId} AS uuid)
+          AND b.deleted_at IS NULL
+          AND NULLIF(BTRIM(c.accession_number), '') IS NOT NULL
+          AND BTRIM(c.accession_number) = c.barcode
+          AND NOT EXISTS (
+            SELECT 1
+            FROM library.library_barcode_print_items i
+            JOIN library.library_barcode_print_jobs j ON j.id = i.job_id
+            WHERE i.copy_id = c.id AND j.status = 'USER_CONFIRMED'
+          )
+          AND BTRIM(c.accession_number) NOT IN (
+            SELECT BTRIM(c2.accession_number)
+            FROM library.library_book_copies c2
+            JOIN library.library_books b2 ON b2.id = c2.book_id
+            WHERE c2.tenant_id = CAST(${tenantId} AS uuid)
+              AND b2.deleted_at IS NULL
+              AND NULLIF(BTRIM(c2.accession_number), '') IS NOT NULL
+            GROUP BY BTRIM(c2.accession_number)
+            HAVING COUNT(*) > 1
+          )
+      `,
     ]);
     const row = counts[0] ?? {
       total: 0,
@@ -76,6 +103,7 @@ export class LibraryBarcodeService {
       totalCopies: row.total,
       withAccession: row.withAccession,
       printable: Math.max(row.matched - duplicateCopies, 0),
+      readyToPrint: readyRows[0]?.ready ?? 0,
       confirmedLabels: confirmed.length,
       missingAccession: row.missing,
       duplicateAccessionNumbers: duplicates.length,
@@ -93,7 +121,7 @@ export class LibraryBarcodeService {
       this.prisma.libraryBookCopy.findMany({
         where,
         include: copyInclude,
-        orderBy: [{ accessionNumber: 'asc' }, { barcode: 'asc' }],
+        orderBy: this.copyOrder(query),
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -126,6 +154,98 @@ export class LibraryBarcodeService {
       total,
       truncated: total > records.length,
       limit: BARCODE_SELECT_LIMIT,
+    };
+  }
+
+  async alignBarcodes(
+    tenantId: string,
+    actorId: string | null,
+    dto: AlignBarcodesDto,
+  ) {
+    const copyIds = [...new Set(dto.copyIds ?? [])];
+    if (dto.scope === 'SELECTED' && !copyIds.length) {
+      throw new BadRequestException('Select at least one copy.');
+    }
+    const idClause =
+      dto.scope === 'SELECTED'
+        ? Prisma.sql`AND c.id IN (${Prisma.join(copyIds.map((id) => Prisma.sql`CAST(${id} AS uuid)`))})`
+        : Prisma.empty;
+    const updated = await this.prisma.$queryRaw<{ id: string }[]>`
+      UPDATE library.library_book_copies AS c
+      SET barcode = BTRIM(c.accession_number),
+          updated_at = NOW()
+      FROM library.library_books AS b
+      WHERE b.id = c.book_id
+        AND c.tenant_id = CAST(${tenantId} AS uuid)
+        AND b.deleted_at IS NULL
+        AND BTRIM(c.barcode) = ''
+        AND NULLIF(BTRIM(c.accession_number), '') IS NOT NULL
+        ${idClause}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM library.library_book_copies AS other
+          WHERE other.tenant_id = c.tenant_id
+            AND other.id <> c.id
+            AND other.barcode = BTRIM(c.accession_number)
+        )
+        AND (
+          SELECT COUNT(*)
+          FROM library.library_book_copies AS dup
+          JOIN library.library_books AS db ON db.id = dup.book_id
+          WHERE dup.tenant_id = c.tenant_id
+            AND db.deleted_at IS NULL
+            AND BTRIM(dup.accession_number) = BTRIM(c.accession_number)
+        ) = 1
+      RETURNING c.id
+    `;
+    const scopeWhere =
+      dto.scope === 'SELECTED'
+        ? Prisma.sql`AND c.id IN (${Prisma.join(copyIds.map((id) => Prisma.sql`CAST(${id} AS uuid)`))})`
+        : Prisma.empty;
+    const counted = await this.prisma.$queryRaw<
+      { matched: number; different: number; missing: number }[]
+    >`
+      SELECT
+        COUNT(*) FILTER (
+          WHERE NULLIF(BTRIM(c.accession_number), '') IS NOT NULL
+            AND BTRIM(c.barcode) = BTRIM(c.accession_number)
+        )::int AS matched,
+        COUNT(*) FILTER (
+          WHERE BTRIM(c.barcode) <> ''
+            AND BTRIM(c.barcode) <> BTRIM(COALESCE(c.accession_number, ''))
+        )::int AS different,
+        COUNT(*) FILTER (
+          WHERE NULLIF(BTRIM(c.accession_number), '') IS NULL
+        )::int AS missing
+      FROM library.library_book_copies c
+      JOIN library.library_books b ON b.id = c.book_id
+      WHERE c.tenant_id = CAST(${tenantId} AS uuid)
+        AND b.deleted_at IS NULL
+        ${scopeWhere}
+    `;
+    const row = counted[0] ?? { matched: 0, different: 0, missing: 0 };
+    await this.prisma.libraryAuditLog.create({
+      data: {
+        id: randomUUID(),
+        tenantId,
+        actorId,
+        action: 'BARCODE_ALIGN',
+        entityType: 'COPY',
+        metadata: {
+          scope: dto.scope,
+          updated: updated.length,
+          alreadyMatched: row.matched,
+          leftUnchanged: row.different,
+          missingAccession: row.missing,
+        },
+      },
+    });
+    return {
+      updated: updated.length,
+      alreadyMatched: row.matched,
+      leftUnchanged: row.different,
+      missingAccession: row.missing,
+      note: 'Only an empty barcode is filled with its accession number. An existing barcode is left as stored so circulation can still scan it.',
     };
   }
 
@@ -499,7 +619,8 @@ export class LibraryBarcodeService {
     const duplicates =
       query.printStatus === 'NOT_PRINTABLE' ||
       query.printStatus === 'UNPRINTED' ||
-      query.printStatus === 'LOCAL_UNPRINTED'
+      query.printStatus === 'LOCAL_UNPRINTED' ||
+      query.printStatus === 'DUPLICATE'
         ? (await this.duplicateAccessions(tenantId)).map((row) => row.value)
         : [];
     const book: Prisma.LibraryBookWhereInput = {
@@ -570,6 +691,26 @@ export class LibraryBarcodeService {
           : []),
       ];
     }
+    if (query.printStatus === 'HAS_ACCESSION') {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        { accessionNumber: { not: null } },
+        { NOT: { accessionNumber: '' } },
+      ];
+    }
+    if (query.printStatus === 'MISSING') {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        {
+          OR: [{ accessionNumber: null }, { accessionNumber: '' }],
+        },
+      ];
+    }
+    if (query.printStatus === 'DUPLICATE') {
+      where.accessionNumber = {
+        in: duplicates.length ? duplicates : ['__none__'],
+      };
+    }
     if (query.printStatus === 'NOT_PRINTABLE') {
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : []),
@@ -629,6 +770,25 @@ export class LibraryBarcodeService {
       printable: prepared.labels.length === 1,
       blocker: prepared.rejected[0]?.reason ?? null,
     };
+  }
+
+  private copyOrder(
+    query: BarcodeCopyQueryDto,
+  ): Prisma.LibraryBookCopyOrderByWithRelationInput[] {
+    const dir = query.sortDir === 'desc' ? 'desc' : 'asc';
+    if (query.sort === 'title') {
+      return [{ book: { title: dir } }, { accessionNumber: 'asc' }];
+    }
+    if (query.sort === 'author') {
+      return [{ book: { author: dir } }, { accessionNumber: 'asc' }];
+    }
+    if (query.sort === 'status') {
+      return [
+        { barcodePrintItems: { _count: dir } },
+        { accessionNumber: 'asc' },
+      ];
+    }
+    return [{ accessionNumber: dir }, { barcode: 'asc' }];
   }
 
   private async duplicateAccessions(tenantId: string) {

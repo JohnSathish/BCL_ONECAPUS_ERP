@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -9,18 +9,27 @@ import {
   BookOpen,
   Calendar,
   History,
+  Info,
   Library,
   RotateCcw,
   Search,
   Settings,
   UserPlus,
   Users,
+  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { useAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
+import { useBranding } from '@/hooks/use-branding';
+import {
+  newIssueReceiptNo,
+  printIssueReceipt,
+  type IssueReceiptSlip,
+  type IssueReceiptWidth,
+} from './library-issue-receipt';
 import {
   fetchActiveLoans,
   fetchLibraryBookPreview,
@@ -56,6 +65,11 @@ type IssueLine = {
   title: string;
   author: string;
   category: string;
+  callNumber: string;
+  publisher: string;
+  edition: string;
+  publicationYear: string;
+  coverImageUrl: string;
   dueAt: string;
 };
 
@@ -90,6 +104,8 @@ function accessionOf(loan: LibraryLoan) {
 
 export function LibraryCirculationDesk() {
   const enabled = useAuthQueryEnabled();
+  const { session } = useAuth();
+  const branding = useBranding();
   const qc = useQueryClient();
   const memberRef = useRef<HTMLInputElement>(null);
   const bookRef = useRef<HTMLInputElement>(null);
@@ -128,6 +144,8 @@ export function LibraryCirculationDesk() {
   const [bookMode, setBookMode] = useState<'scan' | 'search' | 'category' | 'recent'>('scan');
   const [categoryId, setCategoryId] = useState('');
   const [notes, setNotes] = useState('');
+  const [receiptWidth, setReceiptWidth] = useState<IssueReceiptWidth>(80);
+  const [lastReceipt, setLastReceipt] = useState<IssueReceiptSlip | null>(null);
   const [recentMembers, setRecentMembers] = useState<LibraryMemberSummary[]>([]);
   const [checked, setChecked] = useState<string[]>([]);
   const [confirmRenewOpen, setConfirmRenewOpen] = useState(false);
@@ -211,6 +229,11 @@ export function LibraryCirculationDesk() {
   });
   const nextDue = member?.activeLoans.map((loan) => loan.dueAt).sort()[0];
 
+  useEffect(() => {
+    const saved = window.localStorage.getItem('library-receipt-width');
+    if (saved === '58' || saved === '80') setReceiptWidth(Number(saved) as IssueReceiptWidth);
+  }, []);
+
   async function loadMember(code: string) {
     const scan = code.trim();
     if (!scan) return;
@@ -282,6 +305,11 @@ export function LibraryCirculationDesk() {
           title: book.book.title,
           author: book.book.author || '',
           category: book.book.category || '',
+          callNumber: book.book.callNumber || '',
+          publisher: book.book.publisher || '',
+          edition: book.book.edition || '',
+          publicationYear: book.book.publicationYear || '',
+          coverImageUrl: book.book.coverImageUrl || '',
           dueAt: preview.dueAt,
         },
       ]);
@@ -299,24 +327,66 @@ export function LibraryCirculationDesk() {
     const scan = member.profile.registrationNumber || member.profile.memberId;
     setBusy(true);
     setNotice('');
-    const issued: Array<IssueLine & { loanId: string }> = [];
+    const issued: Array<IssueLine & { loanId: string; issuedAt: string }> = [];
+    const receiptNo = newIssueReceiptNo();
+    let storedReceipt = receiptNo;
     try {
       for (const line of cart) {
-        const result = await issueLibraryBook(scan, line.barcode);
-        issued.push({ ...line, loanId: result.loan.id });
+        const result = await issueLibraryBook(scan, line.barcode, receiptNo);
+        storedReceipt = result.loan.receiptNo || storedReceipt;
+        issued.push({
+          ...line,
+          loanId: result.loan.id,
+          issuedAt: result.loan.issuedAt,
+        });
       }
+      const slip = receiptSlip({
+        width: receiptWidth,
+        receiptNo: storedReceipt,
+        issuedAt: issued[0]?.issuedAt || new Date().toISOString(),
+        issuedBy: session?.user.displayName?.trim() || session?.user.email || '',
+        member,
+        collegeName: branding.displayName,
+        address: collegeAddress(branding.displayName, branding.branding?.address),
+        logoUrl: absoluteAsset(branding.logo),
+        books: issued,
+        notes,
+      });
+      setLastReceipt(slip);
+      const opened = printIssueReceipt(slip);
       setNotice(
-        `Issued ${issued.length} ${issued.length === 1 ? 'book' : 'books'} to ${member.profile.fullName}.`,
+        `Issued ${issued.length} ${issued.length === 1 ? 'book' : 'books'} to ${member.profile.fullName}.${
+          opened ? '' : ' Allow pop-up windows to print the receipt.'
+        }`,
       );
-      printIssueReceipt(member, issued, notes);
       setCart([]);
       setChecked([]);
       setNotes('');
       setBook(null);
+      setBookQuery('');
+      setMember(null);
+      setMemberQuery('');
+      setMemberTerm('');
       setConfirmIssue(false);
-      await loadMember(scan);
+      memberRef.current?.focus();
       void qc.invalidateQueries({ queryKey: ['library', 'circulation'] });
     } catch (error) {
+      if (issued.length) {
+        setLastReceipt(
+          receiptSlip({
+            width: receiptWidth,
+            receiptNo: storedReceipt,
+            issuedAt: issued[0]?.issuedAt || new Date().toISOString(),
+            issuedBy: session?.user.displayName?.trim() || session?.user.email || '',
+            member,
+            collegeName: branding.displayName,
+            address: collegeAddress(branding.displayName, branding.branding?.address),
+            logoUrl: absoluteAsset(branding.logo),
+            books: issued,
+            notes,
+          }),
+        );
+      }
       setNotice(
         `${issued.length ? `Issued ${issued.map((line) => line.accession).join(', ')} before the next copy failed. ` : ''}${apiErrorMessage(error)}`,
       );
@@ -326,6 +396,37 @@ export function LibraryCirculationDesk() {
       setConfirmIssue(false);
     } finally {
       setBusy(false);
+    }
+  }
+
+  function reprintFromHistory(loan: LibraryLoan) {
+    if (!member) return;
+    const pool = [...member.activeLoans, ...(member.returnedLoans ?? [])];
+    const group = loan.receiptNo ? pool.filter((row) => row.receiptNo === loan.receiptNo) : [loan];
+    const rows = (group.length ? group : [loan]).sort(
+      (left, right) => new Date(left.issuedAt).getTime() - new Date(right.issuedAt).getTime(),
+    );
+    const slip: IssueReceiptSlip = {
+      width: receiptWidth,
+      receiptNo: loan.receiptNo || legacyReceiptNo(loan),
+      issuedAt: rows[0]?.issuedAt || loan.issuedAt,
+      issuedBy: rows.find((row) => row.issuedByName)?.issuedByName || '',
+      memberName: member.profile.fullName,
+      memberId: member.profile.registrationNumber || member.profile.memberId,
+      memberType: memberKind(member.profile.memberType),
+      department: member.profile.department || '',
+      collegeName: branding.displayName.toUpperCase(),
+      address: collegeAddress(branding.displayName, branding.branding?.address),
+      logoUrl: absoluteAsset(branding.logo),
+      books: rows.map((row) => ({
+        accession: accessionOf(row),
+        title: row.copy.book.title,
+        dueAt: row.dueAt,
+      })),
+    };
+    setLastReceipt(slip);
+    if (!printIssueReceipt(slip)) {
+      setNotice('Allow pop-up windows to print the receipt.');
     }
   }
 
@@ -571,9 +672,14 @@ export function LibraryCirculationDesk() {
       </div>
 
       {notice ? (
-        <p className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-          {notice}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+          <p>{notice}</p>
+          {lastReceipt ? (
+            <Button type="button" variant="outline" onClick={() => printIssueReceipt(lastReceipt)}>
+              Print receipt
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       {busy ? <p className="text-sm text-slate-500">Working…</p> : null}
 
@@ -890,6 +996,28 @@ export function LibraryCirculationDesk() {
                 />
               </label>
               <div className="text-sm text-slate-600">
+                <p className="font-medium">Receipt width</p>
+                <div className="mt-1 flex gap-1">
+                  {([80, 58] as const).map((width) => (
+                    <button
+                      key={width}
+                      type="button"
+                      className={`rounded border px-2 py-1 text-xs ${
+                        receiptWidth === width
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 bg-white text-slate-700'
+                      }`}
+                      onClick={() => {
+                        setReceiptWidth(width);
+                        window.localStorage.setItem('library-receipt-width', String(width));
+                      }}
+                    >
+                      {width} mm
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="text-sm text-slate-600">
                 <p className="font-medium">Due date</p>
                 <p>{cart[0] ? fmtDate(cart[0].dueAt) : 'Auto, from the member loan period'}</p>
               </div>
@@ -1114,8 +1242,16 @@ export function LibraryCirculationDesk() {
           </div>
           {member ? (
             <div className="grid gap-4 lg:grid-cols-2">
-              <LoanList title="Currently issued" loans={member.activeLoans} />
-              <LoanList title="Returned" loans={member.returnedLoans ?? []} />
+              <LoanList
+                title="Currently issued"
+                loans={member.activeLoans}
+                onReprint={reprintFromHistory}
+              />
+              <LoanList
+                title="Returned"
+                loans={member.returnedLoans ?? []}
+                onReprint={reprintFromHistory}
+              />
             </div>
           ) : null}
         </section>
@@ -1147,35 +1283,16 @@ export function LibraryCirculationDesk() {
         </div>
       ) : null}
 
-      {confirmIssue && member ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
-            <h2 className="text-lg font-semibold">Confirm issue</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              {member.profile.fullName} · {member.profile.registrationNumber}
-            </p>
-            <ul className="mt-3 space-y-1 text-sm">
-              {cart.map((line) => (
-                <li key={line.barcode}>
-                  {line.accession} · {line.title} · due {fmtDate(line.dueAt)}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-sm">
-              Books after this issue: {member.borrowedCount + cart.length} of {member.maxBooks}. Due
-              dates follow the member loan period.
-            </p>
-            {notes ? <p className="mt-2 text-sm text-slate-600">Receipt note: {notes}</p> : null}
-            <div className="mt-4 flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setConfirmIssue(false)}>
-                Cancel
-              </Button>
-              <Button type="button" disabled={busy} onClick={() => void issueCart()}>
-                Confirm issue
-              </Button>
-            </div>
-          </div>
-        </div>
+      {confirmIssue && member && cart.length ? (
+        <ConfirmIssueDialog
+          member={member}
+          cart={cart}
+          collegeName={branding.displayName}
+          notes={notes}
+          busy={busy}
+          onClose={() => setConfirmIssue(false)}
+          onConfirm={() => void issueCart()}
+        />
       ) : null}
     </div>
   );
@@ -1187,23 +1304,287 @@ function dayChange(current?: number, previous?: number) {
   return { text: `${value > 0 ? '+' : ''}${value}%`, up: value >= 0 };
 }
 
-function printIssueReceipt(
-  member: LibraryMemberSummary,
-  lines: Array<IssueLine & { loanId: string }>,
-  notes: string,
-) {
-  const popup = window.open('', '_blank');
-  if (!popup) return;
-  const rows = lines
-    .map(
-      (line) =>
-        `<tr><td>${line.accession}</td><td>${line.title}</td><td>${line.loanId}</td><td>${fmtDate(line.dueAt)}</td></tr>`,
-    )
-    .join('');
-  popup.document.write(
-    `<!doctype html><title>Issue receipt</title><body style="font-family:sans-serif"><h1>Library issue receipt</h1><p>${member.profile.fullName} · ${member.profile.registrationNumber || member.profile.memberId}</p><table border="1" cellpadding="6"><tr><th>Accession</th><th>Title</th><th>Loan</th><th>Due</th></tr>${rows}</table>${notes ? `<p>Notes: ${notes}</p>` : ''}<script>print()</script></body>`,
+function ConfirmIssueDialog({
+  member,
+  cart,
+  collegeName,
+  notes,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  member: LibraryMemberSummary;
+  cart: IssueLine[];
+  collegeName: string;
+  notes: string;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const overdue = member.activeLoans.filter((loan) => new Date(loan.dueAt) < new Date()).length;
+  const after = member.borrowedCount + cart.length;
+  const sameDue = cart.every((line) => line.dueAt === cart[0]?.dueAt);
+  const code = member.profile.registrationNumber || member.profile.memberId;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      <div
+        role="dialog"
+        aria-labelledby="confirm-issue-title"
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <BookOpen className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 id="confirm-issue-title" className="text-lg font-semibold text-slate-900">
+                Confirm Issue
+              </h2>
+              <p className="text-sm text-slate-500">
+                Please review the details before issuing the book to the member.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="flex items-start gap-3">
+              {member.profile.photoUrl ? (
+                <img
+                  src={member.profile.photoUrl}
+                  alt=""
+                  className="h-14 w-14 rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                  {initials(member.profile.fullName)}
+                </span>
+              )}
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-slate-900">{member.profile.fullName}</p>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      member.profile.active
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {member.profile.active ? 'Active' : member.membershipStatus}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {code} · {memberKind(member.profile.memberType)}
+                </p>
+                <p className="mt-2 text-sm text-slate-600">
+                  Department: {member.profile.department || '—'}
+                </p>
+                <p className="text-sm text-slate-600">{collegeName}</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+              <Metric
+                icon={<BookOpen className="h-4 w-4 text-blue-600" />}
+                value={`${member.borrowedCount} / ${member.maxBooks}`}
+                label="Currently Issued"
+              />
+              <Metric
+                icon={<AlertTriangle className="h-4 w-4 text-rose-500" />}
+                value={String(overdue)}
+                label="Overdue Books"
+              />
+              <Metric
+                icon={<span className="text-sm font-semibold text-amber-600">₹</span>}
+                value={money(member.outstandingFine)}
+                label="Outstanding Fine"
+              />
+            </div>
+          </section>
+
+          <div className="space-y-3">
+            {cart.map((line) => (
+              <section key={line.barcode} className="rounded-2xl border border-slate-200 p-4">
+                <div className="flex gap-3">
+                  {line.coverImageUrl ? (
+                    <img
+                      src={line.coverImageUrl}
+                      alt=""
+                      className="h-24 w-16 shrink-0 rounded-md border object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-24 w-16 shrink-0 items-center justify-center rounded-md border bg-slate-50 text-slate-400">
+                      <BookOpen className="h-6 w-6" />
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900">{line.title}</p>
+                    <p className="text-sm text-slate-500">Author: {line.author || '—'}</p>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                      <Field label="Accession No." value={line.accession || '—'} />
+                      <Field label="Publisher" value={line.publisher || '—'} />
+                      <Field label="Call No." value={line.callNumber || '—'} />
+                      <Field label="Publication Year" value={line.publicationYear || '—'} />
+                      <Field label="Book Category" value={line.category || '—'} />
+                      <Field label="Edition" value={line.edition || '—'} />
+                    </dl>
+                    {!sameDue ? (
+                      <p className="mt-2 text-xs text-slate-500">Due {fmtDate(line.dueAt)}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-50 text-violet-600">
+              <Calendar className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="font-semibold text-slate-900">Due Date</p>
+              <p className="text-sm text-slate-600">
+                Books after this issue: {after} of {member.maxBooks}
+              </p>
+              <p className="text-xs text-slate-500">Due dates follow the member loan period.</p>
+            </div>
+          </div>
+          <div className="rounded-xl bg-violet-50 px-4 py-3 text-violet-800">
+            <p className="text-lg font-semibold">
+              {sameDue ? fmtDate(cart[0].dueAt) : 'See each book'}
+            </p>
+            <p className="text-xs">including the loan period</p>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-slate-700">
+          <p className="flex items-start gap-2">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+            <span>
+              This will count as {cart.length} {cart.length === 1 ? 'book' : 'books'} out of{' '}
+              {member.maxBooks} allowed for this member.
+            </span>
+          </p>
+          <p className="mt-1 pl-6">
+            The member will be required to return {cart.length === 1 ? 'the book' : 'each book'} on
+            or before the due date.
+          </p>
+          {notes ? <p className="mt-1 pl-6">Receipt note: {notes}</p> : null}
+        </div>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            <X className="mr-1 h-4 w-4" /> Cancel
+          </Button>
+          <Button type="button" disabled={busy} onClick={onConfirm}>
+            <BookOpen className="mr-1 h-4 w-4" /> Confirm Issue
+          </Button>
+        </div>
+      </div>
+    </div>
   );
-  popup.document.close();
+}
+
+function Metric({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
+  return (
+    <div>
+      <div className="flex items-center justify-center gap-1 text-sm font-semibold text-slate-900">
+        {icon}
+        {value}
+      </div>
+      <p className="mt-1 text-[11px] text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-slate-400">{label}</dt>
+      <dd className="font-medium text-slate-800">{value}</dd>
+    </div>
+  );
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function memberKind(type: LibraryMemberSummary['profile']['memberType']) {
+  if (type === 'FACULTY') return 'Faculty';
+  if (type === 'STAFF') return 'Staff';
+  if (type === 'RESEARCH_SCHOLAR') return 'Research scholar';
+  if (type === 'VISITOR') return 'Visitor';
+  return 'Student';
+}
+
+function collegeAddress(name: string, address?: string | null) {
+  const saved = address?.trim();
+  if (saved) return saved;
+  if (/don bosco/i.test(name)) return 'Tura, Meghalaya – 794002';
+  return '';
+}
+
+function absoluteAsset(url?: string | null) {
+  if (!url) return '';
+  if (/^https?:/i.test(url)) return url;
+  if (typeof window === 'undefined') return url;
+  return `${window.location.origin}${url.startsWith('/') ? url : `/${url}`}`;
+}
+
+function legacyReceiptNo(loan: LibraryLoan) {
+  const date = new Date(loan.issuedAt);
+  const year = String(date.getFullYear()).slice(2);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `IR${year}${month}${day}${loan.id.replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+}
+
+function receiptSlip(input: {
+  width: IssueReceiptWidth;
+  receiptNo: string;
+  issuedAt: string;
+  issuedBy: string;
+  member: LibraryMemberSummary;
+  collegeName: string;
+  address: string;
+  logoUrl: string;
+  books: Array<{ accession: string; title: string; dueAt: string }>;
+  notes?: string;
+}): IssueReceiptSlip {
+  return {
+    width: input.width,
+    receiptNo: input.receiptNo,
+    issuedAt: input.issuedAt,
+    issuedBy: input.issuedBy,
+    memberName: input.member.profile.fullName,
+    memberId: input.member.profile.registrationNumber || input.member.profile.memberId,
+    memberType: memberKind(input.member.profile.memberType),
+    department: input.member.profile.department || '',
+    collegeName: input.collegeName.toUpperCase(),
+    address: input.address,
+    logoUrl: input.logoUrl,
+    books: input.books.map((book) => ({
+      accession: book.accession,
+      title: book.title,
+      dueAt: book.dueAt,
+    })),
+    notes: input.notes?.trim() || undefined,
+  };
 }
 
 function Stat({
@@ -1319,7 +1700,15 @@ function BookCard({ book }: { book: LibraryBookPreview }) {
   );
 }
 
-function LoanList({ title, loans }: { title: string; loans: LibraryLoan[] }) {
+function LoanList({
+  title,
+  loans,
+  onReprint,
+}: {
+  title: string;
+  loans: LibraryLoan[];
+  onReprint?: (loan: LibraryLoan) => void;
+}) {
   return (
     <section className="rounded-xl border bg-white p-4 shadow-sm">
       <h2 className="text-sm font-semibold">{title}</h2>
@@ -1331,6 +1720,7 @@ function LoanList({ title, loans }: { title: string; loans: LibraryLoan[] }) {
               <th>Title</th>
               <th>Due</th>
               <th>Status</th>
+              {onReprint ? <th /> : null}
             </tr>
           </thead>
           <tbody>
@@ -1346,6 +1736,17 @@ function LoanList({ title, loans }: { title: string; loans: LibraryLoan[] }) {
                       ? 'Overdue'
                       : 'On time'}
                 </td>
+                {onReprint ? (
+                  <td className="text-right">
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-violet-800"
+                      onClick={() => onReprint(loan)}
+                    >
+                      Reprint
+                    </button>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

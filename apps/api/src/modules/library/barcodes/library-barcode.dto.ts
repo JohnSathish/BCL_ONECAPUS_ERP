@@ -40,8 +40,23 @@ export class BarcodeCopyQueryDto {
   edition?: string;
 
   @IsOptional()
-  @IsIn(['CONFIRMED', 'UNPRINTED', 'LOCAL_UNPRINTED', 'NOT_PRINTABLE'])
-  printStatus?: 'CONFIRMED' | 'UNPRINTED' | 'LOCAL_UNPRINTED' | 'NOT_PRINTABLE';
+  @IsIn([
+    'CONFIRMED',
+    'UNPRINTED',
+    'LOCAL_UNPRINTED',
+    'NOT_PRINTABLE',
+    'HAS_ACCESSION',
+    'MISSING',
+    'DUPLICATE',
+  ])
+  printStatus?:
+    | 'CONFIRMED'
+    | 'UNPRINTED'
+    | 'LOCAL_UNPRINTED'
+    | 'NOT_PRINTABLE'
+    | 'HAS_ACCESSION'
+    | 'MISSING'
+    | 'DUPLICATE';
 
   @IsOptional()
   @IsString()
@@ -63,6 +78,25 @@ export class BarcodeCopyQueryDto {
   @Min(1)
   @Max(100)
   limit?: number;
+
+  @IsOptional()
+  @IsIn(['accession', 'title', 'author', 'status'])
+  sort?: 'accession' | 'title' | 'author' | 'status';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortDir?: 'asc' | 'desc';
+}
+
+export class AlignBarcodesDto {
+  @IsIn(['ALL', 'SELECTED'])
+  scope!: 'ALL' | 'SELECTED';
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  copyIds?: string[];
 }
 
 export class BarcodePreviewDto {

@@ -451,6 +451,11 @@ export class IssueBookDto {
   @IsString()
   @IsNotEmpty()
   copyBarcode!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  receiptNo?: string;
 }
 
 export class ReturnBookDto {

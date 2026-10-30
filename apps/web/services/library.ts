@@ -181,9 +181,13 @@ export const updateLibraryBook = (id: string, payload: Record<string, unknown>) 
 export const addLibraryCopy = (payload: { bookId: string; barcode: string; copyNumber?: number }) =>
   api.post(`${base}/copies`, payload).then((r) => r.data);
 
-export const issueLibraryBook = (memberScan: string, copyBarcode: string) =>
+export const issueLibraryBook = (memberScan: string, copyBarcode: string, receiptNo?: string) =>
   api
-    .post<{ loan: LibraryLoan }>(`${base}/circulation/issue`, { memberScan, copyBarcode })
+    .post<{ loan: LibraryLoan }>(`${base}/circulation/issue`, {
+      memberScan,
+      copyBarcode,
+      receiptNo,
+    })
     .then((r) => r.data);
 
 export const returnLibraryBook = (copyBarcode: string) =>
@@ -945,6 +949,7 @@ export const fetchBarcodeSummary = () =>
       totalCopies: number;
       withAccession: number;
       printable: number;
+      readyToPrint: number;
       confirmedLabels: number;
       missingAccession: number;
       duplicateAccessionNumbers: number;
@@ -971,6 +976,17 @@ export const fetchBarcodeCopyIds = (params: Record<string, string | number | und
         params,
       },
     )
+    .then((r) => r.data);
+
+export const alignBarcodeCopies = (payload: { scope: 'ALL' | 'SELECTED'; copyIds?: string[] }) =>
+  api
+    .post<{
+      updated: number;
+      alreadyMatched: number;
+      leftUnchanged: number;
+      missingAccession: number;
+      note: string;
+    }>(`${barcodeBase}/align`, payload)
     .then((r) => r.data);
 
 export const previewBarcodeLabels = (copyIds: string[]) =>

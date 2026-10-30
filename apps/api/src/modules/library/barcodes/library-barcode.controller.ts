@@ -18,6 +18,7 @@ import {
 import { RequireAnyPermission } from '../../../common/decorators/require-permissions.decorator';
 import { exportCatalogueReport } from '../reports/library-catalogue-report.export';
 import {
+  AlignBarcodesDto,
   BarcodeCopyQueryDto,
   BarcodePreviewDto,
   CreateBarcodeJobDto,
@@ -62,6 +63,12 @@ export class LibraryBarcodeController {
   @Get('copies')
   copies(@CurrentUser() user: JwtUser, @Query() query: BarcodeCopyQueryDto) {
     return this.barcodes.copies(user.tid, query);
+  }
+
+  @Post('align')
+  @RequireAnyPermission('library:manage')
+  align(@CurrentUser() user: JwtUser, @Body() dto: AlignBarcodesDto) {
+    return this.barcodes.alignBarcodes(user.tid, user.sub, dto);
   }
 
   @Post('preview')
