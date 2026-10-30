@@ -1,5 +1,6 @@
 import {
   previousRange,
+  staleVisitSignOut,
   visitPresentation,
   visitRange,
 } from './library-visit.logic';
@@ -52,5 +53,24 @@ describe('library visit presentation', () => {
     });
     const previous = previousRange(range);
     expect(previous.to.getTime()).toBeLessThan(range.from.getTime());
+  });
+});
+
+describe('staleVisitSignOut', () => {
+  const entry = new Date('2026-10-30T08:00:00');
+
+  it('leaves a visit open during the first hour', () => {
+    expect(
+      staleVisitSignOut(entry, new Date('2026-10-30T08:59:00')),
+    ).toBeNull();
+  });
+
+  it('signs the visit out at one hour, not at the time the job runs', () => {
+    const result = staleVisitSignOut(entry, new Date('2026-10-30T14:30:00'));
+    expect(result).toEqual({
+      exitAt: new Date('2026-10-30T09:00:00'),
+      durationMinutes: 60,
+      exitMethod: 'AUTO',
+    });
   });
 });

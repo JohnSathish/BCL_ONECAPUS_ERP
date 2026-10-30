@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LibraryDeskSidePanel } from '@/components/library/library-desk-side-panel';
 import { LibraryScannerStage, type ScannerPhase } from '@/components/library/library-scanner-stage';
+import { useBranding } from '@/hooks/use-branding';
 import { useAuth } from '@/hooks/use-auth';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useLibraryRealtime } from '@/hooks/use-library-realtime';
@@ -91,34 +92,37 @@ function useLiveClock() {
   return now;
 }
 
+function changeLabel(value?: number | null) {
+  if (value == null) return undefined;
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value}% from yesterday`;
+}
+
 function KpiCard({
   label,
   value,
   sub,
   icon: Icon,
-  glow,
+  tone,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   icon: typeof Users;
-  glow?: string;
+  tone: string;
 }) {
   return (
-    <div
-      className={cn(
-        'rounded-xl border border-white/10 bg-slate-900/80 p-4 shadow-lg backdrop-blur',
-        glow,
-      )}
-    >
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{label}</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-white">{value}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            {label}
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{value}</p>
           {sub ? <p className="mt-0.5 text-[11px] text-slate-500">{sub}</p> : null}
         </div>
-        <div className="rounded-lg bg-white/5 p-2">
-          <Icon className="h-5 w-5 text-cyan-400" />
+        <div className={cn('rounded-xl p-2', tone)}>
+          <Icon className="h-5 w-5" />
         </div>
       </div>
     </div>
@@ -135,39 +139,61 @@ const VISITOR_TYPES = [
 ] as const;
 
 function HourlyFootfallChart({
-  data,
-  totalScans,
+  entries,
+  exits,
 }: {
-  data: { hour: number; count: number }[];
-  totalScans: number;
+  entries: { hour: number; count: number }[];
+  exits: { hour: number; count: number }[];
 }) {
-  const slice = data.slice(8, 19);
-  const max = Math.max(1, ...slice.map((d) => d.count));
-  const peak = slice.reduce((best, d) => (d.count > best.count ? d : best), slice[0]!);
+  const slice = entries.filter((row) => row.hour >= 8 && row.hour <= 20);
+  const exitMap = new Map(exits.map((row) => [row.hour, row.count]));
+  const max = Math.max(1, ...slice.map((row) => Math.max(row.count, exitMap.get(row.hour) ?? 0)));
+  const peak = slice.reduce((best, row) => (row.count > best.count ? row : best), slice[0]);
 
   return (
-    <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">Hourly Footfall Today</h3>
-        <span className="text-xs text-slate-400">{totalScans} scans</span>
+        <h3 className="text-sm font-semibold text-slate-900">Hourly footfall today</h3>
+        <div className="flex gap-3 text-xs text-slate-500">
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-sm bg-sky-500" /> Entries
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-sm bg-emerald-400" /> Exits
+          </span>
+        </div>
       </div>
-      <div className="flex h-28 items-end gap-1">
-        {slice.map((b) => (
-          <div key={b.hour} className="flex flex-1 flex-col items-center gap-1">
-            <div
-              className="w-full rounded-t bg-gradient-to-t from-cyan-600 to-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.35)]"
-              style={{ height: `${Math.max(6, (b.count / max) * 100)}%` }}
-              title={`${b.hour}:00 — ${b.count}`}
-            />
-            <span className="text-[9px] text-slate-500">{b.hour}</span>
-          </div>
-        ))}
+      <div className="flex h-36 items-end gap-1">
+        {slice.map((row) => {
+          const exitCount = exitMap.get(row.hour) ?? 0;
+          return (
+            <div key={row.hour} className="flex flex-1 items-end justify-center gap-0.5">
+              <div className="flex h-28 w-full flex-col items-center justify-end gap-1">
+                <div className="flex h-full w-full items-end gap-0.5">
+                  <div
+                    className="w-1/2 rounded-t bg-sky-500"
+                    style={{ height: `${Math.max(row.count ? 6 : 0, (row.count / max) * 100)}%` }}
+                    title={`${row.hour}:00 entries ${row.count}`}
+                  />
+                  <div
+                    className="w-1/2 rounded-t bg-emerald-400"
+                    style={{ height: `${Math.max(exitCount ? 6 : 0, (exitCount / max) * 100)}%` }}
+                    title={`${row.hour}:00 exits ${exitCount}`}
+                  />
+                </div>
+                <span className="text-[9px] text-slate-400">{row.hour}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
-      {peak ? (
-        <p className="mt-2 text-xs text-cyan-300/80">
+      {peak && peak.count > 0 ? (
+        <p className="mt-2 text-xs text-slate-500">
           Peak: {peak.hour}:00–{peak.hour + 1}:00 ({peak.count} entries)
         </p>
-      ) : null}
+      ) : (
+        <p className="mt-2 text-xs text-slate-500">No entries recorded between 8:00 and 20:00.</p>
+      )}
     </div>
   );
 }
@@ -186,6 +212,7 @@ export function LibraryAccessDesk() {
   const qc = useQueryClient();
   const enabled = useAuthQueryEnabled();
   const { session } = useAuth();
+  const branding = useBranding();
   const now = useLiveClock();
   const inputRef = useRef<HTMLInputElement>(null);
   const scanKeyTimesRef = useRef<number[]>([]);
@@ -441,7 +468,10 @@ export function LibraryAccessDesk() {
 
   return (
     <div
-      className={cn('flex min-h-screen bg-[#0a0f1e] text-white', fullscreen && 'kiosk-fullscreen')}
+      className={cn(
+        'flex min-h-screen bg-slate-50 text-slate-900',
+        fullscreen && 'kiosk-fullscreen',
+      )}
       onMouseDown={(e) => {
         if (visitorOpenRef.current) return;
         const target = e.target as HTMLElement;
@@ -455,14 +485,14 @@ export function LibraryAccessDesk() {
       {/* Sidebar — hidden in kiosk fullscreen for max scan area */}
       <aside
         className={cn(
-          'hidden w-56 shrink-0 flex-col border-r border-white/10 bg-[#070b14] lg:flex',
+          'hidden w-56 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex',
           fullscreen && 'lg:hidden',
         )}
       >
-        <div className="border-b border-white/10 p-4">
+        <div className="border-b border-slate-200 p-4">
           <div className="flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-cyan-400" />
-            <span className="text-sm font-bold">Library I/O</span>
+            <BookOpen className="h-6 w-6 text-sky-700" />
+            <span className="text-sm font-bold text-slate-900">Library I/O</span>
           </div>
         </div>
         <nav className="flex-1 space-y-0.5 p-2">
@@ -472,7 +502,7 @@ export function LibraryAccessDesk() {
                 key={label}
                 href={href}
                 target={href.startsWith('/admin') ? '_blank' : undefined}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50"
               >
                 <Icon className="h-4 w-4" />
                 {label}
@@ -484,8 +514,8 @@ export function LibraryAccessDesk() {
                 className={cn(
                   'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm',
                   active
-                    ? 'bg-cyan-500/15 text-cyan-300'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white',
+                    ? 'bg-sky-50 font-semibold text-sky-800'
+                    : 'text-slate-600 hover:bg-slate-50',
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -494,36 +524,44 @@ export function LibraryAccessDesk() {
             ),
           )}
         </nav>
-        <div className="border-t border-white/10 p-2">
+        <div className="border-t border-slate-200 p-2">
           <button
             type="button"
             onClick={() => void handleLogout()}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition-colors hover:bg-red-50 hover:text-red-700"
           >
             <LogOut className="h-4 w-4" />
             Sign out
           </button>
         </div>
-        <div className="border-t border-white/10 p-4 text-xs text-slate-500">
-          <p>Library Hours</p>
-          <p className="mt-1 font-medium text-slate-300">8:00 AM – 6:00 PM</p>
-          <span className="mt-2 inline-block rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
-            OPEN
-          </span>
+        <div className="border-t border-slate-200 p-4 text-xs text-slate-500">
+          <p className="font-medium text-slate-700">Auto sign-out</p>
+          <p className="mt-1">Open visits close after 1 hour.</p>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top header */}
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#0d1324]/90 px-4 py-3 backdrop-blur">
-          <div>
-            <p className="text-xs text-slate-400">Don Bosco College Tura</p>
-            <h1 className={cn('font-bold tracking-tight', fullscreen ? 'text-2xl' : 'text-lg')}>
-              Library In-Out Management System
-            </h1>
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+          <div className="flex items-center gap-3">
+            {branding.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={branding.logo} alt="" className="h-10 w-10 rounded-full object-contain" />
+            ) : null}
+            <div>
+              <p className="text-xs font-semibold text-slate-500">{branding.displayName}</p>
+              <h1
+                className={cn(
+                  'font-bold tracking-tight text-slate-950',
+                  fullscreen ? 'text-2xl' : 'text-lg',
+                )}
+              >
+                Library In-Out Management System
+              </h1>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <span className="flex items-center gap-1.5 text-xs text-emerald-400">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
               <Wifi className="h-3.5 w-3.5" />
               System Online
             </span>
@@ -531,7 +569,7 @@ export function LibraryAccessDesk() {
               <p className="font-mono text-lg font-semibold tabular-nums">
                 {now ? now.toLocaleTimeString('en-IN', { hour12: true }) : '--:--:-- --'}
               </p>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500">
                 {now
                   ? now.toLocaleDateString('en-IN', {
                       weekday: 'long',
@@ -542,20 +580,20 @@ export function LibraryAccessDesk() {
                   : 'Loading…'}
               </p>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/20 text-xs font-bold text-cyan-300">
+            <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-800">
                 {librarianName.slice(0, 2).toUpperCase()}
               </div>
               <div className="text-xs">
                 <p className="font-medium capitalize">{librarianName}</p>
-                <p className="text-slate-500">Gate Operator</p>
+                <p className="text-slate-500">Librarian</p>
               </div>
             </div>
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="shrink-0 border-white/15 bg-white/5 text-slate-200 hover:bg-red-500/10 hover:text-red-200"
+              className="shrink-0 border-slate-200 bg-white text-slate-700 hover:bg-red-50 hover:text-red-700"
               onClick={() => void handleLogout()}
             >
               <LogOut className="mr-2 h-4 w-4" />
@@ -565,8 +603,7 @@ export function LibraryAccessDesk() {
               type="button"
               size="sm"
               className={cn(
-                'shrink-0 border-0 bg-gradient-to-r from-cyan-500 to-violet-600 px-4 font-semibold text-white shadow-lg shadow-cyan-500/25 transition hover:from-cyan-400 hover:to-violet-500 hover:shadow-cyan-400/40',
-                fullscreen && 'from-violet-600 to-cyan-500 hover:from-violet-500 hover:to-cyan-400',
+                'shrink-0 border-0 bg-sky-700 px-4 font-semibold text-white hover:bg-sky-800',
               )}
               onClick={toggleFullscreen}
             >
@@ -586,12 +623,12 @@ export function LibraryAccessDesk() {
         </header>
 
         {dashboardError ? (
-          <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-100">
+          <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
             <span>Dashboard stats unavailable: {dashboardError}</span>
             <Button
               size="sm"
               variant="outline"
-              className="border-amber-400/40 text-amber-100"
+              className="border-amber-300 text-amber-900"
               onClick={() => void dashboard.refetch()}
             >
               Retry
@@ -605,31 +642,45 @@ export function LibraryAccessDesk() {
             {!fullscreen ? (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
                 <KpiCard
-                  label="Entries Today (IN)"
+                  label="Entries today (in)"
                   value={stats?.entriesToday ?? '—'}
+                  sub={changeLabel(stats?.entriesChange)}
                   icon={LogIn}
-                  glow="shadow-cyan-500/5"
+                  tone="bg-sky-50 text-sky-700"
                 />
-                <KpiCard label="Exits Today (OUT)" value={stats?.exitsToday ?? '—'} icon={LogOut} />
                 <KpiCard
-                  label="Currently Inside"
+                  label="Exits today (out)"
+                  value={stats?.exitsToday ?? '—'}
+                  sub={changeLabel(stats?.exitsChange)}
+                  icon={LogOut}
+                  tone="bg-rose-50 text-rose-600"
+                />
+                <KpiCard
+                  label="Currently inside"
                   value={stats?.currentlyInside ?? '—'}
-                  sub="Live in library"
+                  sub="Signed out after 1 hour"
                   icon={Users}
-                  glow="shadow-emerald-500/10"
+                  tone="bg-emerald-50 text-emerald-700"
                 />
                 <KpiCard
-                  label="Visitors Today"
+                  label="Visitors today"
                   value={stats?.visitorsToday ?? '—'}
                   sub="Total footfall"
                   icon={UserPlus}
+                  tone="bg-violet-50 text-violet-700"
                 />
                 <KpiCard
-                  label="Avg. Stay Time"
+                  label="Avg. stay time"
                   value={stats ? formatStay(stats.avgStayMinutes) : '—'}
                   icon={Clock}
+                  tone="bg-sky-50 text-sky-700"
                 />
-                <KpiCard label="Scans Today" value={stats?.scansToday ?? '—'} icon={ScanLine} />
+                <KpiCard
+                  label="Scans today"
+                  value={stats?.scansToday ?? '—'}
+                  icon={ScanLine}
+                  tone="bg-indigo-50 text-indigo-700"
+                />
               </div>
             ) : null}
 
@@ -652,17 +703,17 @@ export function LibraryAccessDesk() {
             />
 
             {occ ? (
-              <HourlyFootfallChart data={occ.hourlyFootfall} totalScans={stats?.scansToday ?? 0} />
+              <HourlyFootfallChart entries={occ.hourlyFootfall} exits={occ.hourlyExits ?? []} />
             ) : null}
           </div>
 
           <aside className={cn('w-full shrink-0 space-y-4 xl:w-80', fullscreen && 'xl:w-72')}>
-            <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4">
-              <h3 className="mb-3 text-sm font-semibold">Quick Actions</h3>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold text-slate-900">Quick actions</h3>
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
-                  className="h-auto flex-col gap-1 border-0 bg-gradient-to-br from-cyan-600/80 to-cyan-800 py-3 text-[10px] font-medium text-white shadow-md hover:from-cyan-500 hover:to-cyan-700"
+                  className="h-auto flex-col gap-1 border-0 bg-sky-600 py-3 text-[11px] font-semibold text-white hover:bg-sky-700"
                   onClick={() => setVisitorOpen(true)}
                 >
                   <UserPlus className="h-5 w-5" />
@@ -670,7 +721,7 @@ export function LibraryAccessDesk() {
                 </Button>
                 <Button
                   type="button"
-                  className="h-auto flex-col gap-1 border border-cyan-500/30 bg-cyan-950/40 py-3 text-[10px] font-medium text-cyan-100 hover:bg-cyan-900/50"
+                  className="h-auto flex-col gap-1 border border-slate-200 bg-white py-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
                   onClick={() => focusScanner()}
                 >
                   <ScanLine className="h-5 w-5" />
@@ -685,21 +736,21 @@ export function LibraryAccessDesk() {
 
       {visitorOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
           data-kiosk-modal
         >
-          <div className="w-full max-w-md overflow-hidden rounded-xl border border-cyan-500/30 bg-slate-900 text-white shadow-2xl shadow-cyan-500/10">
-            <div className="bg-gradient-to-r from-cyan-600 to-violet-700 px-6 py-4">
-              <h2 className="text-lg font-semibold">Register Visitor Pass</h2>
-              <p className="text-xs text-cyan-100/80">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl">
+            <div className="bg-sky-700 px-6 py-4 text-white">
+              <h2 className="text-lg font-semibold">Register visitor pass</h2>
+              <p className="text-xs text-sky-100">
                 Parent · Guest · Alumni · Vendor · External faculty
               </p>
             </div>
             <div className="space-y-3 p-6">
-              <label className="block text-xs text-slate-400">
-                Visitor Type
+              <label className="block text-xs text-slate-500">
+                Visitor type
                 <select
-                  className="mt-1 w-full rounded-md border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white"
+                  className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
                   value={visitorForm.visitorType}
                   onChange={(e) =>
                     setVisitorForm({
@@ -716,40 +767,40 @@ export function LibraryAccessDesk() {
                 </select>
               </label>
               <Input
-                className="border-white/10 bg-slate-800"
+                className="border-slate-200 bg-white"
                 placeholder="Full name"
                 value={visitorForm.fullName}
                 onChange={(e) => setVisitorForm({ ...visitorForm, fullName: e.target.value })}
               />
               <Input
-                className="border-white/10 bg-slate-800"
+                className="border-slate-200 bg-white"
                 placeholder="Mobile"
                 value={visitorForm.mobile}
                 onChange={(e) => setVisitorForm({ ...visitorForm, mobile: e.target.value })}
               />
               <Input
-                className="border-white/10 bg-slate-800"
+                className="border-slate-200 bg-white"
                 placeholder="Organization (optional)"
                 value={visitorForm.institution}
                 onChange={(e) => setVisitorForm({ ...visitorForm, institution: e.target.value })}
               />
               <Input
-                className="border-white/10 bg-slate-800"
+                className="border-slate-200 bg-white"
                 placeholder="Purpose of visit"
                 value={visitorForm.purpose}
                 onChange={(e) => setVisitorForm({ ...visitorForm, purpose: e.target.value })}
               />
             </div>
-            <div className="flex justify-end gap-2 border-t border-white/10 bg-slate-950/50 px-6 py-4">
+            <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">
               <Button
                 variant="ghost"
-                className="text-slate-300 hover:text-white"
+                className="text-slate-600"
                 onClick={() => setVisitorOpen(false)}
               >
                 Cancel
               </Button>
               <Button
-                className="bg-gradient-to-r from-cyan-500 to-violet-600 font-semibold hover:from-cyan-400 hover:to-violet-500"
+                className="bg-sky-700 font-semibold hover:bg-sky-800"
                 disabled={!visitorForm.fullName.trim() || visitorMut.isPending}
                 onClick={() => visitorMut.mutate()}
               >

@@ -18,6 +18,7 @@ export type OccupancySnapshot = {
   totalSeats: number;
   occupancyPercent: number;
   hourlyFootfall: { hour: number; count: number }[];
+  hourlyExits: { hour: number; count: number }[];
 };
 
 @Injectable()
@@ -27,7 +28,23 @@ export class LibraryAnalyticsService {
     private readonly settings: LibrarySettingsService,
   ) {}
 
+  /** Close visits that have stayed open for more than one hour. */
+  async closeStaleOpenVisits(tenantId: string) {
+    const cutoff = new Date(Date.now() - 60 * 60 * 1000);
+    return this.prisma.$executeRaw`
+      UPDATE library.library_visits
+      SET exit_at = entry_at + interval '1 hour',
+          duration_minutes = 60,
+          exit_method = 'AUTO',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tenant_id = CAST(${tenantId} AS uuid)
+        AND exit_at IS NULL
+        AND entry_at < ${cutoff}
+    `;
+  }
+
   async getOccupancy(tenantId: string): Promise<OccupancySnapshot> {
+    await this.closeStaleOpenVisits(tenantId);
     const settings = await this.settings.getSettings(tenantId);
     const openVisits = await this.prisma.libraryVisit.findMany({
       where: { tenantId, exitAt: null },
@@ -77,13 +94,26 @@ export class LibraryAnalyticsService {
 
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-    const todayVisits = await this.prisma.libraryVisit.findMany({
-      where: { tenantId, entryAt: { gte: startOfDay } },
-      select: { entryAt: true },
-    });
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+    const [todayVisits, todayExits] = await Promise.all([
+      this.prisma.libraryVisit.findMany({
+        where: { tenantId, entryAt: { gte: startOfDay, lt: endOfDay } },
+        select: { entryAt: true },
+      }),
+      this.prisma.libraryVisit.findMany({
+        where: { tenantId, exitAt: { gte: startOfDay, lt: endOfDay } },
+        select: { exitAt: true },
+      }),
+    ]);
     const hourlyFootfall = Array.from({ length: 24 }, (_, hour) => ({
       hour,
       count: todayVisits.filter((v) => v.entryAt.getHours() === hour).length,
+    }));
+    const hourlyExits = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      count: todayExits.filter((v) => v.exitAt && v.exitAt.getHours() === hour)
+        .length,
     }));
 
     return {
@@ -98,6 +128,7 @@ export class LibraryAnalyticsService {
       totalSeats,
       occupancyPercent,
       hourlyFootfall,
+      hourlyExits,
     };
   }
 

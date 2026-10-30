@@ -41,51 +41,51 @@ const PHASE_COPY: Record<
   idle: {
     title: 'Ready to Scan Student ID Card',
     sub: 'Show your ID card to enter or exit the library',
-    accent: 'text-cyan-300',
-    border: 'border-cyan-400/40',
-    bg: 'from-cyan-950/20 via-slate-900/80 to-slate-950/90',
+    accent: 'text-slate-900',
+    border: 'border-sky-100',
+    bg: 'from-white via-sky-50/60 to-white',
   },
   detecting: {
     title: 'Card Detected',
     sub: 'Reading barcode — hold steady…',
-    accent: 'text-sky-300',
-    border: 'border-sky-400/70',
-    bg: 'from-sky-950/40 via-slate-900/80 to-slate-950/90',
+    accent: 'text-sky-800',
+    border: 'border-sky-200',
+    bg: 'from-sky-50 to-white',
   },
   verifying: {
     title: 'Verifying Student Information',
-    sub: 'AI verification · membership · entry/exit rules',
-    accent: 'text-violet-300',
-    border: 'border-violet-400/60',
-    bg: 'from-violet-950/40 via-slate-900/80 to-slate-950/90',
+    sub: 'Checking membership and entry rules',
+    accent: 'text-violet-800',
+    border: 'border-violet-200',
+    bg: 'from-violet-50 to-white',
   },
   entry: {
     title: 'ENTRY ALLOWED',
-    sub: 'Welcome to Don Bosco College Library',
-    accent: 'text-emerald-300',
-    border: 'border-emerald-400/70',
-    bg: 'from-emerald-950/50 via-slate-900/80 to-slate-950/90',
+    sub: 'Welcome to the library',
+    accent: 'text-emerald-800',
+    border: 'border-emerald-200',
+    bg: 'from-emerald-50 to-white',
   },
   exit: {
     title: 'EXIT RECORDED',
     sub: 'Thank you — visit recorded successfully',
-    accent: 'text-amber-300',
-    border: 'border-amber-400/70',
-    bg: 'from-amber-950/40 via-slate-900/80 to-slate-950/90',
+    accent: 'text-amber-800',
+    border: 'border-amber-200',
+    bg: 'from-amber-50 to-white',
   },
   'not-found': {
     title: 'Student Not Found',
     sub: 'Invalid barcode · not registered · card not assigned',
-    accent: 'text-red-300',
-    border: 'border-red-500/70',
-    bg: 'from-red-950/40 via-slate-900/80 to-slate-950/90',
+    accent: 'text-red-800',
+    border: 'border-red-200',
+    bg: 'from-red-50 to-white',
   },
   blocked: {
     title: 'Access Restricted',
     sub: 'Membership suspended · fines · disciplinary hold',
-    accent: 'text-orange-300',
-    border: 'border-orange-500/70',
-    bg: 'from-orange-950/40 via-slate-900/80 to-slate-950/90',
+    accent: 'text-orange-800',
+    border: 'border-orange-200',
+    bg: 'from-orange-50 to-white',
   },
 };
 
@@ -114,7 +114,7 @@ function ScannerParticles() {
       {dots.map((d) => (
         <motion.span
           key={d.id}
-          className="absolute rounded-full bg-cyan-400/30"
+          className="absolute rounded-full bg-sky-300/50"
           style={{ left: d.left, top: d.top, width: d.size, height: d.size }}
           animate={{ opacity: [0.15, 0.7, 0.15], y: [0, -8, 0] }}
           transition={{ duration: 3 + (d.id % 4), repeat: Infinity, delay: d.delay }}
@@ -127,7 +127,7 @@ function ScannerParticles() {
 function CornerBracket({ className }: { className: string }) {
   return (
     <motion.span
-      className={cn('absolute h-8 w-8 border-cyan-400/80', className)}
+      className={cn('absolute h-8 w-8 border-sky-400', className)}
       animate={{ opacity: [0.35, 1, 0.35] }}
       transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
     />
@@ -142,7 +142,7 @@ function MemberPhotoLarge({ name, photoUrl }: { name: string; photoUrl?: string 
       <img
         src={src}
         alt={name}
-        className="h-40 w-32 rounded-xl border-2 border-white/20 object-cover shadow-2xl shadow-emerald-500/20"
+        className="h-40 w-32 rounded-xl border-2 border-slate-200 object-cover shadow-sm"
       />
     );
   }
@@ -152,7 +152,7 @@ function MemberPhotoLarge({ name, photoUrl }: { name: string; photoUrl?: string 
     .map((p) => p[0])
     .join('');
   return (
-    <div className="flex h-40 w-32 items-center justify-center rounded-xl border-2 border-white/10 bg-slate-800 text-2xl font-bold text-slate-300">
+    <div className="flex h-40 w-32 items-center justify-center rounded-xl border-2 border-slate-200 bg-slate-100 text-2xl font-bold text-slate-600">
       {initials || '?'}
     </div>
   );
@@ -163,11 +163,13 @@ function VerifyChip({ label, value, warn }: { label: string; value: string; warn
     <div
       className={cn(
         'rounded-md border px-2 py-1.5 text-center',
-        warn ? 'border-amber-500/40 bg-amber-500/10' : 'border-white/10 bg-black/20',
+        warn ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white',
       )}
     >
       <p className="text-[10px] uppercase tracking-wider text-slate-500">{label}</p>
-      <p className={cn('text-xs font-semibold', warn ? 'text-amber-300' : 'text-white')}>{value}</p>
+      <p className={cn('text-xs font-semibold', warn ? 'text-amber-800' : 'text-slate-900')}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -182,15 +184,15 @@ function LibrarianVerifyStrip({ scan, displayMs }: { scan: ScanResult; displayMs
   const attendanceWarn = attendance != null && attendance < 75;
 
   return (
-    <div className="relative mt-4 w-full overflow-hidden rounded-lg border border-cyan-500/20 bg-cyan-950/20">
+    <div className="relative mt-4 w-full overflow-hidden rounded-lg border border-sky-100 bg-sky-50">
       <motion.div
-        className="absolute inset-y-0 left-0 bg-cyan-400/10"
+        className="absolute inset-y-0 left-0 bg-sky-200/40"
         initial={{ width: '100%' }}
         animate={{ width: '0%' }}
         transition={{ duration: displayMs / 1000, ease: 'linear' }}
       />
       <div className="relative px-3 py-2">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-cyan-400/90">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-sky-800">
           Librarian verify · auto-ready for next scan
         </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
@@ -249,14 +251,14 @@ export function LibraryScannerStage({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border-2 bg-gradient-to-br p-6 shadow-2xl transition-all duration-500',
+        'relative overflow-hidden rounded-3xl border bg-gradient-to-br p-6 shadow-sm transition-all duration-500',
         copy.border,
         copy.bg,
         isError && 'animate-pulse',
       )}
     >
       <ScannerParticles />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,0.08),transparent_65%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(14,165,233,0.08),transparent_60%)]" />
 
       <CornerBracket className="left-3 top-3 border-l-2 border-t-2" />
       <CornerBracket className="right-3 top-3 border-r-2 border-t-2" />
@@ -322,7 +324,7 @@ export function LibraryScannerStage({
                 {phase === 'entry' ? (
                   <div className="sm:col-span-2">
                     <dt className="text-slate-500">Entry Time</dt>
-                    <dd className="font-mono text-emerald-300">
+                    <dd className="font-mono text-emerald-700">
                       {new Date(lastScan.visit.entryAt).toLocaleTimeString('en-IN', {
                         hour12: true,
                       })}
@@ -340,7 +342,7 @@ export function LibraryScannerStage({
                     </div>
                     <div>
                       <dt className="text-slate-500">Exit Time</dt>
-                      <dd className="font-mono text-amber-300">
+                      <dd className="font-mono text-amber-700">
                         {lastScan.visit.exitAt
                           ? new Date(lastScan.visit.exitAt).toLocaleTimeString('en-IN', {
                               hour12: true,
@@ -350,7 +352,7 @@ export function LibraryScannerStage({
                     </div>
                     <div className="sm:col-span-2">
                       <dt className="text-slate-500">Duration</dt>
-                      <dd className="font-semibold text-amber-200">
+                      <dd className="font-semibold text-amber-800">
                         {formatDuration(lastScan.visit.durationMinutes)}
                       </dd>
                     </div>
@@ -397,7 +399,7 @@ export function LibraryScannerStage({
                     <UserX className="h-20 w-20 text-red-400" />
                   )
                 ) : (
-                  <ScanLine className="h-20 w-20 text-cyan-400 drop-shadow-[0_0_24px_rgba(34,211,238,0.45)]" />
+                  <ScanLine className="h-20 w-20 text-sky-600" />
                 )}
               </motion.div>
               {(phase === 'detecting' || phase === 'verifying' || phase === 'idle') && (
@@ -417,7 +419,7 @@ export function LibraryScannerStage({
             <p className="mt-1 max-w-md text-center text-sm text-slate-400">{copy.sub}</p>
 
             {errorMessage && isError ? (
-              <p className="mt-3 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">
+              <p className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 {errorMessage}
               </p>
@@ -455,7 +457,7 @@ export function LibraryScannerStage({
           autoComplete="off"
           spellCheck={false}
           name="scanCode"
-          className="border-cyan-500/40 bg-slate-950/80 text-lg text-white ring-cyan-500/30 placeholder:text-slate-500 focus-visible:ring-cyan-400"
+          className="h-12 border-slate-200 bg-white text-lg text-slate-900 ring-sky-200 placeholder:text-slate-400 focus-visible:ring-sky-400"
           placeholder="Scanner auto-capture · manual type + Enter"
           value={scanInput}
           onChange={onChange}
@@ -464,7 +466,7 @@ export function LibraryScannerStage({
         />
         <Button
           type="submit"
-          className="shrink-0 bg-cyan-600 hover:bg-cyan-700"
+          className="h-12 shrink-0 bg-sky-600 px-6 hover:bg-sky-700"
           disabled={!scanInput.trim() || isPending}
         >
           {isPending ? '…' : 'Scan'}

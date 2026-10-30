@@ -144,6 +144,7 @@ export class LibraryAccessService {
   ): Promise<ScanResult> {
     const profile = await this.lookup.lookup(tenantId, dto.scanCode);
     const settings = await this.settings.getSettings(tenantId);
+    await this.analytics.closeStaleOpenVisits(tenantId);
 
     const openVisit = await this.prisma.libraryVisit.findFirst({
       where: this.openVisitWhere(tenantId, profile),
@@ -168,7 +169,7 @@ export class LibraryAccessService {
       );
       visit = await this.prisma.libraryVisit.update({
         where: { id: openVisit.id },
-        data: { exitAt, durationMinutes },
+        data: { exitAt, durationMinutes, exitMethod: 'SCAN' },
       });
       action = 'EXIT';
     } else {
@@ -285,7 +286,7 @@ export class LibraryAccessService {
     );
     const updated = await this.prisma.libraryVisit.updateMany({
       where: { id: visit.id, tenantId, exitAt: null },
-      data: { exitAt, durationMinutes },
+      data: { exitAt, durationMinutes, exitMethod: 'SCAN' },
     });
     if (updated.count !== 1) {
       throw new BadRequestException('This visit already has an exit time.');
@@ -667,6 +668,8 @@ export class LibraryAccessService {
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(startOfDay);
     endOfDay.setDate(endOfDay.getDate() + 1);
+    const yesterdayStart = new Date(startOfDay);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
 
     const occupancy = await this.analytics.getOccupancy(tenantId);
 
@@ -678,6 +681,9 @@ export class LibraryAccessService {
       unpaidFinesCount,
       booksIssuedToday,
       booksReturnedToday,
+      entriesYesterday,
+      exitsYesterday,
+      autoSignedOutToday,
       openVisitsRaw,
     ] = await Promise.all([
       this.prisma.libraryVisit.count({
@@ -705,6 +711,19 @@ export class LibraryAccessService {
       }),
       this.prisma.libraryLoan.count({
         where: { tenantId, returnedAt: { gte: startOfDay, lt: endOfDay } },
+      }),
+      this.prisma.libraryVisit.count({
+        where: { tenantId, entryAt: { gte: yesterdayStart, lt: startOfDay } },
+      }),
+      this.prisma.libraryVisit.count({
+        where: { tenantId, exitAt: { gte: yesterdayStart, lt: startOfDay } },
+      }),
+      this.prisma.libraryVisit.count({
+        where: {
+          tenantId,
+          exitMethod: 'AUTO',
+          exitAt: { gte: startOfDay, lt: endOfDay },
+        },
       }),
       this.prisma.libraryVisit.findMany({
         where: { tenantId, exitAt: null },
@@ -879,6 +898,9 @@ export class LibraryAccessService {
         booksIssuedToday,
         booksReturnedToday,
         peakHour,
+        entriesChange: percentChange(entriesToday, entriesYesterday),
+        exitsChange: percentChange(exitsToday, exitsYesterday),
+        autoSignedOutToday,
       },
       occupancy: {
         ...occupancy,
@@ -919,4 +941,9 @@ export class LibraryAccessService {
       ],
     };
   }
+}
+
+function percentChange(current: number, previous: number) {
+  if (previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
 }

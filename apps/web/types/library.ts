@@ -31,6 +31,7 @@ export type OccupancySnapshot = {
   totalSeats: number;
   occupancyPercent: number;
   hourlyFootfall: { hour: number; count: number }[];
+  hourlyExits?: { hour: number; count: number }[];
   maleStaffInside?: number;
   femaleStaffInside?: number;
 };
@@ -72,6 +73,9 @@ export type LibraryAccessDeskDashboard = {
     booksIssuedToday?: number;
     booksReturnedToday?: number;
     peakHour?: number | null;
+    entriesChange?: number | null;
+    exitsChange?: number | null;
+    autoSignedOutToday?: number;
   };
   occupancy: OccupancySnapshot;
   visitorSummary: {

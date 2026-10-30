@@ -9913,6 +9913,7 @@ model LibraryVisit {
   zoneId          String?   @map("zone_id") @db.Uuid
   seatLabel       String?   @map("seat_label")
   entryMethod     String?   @map("entry_method")
+  exitMethod      String?   @map("exit_method")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

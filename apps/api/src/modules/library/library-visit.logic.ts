@@ -23,6 +23,19 @@ export function memberTypeWhere(
   return {};
 }
 
+/** Open visits are closed automatically after this many minutes. */
+export const AUTO_SIGNOUT_MINUTES = 60;
+
+export function staleVisitSignOut(entryAt: Date, now = new Date()) {
+  const elapsedMs = now.getTime() - entryAt.getTime();
+  if (elapsedMs < AUTO_SIGNOUT_MINUTES * 60_000) return null;
+  return {
+    exitAt: new Date(entryAt.getTime() + AUTO_SIGNOUT_MINUTES * 60_000),
+    durationMinutes: AUTO_SIGNOUT_MINUTES,
+    exitMethod: 'AUTO' as const,
+  };
+}
+
 export function visitRange(input: {
   period?: 'today' | 'week' | 'month' | 'custom';
   from?: string;
