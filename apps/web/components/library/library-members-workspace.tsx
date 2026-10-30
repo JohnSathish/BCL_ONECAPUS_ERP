@@ -20,6 +20,13 @@ import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { printLibraryMemberCards } from '@/components/library/library-member-cards';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  libraryFilterControlClass,
+  libraryFilterLabelClass,
+  librarySearchButtonClass,
+  librarySearchInputClass,
+  librarySearchPanelClass,
+} from '@/components/library/library-search-panel';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useBranding } from '@/hooks/use-branding';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -460,75 +467,93 @@ export function LibraryMembersWorkspace() {
         ))}
       </div>
 
-      <div className="rounded-xl border bg-white p-3">
-        <div className="flex flex-wrap gap-2">
-          <div className="relative min-w-[220px] flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              className="pl-9"
-              placeholder="Name, enrolment, staff ID, email, phone, card"
-              value={draftSearch}
-              onChange={(event) => setDraftSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') applySearch();
-              }}
-            />
-          </div>
-          <select
-            className="h-10 rounded-md border px-2 text-sm"
-            value={filters.departmentId}
-            onChange={(event) =>
-              setFilters((current) => ({ ...current, departmentId: event.target.value, page: 1 }))
-            }
-          >
-            <option value="">All departments</option>
-            {cards?.departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="h-10 rounded-md border px-2 text-sm"
-            value={filters.status}
-            onChange={(event) =>
-              setFilters((current) => ({ ...current, status: event.target.value, page: 1 }))
-            }
-          >
-            <option value="">All statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-            <option value="BLOCKED">Blocked</option>
-          </select>
-          <select
-            className="h-10 rounded-md border px-2 text-sm"
-            value={filters.academicYear}
-            onChange={(event) =>
-              setFilters((current) => ({ ...current, academicYear: event.target.value, page: 1 }))
-            }
-          >
-            <option value="">All entry years</option>
-            {cards?.academicYears.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-          <select
-            className="h-10 rounded-md border px-2 text-sm"
-            value={filters.semester}
-            onChange={(event) =>
-              setFilters((current) => ({ ...current, semester: event.target.value, page: 1 }))
-            }
-          >
-            <option value="">All semesters</option>
-            {cards?.semesters.map((semester) => (
-              <option key={semester} value={semester}>
-                Semester {semester}
-              </option>
-            ))}
-          </select>
-          <Button onClick={applySearch}>Search</Button>
+      <div className={librarySearchPanelClass}>
+        <div className="flex flex-wrap items-end gap-4">
+          <label className={`min-w-[240px] flex-1 ${libraryFilterLabelClass}`}>
+            Search
+            <div className="relative mt-1.5">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <Input
+                className={librarySearchInputClass}
+                placeholder="Name, enrolment, staff ID, email, phone, card"
+                value={draftSearch}
+                onChange={(event) => setDraftSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') applySearch();
+                }}
+              />
+            </div>
+          </label>
+          <label className={`min-w-[160px] ${libraryFilterLabelClass}`}>
+            Department
+            <select
+              className={`mt-1.5 ${libraryFilterControlClass}`}
+              value={filters.departmentId}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, departmentId: event.target.value, page: 1 }))
+              }
+            >
+              <option value="">All departments</option>
+              {cards?.departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={`min-w-[140px] ${libraryFilterLabelClass}`}>
+            Status
+            <select
+              className={`mt-1.5 ${libraryFilterControlClass}`}
+              value={filters.status}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, status: event.target.value, page: 1 }))
+              }
+            >
+              <option value="">All statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+              <option value="BLOCKED">Blocked</option>
+            </select>
+          </label>
+          <label className={`min-w-[140px] ${libraryFilterLabelClass}`}>
+            Entry year
+            <select
+              className={`mt-1.5 ${libraryFilterControlClass}`}
+              value={filters.academicYear}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, academicYear: event.target.value, page: 1 }))
+              }
+            >
+              <option value="">All entry years</option>
+              {cards?.academicYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={`min-w-[140px] ${libraryFilterLabelClass}`}>
+            Semester
+            <select
+              className={`mt-1.5 ${libraryFilterControlClass}`}
+              value={filters.semester}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, semester: event.target.value, page: 1 }))
+              }
+            >
+              <option value="">All semesters</option>
+              {cards?.semesters.map((semester) => (
+                <option key={semester} value={semester}>
+                  Semester {semester}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button className={librarySearchButtonClass} onClick={applySearch}>
+            <Search className="mr-2 h-4 w-4" />
+            Search
+          </Button>
           <Button
             variant="outline"
             onClick={() => {
@@ -541,7 +566,7 @@ export function LibraryMembersWorkspace() {
             Clear
           </Button>
         </div>
-        <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-600">
+        <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold text-[#0B1F44]">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"

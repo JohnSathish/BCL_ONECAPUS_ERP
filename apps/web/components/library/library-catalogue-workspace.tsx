@@ -21,6 +21,13 @@ import {
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  libraryFilterControlClass,
+  libraryFilterLabelClass,
+  librarySearchButtonClass,
+  librarySearchInputClass,
+  librarySearchPanelClass,
+} from '@/components/library/library-search-panel';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { usePermissions } from '@/hooks/use-permissions';
 import {
@@ -323,21 +330,24 @@ export function LibraryCatalogueWorkspace() {
         />
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section className={librarySearchPanelClass}>
         <form
-          className="flex flex-wrap gap-2"
+          className="flex flex-wrap items-center gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             apply({ search: draft.search, page: 1 });
           }}
         >
-          <Input
-            className="min-w-[240px] flex-1"
-            placeholder="Search by title, author, accession no., ISBN, subject..."
-            value={draft.search}
-            onChange={(event) => setDraft({ ...draft, search: event.target.value })}
-          />
-          <Button type="submit">
+          <div className="relative min-w-[240px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+            <Input
+              className={librarySearchInputClass}
+              placeholder="Search by title, author, accession no., ISBN, subject..."
+              value={draft.search}
+              onChange={(event) => setDraft({ ...draft, search: event.target.value })}
+            />
+          </div>
+          <Button type="submit" className={librarySearchButtonClass}>
             <Search className="mr-2 h-4 w-4" />
             Search
           </Button>
@@ -357,7 +367,7 @@ export function LibraryCatalogueWorkspace() {
           </Button>
         </form>
         {advanced ? (
-          <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+          <div className="mt-4 grid gap-4 md:grid-cols-3 xl:grid-cols-6">
             <Select
               label="Department"
               value={filters.departmentId}
@@ -882,10 +892,10 @@ function Select({
   children: ReactNode;
 }) {
   return (
-    <label className="text-xs text-slate-500">
+    <label className={libraryFilterLabelClass}>
       {label}
       <select
-        className="mt-1 h-10 w-full rounded-md border px-2 text-sm text-slate-800"
+        className={`mt-1.5 ${libraryFilterControlClass}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >

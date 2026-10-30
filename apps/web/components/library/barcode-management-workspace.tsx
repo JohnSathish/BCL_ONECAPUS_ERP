@@ -16,6 +16,13 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  libraryFilterControlClass,
+  libraryFilterLabelClass,
+  librarySearchButtonClass,
+  librarySearchInputClass,
+  librarySearchPanelClass,
+} from '@/components/library/library-search-panel';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import { fetchAcademicDepartments } from '@/services/organization';
 import {
@@ -470,146 +477,190 @@ export function BarcodeManagementWorkspace() {
       {progress ? <p className="text-sm font-medium text-slate-700">{progress}</p> : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="space-y-3 rounded-xl border bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="font-semibold text-slate-900">Search & Filter</h2>
-              <p className="text-xs text-slate-500">
-                Find physical copies by accession number, title, author, ISBN, call number, or
-                barcode.
-              </p>
+        <section className="space-y-3">
+          <div className={`${librarySearchPanelClass} space-y-4`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-slate-900">Search & Filter</h2>
+                <p className="text-xs text-slate-500">
+                  Find physical copies by accession number, title, author, ISBN, call number, or
+                  barcode.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  ['', 'All'],
+                  ['UNPRINTED', 'Not Printed'],
+                  ['CONFIRMED', 'Printed'],
+                  ['MISSING', 'Missing Accession'],
+                  ['DUPLICATE', 'Duplicates'],
+                ].map(([value, label]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      filters.printStatus === value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                    onClick={() => applyQuick(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1">
-              {[
-                ['', 'All'],
-                ['UNPRINTED', 'Not Printed'],
-                ['CONFIRMED', 'Printed'],
-                ['MISSING', 'Missing Accession'],
-                ['DUPLICATE', 'Duplicates'],
-              ].map(([value, label]) => (
-                <button
-                  key={label}
-                  type="button"
-                  className={`rounded-full px-3 py-1 text-xs font-medium ${
-                    filters.printStatus === value
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                  onClick={() => applyQuick(value)}
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className={libraryFilterLabelClass}>
+                Search
+                <div className="relative mt-1.5">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <Input
+                    className={librarySearchInputClass}
+                    placeholder="Accession, title, author, ISBN, call number"
+                    value={draft.search}
+                    onChange={(event) => setDraft({ ...draft, search: event.target.value })}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        setPage(1);
+                        setFilters(draft);
+                      }
+                    }}
+                  />
+                </div>
+              </label>
+              <label className={libraryFilterLabelClass}>
+                Department
+                <Select
+                  className={`mt-1.5 ${libraryFilterControlClass}`}
+                  value={draft.departmentId}
+                  placeholder="All departments"
+                  onChange={(value) => setDraft({ ...draft, departmentId: value })}
                 >
-                  {label}
-                </button>
-              ))}
+                  {(departments.data ?? []).map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label className={libraryFilterLabelClass}>
+                Book category
+                <Select
+                  className={`mt-1.5 ${libraryFilterControlClass}`}
+                  value={draft.categoryId}
+                  placeholder="All categories"
+                  onChange={(value) => setDraft({ ...draft, categoryId: value })}
+                >
+                  {(categories.data ?? []).map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              {showAdvanced ? (
+                <>
+                  <label className={libraryFilterLabelClass}>
+                    Publisher
+                    <Input
+                      className={`mt-1.5 ${libraryFilterControlClass}`}
+                      placeholder="Publisher"
+                      value={draft.publisher}
+                      onChange={(event) => setDraft({ ...draft, publisher: event.target.value })}
+                    />
+                  </label>
+                  <label className={libraryFilterLabelClass}>
+                    Publication year
+                    <Input
+                      className={`mt-1.5 ${libraryFilterControlClass}`}
+                      placeholder="Publication year"
+                      value={draft.year}
+                      onChange={(event) => setDraft({ ...draft, year: event.target.value })}
+                    />
+                  </label>
+                  <label className={libraryFilterLabelClass}>
+                    Edition
+                    <Input
+                      className={`mt-1.5 ${libraryFilterControlClass}`}
+                      placeholder="Edition"
+                      value={draft.edition}
+                      onChange={(event) => setDraft({ ...draft, edition: event.target.value })}
+                    />
+                  </label>
+                  <label className={libraryFilterLabelClass}>
+                    Printing status
+                    <Select
+                      className={`mt-1.5 ${libraryFilterControlClass}`}
+                      value={draft.printStatus}
+                      placeholder="All statuses"
+                      onChange={(value) => setDraft({ ...draft, printStatus: value })}
+                    >
+                      <option value="HAS_ACCESSION">With accession number</option>
+                      <option value="UNPRINTED">Not printed</option>
+                      <option value="CONFIRMED">Printed</option>
+                      <option value="MISSING">Missing accession</option>
+                      <option value="DUPLICATE">Duplicates</option>
+                      <option value="LOCAL_UNPRINTED">Not printed in this ERP</option>
+                      <option value="NOT_PRINTABLE">Not printable</option>
+                    </Select>
+                  </label>
+                  <label className={libraryFilterLabelClass}>
+                    Accession from
+                    <Input
+                      className={`mt-1.5 ${libraryFilterControlClass}`}
+                      placeholder="Accession from"
+                      value={draft.accessionFrom}
+                      onChange={(event) =>
+                        setDraft({ ...draft, accessionFrom: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className={libraryFilterLabelClass}>
+                    Accession to
+                    <Input
+                      className={`mt-1.5 ${libraryFilterControlClass}`}
+                      placeholder="Accession to"
+                      value={draft.accessionTo}
+                      onChange={(event) => setDraft({ ...draft, accessionTo: event.target.value })}
+                    />
+                  </label>
+                </>
+              ) : null}
             </div>
-          </div>
-          <div className="grid gap-2 md:grid-cols-3">
-            <Input
-              placeholder="Accession, title, author, ISBN, call number"
-              value={draft.search}
-              onChange={(event) => setDraft({ ...draft, search: event.target.value })}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
+            <div className="flex flex-wrap gap-3">
+              <Button
+                type="button"
+                className={librarySearchButtonClass}
+                onClick={() => {
                   setPage(1);
                   setFilters(draft);
-                }
-              }}
-            />
-            <Select
-              value={draft.departmentId}
-              placeholder="Department"
-              onChange={(value) => setDraft({ ...draft, departmentId: value })}
-            >
-              {(departments.data ?? []).map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </Select>
-            <Select
-              value={draft.categoryId}
-              placeholder="Book category"
-              onChange={(value) => setDraft({ ...draft, categoryId: value })}
-            >
-              {(categories.data ?? []).map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </Select>
-            {showAdvanced ? (
-              <>
-                <Input
-                  placeholder="Publisher"
-                  value={draft.publisher}
-                  onChange={(event) => setDraft({ ...draft, publisher: event.target.value })}
-                />
-                <Input
-                  placeholder="Publication year"
-                  value={draft.year}
-                  onChange={(event) => setDraft({ ...draft, year: event.target.value })}
-                />
-                <Input
-                  placeholder="Edition"
-                  value={draft.edition}
-                  onChange={(event) => setDraft({ ...draft, edition: event.target.value })}
-                />
-                <Select
-                  value={draft.printStatus}
-                  placeholder="Printing status"
-                  onChange={(value) => setDraft({ ...draft, printStatus: value })}
-                >
-                  <option value="HAS_ACCESSION">With accession number</option>
-                  <option value="UNPRINTED">Not printed</option>
-                  <option value="CONFIRMED">Printed</option>
-                  <option value="MISSING">Missing accession</option>
-                  <option value="DUPLICATE">Duplicates</option>
-                  <option value="LOCAL_UNPRINTED">Not printed in this ERP</option>
-                  <option value="NOT_PRINTABLE">Not printable</option>
-                </Select>
-                <Input
-                  placeholder="Accession from"
-                  value={draft.accessionFrom}
-                  onChange={(event) => setDraft({ ...draft, accessionFrom: event.target.value })}
-                />
-                <Input
-                  placeholder="Accession to"
-                  value={draft.accessionTo}
-                  onChange={(event) => setDraft({ ...draft, accessionTo: event.target.value })}
-                />
-              </>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              onClick={() => {
-                setPage(1);
-                setFilters(draft);
-              }}
-            >
-              <Search className="mr-1 h-4 w-4" /> Search
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setDraft(EMPTY_FILTERS);
-                setFilters(EMPTY_FILTERS);
-                setPage(1);
-              }}
-            >
-              Reset
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowAdvanced((open) => !open)}
-            >
-              Advanced Filters
-            </Button>
+                }}
+              >
+                <Search className="mr-1 h-4 w-4" /> Search
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setDraft(EMPTY_FILTERS);
+                  setFilters(EMPTY_FILTERS);
+                  setPage(1);
+                }}
+              >
+                Reset
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowAdvanced((open) => !open)}
+              >
+                Advanced Filters
+              </Button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t pt-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white p-3 text-sm shadow-sm">
             <p className="mr-auto font-medium text-slate-700">
               Book Copies ({copies.data?.total ?? 0})
               {selected.length ? (
@@ -1399,15 +1450,17 @@ function Select({
   placeholder,
   onChange,
   children,
+  className,
 }: {
   value: string;
   placeholder: string;
   onChange: (value: string) => void;
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <select
-      className="h-10 rounded-md border bg-white px-3 text-sm"
+      className={className ?? 'h-10 rounded-md border bg-white px-3 text-sm'}
       value={value}
       onChange={(event) => onChange(event.target.value)}
     >

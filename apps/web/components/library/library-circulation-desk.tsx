@@ -22,6 +22,11 @@ import type { LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  librarySearchButtonClass,
+  librarySearchInputClass,
+  librarySearchPanelClass,
+} from '@/components/library/library-search-panel';
 import { useAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useBranding } from '@/hooks/use-branding';
 import {
@@ -723,20 +728,28 @@ export function LibraryCirculationDesk() {
                   </button>
                 ))}
               </div>
-              <div className="mt-3 flex gap-2">
-                <Input
-                  ref={memberRef}
-                  placeholder="Scan member card or search name, enrolment no."
-                  value={memberQuery}
-                  onChange={(event) => {
-                    setMemberQuery(event.target.value);
-                    setMember(null);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') void loadMember(memberQuery);
-                  }}
-                />
-                <Button type="button" onClick={() => void loadMember(memberQuery)}>
+              <div className={`mt-3 flex gap-3 ${librarySearchPanelClass}`}>
+                <div className="relative min-w-0 flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <Input
+                    ref={memberRef}
+                    className={librarySearchInputClass}
+                    placeholder="Scan member card or search name, enrolment no."
+                    value={memberQuery}
+                    onChange={(event) => {
+                      setMemberQuery(event.target.value);
+                      setMember(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') void loadMember(memberQuery);
+                    }}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  className={librarySearchButtonClass}
+                  onClick={() => void loadMember(memberQuery)}
+                >
                   Search
                 </Button>
               </div>
@@ -850,20 +863,28 @@ export function LibraryCirculationDesk() {
                   Latest accession numbers on record. Acquisition date is not used.
                 </p>
               ) : null}
-              <div className="mt-3 flex gap-2">
-                <Input
-                  ref={bookRef}
-                  placeholder="Scan book barcode or search title, author, accession no."
-                  value={bookQuery}
-                  onChange={(event) => {
-                    setBookQuery(event.target.value);
-                    setBook(null);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') void loadBook(bookQuery);
-                  }}
-                />
-                <Button type="button" variant="outline" onClick={() => void loadBook(bookQuery)}>
+              <div className={`mt-3 flex gap-3 ${librarySearchPanelClass}`}>
+                <div className="relative min-w-0 flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <Input
+                    ref={bookRef}
+                    className={librarySearchInputClass}
+                    placeholder="Scan book barcode or search title, author, accession no."
+                    value={bookQuery}
+                    onChange={(event) => {
+                      setBookQuery(event.target.value);
+                      setBook(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') void loadBook(bookQuery);
+                    }}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  className={librarySearchButtonClass}
+                  onClick={() => void loadBook(bookQuery)}
+                >
                   Search
                 </Button>
               </div>
@@ -1067,17 +1088,25 @@ export function LibraryCirculationDesk() {
       {tab === 'return' ? (
         <section className="rounded-xl border bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold">Scan the returned book</h2>
-          <div className="mt-3 flex gap-2">
-            <Input
-              ref={returnRef}
-              placeholder="Book barcode or accession number"
-              value={returnCode}
-              onChange={(event) => setReturnCode(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') void loadReturn(returnCode);
-              }}
-            />
-            <Button type="button" onClick={() => void loadReturn(returnCode)}>
+          <div className={`mt-3 flex gap-3 ${librarySearchPanelClass}`}>
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <Input
+                ref={returnRef}
+                className={librarySearchInputClass}
+                placeholder="Book barcode or accession number"
+                value={returnCode}
+                onChange={(event) => setReturnCode(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void loadReturn(returnCode);
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              className={librarySearchButtonClass}
+              onClick={() => void loadReturn(returnCode)}
+            >
               Find loan
             </Button>
           </div>
@@ -1177,17 +1206,25 @@ export function LibraryCirculationDesk() {
       {tab === 'renew' ? (
         <section className="rounded-xl border bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold">Find the active loan</h2>
-          <div className="mt-3 flex gap-2">
-            <Input
-              ref={renewRef}
-              placeholder="Book barcode or accession number"
-              value={renewCode}
-              onChange={(event) => setRenewCode(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') void loadRenew(renewCode);
-              }}
-            />
-            <Button type="button" onClick={() => void loadRenew(renewCode)}>
+          <div className={`mt-3 flex gap-3 ${librarySearchPanelClass}`}>
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <Input
+                ref={renewRef}
+                className={librarySearchInputClass}
+                placeholder="Book barcode or accession number"
+                value={renewCode}
+                onChange={(event) => setRenewCode(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void loadRenew(renewCode);
+                }}
+              />
+            </div>
+            <Button
+              type="button"
+              className={librarySearchButtonClass}
+              onClick={() => void loadRenew(renewCode)}
+            >
               Check renewal
             </Button>
           </div>
@@ -1255,17 +1292,25 @@ export function LibraryCirculationDesk() {
       {tab === 'history' ? (
         <section className="space-y-4">
           <div className="rounded-xl border bg-white p-4 shadow-sm">
-            <div className="flex gap-2">
-              <Input
-                ref={memberRef}
-                placeholder="Member ID, enrolment number or card"
-                value={memberQuery}
-                onChange={(event) => setMemberQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') void loadMember(memberQuery);
-                }}
-              />
-              <Button type="button" onClick={() => void loadMember(memberQuery)}>
+            <div className={`flex gap-3 ${librarySearchPanelClass}`}>
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                <Input
+                  ref={memberRef}
+                  className={librarySearchInputClass}
+                  placeholder="Member ID, enrolment number or card"
+                  value={memberQuery}
+                  onChange={(event) => setMemberQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void loadMember(memberQuery);
+                  }}
+                />
+              </div>
+              <Button
+                type="button"
+                className={librarySearchButtonClass}
+                onClick={() => void loadMember(memberQuery)}
+              >
                 Search
               </Button>
             </div>
