@@ -284,6 +284,8 @@ export type LibraryCirculationDeskContext = {
   stats: {
     issuedToday: number;
     returnedToday: number;
+    issuedYesterday?: number;
+    returnedYesterday?: number;
     renewalsToday: number;
     overdueLoans: number;
     issuedNow?: number;

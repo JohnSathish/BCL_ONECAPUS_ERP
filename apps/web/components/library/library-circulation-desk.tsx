@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
+  Barcode,
   BookOpen,
-  CalendarClock,
+  Calendar,
+  History,
   Library,
   RotateCcw,
   Search,
@@ -13,6 +16,7 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +25,7 @@ import {
   fetchActiveLoans,
   fetchLibraryBookPreview,
   fetchLibraryBooks,
+  fetchLibraryCategories,
   fetchLibraryDeskContext,
   fetchLibraryIssuePreview,
   fetchLibraryMemberSummary,
@@ -45,13 +50,20 @@ import type {
 import { apiErrorMessage } from '@/utils/api-error';
 
 type Tab = 'issue' | 'return' | 'renew' | 'history';
-type IssueLine = { barcode: string; accession: string; title: string; dueAt: string };
+type IssueLine = {
+  barcode: string;
+  accession: string;
+  title: string;
+  author: string;
+  category: string;
+  dueAt: string;
+};
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'issue', label: 'Issue Book' },
-  { id: 'return', label: 'Return Book' },
-  { id: 'renew', label: 'Renew Book' },
-  { id: 'history', label: 'Member History' },
+const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
+  { id: 'issue', label: 'Issue Book', icon: BookOpen },
+  { id: 'return', label: 'Return Book', icon: RotateCcw },
+  { id: 'renew', label: 'Renew Book', icon: Calendar },
+  { id: 'history', label: 'Member History', icon: History },
 ];
 
 function money(value: number) {
@@ -112,6 +124,15 @@ export function LibraryCirculationDesk() {
   const [renewPreview, setRenewPreview] = useState<LibraryRenewPreview | null>(null);
   const [showOverdue, setShowOverdue] = useState(false);
   const [showDueWeek, setShowDueWeek] = useState(false);
+  const [memberMode, setMemberMode] = useState<'scan' | 'search' | 'quick'>('scan');
+  const [bookMode, setBookMode] = useState<'scan' | 'search' | 'category' | 'recent'>('scan');
+  const [categoryId, setCategoryId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [recentMembers, setRecentMembers] = useState<LibraryMemberSummary[]>([]);
+  const [checked, setChecked] = useState<string[]>([]);
+  const [confirmRenewOpen, setConfirmRenewOpen] = useState(false);
+  const [memberTerm, setMemberTerm] = useState('');
+  const [bookTerm, setBookTerm] = useState('');
 
   const desk = useQuery({
     queryKey: ['library', 'circulation', 'desk-context'],
@@ -126,18 +147,49 @@ export function LibraryCirculationDesk() {
   const active = useQuery({
     queryKey: ['library', 'circulation', 'active'],
     queryFn: fetchActiveLoans,
-    enabled: enabled && (tab === 'issue' || showDueWeek),
+    enabled: enabled && showDueWeek,
   });
   const memberHits = useQuery({
-    queryKey: ['library', 'members', 'search', memberQuery],
-    queryFn: () => fetchLibraryMembers({ search: memberQuery, limit: 6 }),
-    enabled: enabled && memberQuery.trim().length > 2 && !member,
+    queryKey: ['library', 'members', 'search', memberTerm],
+    queryFn: () => fetchLibraryMembers({ search: memberTerm, limit: 6 }),
+    enabled: enabled && memberTerm.length > 2 && !member,
   });
   const bookHits = useQuery({
-    queryKey: ['library', 'books', 'search', bookQuery],
-    queryFn: () => fetchLibraryBooks({ search: bookQuery, limit: 6 }),
-    enabled: enabled && tab === 'issue' && bookQuery.trim().length > 2 && !book,
+    queryKey: ['library', 'books', 'search', bookTerm],
+    queryFn: () => fetchLibraryBooks({ search: bookTerm, limit: 6, facets: 'false' }),
+    enabled:
+      enabled &&
+      tab === 'issue' &&
+      bookMode !== 'category' &&
+      bookMode !== 'recent' &&
+      bookTerm.length > 2 &&
+      !book,
   });
+  const categories = useQuery({
+    queryKey: ['library', 'categories'],
+    queryFn: fetchLibraryCategories,
+    enabled: enabled && tab === 'issue' && bookMode === 'category',
+  });
+  const categoryBooks = useQuery({
+    queryKey: ['library', 'books', 'category', categoryId],
+    queryFn: () => fetchLibraryBooks({ categoryId, limit: 8, facets: 'false' }),
+    enabled: enabled && tab === 'issue' && bookMode === 'category' && Boolean(categoryId),
+  });
+  const recentBooks = useQuery({
+    queryKey: ['library', 'books', 'latest-accession'],
+    queryFn: () =>
+      fetchLibraryBooks({ sort: 'accession', sortDir: 'desc', limit: 6, facets: 'false' }),
+    enabled: enabled && tab === 'issue' && bookMode === 'recent',
+  });
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMemberTerm(memberQuery.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [memberQuery]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setBookTerm(bookQuery.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [bookQuery]);
 
   useEffect(() => {
     const node =
@@ -168,6 +220,12 @@ export function LibraryCirculationDesk() {
       const summary = await fetchLibraryMemberSummary(scan);
       setMember(summary);
       setMemberQuery(summary.profile.fullName);
+      setRecentMembers((current) =>
+        [
+          summary,
+          ...current.filter((item) => item.profile.memberId !== summary.profile.memberId),
+        ].slice(0, 5),
+      );
       bookRef.current?.focus();
     } catch (error) {
       setMember(null);
@@ -222,9 +280,12 @@ export function LibraryCirculationDesk() {
           barcode: book.copy.barcode,
           accession: book.book.accessionNo,
           title: book.book.title,
+          author: book.book.author || '',
+          category: book.book.category || '',
           dueAt: preview.dueAt,
         },
       ]);
+      setChecked((current) => [...current, book.copy.barcode]);
       setBook(null);
       setBookQuery('');
       bookRef.current?.focus();
@@ -238,25 +299,30 @@ export function LibraryCirculationDesk() {
     const scan = member.profile.registrationNumber || member.profile.memberId;
     setBusy(true);
     setNotice('');
-    const issued: string[] = [];
+    const issued: Array<IssueLine & { loanId: string }> = [];
     try {
       for (const line of cart) {
-        await issueLibraryBook(scan, line.barcode);
-        issued.push(line.accession);
+        const result = await issueLibraryBook(scan, line.barcode);
+        issued.push({ ...line, loanId: result.loan.id });
       }
       setNotice(
-        `Issued ${issued.length} ${issued.length === 1 ? 'book' : 'books'} to ${member.profile.fullName}: ${issued.join(', ')}.`,
+        `Issued ${issued.length} ${issued.length === 1 ? 'book' : 'books'} to ${member.profile.fullName}.`,
       );
+      printIssueReceipt(member, issued, notes);
       setCart([]);
+      setChecked([]);
+      setNotes('');
       setBook(null);
       setConfirmIssue(false);
       await loadMember(scan);
       void qc.invalidateQueries({ queryKey: ['library', 'circulation'] });
     } catch (error) {
       setNotice(
-        `${issued.length ? `Issued ${issued.join(', ')} before the next copy failed. ` : ''}${apiErrorMessage(error)}`,
+        `${issued.length ? `Issued ${issued.map((line) => line.accession).join(', ')} before the next copy failed. ` : ''}${apiErrorMessage(error)}`,
       );
-      setCart((current) => current.filter((line) => !issued.includes(line.accession)));
+      setCart((current) =>
+        current.filter((line) => !issued.some((done) => done.accession === line.accession)),
+      );
       setConfirmIssue(false);
     } finally {
       setBusy(false);
@@ -369,30 +435,44 @@ export function LibraryCirculationDesk() {
           : null
     : null;
 
+  const bookChoices =
+    bookMode === 'category'
+      ? (categoryBooks.data?.items ?? [])
+      : bookMode === 'recent'
+        ? (recentBooks.data?.items ?? [])
+        : (bookHits.data?.items ?? []);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs text-slate-500">Library / Circulation</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Library Circulation</h1>
-          <p className="text-sm text-slate-500">
-            Issue, return and renew books for library members.
-          </p>
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white">
+            <BookOpen className="h-5 w-5" />
+          </span>
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Library Circulation</h1>
+            <p className="text-sm text-slate-500">
+              Issue, return and renew books for library members.
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" asChild>
             <Link href="/admin/library/settings">
-              <Settings className="mr-1 h-4 w-4" /> Circulation Rules
+              <Settings className="mr-1 h-4 w-4" />
+              Circulation Rules
             </Link>
           </Button>
           <Button type="button" variant="outline" asChild>
             <Link href="/admin/library/settings">
-              <RotateCcw className="mr-1 h-4 w-4" /> Renewal Settings
+              <RotateCcw className="mr-1 h-4 w-4" />
+              Renewal Settings
             </Link>
           </Button>
-          <Button type="button" asChild>
+          <Button type="button" variant="outline" asChild>
             <Link href="/admin/library/members">
-              <UserPlus className="mr-1 h-4 w-4" /> Add Member
+              <UserPlus className="mr-1 h-4 w-4" />
+              Add Member
             </Link>
           </Button>
           <Button
@@ -403,67 +483,85 @@ export function LibraryCirculationDesk() {
               memberRef.current?.focus();
             }}
           >
-            <Search className="mr-1 h-4 w-4" /> Member Search
+            <Search className="mr-1 h-4 w-4" />
+            Member Search
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <Stat
           href="/admin/library/catalogue"
-          icon={<Library className="h-4 w-4" />}
+          icon={Library}
+          tone="bg-blue-50 text-blue-700"
           label="Total Books"
           value={stats?.totalCopies}
+          hint="Physical copies in library"
         />
         <Stat
           href="/admin/library/members"
-          icon={<Users className="h-4 w-4" />}
+          icon={Users}
+          tone="bg-emerald-50 text-emerald-700"
           label="Total Members"
           value={stats?.totalMembers}
+          hint="Students and staff on record"
         />
         <Stat
-          icon={<BookOpen className="h-4 w-4" />}
-          label="Issued Books"
-          value={stats?.issuedNow}
-          hint={`Today: ${stats?.issuedToday ?? 0}`}
+          icon={BookOpen}
+          tone="bg-violet-50 text-violet-700"
+          label="Issued Today"
+          value={stats?.issuedToday}
+          change={dayChange(stats?.issuedToday, stats?.issuedYesterday)}
+          hint="Books issued today"
         />
         <Stat
-          icon={<RotateCcw className="h-4 w-4" />}
+          icon={RotateCcw}
+          tone="bg-orange-50 text-orange-700"
           label="Returned Today"
           value={stats?.returnedToday}
+          change={dayChange(stats?.returnedToday, stats?.returnedYesterday)}
+          hint="Books returned today"
         />
         <button type="button" className="text-left" onClick={() => setShowOverdue((open) => !open)}>
           <Stat
-            icon={<CalendarClock className="h-4 w-4" />}
+            icon={AlertTriangle}
+            tone="bg-rose-50 text-rose-700"
             label="Overdue Books"
             value={stats?.overdueLoans}
-            warn
+            hint="Books not yet returned"
           />
         </button>
         <button type="button" className="text-left" onClick={() => setShowDueWeek((open) => !open)}>
           <Stat
-            icon={<CalendarClock className="h-4 w-4" />}
+            icon={Calendar}
+            tone="bg-sky-50 text-sky-700"
             label="Due This Week"
             value={stats?.dueThisWeek}
+            hint="Books due in the next 7 days"
           />
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 md:grid-cols-4">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={
-              item.id === tab
-                ? 'rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white'
-                : 'rounded-lg px-3 py-2 text-sm text-slate-600'
-            }
-            onClick={() => setTab(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        {TABS.map((item) => {
+          const Icon = item.icon;
+          const active = item.id === tab;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={
+                active
+                  ? 'flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-sm font-medium text-white shadow-sm'
+                  : 'flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-600'
+              }
+              onClick={() => setTab(item.id)}
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </button>
+          );
+        })}
       </div>
 
       {notice ? (
@@ -479,8 +577,33 @@ export function LibraryCirculationDesk() {
       {tab === 'issue' ? (
         <div className="space-y-4">
           <div className="grid gap-4 xl:grid-cols-2">
-            <section className="rounded-xl border bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold">1. Select Member</h2>
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="font-semibold text-slate-900">1. Select Member</h2>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(
+                  [
+                    ['scan', 'Scan Member Card'],
+                    ['search', 'Search Member'],
+                    ['quick', 'Quick Member'],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={
+                      memberMode === id
+                        ? 'rounded-lg bg-blue-600 px-3 py-1.5 text-xs text-white'
+                        : 'rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600'
+                    }
+                    onClick={() => {
+                      setMemberMode(id);
+                      memberRef.current?.focus();
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <div className="mt-3 flex gap-2">
                 <Input
                   ref={memberRef}
@@ -518,9 +641,41 @@ export function LibraryCirculationDesk() {
               {member ? (
                 <MemberCard member={member} />
               ) : (
-                <p className="mt-4 text-sm text-slate-500">
-                  Scan a card or search to load a member.
-                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_0.8fr]">
+                  <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                    <Users className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+                    No member selected
+                    <p className="mt-1 text-xs">Scan a card or search to load member details.</p>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase text-slate-400">
+                      Recent members
+                    </p>
+                    {recentMembers.length ? (
+                      recentMembers.map((item) => (
+                        <button
+                          key={item.profile.memberId}
+                          type="button"
+                          className="mb-2 block w-full rounded-lg border border-slate-100 px-2 py-1.5 text-left text-sm hover:bg-slate-50"
+                          onClick={() =>
+                            void loadMember(
+                              item.profile.registrationNumber || item.profile.memberId,
+                            )
+                          }
+                        >
+                          <span className="font-medium">{item.profile.fullName}</span>
+                          <span className="block text-xs text-slate-500">
+                            {item.profile.registrationNumber || item.profile.memberType}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400">
+                        Members you open in this session appear here.
+                      </p>
+                    )}
+                  </div>
+                </div>
               )}
               {blockReason ? (
                 <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -528,8 +683,54 @@ export function LibraryCirculationDesk() {
                 </p>
               ) : null}
             </section>
-            <section className="rounded-xl border bg-white p-4 shadow-sm">
-              <h2 className="text-sm font-semibold">2. Select Book</h2>
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="font-semibold text-slate-900">2. Select Book</h2>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(
+                  [
+                    ['scan', 'Scan Barcode'],
+                    ['search', 'Search Catalogue'],
+                    ['category', 'Browse by Category'],
+                    ['recent', 'Recently Added'],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={
+                      bookMode === id
+                        ? 'rounded-lg bg-blue-600 px-3 py-1.5 text-xs text-white'
+                        : 'rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600'
+                    }
+                    onClick={() => {
+                      setBookMode(id);
+                      if (id === 'scan' || id === 'search') bookRef.current?.focus();
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {bookMode === 'category' ? (
+                <select
+                  className="mt-3 h-10 w-full rounded-md border px-3 text-sm"
+                  aria-label="Category"
+                  value={categoryId}
+                  onChange={(event) => setCategoryId(event.target.value)}
+                >
+                  <option value="">Select a category</option>
+                  {(categories.data ?? []).map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              {bookMode === 'recent' ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Latest accession numbers on record. Acquisition date is not used.
+                </p>
+              ) : null}
               <div className="mt-3 flex gap-2">
                 <Input
                   ref={bookRef}
@@ -547,9 +748,9 @@ export function LibraryCirculationDesk() {
                   Search
                 </Button>
               </div>
-              {(bookHits.data?.items ?? []).length && !book ? (
+              {bookChoices.length && !book ? (
                 <ul className="mt-2 divide-y rounded-lg border text-sm">
-                  {bookHits.data?.items.map((item) => (
+                  {bookChoices.map((item) => (
                     <li key={item.id}>
                       <button
                         type="button"
@@ -590,51 +791,102 @@ export function LibraryCirculationDesk() {
               </div>
             </section>
           </div>
-          <section className="rounded-xl border bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">3. Books to Issue</h2>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setCart([])}>
-                Clear selected books
+              <h2 className="font-semibold text-slate-900">3. Books to Issue</h2>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setCart((current) => current.filter((line) => !checked.includes(line.barcode)))
+                }
+              >
+                Clear Selected
               </Button>
             </div>
-            <table className="mt-3 w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="py-2">#</th>
-                  <th>Accession no.</th>
-                  <th>Book title</th>
-                  <th>Due date</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {cart.map((line, index) => (
-                  <tr key={line.barcode} className="border-t">
-                    <td className="py-2">{index + 1}</td>
-                    <td className="font-mono text-xs">{line.accession}</td>
-                    <td>{line.title}</td>
-                    <td>{fmtDate(line.dueAt)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="text-red-600"
-                        onClick={() =>
-                          setCart((current) =>
-                            current.filter((item) => item.barcode !== line.barcode),
-                          )
-                        }
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!cart.length ? (
-              <p className="py-4 text-sm text-slate-500">No books selected.</p>
-            ) : null}
-            <div className="mt-4 flex justify-end">
+            {cart.length ? (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="text-xs text-slate-500">
+                    <tr>
+                      {[
+                        '',
+                        '#',
+                        'Accession No.',
+                        'Book Title',
+                        'Author',
+                        'Category',
+                        'Due Date',
+                        'Actions',
+                      ].map((header) => (
+                        <th key={header || 'check'} className="py-2 pr-3 font-medium">
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cart.map((line, index) => (
+                      <tr key={line.barcode} className="border-t">
+                        <td className="py-2">
+                          <input
+                            type="checkbox"
+                            checked={checked.includes(line.barcode)}
+                            onChange={(event) =>
+                              setChecked((current) =>
+                                event.target.checked
+                                  ? [...current, line.barcode]
+                                  : current.filter((id) => id !== line.barcode),
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="py-2">{index + 1}</td>
+                        <td className="py-2 font-mono text-xs">{line.accession}</td>
+                        <td className="py-2">{line.title}</td>
+                        <td className="py-2">{line.author || '—'}</td>
+                        <td className="py-2">{line.category || '—'}</td>
+                        <td className="py-2">{fmtDate(line.dueAt)}</td>
+                        <td className="py-2">
+                          <button
+                            type="button"
+                            className="text-rose-600"
+                            onClick={() =>
+                              setCart((current) =>
+                                current.filter((item) => item.barcode !== line.barcode),
+                              )
+                            }
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="py-10 text-center text-sm text-slate-500">
+                <Library className="mx-auto mb-2 h-10 w-10 text-slate-300" />
+                No books selected
+                <p className="mt-1">Search and add books to the issue list.</p>
+              </div>
+            )}
+            <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t pt-4">
+              <label className="block min-w-[240px] flex-1 text-sm">
+                <span className="text-slate-500">Issue notes (optional)</span>
+                <Input
+                  className="mt-1"
+                  placeholder="Shown on the printed receipt. Not stored on the loan."
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                />
+              </label>
+              <div className="text-sm text-slate-600">
+                <p className="font-medium">Due date</p>
+                <p>{cart[0] ? fmtDate(cart[0].dueAt) : 'Auto, from the member loan period'}</p>
+              </div>
               <Button
                 type="button"
                 disabled={!cart.length || Boolean(blockReason) || busy}
@@ -791,10 +1043,41 @@ export function LibraryCirculationDesk() {
               <Button
                 type="button"
                 disabled={!renewPreview.canRenew || busy}
-                onClick={() => void confirmRenew()}
+                onClick={() => setConfirmRenewOpen(true)}
               >
                 Confirm Renewal
               </Button>
+              {confirmRenewOpen ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                  <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+                    <h2 className="text-lg font-semibold">Confirm renewal</h2>
+                    <p className="mt-2 text-sm">{renewPreview.bookTitle}</p>
+                    <p className="text-sm text-slate-600">
+                      New due date {fmtDate(renewPreview.newDueAt)}. Renewal{' '}
+                      {renewPreview.renewalCount + 1} of {renewPreview.maxRenewals}.
+                    </p>
+                    <div className="mt-4 flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setConfirmRenewOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setConfirmRenewOpen(false);
+                          void confirmRenew();
+                        }}
+                      >
+                        Renew
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : (
             <p className="mt-4 text-sm text-slate-500">
@@ -873,8 +1156,10 @@ export function LibraryCirculationDesk() {
               ))}
             </ul>
             <p className="mt-3 text-sm">
-              Books after this issue: {member.borrowedCount + cart.length} of {member.maxBooks}
+              Books after this issue: {member.borrowedCount + cart.length} of {member.maxBooks}. Due
+              dates follow the member loan period.
             </p>
+            {notes ? <p className="mt-2 text-sm text-slate-600">Receipt note: {notes}</p> : null}
             <div className="mt-4 flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setConfirmIssue(false)}>
                 Cancel
@@ -890,29 +1175,68 @@ export function LibraryCirculationDesk() {
   );
 }
 
+function dayChange(current?: number, previous?: number) {
+  if (current == null || previous == null || previous <= 0) return null;
+  const value = Math.round(((current - previous) / previous) * 1000) / 10;
+  return { text: `${value > 0 ? '+' : ''}${value}%`, up: value >= 0 };
+}
+
+function printIssueReceipt(
+  member: LibraryMemberSummary,
+  lines: Array<IssueLine & { loanId: string }>,
+  notes: string,
+) {
+  const popup = window.open('', '_blank');
+  if (!popup) return;
+  const rows = lines
+    .map(
+      (line) =>
+        `<tr><td>${line.accession}</td><td>${line.title}</td><td>${line.loanId}</td><td>${fmtDate(line.dueAt)}</td></tr>`,
+    )
+    .join('');
+  popup.document.write(
+    `<!doctype html><title>Issue receipt</title><body style="font-family:sans-serif"><h1>Library issue receipt</h1><p>${member.profile.fullName} · ${member.profile.registrationNumber || member.profile.memberId}</p><table border="1" cellpadding="6"><tr><th>Accession</th><th>Title</th><th>Loan</th><th>Due</th></tr>${rows}</table>${notes ? `<p>Notes: ${notes}</p>` : ''}<script>print()</script></body>`,
+  );
+  popup.document.close();
+}
+
 function Stat({
   label,
   value,
   hint,
-  warn,
-  icon,
+  change,
+  icon: Icon,
+  tone,
   href,
 }: {
   label: string;
   value?: number;
-  hint?: string;
-  warn?: boolean;
-  icon: ReactNode;
+  hint: string;
+  change?: { text: string; up: boolean } | null;
+  icon: LucideIcon;
+  tone: string;
   href?: string;
 }) {
   const body = (
-    <div className={`rounded-xl border bg-white p-3 shadow-sm ${warn ? 'border-red-200' : ''}`}>
-      <p className="flex items-center gap-2 text-xs text-slate-500">
-        {icon}
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-semibold">{value ?? '…'}</p>
-      {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div>
+        <p className="text-sm text-slate-500">{label}</p>
+        <p className="text-2xl font-semibold text-slate-900">
+          {value ?? '—'}
+          {change ? (
+            <span
+              className={change.up ? 'ml-2 text-xs text-emerald-600' : 'ml-2 text-xs text-rose-600'}
+              title="Compared with yesterday"
+            >
+              {change.text}
+            </span>
+          ) : null}
+        </p>
+        <p className="text-xs text-slate-500">{hint}</p>
+      </div>
     </div>
   );
   return href ? <Link href={href}>{body}</Link> : body;

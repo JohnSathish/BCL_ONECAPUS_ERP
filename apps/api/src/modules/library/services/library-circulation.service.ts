@@ -531,9 +531,13 @@ export class LibraryCirculationService {
 
     const weekAhead = new Date();
     weekAhead.setDate(weekAhead.getDate() + 7);
+    const yesterdayStart = new Date(startOfDay);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
     const [
       issuedToday,
       returnedToday,
+      issuedYesterday,
+      returnedYesterday,
       renewalsToday,
       overdueLoans,
       issuedNow,
@@ -551,6 +555,15 @@ export class LibraryCirculationService {
       }),
       this.prisma.libraryLoan.count({
         where: { tenantId, returnedAt: { gte: startOfDay, lt: endOfDay } },
+      }),
+      this.prisma.libraryLoan.count({
+        where: { tenantId, issuedAt: { gte: yesterdayStart, lt: startOfDay } },
+      }),
+      this.prisma.libraryLoan.count({
+        where: {
+          tenantId,
+          returnedAt: { gte: yesterdayStart, lt: startOfDay },
+        },
       }),
       this.prisma.libraryAuditLog.count({
         where: {
@@ -600,6 +613,8 @@ export class LibraryCirculationService {
       stats: {
         issuedToday,
         returnedToday,
+        issuedYesterday,
+        returnedYesterday,
         renewalsToday,
         overdueLoans,
         issuedNow,
