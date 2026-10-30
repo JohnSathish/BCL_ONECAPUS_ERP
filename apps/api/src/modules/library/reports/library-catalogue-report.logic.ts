@@ -104,6 +104,22 @@ export const CATALOGUE_REPORTS: CatalogueReportDefinition[] = [
     formal: false,
   },
   {
+    key: 'copy-type',
+    title: 'Copy Type Collection',
+    group: 'Collection',
+    kind: 'summary',
+    sensitive: false,
+    formal: false,
+  },
+  {
+    key: 'reference-register',
+    title: 'Reference Book Register',
+    group: 'Collection',
+    kind: 'copies',
+    sensitive: false,
+    formal: false,
+  },
+  {
     key: 'unmapped',
     title: 'Books Without Department Mapping',
     group: 'Collection',

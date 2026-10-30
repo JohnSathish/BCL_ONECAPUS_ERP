@@ -181,6 +181,30 @@ export const updateLibraryBook = (id: string, payload: Record<string, unknown>) 
 export const addLibraryCopy = (payload: { bookId: string; barcode: string; copyNumber?: number }) =>
   api.post(`${base}/copies`, payload).then((r) => r.data);
 
+export const addAccessionCopies = (
+  bookId: string,
+  copies: Array<{
+    copyType: string;
+    issueAllowed: boolean;
+    location?: string;
+    condition?: string;
+    availability?: string;
+    remarks?: string;
+  }>,
+) => api.post<LibraryBook>(`${base}/books/${bookId}/copies`, { copies }).then((r) => r.data);
+
+export const updateLibraryCopyCirculation = (
+  copyId: string,
+  payload: {
+    copyType?: string;
+    issueAllowed?: boolean;
+    location?: string;
+    condition?: string;
+    status?: string;
+    remarks?: string;
+  },
+) => api.patch(`${base}/copies/${copyId}`, payload).then((r) => r.data);
+
 export const issueLibraryBook = (memberScan: string, copyBarcode: string, receiptNo?: string) =>
   api
     .post<{ loan: LibraryLoan }>(`${base}/circulation/issue`, {
@@ -1074,6 +1098,8 @@ export type LibraryBarcodeCopyRow = {
   department: string;
   category: string;
   callNumber: string;
+  copyType?: string;
+  issueAllowed?: boolean | null;
   copyStatus: string;
   printStatus: string;
   printable: boolean;

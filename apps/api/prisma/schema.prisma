@@ -10007,6 +10007,9 @@ model LibraryBookCopy {
   homeBranchCode   String?   @map("home_branch_code")
   itemTypeCode     String?   @map("item_type_code")
   copyCondition    String?   @map("copy_condition")
+  copyType         String?   @map("copy_type")
+  issueAllowed     Boolean?  @map("issue_allowed")
+  copyRemarks      String?   @map("copy_remarks")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
@@ -10023,6 +10026,7 @@ model LibraryBookCopy {
   @@unique([tenantId, accessionNumber])
   @@index([tenantId, status])
   @@index([tenantId, collectionCode])
+  @@index([tenantId, copyType])
   @@map("library_book_copies")
   @@schema("library")
 }

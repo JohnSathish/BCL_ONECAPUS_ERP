@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,8 +22,16 @@ import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import {
   createAccessionBook,
   fetchLibraryCategories,
+  fetchLibrarySettings,
   fetchNextAccessionNo,
 } from '@/services/library';
+import { AccessionCopyTable, type DraftCopy } from './library-accession-copies';
+import {
+  copyTypeForBookType,
+  mergeCopyIssue,
+  previewAccessionNumbers,
+  type CopyType,
+} from './library-copy-rules';
 import { fetchAcademicDepartments } from '@/services/organization';
 import type { LibraryBook } from '@/types/library';
 import { apiErrorMessage } from '@/utils/api-error';
@@ -110,6 +118,20 @@ function todayIso() {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+function draftCopy(copyType: CopyType = 'GENERAL'): DraftCopy {
+  return {
+    key: crypto.randomUUID(),
+    copyType,
+    issueAllowed: copyType !== 'REFERENCE' && copyType !== 'RARE' && copyType !== 'RESTRICTED',
+    location: '',
+    condition: 'NEW',
+    availability: 'RECEIVED',
+    remarks: '',
+    selected: false,
+    custom: false,
+  };
+}
+
 function blankForm(): FormState {
   const today = todayIso();
   return {
@@ -159,6 +181,7 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
   const qc = useQueryClient();
   const enabled = useAuthQueryEnabled();
   const [form, setForm] = useState<FormState>(blankForm);
+  const [rows, setRows] = useState<DraftCopy[]>(() => [draftCopy()]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState('');
   const [savedLabels, setSavedLabels] = useState<ReturnType<typeof labelsFor>>([]);
@@ -179,6 +202,21 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
     queryFn: () => fetchAcademicDepartments(),
     enabled,
   });
+  const settings = useQuery({
+    queryKey: ['library', 'settings'],
+    queryFn: fetchLibrarySettings,
+    enabled,
+  });
+  const rules = useMemo(
+    () => mergeCopyIssue(settings.data?.circulationPolicy?.copyIssue),
+    [settings.data?.circulationPolicy?.copyIssue],
+  );
+
+  useEffect(() => {
+    setRows((current) =>
+      current.map((row) => (row.custom ? row : { ...row, issueAllowed: rules[row.copyType] })),
+    );
+  }, [rules]);
 
   const copies = Math.max(0, Number(form.totalCopies) || 0);
   const price = Number(form.price);
@@ -202,6 +240,50 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function freshCopy(copyType?: CopyType): DraftCopy {
+    const type = copyType ?? copyTypeForBookType(form.bookType);
+    return {
+      ...draftCopy(type),
+      issueAllowed: rules[type],
+      location: form.location,
+      condition: form.condition,
+      availability: form.availability,
+    };
+  }
+
+  function setCopyCount(raw: string) {
+    set('totalCopies', raw);
+    const count = Number(raw);
+    if (!Number.isInteger(count) || count < 1 || count > 100) return;
+    setRows((current) => {
+      if (count === current.length) return current;
+      if (count < current.length) return current.slice(0, count);
+      return [...current, ...Array.from({ length: count - current.length }, () => freshCopy())];
+    });
+  }
+
+  function setBookType(value: string) {
+    set('bookType', value);
+    const type = copyTypeForBookType(value);
+    setRows((current) =>
+      current.map((row) =>
+        row.custom ? row : { ...row, copyType: type, issueAllowed: rules[type] },
+      ),
+    );
+  }
+
+  function setShared(key: 'location' | 'condition' | 'availability', value: string) {
+    set(key, value);
+    setRows((current) => current.map((row) => (row.custom ? row : { ...row, [key]: value })));
+  }
+
+  function removeRow(key: string) {
+    const next = rows.filter((row) => row.key !== key);
+    const kept = next.length ? next : [freshCopy()];
+    setRows(kept);
+    set('totalCopies', String(kept.length));
+  }
+
   function validate() {
     const next: Record<string, string> = {};
     if (!form.title.trim()) next.title = 'Book title is required.';
@@ -210,7 +292,7 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
     if (!form.bookType) next.bookType = 'Choose a book type.';
     if (!form.departmentId) next.departmentId = 'Choose a department.';
     if (!form.dateReceived) next.dateReceived = 'Date received is required.';
-    if (!Number.isInteger(copies) || copies < 1 || copies > 100) {
+    if (!Number.isInteger(copies) || copies < 1 || copies > 100 || rows.length !== copies) {
       next.totalCopies = 'Enter between 1 and 100 copies.';
     }
     if (form.price.trim() && !Number.isFinite(price)) next.price = 'Enter a valid price.';
@@ -239,7 +321,15 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
         classificationNumber: form.classificationNumber.trim() || undefined,
         location: form.location.trim() || undefined,
         subjectClassification: form.subjectClassification.trim() || undefined,
-        totalCopies: copies,
+        totalCopies: rows.length,
+        copies: rows.map((row) => ({
+          copyType: row.copyType,
+          issueAllowed: row.issueAllowed,
+          location: row.location.trim() || undefined,
+          condition: row.condition,
+          availability: row.availability,
+          remarks: row.remarks.trim() || undefined,
+        })),
         dateReceived: form.dateReceived,
         condition: form.condition,
         availability: form.availability,
@@ -273,6 +363,16 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
       if (mode === 'print' && popup) writeLibraryBarcodeLabels(popup, labels);
       else popup?.close();
       if (mode === 'another') {
+        const type = copyTypeForBookType(form.bookType);
+        setRows([
+          {
+            ...draftCopy(type),
+            issueAllowed: rules[type],
+            location: form.location,
+            condition: form.condition,
+            availability: form.availability,
+          },
+        ]);
         setForm((current) => ({
           ...blankForm(),
           departmentId: current.departmentId,
@@ -280,6 +380,9 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
           categoryId: current.categoryId,
           bookType: current.bookType,
           language: current.language,
+          location: current.location,
+          condition: current.condition,
+          availability: current.availability,
           acquisitionType: current.acquisitionType,
           fundingSource: current.fundingSource,
         }));
@@ -437,11 +540,7 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
             </Select>
           </Field>
           <Field label="Book Type" required error={errors.bookType}>
-            <Select
-              value={form.bookType}
-              placeholder="Select book type"
-              onChange={(value) => set('bookType', value)}
-            >
+            <Select value={form.bookType} placeholder="Select book type" onChange={setBookType}>
               {BOOK_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
@@ -490,7 +589,7 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
             <Input
               value={form.location}
               placeholder="e.g. Rack A - Shelf 3"
-              onChange={(e) => set('location', e.target.value)}
+              onChange={(e) => setShared('location', e.target.value)}
             />
           </Field>
           <Field label="Subject Classification">
@@ -542,7 +641,7 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
               min={1}
               max={100}
               value={form.totalCopies}
-              onChange={(e) => set('totalCopies', e.target.value)}
+              onChange={(e) => setCopyCount(e.target.value)}
             />
           </Field>
           <Field label="Date Received" required error={errors.dateReceived}>
@@ -553,7 +652,7 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
             />
           </Field>
           <Field label="Book Condition">
-            <Select value={form.condition} onChange={(value) => set('condition', value)}>
+            <Select value={form.condition} onChange={(value) => setShared('condition', value)}>
               {CONDITIONS.map((condition) => (
                 <option key={condition.value} value={condition.value}>
                   {condition.label}
@@ -562,7 +661,10 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
             </Select>
           </Field>
           <Field label="Availability Status">
-            <Select value={form.availability} onChange={(value) => set('availability', value)}>
+            <Select
+              value={form.availability}
+              onChange={(value) => setShared('availability', value)}
+            >
               {AVAILABILITY.map((status) => (
                 <option key={status.value} value={status.value}>
                   {status.label}
@@ -574,10 +676,27 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
         <div className="flex gap-3 rounded-lg border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
           <Info className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
-            Each copy will be created with a unique accession number and barcode. If you enter
-            multiple copies, the system will generate individual accession numbers for each copy.
+            Each copy will be created with a unique accession number and barcode. Reference, rare,
+            and restricted copies can be blocked while other copies of the same title stay issuable.
           </p>
         </div>
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setCopyCount(String(Math.min(100, rows.length + 1)))}
+          >
+            <Plus className="mr-1 h-4 w-4" />
+            Add copy
+          </Button>
+        </div>
+        <AccessionCopyTable
+          rows={rows}
+          numbers={previewAccessionNumbers(nextAcc.data?.accessionNo ?? '', rows.length)}
+          issueFor={(type) => rules[type]}
+          onChange={setRows}
+          onRemove={removeRow}
+        />
       </Section>
 
       <Section
@@ -663,6 +782,7 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
           variant="ghost"
           onClick={() => {
             setForm(blankForm());
+            setRows([draftCopy()]);
             setErrors({});
             setNotice('');
             setSavedLabels([]);

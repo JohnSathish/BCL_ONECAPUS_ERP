@@ -18,9 +18,10 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import type {
-  CirculationPolicy,
-  FinePolicy,
+import {
+  COPY_TYPES,
+  type CirculationPolicy,
+  type FinePolicy,
 } from '../domain/library-policy.types';
 export class ScanAccessDto {
   @IsString()
@@ -1243,6 +1244,78 @@ export class MemberBulkDto {
   expiresAt?: string | null;
 }
 
+const ACCESSION_AVAILABILITY = [
+  'RECEIVED',
+  'CATALOGUED',
+  'ON_SHELF',
+  'ISSUED',
+  'LOST',
+  'DAMAGED',
+  'WITHDRAWN',
+] as const;
+
+export class AccessionCopyLineDto {
+  @IsIn(COPY_TYPES)
+  copyType!: (typeof COPY_TYPES)[number];
+
+  @IsBoolean()
+  issueAllowed!: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  location?: string;
+
+  @IsOptional()
+  @IsIn(['NEW', 'GOOD', 'FAIR', 'DAMAGED'])
+  condition?: string;
+
+  @IsOptional()
+  @IsIn(ACCESSION_AVAILABILITY)
+  availability?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  remarks?: string;
+}
+
+export class AddAccessionCopiesDto {
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => AccessionCopyLineDto)
+  copies!: AccessionCopyLineDto[];
+}
+
+export class UpdateCopyCirculationDto {
+  @IsOptional()
+  @IsIn(COPY_TYPES)
+  copyType?: (typeof COPY_TYPES)[number];
+
+  @IsOptional()
+  @IsBoolean()
+  issueAllowed?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  location?: string;
+
+  @IsOptional()
+  @IsIn(['NEW', 'GOOD', 'FAIR', 'DAMAGED'])
+  condition?: string;
+
+  @IsOptional()
+  @IsIn(['AVAILABLE', 'PROCESSING', 'LOST', 'DAMAGED', 'WITHDRAWN'])
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  remarks?: string;
+}
+
 export class CreateAccessionBookDto {
   @IsString()
   @IsNotEmpty()
@@ -1318,16 +1391,15 @@ export class CreateAccessionBookDto {
   condition?: string;
 
   @IsOptional()
-  @IsIn([
-    'RECEIVED',
-    'CATALOGUED',
-    'ON_SHELF',
-    'ISSUED',
-    'LOST',
-    'DAMAGED',
-    'WITHDRAWN',
-  ])
+  @IsIn(ACCESSION_AVAILABILITY)
   availability?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => AccessionCopyLineDto)
+  copies?: AccessionCopyLineDto[];
 
   @IsIn(['PURCHASE', 'DONATION', 'GIFT', 'OTHER'])
   acquisitionType!: string;

@@ -10,6 +10,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import type { IssueBookDto, ReturnBookDto } from '../dto/library.dto';
 import { mergeCirculationPolicy } from '../domain/library-policy.types';
+import { resolveCopyIssue } from '../domain/library-copy-issue.logic';
 import { calculateOverdueFine } from '../utils/library-fine.util';
 import { computeReadingScore } from '../domain/library-reading-score';
 import { LibraryCatalogueService } from './library-catalogue.service';
@@ -187,20 +188,27 @@ export class LibraryCirculationService {
     const available = await this.prisma.libraryBookCopy.count({
       where: { tenantId, bookId: copy.bookId, status: 'AVAILABLE' },
     });
-    const policies = await this.policy.getPolicies(tenantId);
-    const loanDays = this.policy.resolveLoanDays(
-      policies.circulation,
+    const { decision, policy } = await this.copyDecision(tenantId, copy);
+    let loanDays = this.policy.resolveLoanDays(
+      policy,
       'STUDENT',
-      copy.book.category?.code,
+      loanCategory(copy, decision.copyType),
     );
+    if (decision.allowed && loanDays < 1) {
+      loanDays = this.policy.resolveLoanDays(policy, 'STUDENT', null);
+    }
 
     return {
+      issueAllowed: decision.allowed,
+      issueMessage: decision.message,
       copy: {
         id: copy.id,
         barcode: copy.barcode,
         accessionNumber: copy.accessionNumber,
         status: copy.status,
         copyNumber: copy.copyNumber,
+        copyType: decision.copyType ?? copy.copyType ?? null,
+        issueAllowed: copy.issueAllowed,
       },
       book: {
         id: copy.book.id,
@@ -234,18 +242,27 @@ export class LibraryCirculationService {
     const barcode = this.resolveCopyBarcode(copyBarcode);
     const copy = await this.catalogue.findCopyByBarcode(tenantId, barcode);
     const rules = await this.policy.loadBorrowRules(tenantId, profile);
-    await this.policy.validateIssue(
-      tenantId,
-      profile,
-      copy.book.category?.code,
-    );
-    const policies = await this.policy.getPolicies(tenantId);
-    const loanDays = this.policy.resolveLoanDays(
-      policies.circulation,
+    const { decision, policy } = await this.copyDecision(tenantId, copy);
+    if (!decision.allowed) {
+      throw new BadRequestException(
+        decision.message ?? 'Issue is not permitted for this copy.',
+      );
+    }
+    await this.policy.validateIssue(tenantId, profile, null);
+    let loanDays = this.policy.resolveLoanDays(
+      policy,
       profile.memberType,
-      copy.book.category?.code,
+      loanCategory(copy, decision.copyType),
       rules.loanDays,
     );
+    if (loanDays < 1) {
+      loanDays = this.policy.resolveLoanDays(
+        policy,
+        profile.memberType,
+        null,
+        rules.loanDays,
+      );
+    }
     const dueAt = this.policy.computeDueDate(loanDays);
     const settings = await this.settings.getSettings(tenantId);
     return {
@@ -295,19 +312,28 @@ export class LibraryCirculationService {
       throw new BadRequestException(`Copy is ${copy.status}`);
     }
 
-    await this.policy.validateIssue(
-      user.tid,
-      profile,
-      copy.book.category?.code,
-    );
+    const { decision, policy } = await this.copyDecision(user.tid, copy);
+    if (!decision.allowed) {
+      throw new BadRequestException(
+        decision.message ?? 'Issue is not permitted for this copy.',
+      );
+    }
+    await this.policy.validateIssue(user.tid, profile, null);
 
-    const policies = await this.policy.getPolicies(user.tid);
-    const loanDays = this.policy.resolveLoanDays(
-      policies.circulation,
+    let loanDays = this.policy.resolveLoanDays(
+      policy,
       profile.memberType,
-      copy.book.category?.code,
+      loanCategory(copy, decision.copyType),
       issueRules.loanDays,
     );
+    if (loanDays < 1) {
+      loanDays = this.policy.resolveLoanDays(
+        policy,
+        profile.memberType,
+        null,
+        issueRules.loanDays,
+      );
+    }
     const dueAt = this.policy.computeDueDate(loanDays);
 
     const loan = await this.prisma.$transaction(async (tx) => {
@@ -474,12 +500,20 @@ export class LibraryCirculationService {
       );
     }
 
-    const loanDays = this.policy.resolveLoanDays(
+    let loanDays = this.policy.resolveLoanDays(
       policies,
       loan.memberType,
-      copy.book.category?.code,
+      loanCategory(copy, copy.copyType),
       renewRules.loanDays,
     );
+    if (copy.issueAllowed === true && loanDays < 1) {
+      loanDays = this.policy.resolveLoanDays(
+        policies,
+        loan.memberType,
+        null,
+        renewRules.loanDays,
+      );
+    }
     const base = loan.dueAt > now ? loan.dueAt : now;
     const newDue = this.policy.computeDueDate(loanDays, base);
 
@@ -843,12 +877,20 @@ export class LibraryCirculationService {
     );
     const now = new Date();
     const overdueFine = calculateOverdueFine(loan.dueAt, now, settings);
-    const loanDays = this.policy.resolveLoanDays(
+    let loanDays = this.policy.resolveLoanDays(
       policies,
       loan.memberType,
-      copy.book.category?.code,
+      loanCategory(copy, copy.copyType),
       renewRules.loanDays,
     );
+    if (copy.issueAllowed === true && loanDays < 1) {
+      loanDays = this.policy.resolveLoanDays(
+        policies,
+        loan.memberType,
+        null,
+        renewRules.loanDays,
+      );
+    }
     const base = loan.dueAt > now ? loan.dueAt : now;
     const newDueAt = this.policy.computeDueDate(loanDays, base);
 
@@ -877,4 +919,42 @@ export class LibraryCirculationService {
       blockReason,
     };
   }
+
+  private async copyDecision(
+    tenantId: string,
+    copy: {
+      copyType: string | null;
+      issueAllowed: boolean | null;
+      book: { category: { code: string } | null };
+    },
+  ) {
+    const settings = await this.settings.getSettings(tenantId);
+    const policy = mergeCirculationPolicy(settings.circulationPolicy);
+    const decision = resolveCopyIssue({
+      copyType: copy.copyType,
+      issueAllowed: copy.issueAllowed,
+      categoryCode: copy.book.category?.code,
+      copyIssue: policy.copyIssue,
+      referenceAllow: policy.reference.allowIssue,
+      rareAllow: policy.rare.allowIssue,
+    });
+    return { decision, policy };
+  }
+}
+
+function loanCategory(
+  copy: {
+    issueAllowed: boolean | null;
+    copyType: string | null;
+    book: { category: { code: string } | null };
+  },
+  decisionType: string | null,
+) {
+  const type = decisionType ?? copy.copyType;
+  if (copy.issueAllowed != null || type) {
+    if (type === 'REFERENCE') return 'REFERENCE';
+    if (type === 'RARE') return 'RARE';
+    return null;
+  }
+  return copy.book.category?.code ?? null;
 }

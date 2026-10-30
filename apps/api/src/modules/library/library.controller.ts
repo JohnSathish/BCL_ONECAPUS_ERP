@@ -37,6 +37,7 @@ import {
   CopyIncidentQueryDto,
   IncidentCopyQueryDto,
   ReplaceByBarcodeDto,
+  AddAccessionCopiesDto,
   CreateAccessionBookDto,
   CreateBookCopyDto,
   CreateBookDto,
@@ -77,6 +78,7 @@ import {
   ReturnBookDto,
   ScanAccessDto,
   UpdateAccessionWorkflowDto,
+  UpdateCopyCirculationDto,
   UpdateBookDto,
   UpdateDigitalAssetDto,
   UpdateReadingZoneDto,
@@ -683,6 +685,26 @@ export class LibraryController {
     @Body() dto: MemberPrivilegeDto,
   ) {
     return this.members.updatePrivileges(user.tid, memberId, user.sub, dto);
+  }
+
+  @Post('books/:id/copies')
+  @RequirePermissions('library:manage')
+  addAccessionCopies(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: AddAccessionCopiesDto,
+  ) {
+    return this.catalogue.addAccessionCopies(user.tid, id, dto);
+  }
+
+  @Patch('copies/:id')
+  @RequirePermissions('library:manage')
+  updateCopyCirculation(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateCopyCirculationDto,
+  ) {
+    return this.catalogue.updateCopyCirculation(user.tid, id, dto);
   }
 
   @Post('copies')

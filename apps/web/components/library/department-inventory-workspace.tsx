@@ -549,6 +549,8 @@ function BookLine({
     accession: string;
     displayStatus: string;
     callNumber: string;
+    copyType?: string;
+    issue?: string;
     collectionCode: string;
     shelvingLocation: string;
   }[];
@@ -570,6 +572,8 @@ function BookLine({
             <tr className="text-slate-500">
               <th>Accession</th>
               <th>Status</th>
+              <th>Copy type</th>
+              <th>Issue</th>
               <th>Call number</th>
               <th>Collection</th>
               <th>Shelf</th>
@@ -580,6 +584,8 @@ function BookLine({
               <tr key={copy.id} className="border-t">
                 <td className="py-1 font-mono">{copy.accession || '—'}</td>
                 <td>{copy.displayStatus}</td>
+                <td>{copy.copyType || '—'}</td>
+                <td>{copy.issue || '—'}</td>
                 <td>{copy.callNumber || '—'}</td>
                 <td>{copy.collectionCode || '—'}</td>
                 <td>{copy.shelvingLocation || '—'}</td>

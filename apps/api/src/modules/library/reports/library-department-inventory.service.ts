@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import type { CatalogueReportQueryDto } from '../dto/catalogue-report.dto';
+import { copyTypeLabel, isCopyType } from '../domain/library-copy-issue.logic';
 
 type CountRow = {
   titles: number;
@@ -88,6 +89,9 @@ export class LibraryDepartmentInventoryService {
           COUNT(c.id) FILTER (WHERE c.status IN ('LOST', 'DAMAGED'))::int AS "lostDamaged",
           MIN(NULLIF(BTRIM(c.call_number), '')) AS "callNumber",
           CASE
+            WHEN COUNT(DISTINCT NULLIF(BTRIM(c.copy_type), '')) = 1
+              THEN MIN(NULLIF(BTRIM(c.copy_type), ''))
+            WHEN COUNT(DISTINCT NULLIF(BTRIM(c.copy_type), '')) > 1 THEN 'Mixed'
             WHEN COUNT(DISTINCT NULLIF(BTRIM(c.collection_code), '')) = 1
               THEN MIN(NULLIF(BTRIM(c.collection_code), ''))
             WHEN COUNT(DISTINCT NULLIF(BTRIM(c.collection_code), '')) > 1 THEN 'Mixed'
@@ -119,6 +123,8 @@ export class LibraryDepartmentInventoryService {
         c.barcode,
         c.status,
         COALESCE(c.call_number, '') AS "callNumber",
+        COALESCE(c.copy_type, '') AS "copyType",
+        c.issue_allowed AS "issueAllowed",
         COALESCE(c.collection_code, '') AS "collectionCode",
         COALESCE(c.shelving_location, '') AS "shelvingLocation",
         (loan.id IS NOT NULL) AS "onLoan"
@@ -131,6 +137,13 @@ export class LibraryDepartmentInventoryService {
     `;
     return rows.map((row) => ({
       ...row,
+      copyType: labelCopyKind(row.copyType),
+      issue:
+        row.issueAllowed == null
+          ? 'Not set'
+          : row.issueAllowed
+            ? 'Allowed'
+            : 'Not allowed',
       onLoan: Boolean(row.onLoan),
       displayStatus: copyInventoryStatus(row.status, Boolean(row.onLoan)),
     }));
@@ -155,6 +168,8 @@ export class LibraryDepartmentInventoryService {
           b.title,
           COALESCE(b.author, '') AS author,
           COALESCE(b.isbn, '') AS isbn,
+          COALESCE(c.copy_type, '') AS "copyType",
+          c.issue_allowed AS "issueAllowed",
           c.status,
           (loan.id IS NOT NULL) AS "onLoan",
           COALESCE(dep.department_name, '') AS department
@@ -173,6 +188,13 @@ export class LibraryDepartmentInventoryService {
       total: Number(countRow[0]?.total ?? 0),
       rows: rows.map((row) => ({
         ...row,
+        copyType: labelCopyKind(row.copyType),
+        issue:
+          row.issueAllowed == null
+            ? 'Not set'
+            : row.issueAllowed
+              ? 'Allowed'
+              : 'Not allowed',
         onLoan: Boolean(row.onLoan),
         displayStatus: copyInventoryStatus(row.status, Boolean(row.onLoan)),
       })),
@@ -297,13 +319,24 @@ export class LibraryDepartmentInventoryService {
     const generatedBy = user.email;
     if (format === 'csv') {
       const lines = [
-        ['Accession', 'Title', 'Author', 'ISBN', 'Status', 'Department'],
+        [
+          'Accession',
+          'Title',
+          'Author',
+          'ISBN',
+          'Copy type',
+          'Issue',
+          'Status',
+          'Department',
+        ],
         ...register.rows.map((row) => [
           row.accession,
           row.title,
           row.author,
           row.isbn,
-          row.displayStatus,
+          row.copyType,
+          row.issue ?? '',
+          row.displayStatus ?? '',
           row.department,
         ]),
       ];
@@ -397,6 +430,8 @@ export class LibraryDepartmentInventoryService {
       'Title',
       'Author',
       'ISBN',
+      'Copy type',
+      'Issue',
       'Status',
       'Department',
     ]).font = {
@@ -408,6 +443,12 @@ export class LibraryDepartmentInventoryService {
         row.title,
         row.author,
         row.isbn,
+        labelCopyKind(row.copyType),
+        row.issueAllowed == null
+          ? 'Not set'
+          : row.issueAllowed
+            ? 'Allowed'
+            : 'Not allowed',
         row.displayStatus,
         row.department,
       ]);
@@ -759,6 +800,8 @@ type CopyRow = {
   barcode: string;
   status: string;
   callNumber: string;
+  copyType: string;
+  issueAllowed: boolean | null;
   collectionCode: string;
   shelvingLocation: string;
   onLoan: boolean;
@@ -769,10 +812,13 @@ type RegisterRow = {
   title: string;
   author: string;
   isbn: string;
+  copyType: string;
+  issueAllowed: boolean | null;
   status: string;
   onLoan: boolean;
   department: string;
   displayStatus?: string;
+  issue?: string;
 };
 
 type UnmappedRow = {
@@ -803,8 +849,14 @@ function numberizeBook(row: BookGroup): BookGroup {
     issued: Number(row.issued),
     lostDamaged: Number(row.lostDamaged),
     callNumber: row.callNumber ?? '',
-    collectionType: row.collectionType ?? '',
+    collectionType: labelCopyKind(row.collectionType ?? ''),
   };
+}
+
+function labelCopyKind(value: string | null | undefined) {
+  if (!value) return '';
+  if (value === 'Mixed') return 'Mixed copy types';
+  return isCopyType(value) ? copyTypeLabel(value) : value;
 }
 
 function csvCell(value: string | number) {

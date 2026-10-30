@@ -224,6 +224,7 @@ export type CirculationPolicy = {
   staff: MemberRolePolicy;
   reference: CategoryRulePolicy;
   rare: CategoryRulePolicy;
+  copyIssue?: Record<string, boolean>;
 };
 
 export type FinePolicy = {
@@ -247,12 +248,16 @@ export type LibraryMemberSummary = {
 };
 
 export type LibraryBookPreview = {
+  issueAllowed?: boolean;
+  issueMessage?: string | null;
   copy: {
     id: string;
     barcode: string;
     accessionNumber?: string | null;
     status: string;
     copyNumber: number;
+    copyType?: string | null;
+    issueAllowed?: boolean | null;
   };
   book: {
     id: string;
@@ -374,6 +379,11 @@ export type LibraryBookCopy = {
   barcode: string;
   accessionNumber?: string | null;
   status: string;
+  copyType?: string | null;
+  issueAllowed?: boolean | null;
+  shelvingLocation?: string | null;
+  copyCondition?: string | null;
+  copyRemarks?: string | null;
 };
 
 export type LibraryBook = {

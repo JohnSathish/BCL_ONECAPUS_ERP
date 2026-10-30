@@ -57,6 +57,7 @@ import type {
   LibraryReturnPreview,
 } from '@/types/library';
 import { apiErrorMessage } from '@/utils/api-error';
+import { COPY_TYPE_LABELS, type CopyType } from './library-copy-rules';
 
 type Tab = 'issue' | 'return' | 'renew' | 'history';
 type IssueLine = {
@@ -65,6 +66,7 @@ type IssueLine = {
   title: string;
   author: string;
   category: string;
+  copyType: string;
   callNumber: string;
   publisher: string;
   edition: string;
@@ -286,6 +288,10 @@ export function LibraryCirculationDesk() {
       );
       return;
     }
+    if (book.issueAllowed === false) {
+      setNotice(book.issueMessage || 'Issue is not permitted for this copy.');
+      return;
+    }
     if (cart.some((line) => line.barcode === book.copy.barcode)) {
       setNotice('That copy is already in the issue list.');
       return;
@@ -305,6 +311,7 @@ export function LibraryCirculationDesk() {
           title: book.book.title,
           author: book.book.author || '',
           category: book.book.category || '',
+          copyType: copyTypeName(book.copy.copyType),
           callNumber: book.book.callNumber || '',
           publisher: book.book.publisher || '',
           edition: book.book.edition || '',
@@ -863,14 +870,33 @@ export function LibraryCirculationDesk() {
               {bookChoices.length && !book ? (
                 <ul className="mt-2 divide-y rounded-lg border text-sm">
                   {bookChoices.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        className="w-full px-3 py-2 text-left hover:bg-slate-50"
-                        onClick={() => void loadBook(item.copies?.[0]?.barcode || item.accessionNo)}
-                      >
-                        {item.title} · {item.accessionNo}
-                      </button>
+                    <li key={item.id} className="px-3 py-2">
+                      <p className="font-medium">{item.title}</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {(item.copies?.length
+                          ? item.copies
+                          : [
+                              {
+                                id: item.id,
+                                barcode: item.accessionNo,
+                                accessionNumber: item.accessionNo,
+                                status: '',
+                                copyType: null,
+                              },
+                            ]
+                        ).map((copy) => (
+                          <button
+                            key={copy.id}
+                            type="button"
+                            className="rounded-full border px-2 py-1 text-xs hover:bg-slate-50"
+                            onClick={() => void loadBook(copy.barcode)}
+                          >
+                            {copy.accessionNumber || copy.barcode}
+                            {copy.copyType ? ` · ${copyTypeName(copy.copyType)}` : ''} ·{' '}
+                            {copy.status || 'Open'}
+                          </button>
+                        ))}
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -895,7 +921,12 @@ export function LibraryCirculationDesk() {
                 </Button>
                 <Button
                   type="button"
-                  disabled={!book || book.copy.status !== 'AVAILABLE' || Boolean(blockReason)}
+                  disabled={
+                    !book ||
+                    book.copy.status !== 'AVAILABLE' ||
+                    book.issueAllowed === false ||
+                    Boolean(blockReason)
+                  }
                   onClick={() => void addBook()}
                 >
                   Add to Issue List
@@ -1434,6 +1465,7 @@ function ConfirmIssueDialog({
                       <Field label="Publisher" value={line.publisher || '—'} />
                       <Field label="Call No." value={line.callNumber || '—'} />
                       <Field label="Publication Year" value={line.publicationYear || '—'} />
+                      <Field label="Copy type" value={line.copyType || '—'} />
                       <Field label="Book Category" value={line.category || '—'} />
                       <Field label="Edition" value={line.edition || '—'} />
                     </dl>
@@ -1664,6 +1696,11 @@ function MemberCard({ member }: { member: LibraryMemberSummary }) {
   );
 }
 
+function copyTypeName(type?: string | null) {
+  if (!type) return 'Copy type not set';
+  return COPY_TYPE_LABELS[type as CopyType] ?? type;
+}
+
 function BookCard({ book }: { book: LibraryBookPreview }) {
   const available = book.copy.status === 'AVAILABLE';
   return (
@@ -1675,6 +1712,13 @@ function BookCard({ book }: { book: LibraryBookPreview }) {
           <p>
             Accession {book.book.accessionNo} · Barcode {book.copy.barcode}
           </p>
+          <p>
+            {copyTypeName(book.copy.copyType)} ·{' '}
+            {book.issueAllowed === false ? 'Issue not allowed' : 'Issue allowed'}
+          </p>
+          {book.issueAllowed === false && book.issueMessage ? (
+            <p className="mt-1 font-medium text-rose-700">{book.issueMessage}</p>
+          ) : null}
           <p>
             Call no. {book.book.callNumber || 'Not recorded'} ·{' '}
             {book.book.category || 'No category'}

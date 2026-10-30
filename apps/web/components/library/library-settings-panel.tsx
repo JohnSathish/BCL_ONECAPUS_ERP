@@ -26,6 +26,12 @@ import type {
   MemberRolePolicy,
 } from '@/types/library';
 import { apiErrorMessage } from '@/utils/api-error';
+import {
+  COPY_TYPES,
+  COPY_TYPE_LABELS,
+  DEFAULT_COPY_ISSUE,
+  mergeCopyIssue,
+} from './library-copy-rules';
 
 const TABS = [
   ['general', 'General'],
@@ -60,6 +66,7 @@ const DEFAULT_CIRCULATION: CirculationPolicy = {
   staff: { loanDays: 21, maxBooks: 5, maxRenewals: 1 },
   reference: { loanDays: 0, maxBooks: 0, allowIssue: false },
   rare: { loanDays: 7, maxBooks: 1, allowIssue: true, requireApproval: true },
+  copyIssue: { ...DEFAULT_COPY_ISSUE },
 };
 
 const DEFAULT_FINE: FinePolicy = {
@@ -90,7 +97,10 @@ function decimalInput(value: string | undefined | null): string {
 
 function mergePolicy(raw?: CirculationPolicy): CirculationPolicy {
   if (!raw) return DEFAULT_CIRCULATION;
-  const role = (key: keyof CirculationPolicy, base: MemberRolePolicy | CategoryRulePolicy) => {
+  const role = (
+    key: 'student' | 'faculty' | 'researchScholar' | 'staff' | 'reference' | 'rare',
+    base: MemberRolePolicy | CategoryRulePolicy,
+  ) => {
     const patch = raw[key];
     if (!patch || typeof patch !== 'object') return base;
     return { ...base, ...patch };
@@ -105,6 +115,7 @@ function mergePolicy(raw?: CirculationPolicy): CirculationPolicy {
     staff: role('staff', DEFAULT_CIRCULATION.staff) as MemberRolePolicy,
     reference: role('reference', DEFAULT_CIRCULATION.reference) as CategoryRulePolicy,
     rare: role('rare', DEFAULT_CIRCULATION.rare) as CategoryRulePolicy,
+    copyIssue: mergeCopyIssue(raw.copyIssue),
   };
 }
 
@@ -519,83 +530,109 @@ export function LibrarySettingsPanel() {
       ) : null}
 
       {tab === 'categories' ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card
-            title="Reference collection"
-            hint="The issue desk blocks a reference copy when borrowing is off. Other catalogue categories keep their own records."
-          >
-            <Toggle
-              label="Block issue for reference books"
-              checked={!circulation.reference.allowIssue}
-              onChange={(checked) =>
-                setCirculation({
-                  ...circulation,
-                  reference: { ...circulation.reference, allowIssue: !checked },
-                })
-              }
-            />
-            {circulation.reference.allowIssue ? (
-              <Field label="Reference loan days">
+        <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card
+              title="Reference collection"
+              hint="The issue desk blocks a reference copy when borrowing is off. Other catalogue categories keep their own records."
+            >
+              <Toggle
+                label="Block issue for reference books"
+                checked={!circulation.reference.allowIssue}
+                onChange={(checked) =>
+                  setCirculation({
+                    ...circulation,
+                    reference: { ...circulation.reference, allowIssue: !checked },
+                  })
+                }
+              />
+              {circulation.reference.allowIssue ? (
+                <Field label="Reference loan days">
+                  <Input
+                    type="number"
+                    min={1}
+                    className="w-28"
+                    value={circulation.reference.loanDays}
+                    onChange={(event) =>
+                      setCirculation({
+                        ...circulation,
+                        reference: {
+                          ...circulation.reference,
+                          loanDays: safeNum(event.target.value, 1),
+                        },
+                      })
+                    }
+                  />
+                </Field>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  Reference copies stay in the library for consultation.
+                </p>
+              )}
+            </Card>
+            <Card
+              title="Rare collections"
+              hint="Borrowing is blocked only when this switch is off. The approval flag is stored with the rule."
+            >
+              <Toggle
+                label="Allow rare books to be issued"
+                checked={circulation.rare.allowIssue}
+                onChange={(checked) =>
+                  setCirculation({
+                    ...circulation,
+                    rare: { ...circulation.rare, allowIssue: checked },
+                  })
+                }
+              />
+              <Field label="Loan days">
                 <Input
                   type="number"
-                  min={1}
+                  min={0}
                   className="w-28"
-                  value={circulation.reference.loanDays}
+                  value={circulation.rare.loanDays}
                   onChange={(event) =>
                     setCirculation({
                       ...circulation,
-                      reference: {
-                        ...circulation.reference,
-                        loanDays: safeNum(event.target.value, 1),
-                      },
+                      rare: { ...circulation.rare, loanDays: safeNum(event.target.value) },
                     })
                   }
                 />
               </Field>
-            ) : (
-              <p className="text-sm text-slate-500">
-                Reference copies stay in the library for consultation.
-              </p>
-            )}
-          </Card>
-          <Card
-            title="Rare collections"
-            hint="Borrowing is blocked only when this switch is off. The approval flag is stored with the rule."
-          >
-            <Toggle
-              label="Allow rare books to be issued"
-              checked={circulation.rare.allowIssue}
-              onChange={(checked) =>
-                setCirculation({
-                  ...circulation,
-                  rare: { ...circulation.rare, allowIssue: checked },
-                })
-              }
-            />
-            <Field label="Loan days">
-              <Input
-                type="number"
-                min={0}
-                className="w-28"
-                value={circulation.rare.loanDays}
-                onChange={(event) =>
+              <Toggle
+                label="Mark rare issues as requiring approval"
+                checked={Boolean(circulation.rare.requireApproval)}
+                onChange={(checked) =>
                   setCirculation({
                     ...circulation,
-                    rare: { ...circulation.rare, loanDays: safeNum(event.target.value) },
+                    rare: { ...circulation.rare, requireApproval: checked },
                   })
                 }
               />
-            </Field>
-            <Toggle
-              label="Mark rare issues as requiring approval"
-              checked={Boolean(circulation.rare.requireApproval)}
-              onChange={(checked) =>
-                setCirculation({
-                  ...circulation,
-                  rare: { ...circulation.rare, requireApproval: checked },
-                })
-              }
-            />
+            </Card>
+          </div>
+          <Card
+            title="Copy issue defaults"
+            hint="These defaults fill a new copy. A saved copy keeps its own permission, so one reference copy can stay in the library while the other copies of that title are issued. Copies with no copy type still follow the reference and rare switches above."
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              {COPY_TYPES.map((type) => (
+                <Toggle
+                  key={type}
+                  label={`Allow issue for ${COPY_TYPE_LABELS[type]}`}
+                  checked={Boolean(circulation.copyIssue?.[type])}
+                  onChange={(checked) =>
+                    setCirculation({
+                      ...circulation,
+                      copyIssue: { ...mergeCopyIssue(circulation.copyIssue), [type]: checked },
+                    })
+                  }
+                />
+              ))}
+            </div>
+            <p className="text-sm text-slate-500">
+              Reserve is configurable. Reference, rare, and restricted start as not allowed. General
+              and textbook start as allowed.
+            </p>
           </Card>
         </div>
       ) : null}

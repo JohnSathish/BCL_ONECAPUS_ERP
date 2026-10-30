@@ -738,6 +738,7 @@ export function BarcodeManagementWorkspace() {
                   />
                   <th className="px-2 py-2">Department</th>
                   <th className="px-2 py-2">Call No.</th>
+                  <th className="px-2 py-2">Copy type</th>
                   <th className="px-2 py-2">ISBN</th>
                   <SortHeader
                     label="Status"
@@ -772,6 +773,7 @@ export function BarcodeManagementWorkspace() {
                       <td className="px-2 py-2">{row.author || '—'}</td>
                       <td className="px-2 py-2">{row.department || '—'}</td>
                       <td className="px-2 py-2">{row.callNumber || '—'}</td>
+                      <td className="px-2 py-2">{row.copyType || '—'}</td>
                       <td className="px-2 py-2 font-mono text-xs">{row.isbn || '—'}</td>
                       <td className="px-2 py-2">
                         <span

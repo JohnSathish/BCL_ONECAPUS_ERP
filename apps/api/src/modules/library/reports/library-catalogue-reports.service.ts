@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { copyTypeLabel } from '../domain/library-copy-issue.logic';
 import { PrismaService } from '../../../database/prisma.service';
 import type { CatalogueReportQueryDto } from '../dto/catalogue-report.dto';
 import {
@@ -23,6 +24,8 @@ const COPY_COLUMNS: ReportColumn[] = [
   { key: 'accession', label: 'Accession number', text: true },
   { key: 'barcode', label: 'Barcode', text: true },
   { key: 'callNumber', label: 'Call number' },
+  { key: 'copyType', label: 'Copy type' },
+  { key: 'issue', label: 'Issue permission' },
   { key: 'shelf', label: 'Shelf location' },
   { key: 'status', label: 'Copy status' },
   { key: 'category', label: 'Category' },
@@ -475,9 +478,14 @@ export class LibraryCatalogueReportsService {
     const rows = await this.labelRows(tenantId, key, query);
     return {
       ...base,
-      notes: [
-        'Language and subject are blank when the Koha export did not include those MARC fields.',
-      ],
+      notes:
+        key === 'copy-type'
+          ? [
+              'Each physical copy is counted once under its own copy type. A title with mixed copies appears in more than one row. Copies saved before copy types existed stay in Not set.',
+            ]
+          : [
+              'Language and subject are blank when the Koha export did not include those MARC fields.',
+            ],
       columns: [
         { key: 'label', label: 'Group' },
         { key: 'titles', label: 'Distinct titles' },
@@ -841,6 +849,23 @@ export class LibraryCatalogueReportsService {
       ];
       if (!where.OR.length) where.id = '00000000-0000-0000-0000-000000000000';
     }
+    if (key === 'reference-register') {
+      const reference = {
+        OR: [
+          { copyType: 'REFERENCE' },
+          {
+            copyType: null,
+            book: { bookType: 'REFERENCE' },
+          },
+        ],
+      };
+      const current = Array.isArray(where.AND)
+        ? where.AND
+        : where.AND
+          ? [where.AND]
+          : [];
+      where.AND = [...current, reference];
+    }
     if (key === 'accession-range') {
       where.accessionNumber = {
         ...(query.accessionFrom ? { gte: query.accessionFrom } : {}),
@@ -877,19 +902,30 @@ export class LibraryCatalogueReportsService {
     query: CatalogueReportQueryDto,
   ) {
     const label =
-      key === 'author'
-        ? Prisma.sql`COALESCE(NULLIF(BTRIM(b.author), ''), '(No author)')`
-        : key === 'publisher'
-          ? Prisma.sql`COALESCE(NULLIF(BTRIM(b.publisher), ''), '(No publisher)')`
-          : key === 'language'
-            ? Prisma.sql`COALESCE(NULLIF(BTRIM(b.language), ''), '(No language)')`
-            : key === 'subject'
-              ? Prisma.sql`COALESCE(NULLIF(BTRIM(b.subject), ''), '(No subject)')`
-              : key === 'category'
-                ? Prisma.sql`COALESCE(cat.name, '(No category)')`
-                : key === 'branch'
-                  ? Prisma.sql`COALESCE(NULLIF(BTRIM(c.home_branch_code), ''), '(No branch)')`
-                  : Prisma.sql`COALESCE(NULLIF(BTRIM(c.shelving_location), ''), '(No shelf location)')`;
+      key === 'copy-type'
+        ? Prisma.sql`CASE c.copy_type
+            WHEN 'GENERAL' THEN 'General Book'
+            WHEN 'REFERENCE' THEN 'Reference Book'
+            WHEN 'RARE' THEN 'Rare Book'
+            WHEN 'TEXTBOOK' THEN 'Textbook'
+            WHEN 'RESERVE' THEN 'Reserve Book'
+            WHEN 'RESTRICTED' THEN 'Restricted Book'
+            WHEN 'OTHER' THEN 'Other'
+            ELSE '(Not set on the copy)'
+          END`
+        : key === 'author'
+          ? Prisma.sql`COALESCE(NULLIF(BTRIM(b.author), ''), '(No author)')`
+          : key === 'publisher'
+            ? Prisma.sql`COALESCE(NULLIF(BTRIM(b.publisher), ''), '(No publisher)')`
+            : key === 'language'
+              ? Prisma.sql`COALESCE(NULLIF(BTRIM(b.language), ''), '(No language)')`
+              : key === 'subject'
+                ? Prisma.sql`COALESCE(NULLIF(BTRIM(b.subject), ''), '(No subject)')`
+                : key === 'category'
+                  ? Prisma.sql`COALESCE(cat.name, '(No category)')`
+                  : key === 'branch'
+                    ? Prisma.sql`COALESCE(NULLIF(BTRIM(c.home_branch_code), ''), '(No branch)')`
+                    : Prisma.sql`COALESCE(NULLIF(BTRIM(c.shelving_location), ''), '(No shelf location)')`;
     const categoryJoin =
       key === 'category'
         ? Prisma.sql`LEFT JOIN library.library_categories cat ON cat.id = b.category_id`
@@ -1182,6 +1218,8 @@ function copyRow(
     status: string;
     collectionCode: string | null;
     callNumber: string | null;
+    copyType: string | null;
+    issueAllowed: boolean | null;
     shelvingLocation: string | null;
     acquisitionPrice: { toString(): string } | null;
     copyCondition: string | null;
@@ -1226,6 +1264,13 @@ function copyRow(
     accession: row.accessionNumber ?? '',
     barcode: row.barcode,
     callNumber: row.callNumber || row.book.classificationNumber || '',
+    copyType: copyTypeLabel(row.copyType),
+    issue:
+      row.issueAllowed == null
+        ? 'Not set'
+        : row.issueAllowed
+          ? 'Allowed'
+          : 'Not allowed',
     shelf: row.shelvingLocation ?? '',
     status,
     category: row.book.category?.name ?? '',
@@ -1321,6 +1366,21 @@ function copyNotes(key: string) {
   if (key === 'duplicates') {
     return [
       'Repeated barcodes and accession numbers are listed for review. They were not deleted.',
+    ];
+  }
+  if (key === 'reference-register') {
+    return [
+      'Reference copies are listed from the copy type. Older titles marked Reference, with no copy type yet, are included and are not relabelled.',
+    ];
+  }
+  if (
+    key === 'available' ||
+    key === 'lost' ||
+    key === 'damaged' ||
+    key === 'lost-damaged-inventory'
+  ) {
+    return [
+      'Each row is one physical copy. Copy type shows Reference, General, and the other copy types when they have been set.',
     ];
   }
   return ['Each row is one physical copy.'];

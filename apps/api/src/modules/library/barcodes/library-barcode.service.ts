@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { copyTypeLabel } from '../domain/library-copy-issue.logic';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import type { ReportPayload } from '../reports/library-catalogue-report.logic';
 import type {
@@ -765,6 +766,8 @@ export class LibraryBarcodeService {
       department: departments.get(row.book.departmentId ?? '') ?? '',
       category: row.book.category?.name ?? '',
       callNumber: row.callNumber || row.book.classificationNumber || '',
+      copyType: row.copyType ? copyTypeLabel(row.copyType) : '',
+      issueAllowed: row.issueAllowed,
       copyStatus: row.status,
       printStatus,
       printable: prepared.labels.length === 1,

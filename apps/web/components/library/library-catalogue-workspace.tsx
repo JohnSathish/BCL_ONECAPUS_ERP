@@ -27,9 +27,11 @@ import {
   downloadCatalogueReport,
   fetchLibraryCatalogueOptions,
   fetchLibraryCatalogueSummary,
+  fetchLibraryBook,
   fetchLibraryBooks,
   updateLibraryBook,
 } from '@/services/library';
+import { CopyCirculationEditor } from './library-copy-editor';
 import type { LibraryBook } from '@/types/library';
 import { apiErrorMessage } from '@/utils/api-error';
 import { downloadBlob } from '@/utils/download-blob';
@@ -209,6 +211,9 @@ export function LibraryCatalogueWorkspace() {
 
   function openBook(book: LibraryBook, edit = false) {
     setDetail(book);
+    void fetchLibraryBook(book.id)
+      .then((full) => setDetail(full))
+      .catch(() => setDetail(book));
     setEditing(edit);
     setMenuId(null);
     setEditForm({
@@ -744,17 +749,11 @@ export function LibraryCatalogueWorkspace() {
                   <Field label="Copies" value={String(detail.copyCount ?? detail.totalCopies)} />
                   <Field label="Available" value={String(detail.availableCopies ?? 0)} />
                 </dl>
-                <h4 className="mt-4 text-sm font-semibold">Physical copies</h4>
-                <ul className="mt-2 space-y-1 text-sm">
-                  {(detail.copies ?? []).map((copy) => (
-                    <li key={copy.id} className="flex justify-between rounded border px-2 py-1">
-                      <span className="font-mono text-xs">
-                        {copy.accessionNumber || copy.barcode}
-                      </span>
-                      <span>{copy.status}</span>
-                    </li>
-                  ))}
-                </ul>
+                <CopyCirculationEditor
+                  book={detail}
+                  canManage={canManage}
+                  onUpdated={(book) => setDetail(book)}
+                />
               </>
             )}
             <div className="mt-4 flex justify-end gap-2">

@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../database/prisma.service';
 import type {
+  AddAccessionCopiesDto,
   BookQueryDto,
   CreateAccessionBookDto,
   CreateBookCopyDto,
@@ -14,7 +15,10 @@ import type {
   CreateCategoryDto,
   UpdateAccessionWorkflowDto,
   UpdateBookDto,
+  UpdateCopyCirculationDto,
 } from '../dto/library.dto';
+import { mergeCirculationPolicy } from '../domain/library-policy.types';
+import { copyTypeForBookType } from '../domain/library-copy-issue.logic';
 import { LibrarySettingsService } from './library-settings.service';
 import {
   accessionSeries,
@@ -170,6 +174,8 @@ export class LibraryCatalogueService {
               barcode: true,
               copyNumber: true,
               accessionNumber: true,
+              copyType: true,
+              issueAllowed: true,
             },
           },
         },
@@ -554,6 +560,9 @@ export class LibraryCatalogueService {
     const copies = dto.totalCopies ?? 1;
     if (copies < 1 || copies > 100)
       throw new BadRequestException('Enter between 1 and 100 copies.');
+    if (dto.copies && dto.copies.length !== copies) {
+      throw new BadRequestException('Send one row for each physical copy.');
+    }
     const received = parseIsoDate(dto.dateReceived);
     if (!received)
       throw new BadRequestException('Date received must be a valid date.');
@@ -586,8 +595,15 @@ export class LibraryCatalogueService {
         const settings = await tx.librarySettings.update({
           where: { tenantId },
           data: { accessionNextSeq: { increment: copies } },
-          select: { accessionPrefix: true, accessionNextSeq: true },
+          select: {
+            accessionPrefix: true,
+            accessionNextSeq: true,
+            circulationPolicy: true,
+          },
         });
+        const copyIssue = mergeCirculationPolicy(
+          settings.circulationPolicy,
+        ).copyIssue;
         const start = settings.accessionNextSeq - copies;
         const numbers = accessionSeries(
           settings.accessionPrefix,
@@ -643,6 +659,11 @@ export class LibraryCatalogueService {
         });
         for (let index = 0; index < numbers.length; index += 1) {
           const accessionNo = numbers[index];
+          const line = dto.copies?.[index];
+          const copyType = line?.copyType ?? copyTypeForBookType(dto.bookType);
+          const lineStatus = availabilityToStatuses(
+            line?.availability ?? dto.availability ?? 'RECEIVED',
+          );
           await tx.libraryBookCopy.create({
             data: {
               tenantId,
@@ -650,12 +671,15 @@ export class LibraryCatalogueService {
               copyNumber: index + 1,
               barcode: accessionNo,
               accessionNumber: accessionNo,
-              status: statuses.copyStatus,
-              copyCondition: dto.condition ?? 'NEW',
+              status: lineStatus.copyStatus,
+              copyCondition: line?.condition ?? dto.condition ?? 'NEW',
+              copyType,
+              issueAllowed: line ? line.issueAllowed : copyIssue[copyType],
+              copyRemarks: emptyToNull(line?.remarks),
               acquisitionDate: received,
               acquisitionPrice: price == null ? null : price,
               callNumber: emptyToNull(dto.classificationNumber),
-              shelvingLocation: location,
+              shelvingLocation: emptyToNull(line?.location) ?? location,
             },
           });
         }
@@ -733,6 +757,126 @@ export class LibraryCatalogueService {
     }
 
     return updated;
+  }
+
+  async addAccessionCopies(
+    tenantId: string,
+    bookId: string,
+    dto: AddAccessionCopiesDto,
+  ) {
+    const book = await this.getBook(tenantId, bookId);
+    const lines = dto.copies;
+    if (!lines.length) {
+      throw new BadRequestException('Add at least one physical copy.');
+    }
+    await this.settings.ensureTenantDefaults(tenantId);
+    const received = new Date();
+    received.setUTCHours(0, 0, 0, 0);
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const settings = await tx.librarySettings.update({
+          where: { tenantId },
+          data: { accessionNextSeq: { increment: lines.length } },
+          select: { accessionPrefix: true, accessionNextSeq: true },
+        });
+        const start = settings.accessionNextSeq - lines.length;
+        const numbers = accessionSeries(
+          settings.accessionPrefix,
+          new Date().getFullYear(),
+          start,
+          lines.length,
+        );
+        const last = await tx.libraryBookCopy.aggregate({
+          where: { tenantId, bookId },
+          _max: { copyNumber: true },
+        });
+        let copyNumber = (last._max.copyNumber ?? book.copies.length) + 1;
+        for (let index = 0; index < numbers.length; index += 1) {
+          const line = lines[index];
+          const accessionNo = numbers[index];
+          const lineStatus = availabilityToStatuses(
+            line.availability ?? 'ON_SHELF',
+          );
+          await tx.libraryBookCopy.create({
+            data: {
+              tenantId,
+              bookId,
+              copyNumber,
+              barcode: accessionNo,
+              accessionNumber: accessionNo,
+              status: lineStatus.copyStatus,
+              copyCondition: line.condition ?? 'NEW',
+              copyType: line.copyType,
+              issueAllowed: line.issueAllowed,
+              copyRemarks: emptyToNull(line.remarks),
+              acquisitionDate: received,
+              callNumber: book.classificationNumber,
+              shelvingLocation:
+                emptyToNull(line.location) ?? book.location ?? book.shelf,
+            },
+          });
+          copyNumber += 1;
+        }
+        await tx.libraryBook.update({
+          where: { id: bookId },
+          data: { totalCopies: { increment: lines.length } },
+        });
+        await tx.libraryAuditLog.create({
+          data: {
+            tenantId,
+            action: 'ADD_COPIES',
+            entityType: 'LibraryBook',
+            entityId: bookId,
+            metadata: { copies: lines.length, accessionNumbers: numbers },
+          },
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new BadRequestException(
+          'An accession number or barcode in this batch is already in use. Refresh and save again.',
+        );
+      }
+      throw error;
+    }
+    return this.getBook(tenantId, bookId);
+  }
+
+  async updateCopyCirculation(
+    tenantId: string,
+    copyId: string,
+    dto: UpdateCopyCirculationDto,
+  ) {
+    const copy = await this.prisma.libraryBookCopy.findFirst({
+      where: { id: copyId, tenantId, book: { deletedAt: null } },
+    });
+    if (!copy) throw new NotFoundException('Book copy not found');
+    if (dto.status && dto.status !== copy.status) {
+      const active = await this.prisma.libraryLoan.count({
+        where: { tenantId, copyId, status: 'ACTIVE', returnedAt: null },
+      });
+      if (active) {
+        throw new BadRequestException(
+          'This copy is on loan. Return it before changing its status.',
+        );
+      }
+    }
+    return this.prisma.libraryBookCopy.update({
+      where: { id: copyId },
+      data: {
+        copyType: dto.copyType,
+        issueAllowed: dto.issueAllowed,
+        shelvingLocation:
+          dto.location === undefined ? undefined : emptyToNull(dto.location),
+        copyCondition: dto.condition,
+        status: dto.status,
+        copyRemarks:
+          dto.remarks === undefined ? undefined : emptyToNull(dto.remarks),
+      },
+    });
   }
 
   async findCopyByBarcode(tenantId: string, barcode: string) {
