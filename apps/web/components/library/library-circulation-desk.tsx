@@ -84,6 +84,17 @@ export function LibraryCirculationDesk() {
   const returnRef = useRef<HTMLInputElement>(null);
   const renewRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<Tab>('issue');
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('tab');
+    if (
+      requested === 'issue' ||
+      requested === 'return' ||
+      requested === 'renew' ||
+      requested === 'history'
+    ) {
+      setTab(requested);
+    }
+  }, []);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [memberQuery, setMemberQuery] = useState('');

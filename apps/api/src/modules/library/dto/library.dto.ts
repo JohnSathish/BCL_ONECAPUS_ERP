@@ -171,6 +171,27 @@ export class ActivityQueryDto {
   @IsOptional()
   @IsIn(['today', 'recent'])
   scope?: 'today' | 'recent' = 'today';
+
+  @IsOptional()
+  @IsIn(['ISSUE', 'RETURN', 'RENEW', 'RESERVE'])
+  action?: 'ISSUE' | 'RETURN' | 'RENEW' | 'RESERVE';
+}
+
+export class DashboardUsageQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(92)
+  days?: number;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
 }
 
 export class LibraryDashboardQueryDto {

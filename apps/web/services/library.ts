@@ -45,10 +45,27 @@ const base = '/v1/library';
 export const fetchLibraryDashboard = (period: 'today' | 'week' | 'month' = 'today') =>
   api.get<LibraryDashboard>(`${base}/dashboard`, { params: { period } }).then((r) => r.data);
 
-export const fetchLibraryDashboardActivity = (limit = 20, scope: 'today' | 'recent' = 'today') =>
+export const fetchLibraryDashboardActivity = (
+  limit = 20,
+  scope: 'today' | 'recent' = 'today',
+  action?: 'ISSUE' | 'RETURN' | 'RENEW' | 'RESERVE',
+) =>
   api
-    .get<LibraryActivityItem[]>(`${base}/dashboard/activity`, { params: { limit, scope } })
+    .get<LibraryActivityItem[]>(`${base}/dashboard/activity`, {
+      params: { limit, scope, action },
+    })
     .then((r) => r.data);
+
+export type LibraryDashboardUsage = {
+  from?: string;
+  days: number;
+  newMembers: null;
+  series: { date: string; label: string; issued: number; returned: number }[];
+  topBooks: { bookId: string; title: string; issues: number; share: number }[];
+};
+
+export const fetchLibraryDashboardUsage = (params: { days?: number; from?: string; to?: string }) =>
+  api.get<LibraryDashboardUsage>(`${base}/dashboard/usage`, { params }).then((r) => r.data);
 
 export const fetchLibraryMemberSummary = (scanCode: string) =>
   api

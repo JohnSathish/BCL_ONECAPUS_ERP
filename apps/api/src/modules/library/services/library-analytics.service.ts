@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { libraryHealth } from '../library-health.logic';
+import { fillUsageDays, usageRange } from '../library-usage-days';
 import { LibrarySettingsService } from './library-settings.service';
 
 export type LibraryDashboardPeriod = 'today' | 'week' | 'month';
@@ -108,6 +109,10 @@ export class LibraryAnalyticsService {
     endOfDay.setDate(endOfDay.getDate() + 1);
     const startOfWeek = new Date(startOfDay);
     startOfWeek.setDate(startOfWeek.getDate() - 6);
+    const yesterdayStart = new Date(startOfDay);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const stockCutoff = new Date(startOfDay);
+    stockCutoff.setDate(stockCutoff.getDate() - 30);
     const periodStart =
       period === 'month'
         ? new Date(startOfDay.getTime() - 29 * 86_400_000)
@@ -132,6 +137,7 @@ export class LibraryAnalyticsService {
       issuedToday,
       returnedToday,
       digitalViewsToday,
+      digitalDownloadsToday,
       fineCollectedToday,
       digitalAssets,
       researchItems,
@@ -144,10 +150,15 @@ export class LibraryAnalyticsService {
       periodReturns,
       periodRenewals,
       periodDigitalViews,
-      weekIssues,
-      weekReturns,
-      weekRenewals,
-      weekDigitalViews,
+      issuedYesterday,
+      returnedYesterday,
+      titlesThen,
+      copiesThen,
+      titlesAdded,
+      copiesAdded,
+      renewedToday,
+      reservedToday,
+      members,
     ] = await Promise.all([
       this.prisma.libraryVisit.count({
         where: { tenantId, entryAt: { gte: startOfDay } },
@@ -176,7 +187,18 @@ export class LibraryAnalyticsService {
         },
       }),
       this.prisma.libraryDigitalAccessLog.count({
-        where: { tenantId, createdAt: { gte: startOfDay, lt: endOfDay } },
+        where: {
+          tenantId,
+          action: 'VIEW',
+          createdAt: { gte: startOfDay, lt: endOfDay },
+        },
+      }),
+      this.prisma.libraryDigitalAccessLog.count({
+        where: {
+          tenantId,
+          action: 'DOWNLOAD',
+          createdAt: { gte: startOfDay, lt: endOfDay },
+        },
       }),
       this.prisma.libraryFine.aggregate({
         where: {
@@ -217,21 +239,59 @@ export class LibraryAnalyticsService {
         where: { tenantId, createdAt: { gte: periodStart, lt: endOfDay } },
       }),
       this.prisma.libraryLoan.count({
-        where: { tenantId, issuedAt: { gte: startOfWeek, lt: endOfDay } },
+        where: {
+          tenantId,
+          issuedAt: { gte: yesterdayStart, lt: startOfDay },
+        },
       }),
       this.prisma.libraryLoan.count({
-        where: { tenantId, returnedAt: { gte: startOfWeek, lt: endOfDay } },
+        where: {
+          tenantId,
+          returnedAt: { gte: yesterdayStart, lt: startOfDay },
+        },
+      }),
+      this.prisma.libraryBook.count({
+        where: {
+          tenantId,
+          deletedAt: null,
+          copies: { some: { acquisitionDate: { lt: stockCutoff } } },
+        },
+      }),
+      this.prisma.libraryBookCopy.count({
+        where: {
+          tenantId,
+          acquisitionDate: { lt: stockCutoff },
+          book: { deletedAt: null },
+        },
+      }),
+      this.prisma.libraryBook.count({
+        where: {
+          tenantId,
+          deletedAt: null,
+          copies: {
+            some: { acquisitionDate: { gte: stockCutoff } },
+            none: { acquisitionDate: { lt: stockCutoff } },
+          },
+        },
+      }),
+      this.prisma.libraryBookCopy.count({
+        where: {
+          tenantId,
+          acquisitionDate: { gte: stockCutoff },
+          book: { deletedAt: null },
+        },
       }),
       this.prisma.libraryAuditLog.count({
         where: {
           tenantId,
           action: 'RENEW',
-          createdAt: { gte: startOfWeek, lt: endOfDay },
+          createdAt: { gte: startOfDay, lt: endOfDay },
         },
       }),
-      this.prisma.libraryDigitalAccessLog.count({
-        where: { tenantId, createdAt: { gte: startOfWeek, lt: endOfDay } },
+      this.prisma.libraryReservation.count({
+        where: { tenantId, reservedAt: { gte: startOfDay, lt: endOfDay } },
       }),
+      this.memberEngagement(tenantId, periodStart, endOfDay),
     ]);
 
     const footfallTrends = await this.footfallTrends(tenantId);
@@ -246,12 +306,8 @@ export class LibraryAnalyticsService {
       digitalViews: periodDigitalViews,
       activeLoans,
       overdueLoans,
-      weekEvents:
-        weekIssues +
-        weekReturns +
-        weekRenewals +
-        weekVisitors +
-        weekDigitalViews,
+      activeMembers: members.active,
+      knownMembers: members.known,
     });
     const activity = await this.recentActivity(tenantId, 20, 'today');
     const recentActivity = await this.recentActivity(tenantId, 20, 'recent');
@@ -267,7 +323,12 @@ export class LibraryAnalyticsService {
       availableCopies,
       issuedToday,
       returnedToday,
+      issuedChange: percentChange(issuedToday, issuedYesterday),
+      returnedChange: percentChange(returnedToday, returnedYesterday),
+      titlesGrowth: percentChange(titlesThen + titlesAdded, titlesThen),
+      copiesGrowth: percentChange(copiesThen + copiesAdded, copiesThen),
       digitalViewsToday,
+      digitalDownloadsToday,
       fineCollectedToday: Number(fineCollectedToday._sum.amount ?? 0),
       digitalAssets,
       researchItems,
@@ -282,6 +343,12 @@ export class LibraryAnalyticsService {
       healthScore,
       activity,
       recentActivity,
+      activityCounts: {
+        issued: issuedToday,
+        returned: returnedToday,
+        renewed: renewedToday,
+        reserved: reservedToday,
+      },
       attention,
       departments,
       period,
@@ -293,64 +360,88 @@ export class LibraryAnalyticsService {
     tenantId: string,
     limit = 20,
     scope: 'today' | 'recent' = 'recent',
+    action?: 'ISSUE' | 'RETURN' | 'RENEW' | 'RESERVE',
   ) {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const since = scope === 'today' ? start : undefined;
-    const [issued, returned, renewals] = await Promise.all([
-      this.prisma.libraryLoan.findMany({
-        where: {
-          tenantId,
-          ...(since ? { issuedAt: { gte: since } } : {}),
-        },
-        orderBy: { issuedAt: 'desc' },
-        take: limit,
-        select: {
-          status: true,
-          issuedAt: true,
-          issuedById: true,
-          studentId: true,
-          staffProfileId: true,
-          copy: {
+    const want = (kind: 'ISSUE' | 'RETURN' | 'RENEW' | 'RESERVE') =>
+      !action || action === kind;
+    const [issued, returned, renewals, reserved] = await Promise.all([
+      want('ISSUE')
+        ? this.prisma.libraryLoan.findMany({
+            where: {
+              tenantId,
+              ...(since ? { issuedAt: { gte: since } } : {}),
+            },
+            orderBy: { issuedAt: 'desc' },
+            take: limit,
             select: {
-              accessionNumber: true,
-              barcode: true,
+              status: true,
+              issuedAt: true,
+              issuedById: true,
+              studentId: true,
+              staffProfileId: true,
+              copy: {
+                select: {
+                  accessionNumber: true,
+                  barcode: true,
+                  book: { select: { title: true } },
+                },
+              },
+            },
+          })
+        : [],
+      want('RETURN')
+        ? this.prisma.libraryLoan.findMany({
+            where: {
+              tenantId,
+              returnedAt: since ? { gte: since } : { not: null },
+            },
+            orderBy: { returnedAt: 'desc' },
+            take: limit,
+            select: {
+              status: true,
+              returnedAt: true,
+              returnedById: true,
+              studentId: true,
+              staffProfileId: true,
+              copy: {
+                select: {
+                  accessionNumber: true,
+                  barcode: true,
+                  book: { select: { title: true } },
+                },
+              },
+            },
+          })
+        : [],
+      want('RENEW')
+        ? this.prisma.libraryAuditLog.findMany({
+            where: {
+              tenantId,
+              action: 'RENEW',
+              ...(since ? { createdAt: { gte: since } } : {}),
+            },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+          })
+        : [],
+      want('RESERVE')
+        ? this.prisma.libraryReservation.findMany({
+            where: {
+              tenantId,
+              ...(since ? { reservedAt: { gte: since } } : {}),
+            },
+            orderBy: { reservedAt: 'desc' },
+            take: limit,
+            select: {
+              reservedAt: true,
+              studentId: true,
               book: { select: { title: true } },
             },
-          },
-        },
-      }),
-      this.prisma.libraryLoan.findMany({
-        where: {
-          tenantId,
-          returnedAt: since ? { gte: since } : { not: null },
-        },
-        orderBy: { returnedAt: 'desc' },
-        take: limit,
-        select: {
-          status: true,
-          returnedAt: true,
-          returnedById: true,
-          studentId: true,
-          staffProfileId: true,
-          copy: {
-            select: {
-              accessionNumber: true,
-              barcode: true,
-              book: { select: { title: true } },
-            },
-          },
-        },
-      }),
-      this.prisma.libraryAuditLog.findMany({
-        where: {
-          tenantId,
-          action: 'RENEW',
-          ...(since ? { createdAt: { gte: since } } : {}),
-        },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-      }),
+          })
+        : [],
     ]);
 
     const rows = [
@@ -396,6 +487,17 @@ export class LibraryAnalyticsService {
           memberName: meta.memberName || 'Member',
         };
       }),
+      ...reserved.map((row) => ({
+        at: row.reservedAt,
+        action: 'RESERVE',
+        bookTitle: row.book.title,
+        accessionNumber: null as string | null,
+        status: 'Reserved',
+        studentId: row.studentId,
+        staffProfileId: null as string | null,
+        actorId: null as string | null,
+        memberName: '',
+      })),
     ]
       .sort((a, b) => b.at.getTime() - a.at.getTime())
       .slice(0, limit);
@@ -413,13 +515,17 @@ export class LibraryAnalyticsService {
       studentIds.length
         ? this.prisma.student.findMany({
             where: { tenantId, id: { in: studentIds } },
-            select: { id: true, masterProfile: { select: { fullName: true } } },
+            select: {
+              id: true,
+              enrollmentNumber: true,
+              masterProfile: { select: { fullName: true } },
+            },
           })
         : [],
       staffIds.length
         ? this.prisma.staffProfile.findMany({
             where: { tenantId, id: { in: staffIds } },
-            select: { id: true, fullName: true },
+            select: { id: true, fullName: true, employeeCode: true },
           })
         : [],
       actorIds.length
@@ -432,7 +538,11 @@ export class LibraryAnalyticsService {
     const studentNames = new Map(
       students.map((row) => [row.id, row.masterProfile?.fullName || 'Student']),
     );
+    const studentCodes = new Map(
+      students.map((row) => [row.id, row.enrollmentNumber]),
+    );
     const staffNames = new Map(staff.map((row) => [row.id, row.fullName]));
+    const staffCodes = new Map(staff.map((row) => [row.id, row.employeeCode]));
     const actorNames = new Map(
       actors.map((row) => [row.id, row.displayName || row.email]),
     );
@@ -445,12 +555,153 @@ export class LibraryAnalyticsService {
         (row.staffProfileId ? staffNames.get(row.staffProfileId) : undefined) ||
         row.memberName ||
         'Member',
+      memberCode:
+        (row.studentId ? studentCodes.get(row.studentId) : undefined) ||
+        (row.staffProfileId ? staffCodes.get(row.staffProfileId) : undefined) ||
+        null,
       bookTitle: row.bookTitle,
       accessionNumber: row.accessionNumber,
       staffName: row.actorId ? (actorNames.get(row.actorId) ?? null) : null,
       status: row.status,
       programme: null,
     }));
+  }
+
+  async dashboardUsage(
+    tenantId: string,
+    query: { days?: number; from?: string; to?: string },
+  ) {
+    let range: ReturnType<typeof usageRange>;
+    try {
+      range = usageRange(query);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Invalid reporting period',
+      );
+    }
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const tenant = Prisma.sql`CAST(${tenantId} AS uuid)`;
+    const [issuedRows, returnedRows, books] = await Promise.all([
+      this.prisma.$queryRaw<{ day: string; count: number }[]>`
+        SELECT to_char(issued_at AT TIME ZONE ${timeZone}, 'YYYY-MM-DD') AS day,
+          COUNT(*)::int AS count
+        FROM library.library_loans
+        WHERE tenant_id = ${tenant}
+          AND issued_at >= ${range.from}
+          AND issued_at < ${range.to}
+        GROUP BY 1
+      `,
+      this.prisma.$queryRaw<{ day: string; count: number }[]>`
+        SELECT to_char(returned_at AT TIME ZONE ${timeZone}, 'YYYY-MM-DD') AS day,
+          COUNT(*)::int AS count
+        FROM library.library_loans
+        WHERE tenant_id = ${tenant}
+          AND returned_at >= ${range.from}
+          AND returned_at < ${range.to}
+        GROUP BY 1
+      `,
+      this.prisma.$queryRaw<
+        { bookId: string; title: string; issues: number }[]
+      >`
+        SELECT b.id AS "bookId", b.title, COUNT(*)::int AS issues
+        FROM library.library_loans l
+        JOIN library.library_book_copies c ON c.id = l.copy_id
+        JOIN library.library_books b ON b.id = c.book_id
+        WHERE l.tenant_id = ${tenant}
+          AND l.issued_at >= ${range.from}
+          AND l.issued_at < ${range.to}
+          AND b.deleted_at IS NULL
+        GROUP BY b.id, b.title
+        ORDER BY issues DESC, b.title
+        LIMIT 5
+      `,
+    ]);
+    const issued = new Map(
+      issuedRows.map((row) => [row.day, Number(row.count)]),
+    );
+    const returned = new Map(
+      returnedRows.map((row) => [row.day, Number(row.count)]),
+    );
+    const topIssues = Math.max(1, ...books.map((book) => Number(book.issues)));
+    return {
+      from: fillUsageDays(range.from, 1, issued, returned)[0]?.date,
+      days: range.days,
+      newMembers: null,
+      series: fillUsageDays(range.from, range.days, issued, returned),
+      topBooks: books.map((book) => ({
+        bookId: book.bookId,
+        title: book.title,
+        issues: Number(book.issues),
+        share: Math.round((Number(book.issues) / topIssues) * 100),
+      })),
+    };
+  }
+
+  private async memberEngagement(tenantId: string, from: Date, to: Date) {
+    const rows = await this.prisma.$queryRaw<
+      { active: number; known: number }[]
+    >`
+      WITH known AS (
+        SELECT 's:' || student_id::text AS id
+        FROM library.library_loans
+        WHERE tenant_id = CAST(${tenantId} AS uuid) AND student_id IS NOT NULL
+        UNION
+        SELECT 'f:' || staff_profile_id::text
+        FROM library.library_loans
+        WHERE tenant_id = CAST(${tenantId} AS uuid) AND staff_profile_id IS NOT NULL
+        UNION
+        SELECT 's:' || student_id::text
+        FROM library.library_visits
+        WHERE tenant_id = CAST(${tenantId} AS uuid) AND student_id IS NOT NULL
+        UNION
+        SELECT 'f:' || staff_profile_id::text
+        FROM library.library_visits
+        WHERE tenant_id = CAST(${tenantId} AS uuid) AND staff_profile_id IS NOT NULL
+      ),
+      active AS (
+        SELECT 's:' || student_id::text AS id
+        FROM library.library_loans
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+          AND student_id IS NOT NULL
+          AND issued_at >= ${from} AND issued_at < ${to}
+        UNION
+        SELECT 'f:' || staff_profile_id::text
+        FROM library.library_loans
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+          AND staff_profile_id IS NOT NULL
+          AND issued_at >= ${from} AND issued_at < ${to}
+        UNION
+        SELECT 's:' || student_id::text
+        FROM library.library_loans
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+          AND student_id IS NOT NULL
+          AND returned_at >= ${from} AND returned_at < ${to}
+        UNION
+        SELECT 'f:' || staff_profile_id::text
+        FROM library.library_loans
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+          AND staff_profile_id IS NOT NULL
+          AND returned_at >= ${from} AND returned_at < ${to}
+        UNION
+        SELECT 's:' || student_id::text
+        FROM library.library_visits
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+          AND student_id IS NOT NULL
+          AND entry_at >= ${from} AND entry_at < ${to}
+        UNION
+        SELECT 'f:' || staff_profile_id::text
+        FROM library.library_visits
+        WHERE tenant_id = CAST(${tenantId} AS uuid)
+          AND staff_profile_id IS NOT NULL
+          AND entry_at >= ${from} AND entry_at < ${to}
+      )
+      SELECT (SELECT COUNT(*)::int FROM active) AS active,
+             (SELECT COUNT(*)::int FROM known) AS known
+    `;
+    return {
+      active: Number(rows[0]?.active ?? 0),
+      known: Number(rows[0]?.known ?? 0),
+    };
   }
 
   private async collectionCoverage(tenantId: string) {

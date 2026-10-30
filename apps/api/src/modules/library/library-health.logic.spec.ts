@@ -11,7 +11,8 @@ describe('libraryHealth', () => {
       digitalViews: 0,
       activeLoans: 0,
       overdueLoans: 0,
-      weekEvents: 0,
+      activeMembers: 0,
+      knownMembers: 20,
     });
 
     expect(
@@ -42,7 +43,8 @@ describe('libraryHealth', () => {
       digitalViews: 5,
       activeLoans: 4,
       overdueLoans: 4,
-      weekEvents: 5,
+      activeMembers: 5,
+      knownMembers: 10,
     });
 
     expect(
@@ -50,6 +52,9 @@ describe('libraryHealth', () => {
     ).toBe(0);
     expect(
       health.components.find((item) => item.key === 'digital')?.score,
+    ).toBe(50);
+    expect(
+      health.components.find((item) => item.key === 'engagement')?.score,
     ).toBe(50);
   });
 
@@ -63,7 +68,8 @@ describe('libraryHealth', () => {
       digitalViews: 0,
       activeLoans: 0,
       overdueLoans: 0,
-      weekEvents: 0,
+      activeMembers: 0,
+      knownMembers: 0,
     });
 
     expect(health.overall).toBeNull();

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen,
@@ -98,6 +98,12 @@ export function LibraryCatalogueWorkspace() {
   const canExport = canAny('library:reports', 'library:manage', 'library:read');
   const [draft, setDraft] = useState(EMPTY);
   const [filters, setFilters] = useState(EMPTY);
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search).get('search')?.trim();
+    if (!search) return;
+    setDraft((current) => ({ ...current, search }));
+    setFilters((current) => ({ ...current, search, page: 1 }));
+  }, []);
   const [advanced, setAdvanced] = useState(true);
   const [view, setView] = useState<'table' | 'grid'>('table');
   const [selected, setSelected] = useState<string[]>([]);

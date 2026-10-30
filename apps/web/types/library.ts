@@ -110,7 +110,18 @@ export type LibraryDashboard = {
   availableCopies: number;
   issuedToday?: number;
   returnedToday?: number;
+  issuedChange?: number | null;
+  returnedChange?: number | null;
+  titlesGrowth?: number | null;
+  copiesGrowth?: number | null;
   digitalViewsToday?: number;
+  digitalDownloadsToday?: number;
+  activityCounts?: {
+    issued: number;
+    returned: number;
+    renewed: number;
+    reserved: number;
+  };
   fineCollectedToday?: number;
   digitalAssets?: number;
   researchItems?: number;
@@ -159,6 +170,7 @@ export type LibraryActivityItem = {
   at: string;
   action: 'ISSUE' | 'RETURN' | 'RENEW' | string;
   memberName: string;
+  memberCode?: string | null;
   bookTitle: string;
   programme?: string | null;
   accessionNumber?: string | null;

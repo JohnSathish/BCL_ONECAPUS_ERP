@@ -16,7 +16,8 @@ export type LibraryHealthInput = {
   digitalViews: number;
   activeLoans: number;
   overdueLoans: number;
-  weekEvents: number;
+  activeMembers: number;
+  knownMembers: number;
 };
 
 const WEIGHTS = {
@@ -28,13 +29,11 @@ const WEIGHTS = {
 } as const;
 
 /**
- * Circulation and weekly scores treat a stated share of the physical
- * collection as a full score. They are ratios, not targets stored in settings.
+ * Circulation treats a stated share of the physical collection as a full score.
+ * It is a ratio, not a target stored in settings.
  * 2% of copies circulating in the selected period scores 100.
- * Weekly events equal to 5% of copies score 100.
  */
 const CIRCULATION_FULL_SHARE = 0.02;
-const WEEKLY_FULL_SHARE = 0.05;
 
 function cap(value: number) {
   if (!Number.isFinite(value)) return 0;
@@ -62,8 +61,8 @@ export function libraryHealth(input: LibraryHealthInput) {
       ? cap((1 - input.overdueLoans / input.activeLoans) * 100)
       : null;
   const engagement =
-    input.eligibleCopies > 0
-      ? cap((input.weekEvents / input.eligibleCopies / WEEKLY_FULL_SHARE) * 100)
+    input.knownMembers > 0
+      ? cap((input.activeMembers / input.knownMembers) * 100)
       : null;
 
   const components: LibraryHealthComponent[] = [
@@ -99,9 +98,9 @@ export function libraryHealth(input: LibraryHealthInput) {
       detail:
         digital === null
           ? 'No published digital resources, so views cannot be compared with a collection.'
-          : `${input.digitalViews.toLocaleString('en-IN')} views of ${input.publishedDigitalAssets.toLocaleString('en-IN')} published resources in the selected period.`,
+          : `${input.digitalViews.toLocaleString('en-IN')} views and downloads of ${input.publishedDigitalAssets.toLocaleString('en-IN')} published resources in the selected period.`,
       formula:
-        'Digital access-log views in the selected period, divided by published digital resources.',
+        'Digital access-log views and downloads in the selected period, divided by published digital resources. One event per published resource scores 100.',
     },
     {
       key: 'overdueControl',
@@ -117,15 +116,15 @@ export function libraryHealth(input: LibraryHealthInput) {
     },
     {
       key: 'engagement',
-      label: 'Weekly Engagement',
+      label: 'Member Engagement',
       score: engagement,
       weight: WEIGHTS.engagement,
       detail:
         engagement === null
-          ? 'No physical copies are registered.'
-          : `${input.weekEvents.toLocaleString('en-IN')} issues, returns, renewals, visits, and digital views in the last 7 days.`,
+          ? 'No student or staff member has a recorded loan or library visit.'
+          : `${input.activeMembers.toLocaleString('en-IN')} of ${input.knownMembers.toLocaleString('en-IN')} known borrowers and visitors were active in the selected period.`,
       formula:
-        'Issues, returns, renewals, library visits, and digital views in the last 7 days. Events equal to 5% of physical copies score 100.',
+        'Distinct students and staff with an issue, a return, or a library visit in the selected period, divided by distinct students and staff who have ever borrowed or visited. Renewal logs do not store a member id, so a renewal alone is not counted here.',
     },
   ];
 
