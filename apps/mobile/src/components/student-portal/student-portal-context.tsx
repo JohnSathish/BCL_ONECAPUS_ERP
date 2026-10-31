@@ -19,6 +19,8 @@ export type StudentHomeSnapshot = {
     rollNumber?: string;
     status?: string;
     department?: string;
+    academicYear?: string | null;
+    shiftName?: string | null;
     photoUrl?: string | null;
   };
   fees?: { due?: number; paid?: number; status?: string; semesterLabel?: string };

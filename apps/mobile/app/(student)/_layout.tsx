@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, BackHandler, View } from 'react-native';
-import { Stack, usePathname, useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StudentDrawer } from '@/components/student-portal/student-drawer';
 import { StudentPortalProvider } from '@/components/student-portal/student-portal-context';
 import { CHANGE_PASSWORD_HREF, getMustResetPassword } from '@/auth/password-reset-guard';
@@ -9,7 +9,6 @@ import { SyncGuardProvider } from '@/state/sync-guard';
 
 export default function StudentLayout() {
   const router = useRouter();
-  const pathname = usePathname();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -29,7 +28,7 @@ export default function StudentLayout() {
     return () => {
       cancelled = true;
     };
-  }, [router, pathname]);
+  }, [router]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {

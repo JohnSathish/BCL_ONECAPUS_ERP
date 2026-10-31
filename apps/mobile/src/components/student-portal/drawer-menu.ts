@@ -216,7 +216,12 @@ export const DRAWER_MENU_SECTIONS: DrawerMenuSection[] = [
     title: 'Campus',
     icon: '🏫',
     items: [
-      { id: 'library', label: 'Library', href: '/(student)/library', keywords: ['books'] },
+      {
+        id: 'library',
+        label: 'Library / OPAC',
+        href: '/(student)/library',
+        keywords: ['books', 'opac', 'catalogue', 'library'],
+      },
       {
         id: 'notices',
         label: 'Alerts',

@@ -24,11 +24,27 @@ export default function StudentHomeScreen() {
   const [widgets, setWidgets] = useState<StudentDashboardWidgets | null>(null);
 
   useEffect(() => {
-    void refreshHome();
+    let cancelled = false;
     void fetchStudentHomeWidgets()
-      .then(setWidgets)
-      .catch(() => setWidgets(null));
-  }, [refreshHome]);
+      .then((data) => {
+        if (!cancelled) setWidgets(data);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setWidgets({
+            timetable: [],
+            lms: {},
+            examinations: {},
+            library: {},
+            notifications: {},
+            birthdays: {},
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const studentName = home?.profile?.displayFullName ?? 'Student';
   const program =
@@ -42,6 +58,14 @@ export default function StudentHomeScreen() {
       ? `Semester ${home?.profile.semesterSequence}`
       : 'Semester');
   const roll = home?.profile?.rollNumber ?? '—';
+  const academicYear = home?.profile?.academicYear?.trim() || '';
+  const shiftName = home?.profile?.shiftName?.trim() || '';
+  const profileLine = [
+    academicYear ? `Academic year ${academicYear}` : '',
+    shiftName ? `Shift: ${shiftName}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const feeDue = home?.fees?.due ?? 0;
   const feePaid = home?.fees?.paid ?? 0;
   const feeTotal = feePaid + feeDue;
@@ -108,7 +132,19 @@ export default function StudentHomeScreen() {
               void refreshHome();
               void fetchStudentHomeWidgets()
                 .then(setWidgets)
-                .catch(() => setWidgets(null));
+                .catch(() => {
+                  setWidgets(
+                    (current) =>
+                      current ?? {
+                        timetable: [],
+                        lms: {},
+                        examinations: {},
+                        library: {},
+                        notifications: {},
+                        birthdays: {},
+                      },
+                  );
+                });
             }}
           />
         }
@@ -120,6 +156,7 @@ export default function StudentHomeScreen() {
               🎓 {program} • {semester}
             </Text>
             <Text style={styles.heroMeta}>Roll No: {roll}</Text>
+            {profileLine ? <Text style={styles.heroMeta}>{profileLine}</Text> : null}
             <Pressable
               style={styles.profileBtn}
               onPress={() => router.push('/(student)/(tabs)/profile' as never)}
@@ -219,7 +256,9 @@ export default function StudentHomeScreen() {
 
         <View style={styles.widgetCard}>
           <Text style={styles.sectionTitle}>📅 Today's Classes</Text>
-          {timetableSlots.length > 0 ? (
+          {widgets == null ? (
+            <Text style={styles.widgetLine}>Loading today's classes…</Text>
+          ) : timetableSlots.length > 0 ? (
             timetableSlots.slice(0, 4).map((slot, index) => (
               <Text key={`${slot.startTime}-${index}`} style={styles.widgetLine}>
                 {slot.startTime ?? '—'}
@@ -521,6 +560,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fffbeb',
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: studentTheme.text },
+  sectionHeading: { fontSize: 16, fontWeight: '800', color: studentTheme.text, marginTop: 4 },
   feeValue: { fontSize: 28, fontWeight: '700', color: '#854d0e', marginTop: 6 },
   progressTrack: {
     height: 8,

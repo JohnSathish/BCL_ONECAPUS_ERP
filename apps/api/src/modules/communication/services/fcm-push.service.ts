@@ -184,17 +184,23 @@ export class FcmPushService {
             defaultSound: true,
             defaultVibrateTimings: true,
             visibility: 'PUBLIC',
-            notificationCount: 1,
+            notificationPriority: 'PRIORITY_HIGH',
             ...(publicImage ? { image: publicImage } : {}),
           },
         },
         apns: {
-          headers: { 'apns-priority': '10' },
+          headers: {
+            'apns-priority': '10',
+            'apns-push-type': 'alert',
+          },
           payload: {
             aps: {
+              alert: {
+                title: payload.title,
+                body: payload.body,
+              },
               sound: 'default',
-              'mutable-content': 1,
-              'content-available': 1,
+              ...(publicImage ? { 'mutable-content': 1 } : {}),
             },
           },
           ...(publicImage ? { fcm_options: { image: publicImage } } : {}),

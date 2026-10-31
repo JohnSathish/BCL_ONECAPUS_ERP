@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Stack, usePathname, useRouter, type Href } from 'expo-router';
+import { Stack, useRouter, type Href } from 'expo-router';
 import { FacultyDrawer } from '@/components/faculty-portal/faculty-drawer';
 import { FacultyPortalProvider } from '@/components/faculty-portal/faculty-portal-context';
 import { CHANGE_PASSWORD_HREF, getMustResetPassword } from '@/auth/password-reset-guard';
@@ -8,7 +8,6 @@ import { getAccessToken, getRefreshToken, getUserSnapshot } from '@/auth/session
 
 export default function StaffLayout() {
   const router = useRouter();
-  const pathname = usePathname();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -37,7 +36,7 @@ export default function StaffLayout() {
     return () => {
       cancelled = true;
     };
-  }, [router, pathname]);
+  }, [router]);
 
   if (!ready) {
     return (
@@ -62,6 +61,7 @@ export default function StaffLayout() {
         <Stack.Screen name="calendar" />
         <Stack.Screen name="teaching-load" />
         <Stack.Screen name="notices" />
+        <Stack.Screen name="library" />
         <Stack.Screen name="payroll" />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="security" />

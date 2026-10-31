@@ -15,7 +15,8 @@ process.chdir(root);
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const appVersion = pkg.version || '1.0.34';
-const versionCode = '65';
+const appConfigSrc = fs.readFileSync(path.join(root, 'app.config.ts'), 'utf8');
+const versionCode = (appConfigSrc.match(/versionCode:\s*(\d+)/) || [])[1] || '1';
 
 const jdkCandidates = [
   process.env.JAVA_HOME,

@@ -100,6 +100,13 @@ export const FACULTY_DRAWER_SECTIONS: FacultyDrawerSection[] = [
         href: '/(staff)/notices',
         keywords: ['announcement', 'circular'],
       },
+      {
+        id: 'library',
+        label: 'Library / OPAC',
+        icon: '📖',
+        href: '/(staff)/library',
+        keywords: ['books', 'opac', 'catalogue', 'library'],
+      },
     ],
   },
   {
@@ -207,6 +214,13 @@ export const STAFF_DRAWER_SECTIONS: FacultyDrawerSection[] = [
         icon: '📢',
         href: '/(staff)/notices',
         keywords: ['announcement', 'circular'],
+      },
+      {
+        id: 'library',
+        label: 'Library / OPAC',
+        icon: '📖',
+        href: '/(staff)/library',
+        keywords: ['books', 'opac', 'catalogue', 'library'],
       },
     ],
   },

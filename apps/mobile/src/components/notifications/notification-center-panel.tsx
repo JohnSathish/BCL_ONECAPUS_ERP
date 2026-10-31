@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -79,15 +79,17 @@ export function NotificationCenterPanel({
   const [items, setItems] = useState<UserNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
+  const hasItems = useRef(false);
   const [message, setMessage] = useState('');
   const [detail, setDetail] = useState<MessageModalState | null>(null);
   const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!hasItems.current) setLoading(true);
     try {
       const [list, count] = await Promise.all([fetchNotifications(60, filter), fetchUnreadCount()]);
       setItems(list);
+      hasItems.current = true;
       setUnread(count.count);
       setMessage('');
 

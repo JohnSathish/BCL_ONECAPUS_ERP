@@ -1,7 +1,7 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { Alert, Linking, Platform } from 'react-native';
+import { Alert, AppState, Linking, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { apiFetch } from '@/api/client';
 import { getDeviceId } from '@/auth/device';
@@ -21,13 +21,20 @@ import { startAppUpdate } from '@/services/app-update';
 
 try {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
+    handleNotification: async (notification) => {
+      const data = (notification.request.content.data ?? {}) as Record<string, unknown>;
+      const echo = data.trayEcho === '1';
+      // Android does not post a shade notification for a remote message while the
+      // app is open. The received listener posts one local copy instead.
+      const show = echo || Platform.OS !== 'android';
+      return {
+        shouldShowAlert: show,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: show,
+        shouldShowList: show,
+      };
+    },
   });
 } catch (err) {
   console.warn('[push] setNotificationHandler failed', err);
@@ -44,6 +51,9 @@ function isExpoPushToken(token: string) {
 
 export async function ensureAndroidDefaultChannel() {
   if (Platform.OS !== 'android') return;
+  // Android keeps the first importance forever. Recreate the channel so a
+  // low-importance channel cannot swallow later college notices.
+  await Notifications.deleteNotificationChannelAsync('onecampus_default').catch(() => undefined);
   await Notifications.setNotificationChannelAsync('onecampus_default', {
     name: 'Campus Portal',
     importance: Notifications.AndroidImportance.MAX,
@@ -91,13 +101,12 @@ export async function getNativePushToken(): Promise<string | null> {
     try {
       const deviceToken = await Notifications.getDevicePushTokenAsync();
       const raw = deviceToken?.data != null ? String(deviceToken.data).trim() : '';
-      // iOS returns a raw APNs token. The backend delivers via FCM HTTP v1, which
-      // cannot use an APNs token directly. Until Firebase-iOS (FCM tokens on iOS)
-      // or a dedicated APNs sender is wired, skip registration so we never store a
-      // token the sender can't deliver to.
-      if (deviceToken?.type === 'ios') {
+      // A raw APNs device token is 64 hex characters. FCM HTTP v1 needs the
+      // Firebase registration token, which contains a colon. Keep FCM tokens
+      // even when the platform reports type "ios".
+      if (deviceToken?.type === 'ios' && raw && !raw.includes(':')) {
         console.warn(
-          '[push] iOS APNs token received but FCM sender is not configured for iOS yet — skipping push registration',
+          '[push] iOS returned an APNs device token. FCM needs a Firebase registration token from a build that includes GoogleService-Info.plist.',
         );
         return null;
       }
@@ -294,15 +303,14 @@ export async function trackPushOpened(link?: string) {
   }
 }
 
+let inboxRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
 function scheduleInboxRefresh(source: 'push-received' | 'push-tap') {
-  emitNotificationsInvalidated({ source, reason: 'immediate' });
-  // In-app row may commit slightly after FCM delivery — retry once.
-  setTimeout(() => {
-    emitNotificationsInvalidated({ source, reason: 'retry' });
-  }, 900);
-  setTimeout(() => {
-    emitNotificationsInvalidated({ source, reason: 'retry-late' });
-  }, 2500);
+  if (inboxRefreshTimer) clearTimeout(inboxRefreshTimer);
+  inboxRefreshTimer = setTimeout(() => {
+    inboxRefreshTimer = null;
+    emitNotificationsInvalidated({ source, reason: 'refresh' });
+  }, 500);
 }
 
 export function navigateFromPushLink(
@@ -428,8 +436,22 @@ export function attachPushResponseListener() {
   }
   // Foreground arrivals: refresh in-app Notifications inbox (student + staff).
   if (!receivedSub) {
-    receivedSub = Notifications.addNotificationReceivedListener(() => {
+    receivedSub = Notifications.addNotificationReceivedListener((event) => {
+      const content = event.request.content;
+      const data = (content.data ?? {}) as Record<string, unknown>;
+      if (data.trayEcho === '1') return;
       scheduleInboxRefresh('push-received');
+      if (Platform.OS === 'android' && AppState.currentState === 'active') {
+        void Notifications.scheduleNotificationAsync({
+          content: {
+            title: content.title || 'Don Bosco College',
+            body: content.body || 'New campus notice',
+            sound: 'default',
+            data: { ...data, trayEcho: '1' },
+          },
+          trigger: null,
+        });
+      }
     });
   }
 }
