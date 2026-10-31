@@ -37,6 +37,8 @@ type Props = {
   challengeAnswer: string;
   onFillDemoCredentials?: (email: string, password: string) => void;
   schoolPortal?: boolean;
+  plain?: boolean;
+  identifierLabel?: string;
 };
 
 const SECURITY_LINES = [
@@ -77,6 +79,8 @@ export function LoginAuthCard({
   challengeAnswer,
   onFillDemoCredentials,
   schoolPortal: schoolPortalProp,
+  plain = false,
+  identifierLabel,
 }: Props) {
   const animate = useLoginHeroMotion();
   const schoolPortal = schoolPortalProp ?? context?.institutionType === 'SCHOOL';
@@ -93,22 +97,28 @@ export function LoginAuthCard({
 
   return (
     <motion.article
-      className="login-glass-card login-institution-themed login-auth-card-shell flex w-full min-h-0 min-w-0 max-w-[440px] flex-col overflow-visible rounded-2xl max-lg:max-h-none lg:max-h-[min(calc(100dvh-4rem),880px)] lg:overflow-hidden"
+      className={
+        plain
+          ? 'flex w-full min-w-0 flex-col'
+          : 'login-glass-card login-institution-themed login-auth-card-shell flex w-full min-h-0 min-w-0 max-w-[440px] flex-col overflow-visible rounded-2xl max-lg:max-h-none lg:max-h-[min(calc(100dvh-4rem),880px)] lg:overflow-hidden'
+      }
       style={themeStyle}
-      initial={animate ? { opacity: 0, y: 18, scale: 0.98 } : false}
+      initial={animate && !plain ? { opacity: 0, y: 18, scale: 0.98 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.55, ease: EASE_OUT }}
     >
-      <motion.div {...fadeUp(0.06, animate)}>
-        <LoginInstitutionHeader
-          context={context}
-          loading={contextLoading}
-          waitingForApi={waitingForApi}
-          errorMessage={contextError}
-        />
-      </motion.div>
+      {plain ? null : (
+        <motion.div {...fadeUp(0.06, animate)}>
+          <LoginInstitutionHeader
+            context={context}
+            loading={contextLoading}
+            waitingForApi={waitingForApi}
+            errorMessage={contextError}
+          />
+        </motion.div>
+      )}
 
-      {showSignInIntro ? (
+      {!plain && showSignInIntro ? (
         <motion.div
           className="shrink-0 border-b border-border/30 bg-card/40 px-5 py-3 sm:px-6"
           {...fadeUp(0.14, animate)}
@@ -125,13 +135,24 @@ export function LoginAuthCard({
       ) : null}
 
       <div className="login-auth-card-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-visible max-lg:overflow-y-visible lg:overflow-y-auto overscroll-contain">
-        <div className="space-y-3 px-5 py-4 sm:px-6">
+        <div className={plain ? 'space-y-3' : 'space-y-3 px-5 py-4 sm:px-6'}>
+          {plain && contextLoading ? (
+            <p className="text-sm text-slate-500">Loading the college sign-in…</p>
+          ) : null}
+          {plain && contextError ? (
+            <p className="text-sm text-red-700" role="alert">
+              {contextError}
+            </p>
+          ) : null}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
             <motion.div className="space-y-3" {...fadeUp(0.22, animate)}>
               <LoginField
                 id="identifier"
                 label={
-                  schoolPortal ? 'Admission no., roll no. or email' : 'College roll number or email'
+                  identifierLabel ||
+                  (schoolPortal
+                    ? 'Admission no., roll no. or email'
+                    : 'College roll number or email')
                 }
                 icon={UserRound}
                 type="text"
@@ -218,6 +239,8 @@ export function LoginAuthCard({
                       <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                       Signing in…
                     </>
+                  ) : plain ? (
+                    'Login'
                   ) : (
                     'Sign In Securely'
                   )}
@@ -232,51 +255,55 @@ export function LoginAuthCard({
             </motion.div>
           ) : null}
 
-          <motion.div
-            className="space-y-1 border-t border-border/40 pt-2.5"
-            {...fadeUp(0.48, animate)}
-          >
-            {SECURITY_LINES.map((line) => (
-              <p
-                key={line}
-                className="flex items-center gap-2 text-[10px] leading-snug text-muted-foreground"
-              >
-                <Shield className="h-3 w-3 shrink-0 text-primary/80" aria-hidden />
-                {line}
-              </p>
-            ))}
-          </motion.div>
+          {plain ? null : (
+            <motion.div
+              className="space-y-1 border-t border-border/40 pt-2.5"
+              {...fadeUp(0.48, animate)}
+            >
+              {SECURITY_LINES.map((line) => (
+                <p
+                  key={line}
+                  className="flex items-center gap-2 text-[10px] leading-snug text-muted-foreground"
+                >
+                  <Shield className="h-3 w-3 shrink-0 text-primary/80" aria-hidden />
+                  {line}
+                </p>
+              ))}
+            </motion.div>
+          )}
         </div>
       </div>
 
-      <motion.footer
-        className="shrink-0 border-t border-border/50 bg-muted/15 px-5 py-3 sm:px-6"
-        {...fadeUp(0.54, animate)}
-      >
-        {context?.showPoweredBy !== false ? (
-          <div className="flex flex-col items-center gap-1.5 text-center">
-            <Link
-              href="https://basecodelabs.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex items-center gap-2 rounded-lg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <BrandingLogoImage
-                src="/branding/basecode-labs-logo.png"
-                className="opacity-90"
-                size={28}
-                unoptimized
-              />
-              <p className="text-[10px] text-muted-foreground">
-                Powered by{' '}
-                <span className="font-medium text-foreground/80 group-hover:text-primary">
-                  BaseCode Labs Pvt. Ltd.
-                </span>
-              </p>
-            </Link>
-          </div>
-        ) : null}
-      </motion.footer>
+      {plain ? null : (
+        <motion.footer
+          className="shrink-0 border-t border-border/50 bg-muted/15 px-5 py-3 sm:px-6"
+          {...fadeUp(0.54, animate)}
+        >
+          {context?.showPoweredBy !== false ? (
+            <div className="flex flex-col items-center gap-1.5 text-center">
+              <Link
+                href="https://basecodelabs.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center gap-2 rounded-lg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <BrandingLogoImage
+                  src="/branding/basecode-labs-logo.png"
+                  className="opacity-90"
+                  size={28}
+                  unoptimized
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Powered by{' '}
+                  <span className="font-medium text-foreground/80 group-hover:text-primary">
+                    BaseCode Labs Pvt. Ltd.
+                  </span>
+                </p>
+              </Link>
+            </div>
+          ) : null}
+        </motion.footer>
+      )}
     </motion.article>
   );
 }

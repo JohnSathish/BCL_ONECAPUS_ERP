@@ -43,6 +43,9 @@ type LoginFormProps = {
   compact?: boolean;
   /** From the request Host header (SSR). Never read `window` during render. */
   schoolSis?: boolean;
+  /** Library card: fields and the human check only, without the ERP splash chrome. */
+  plain?: boolean;
+  identifierLabel?: string;
 };
 
 function resolveSafeNextPath(raw: string | null | undefined): string | undefined {
@@ -60,6 +63,8 @@ export function LoginForm({
   hardRedirect = false,
   compact = false,
   schoolSis = false,
+  plain = false,
+  identifierLabel,
 }: LoginFormProps) {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
@@ -378,6 +383,8 @@ export function LoginForm({
       challengeAnswer={challengeAnswer}
       onFillDemoCredentials={fillDemoCredentials}
       schoolPortal={schoolLogin}
+      plain={plain}
+      identifierLabel={identifierLabel}
     />
   );
   const favicon = (
