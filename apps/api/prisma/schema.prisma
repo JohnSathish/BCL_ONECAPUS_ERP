@@ -9836,6 +9836,7 @@ model LibrarySettings {
   accessionNextSeq          Int      @default(1) @map("accession_next_seq")
   barcodeLabelSettings      Json?    @map("barcode_label_settings")
   opacSettings              Json?    @map("opac_settings")
+  accessDeskSettings        Json?    @map("access_desk_settings")
   createdAt                 DateTime @default(now()) @map("created_at")
   updatedAt                 DateTime @updatedAt @map("updated_at")
 

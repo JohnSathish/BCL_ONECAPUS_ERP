@@ -16,6 +16,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import { librarySearchPanelClass } from '@/components/library/library-search-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
@@ -387,6 +388,51 @@ export function CollectionReportsWorkspace() {
             </div>
           </form>
 
+          {key === 'department-detail' ? (
+            <section className={librarySearchPanelClass}>
+              <h2 className="text-base font-bold text-[#0B1F44]">
+                Department-Wise Detailed Book List
+              </h2>
+              <p className="mt-1 text-sm text-[#0B1F44]">
+                View and download the department book inventory with accession numbers, authors,
+                publication details, copy status and summary counts. Choose a department above, or
+                All Departments.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    setFilters(draft);
+                    setPage(1);
+                    setMessage('The table below is the live preview for the selected department.');
+                  }}
+                >
+                  Preview Report
+                </Button>
+                <Button type="button" size="sm" onClick={() => void saveExcel('selected')}>
+                  Download Excel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void saveExcel('consolidated')}
+                >
+                  Download All Departments
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void saveExcel('sheets')}
+                >
+                  Export Separate Department Worksheets
+                </Button>
+              </div>
+            </section>
+          ) : null}
+
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="font-medium">{report.data?.title ?? 'Report'}</h2>
@@ -471,6 +517,25 @@ export function CollectionReportsWorkspace() {
   function open(reportKey: string) {
     setKey(reportKey);
     setPage(1);
+  }
+
+  async function saveExcel(layout: 'selected' | 'consolidated' | 'sheets') {
+    setMessage('Preparing the Excel report…');
+    try {
+      const blob = await downloadCatalogueReport('department-detail', 'xlsx', {
+        ...compact(filters),
+        layout,
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'department-wise-detailed-book-list.xlsx';
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage('The Excel report downloaded. Each row is one physical copy.');
+    } catch (error) {
+      setMessage(apiErrorMessage(error));
+    }
   }
 
   async function save(format: 'xlsx' | 'csv' | 'pdf', print = false) {

@@ -467,8 +467,12 @@ export class LibraryController {
 
   @Get('access/desk-dashboard')
   @RequireAnyPermission(...LIB_DESK)
-  accessDeskDashboard(@CurrentUser() user: JwtUser) {
-    return this.access.accessDeskDashboard(user.tid);
+  accessDeskDashboard(
+    @CurrentUser() user: JwtUser,
+    @Query('period') period?: string,
+  ) {
+    const range = period === 'week' || period === 'month' ? period : 'today';
+    return this.access.accessDeskDashboard(user.tid, range);
   }
 
   @Get('access/visits')

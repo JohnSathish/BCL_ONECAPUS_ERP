@@ -6,8 +6,8 @@ import {
 import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
-import { calculateOverdueFine } from '../utils/library-fine.util';
 import { LibrarySettingsService } from './library-settings.service';
+import { LibraryLoanCalendarService } from './library-loan-calendar.service';
 
 export type FineStatus = 'UNPAID' | 'PAID' | 'WAIVED';
 
@@ -16,6 +16,7 @@ export class LibraryFinesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: LibrarySettingsService,
+    private readonly loanCalendar: LibraryLoanCalendarService,
   ) {}
 
   private fineStatus(fine: {
@@ -125,24 +126,18 @@ export class LibraryFinesService {
   >(tenantId: string, loans: T[]) {
     const settings = await this.settings.getSettings(tenantId);
     const now = new Date();
+    const assessed = await this.loanCalendar.assessMany(
+      tenantId,
+      loans,
+      now,
+      settings,
+    );
 
-    return loans.map((loan) => {
-      const projectedFine = calculateOverdueFine(loan.dueAt, now, settings);
-      const graceEnd = new Date(loan.dueAt);
-      graceEnd.setDate(graceEnd.getDate() + settings.graceDays);
-      const daysOverdue =
-        now > graceEnd
-          ? Math.ceil(
-              (now.getTime() - graceEnd.getTime()) / (24 * 60 * 60 * 1000),
-            )
-          : 0;
-
-      return {
-        ...loan,
-        projectedFine,
-        daysOverdue,
-      };
-    });
+    return loans.map((loan, index) => ({
+      ...loan,
+      projectedFine: assessed[index]?.fine ?? 0,
+      daysOverdue: assessed[index]?.overdueDays ?? 0,
+    }));
   }
 
   async accrueDailyRunningFines(tenantId: string) {
@@ -152,11 +147,38 @@ export class LibraryFinesService {
       where: { tenantId, status: 'ACTIVE', dueAt: { lt: now } },
       include: { fines: true },
     });
+    const assessed = await this.loanCalendar.assessMany(
+      tenantId,
+      overdueLoans,
+      now,
+      settings,
+    );
 
     let updated = 0;
-    for (const loan of overdueLoans) {
-      const projected = calculateOverdueFine(loan.dueAt, now, settings);
-      if (projected <= 0) continue;
+    for (let index = 0; index < overdueLoans.length; index += 1) {
+      const loan = overdueLoans[index];
+      const projected = assessed[index]?.fine ?? 0;
+      if (projected <= 0) {
+        const stale = loan.fines.find((f) => !f.paidAt && !f.waivedAt);
+        if (
+          stale &&
+          (stale.reason === 'Running overdue accrual' ||
+            stale.reason === 'Overdue return') &&
+          Number(stale.amount) !== 0
+        ) {
+          await this.prisma.libraryFine.update({
+            where: { id: stale.id },
+            data: {
+              amount: 0,
+              waivedAt: now,
+              waiveReason:
+                'No overdue working days after Sundays and college holidays',
+            },
+          });
+          updated++;
+        }
+        continue;
+      }
 
       const openFine = loan.fines.find((f) => !f.paidAt && !f.waivedAt);
       if (openFine) {

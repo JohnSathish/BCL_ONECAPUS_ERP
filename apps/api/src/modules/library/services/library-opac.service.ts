@@ -345,6 +345,9 @@ export class LibraryOpacService {
         staffRenewals: policy.staff.maxRenewals,
         finePerDay: Number(stored.finePerDay),
         graceDays: stored.graceDays,
+        workingDayLoans:
+          policy.loanCalendar.excludeWeekends ||
+          policy.loanCalendar.excludeHolidays,
         maxFine: Number(stored.maxFine),
         referenceIssue: policy.reference.allowIssue,
         rareIssue: policy.rare.allowIssue,

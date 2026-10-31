@@ -9,13 +9,17 @@ import { RequireAnyPermission } from '../../../common/decorators/require-permiss
 import { CatalogueReportQueryDto } from '../dto/catalogue-report.dto';
 import { exportCatalogueReport } from './library-catalogue-report.export';
 import { LibraryCatalogueReportsService } from './library-catalogue-reports.service';
+import { LibraryDepartmentDetailReportService } from './library-department-detail.service';
 
 @ApiBearerAuth()
 @ApiTags('library')
 @RequireAnyPermission('library:reports', 'library:manage', 'library:read')
 @Controller({ path: 'library/catalogue-reports', version: '1' })
 export class LibraryCatalogueReportsController {
-  constructor(private readonly reports: LibraryCatalogueReportsService) {}
+  constructor(
+    private readonly reports: LibraryCatalogueReportsService,
+    private readonly departmentDetail: LibraryDepartmentDetailReportService,
+  ) {}
 
   @Get()
   definitions() {
@@ -41,6 +45,16 @@ export class LibraryCatalogueReportsController {
     @Res() res: Response,
   ) {
     const kind = format === 'csv' || format === 'pdf' ? format : 'xlsx';
+    if (key === 'department-detail' && kind === 'xlsx') {
+      const file = await this.departmentDetail.workbook(user.tid, user, query);
+      res.setHeader('Content-Type', file.contentType);
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="department-wise-detailed-book-list.xlsx"',
+      );
+      res.send(file.body);
+      return;
+    }
     const payload = await this.reports.run(
       user.tid,
       key,

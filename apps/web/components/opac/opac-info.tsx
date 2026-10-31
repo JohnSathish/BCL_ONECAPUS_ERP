@@ -26,6 +26,7 @@ type Info = {
     staffRenewals: number;
     finePerDay: number;
     graceDays: number;
+    workingDayLoans?: boolean;
     maxFine: number;
     referenceIssue: boolean;
     rareIssue: boolean;
@@ -43,23 +44,24 @@ export function OpacInfo() {
   if (info.isError || !info.data)
     return <p className="text-sm text-red-700">Library information could not be loaded.</p>;
   const rules = info.data.rules;
+  const period = rules.workingDayLoans === false ? 'days' : 'working days';
   const rows = [
     [
       'Students',
       `${rules.studentMaxBooks} books`,
-      `${rules.studentLoanDays} days`,
+      `${rules.studentLoanDays} ${period}`,
       `${rules.studentRenewals} renewals`,
     ],
     [
       'Faculty',
       `${rules.facultyMaxBooks} books`,
-      `${rules.facultyLoanDays} days`,
+      `${rules.facultyLoanDays} ${period}`,
       `${rules.facultyRenewals} renewals`,
     ],
     [
       'Staff',
       `${rules.staffMaxBooks} books`,
-      `${rules.staffLoanDays} days`,
+      `${rules.staffLoanDays} ${period}`,
       `${rules.staffRenewals} renewals`,
     ],
   ];
@@ -97,7 +99,9 @@ export function OpacInfo() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
           <h2 className="font-semibold">Fines</h2>
           <p className="mt-2">
-            ₹{rules.finePerDay} per day after {rules.graceDays} grace days.
+            ₹{rules.finePerDay} per{' '}
+            {rules.workingDayLoans === false ? 'day' : 'overdue working day'} after{' '}
+            {rules.graceDays} grace days.
           </p>
           <p>Maximum fine on one loan: ₹{rules.maxFine}.</p>
         </div>

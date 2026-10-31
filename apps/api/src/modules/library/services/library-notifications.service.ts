@@ -6,12 +6,10 @@ import { PrismaService } from '../../../database/prisma.service';
 
 import { CommunicationTriggerService } from '../../communication/services/communication-trigger.service';
 
-import {
-  calculateOverdueFine,
-  startOfUtcDay,
-} from '../utils/library-fine.util';
+import { startOfUtcDay } from '../utils/library-fine.util';
 
 import { LibrarySettingsService } from './library-settings.service';
+import { LibraryLoanCalendarService } from './library-loan-calendar.service';
 
 @Injectable()
 export class LibraryNotificationsService {
@@ -23,6 +21,8 @@ export class LibraryNotificationsService {
     private readonly communication: CommunicationTriggerService,
 
     private readonly settings: LibrarySettingsService,
+
+    private readonly loanCalendar: LibraryLoanCalendarService,
   ) {}
 
   private async studentRecipient(tenantId: string, studentId: string) {
@@ -106,11 +106,14 @@ export class LibraryNotificationsService {
 
     const libSettings = await this.settings.getSettings(tenantId);
 
-    const projectedFine = calculateOverdueFine(
-      loan.dueAt,
-      new Date(),
-      libSettings,
-    );
+    const projectedFine = (
+      await this.loanCalendar.assess(
+        tenantId,
+        loan.dueAt,
+        new Date(),
+        libSettings,
+      )
+    ).fine;
 
     await this.communication.trigger({
       tenantId,
@@ -176,11 +179,14 @@ export class LibraryNotificationsService {
 
         if (!recipient) continue;
 
-        const projectedFine = calculateOverdueFine(
-          loan.dueAt,
-          new Date(),
-          libSettings,
-        );
+        const projectedFine = (
+          await this.loanCalendar.assess(
+            tenantId,
+            loan.dueAt,
+            new Date(),
+            libSettings,
+          )
+        ).fine;
 
         const result = await this.communication.trigger({
           tenantId,

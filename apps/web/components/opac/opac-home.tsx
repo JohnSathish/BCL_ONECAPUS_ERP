@@ -60,6 +60,7 @@ type Info = {
     facultyMaxBooks: number;
     finePerDay: number;
     graceDays: number;
+    workingDayLoans?: boolean;
     maxReservations: number;
     reservationDays: number;
   };
@@ -306,14 +307,17 @@ export function OpacHome() {
               <ul className="mt-3 space-y-1 text-slate-700">
                 <li>
                   Students may borrow {rules.studentMaxBooks} books for {rules.studentLoanDays}{' '}
-                  days.
+                  {rules.workingDayLoans === false ? 'days' : 'working days'}.
                 </li>
                 <li>
-                  Faculty may borrow {rules.facultyMaxBooks} books for {rules.facultyLoanDays} days.
+                  Faculty may borrow {rules.facultyMaxBooks} books for {rules.facultyLoanDays}{' '}
+                  {rules.workingDayLoans === false ? 'days' : 'working days'}.
                 </li>
                 <li>Students may renew up to {rules.studentRenewals} times.</li>
                 <li>
-                  Fine is ₹{rules.finePerDay} per day after {rules.graceDays} grace days.
+                  Fine is ₹{rules.finePerDay} per{' '}
+                  {rules.workingDayLoans === false ? 'day' : 'overdue working day'} after{' '}
+                  {rules.graceDays} grace days.
                 </li>
                 <li>
                   Up to {rules.maxReservations} reservations, held for {rules.reservationDays} days.

@@ -108,6 +108,10 @@ export class CatalogueReportQueryDto {
   @IsOptional()
   @IsIn(['stock', 'added'])
   scope?: 'stock' | 'added';
+
+  @IsOptional()
+  @IsIn(['selected', 'consolidated', 'sheets'])
+  layout?: 'selected' | 'consolidated' | 'sheets';
 }
 
 export class AssignLibraryDepartmentDto {

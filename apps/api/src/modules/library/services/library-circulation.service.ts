@@ -11,7 +11,10 @@ import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import type { IssueBookDto, ReturnBookDto } from '../dto/library.dto';
 import { mergeCirculationPolicy } from '../domain/library-policy.types';
 import { resolveCopyIssue } from '../domain/library-copy-issue.logic';
-import { calculateOverdueFine } from '../utils/library-fine.util';
+import {
+  collegeDateIso,
+  renewalPeriodDays,
+} from '../domain/library-loan-calendar.logic';
 import { computeReadingScore } from '../domain/library-reading-score';
 import { LibraryCatalogueService } from './library-catalogue.service';
 import { LibraryFinesService } from './library-fines.service';
@@ -24,6 +27,7 @@ import { LibraryPolicyService } from './library-policy.service';
 import { LibraryQrService } from './library-qr.service';
 import { LibraryReservationService } from './library-reservation.service';
 import { LibrarySettingsService } from './library-settings.service';
+import { LibraryLoanCalendarService } from './library-loan-calendar.service';
 
 @Injectable()
 export class LibraryCirculationService {
@@ -38,6 +42,7 @@ export class LibraryCirculationService {
     private readonly fines: LibraryFinesService,
     private readonly qr: LibraryQrService,
     private readonly realtime: RealtimeGateway,
+    private readonly loanCalendar: LibraryLoanCalendarService,
   ) {}
 
   private resolveCopyBarcode(raw: string) {
@@ -54,6 +59,8 @@ export class LibraryCirculationService {
       bookTitle: string;
       programme?: string | null;
       accessionNumber?: string | null;
+      dueAt?: string;
+      previousDueAt?: string;
     },
   ) {
     await this.prisma.libraryAuditLog.create({
@@ -263,7 +270,7 @@ export class LibraryCirculationService {
         rules.loanDays,
       );
     }
-    const dueAt = this.policy.computeDueDate(loanDays);
+    const dueAt = await this.loanCalendar.dueAt(tenantId, new Date(), loanDays);
     const settings = await this.settings.getSettings(tenantId);
     return {
       dueAt,
@@ -334,7 +341,7 @@ export class LibraryCirculationService {
         issueRules.loanDays,
       );
     }
-    const dueAt = this.policy.computeDueDate(loanDays);
+    const dueAt = await this.loanCalendar.dueAt(user.tid, new Date(), loanDays);
 
     const loan = await this.prisma.$transaction(async (tx) => {
       const reserved = await tx.libraryBookCopy.updateMany({
@@ -369,6 +376,7 @@ export class LibraryCirculationService {
       bookTitle: copy.book.title,
       programme: profile.programme,
       accessionNumber: copy.accessionNumber || copy.barcode,
+      dueAt: dueAt.toISOString(),
     });
 
     return { loan, member: profile };
@@ -387,12 +395,14 @@ export class LibraryCirculationService {
 
     const settings = await this.settings.getSettings(user.tid);
     const returnedAt = new Date();
-    const fineAmount = calculateOverdueFine(loan.dueAt, returnedAt, settings);
-    const overdueDays = Math.max(
-      0,
-      Math.ceil((returnedAt.getTime() - loan.dueAt.getTime()) / 86_400_000) -
-        settings.graceDays,
+    const assessment = await this.loanCalendar.assess(
+      user.tid,
+      loan.dueAt,
+      returnedAt,
+      settings,
     );
+    const fineAmount = assessment.fine;
+    const overdueDays = assessment.overdueDays;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const closed = await tx.libraryLoan.updateMany({
@@ -436,6 +446,17 @@ export class LibraryCirculationService {
             },
           });
         }
+      } else if (openFine && isRunningOverdueFine(openFine.reason)) {
+        fine = await tx.libraryFine.update({
+          where: { id: openFine.id },
+          data: {
+            amount: 0,
+            waivedAt: returnedAt,
+            waivedById: user.sub,
+            waiveReason:
+              'No overdue working days after Sundays and college holidays',
+          },
+        });
       }
 
       return { loan: updatedLoan, fine, overdueDays };
@@ -493,8 +514,14 @@ export class LibraryCirculationService {
     }
 
     const now = new Date();
+    const assessment = await this.loanCalendar.assess(
+      user.tid,
+      loan.dueAt,
+      now,
+      settings,
+    );
 
-    if (calculateOverdueFine(loan.dueAt, now, settings) > 0) {
+    if (assessment.fine > 0 && !policies.loanCalendar.allowRenewalWhenOverdue) {
       throw new BadRequestException(
         'Overdue books cannot be renewed — return or pay fines first',
       );
@@ -514,8 +541,17 @@ export class LibraryCirculationService {
         renewRules.loanDays,
       );
     }
-    const base = loan.dueAt > now ? loan.dueAt : now;
-    const newDue = this.policy.computeDueDate(loanDays, base);
+    const period = renewalPeriodDays(
+      loanDays,
+      policies.loanCalendar.renewalWorkingDays,
+    );
+    const dueIso = collegeDateIso(loan.dueAt);
+    const nowIso = collegeDateIso(now);
+    const newDue = await this.loanCalendar.dueAt(
+      user.tid,
+      dueIso >= nowIso ? loan.dueAt : now,
+      period,
+    );
 
     const renewed = await this.prisma.libraryLoan.updateMany({
       where: { id: loan.id, status: 'ACTIVE', renewalCount: loan.renewalCount },
@@ -536,6 +572,8 @@ export class LibraryCirculationService {
       memberName: 'Member',
       bookTitle: copy.book.title,
       accessionNumber: copy.accessionNumber || copy.barcode,
+      previousDueAt: loan.dueAt.toISOString(),
+      dueAt: newDue.toISOString(),
     });
 
     return updated;
@@ -777,12 +815,14 @@ export class LibraryCirculationService {
 
     const settings = await this.settings.getSettings(tenantId);
     const now = new Date();
-    const projectedFine = calculateOverdueFine(loan.dueAt, now, settings);
-    const overdueDays = Math.max(
-      0,
-      Math.ceil((now.getTime() - loan.dueAt.getTime()) / 86_400_000) -
-        settings.graceDays,
+    const assessment = await this.loanCalendar.assess(
+      tenantId,
+      loan.dueAt,
+      now,
+      settings,
     );
+    const projectedFine = assessment.fine;
+    const overdueDays = assessment.overdueDays;
     const openFine = loan.fines.find((f) => !f.paidAt && !f.waivedAt);
 
     let member: LibraryMemberProfile | null = null;
@@ -876,7 +916,13 @@ export class LibraryCirculationService {
       renewRules.maxRenewals,
     );
     const now = new Date();
-    const overdueFine = calculateOverdueFine(loan.dueAt, now, settings);
+    const assessment = await this.loanCalendar.assess(
+      tenantId,
+      loan.dueAt,
+      now,
+      settings,
+    );
+    const overdueFine = assessment.fine;
     let loanDays = this.policy.resolveLoanDays(
       policies,
       loan.memberType,
@@ -891,8 +937,17 @@ export class LibraryCirculationService {
         renewRules.loanDays,
       );
     }
-    const base = loan.dueAt > now ? loan.dueAt : now;
-    const newDueAt = this.policy.computeDueDate(loanDays, base);
+    const period = renewalPeriodDays(
+      loanDays,
+      policies.loanCalendar.renewalWorkingDays,
+    );
+    const dueIso = collegeDateIso(loan.dueAt);
+    const nowIso = collegeDateIso(now);
+    const newDueAt = await this.loanCalendar.dueAt(
+      tenantId,
+      dueIso >= nowIso ? loan.dueAt : now,
+      period,
+    );
 
     let blockReason: string | null = null;
     if (renewRules.blocked) {
@@ -903,7 +958,10 @@ export class LibraryCirculationService {
       blockReason = 'This library membership has expired.';
     } else if (loan.renewalCount >= maxRenewals) {
       blockReason = `Maximum renewals (${maxRenewals}) reached`;
-    } else if (overdueFine > 0) {
+    } else if (
+      overdueFine > 0 &&
+      !policies.loanCalendar.allowRenewalWhenOverdue
+    ) {
       blockReason = 'Overdue books cannot be renewed';
     }
 
@@ -914,7 +972,7 @@ export class LibraryCirculationService {
       renewalCount: loan.renewalCount,
       maxRenewals,
       newDueAt,
-      loanDays,
+      loanDays: period,
       canRenew: !blockReason,
       blockReason,
     };
@@ -940,6 +998,10 @@ export class LibraryCirculationService {
     });
     return { decision, policy };
   }
+}
+
+function isRunningOverdueFine(reason: string | null): boolean {
+  return reason === 'Running overdue accrual' || reason === 'Overdue return';
 }
 
 function loanCategory(

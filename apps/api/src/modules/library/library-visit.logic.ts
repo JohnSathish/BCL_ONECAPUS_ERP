@@ -119,3 +119,134 @@ export function endOfDay(value: Date) {
   date.setHours(23, 59, 59, 999);
   return date;
 }
+
+export const DUPLICATE_SCAN_MESSAGE = 'Duplicate scan detected. Please wait.';
+export const TOO_SOON_EXIT_MESSAGE =
+  'You have just entered the library. Please wait at least 1 minute before exiting.';
+
+export type AccessDeskSettings = {
+  voiceEnabled: boolean;
+  entryText: string;
+  exitText: string;
+  voiceName: string;
+  speechRate: number;
+  volume: number;
+  minStaySeconds: number;
+  duplicateWindowSeconds: number;
+};
+
+export const DEFAULT_ACCESS_DESK: AccessDeskSettings = {
+  voiceEnabled: true,
+  entryText: 'Welcome to Don Bosco Library.',
+  exitText: 'Thank you for visiting Don Bosco Library. Visit again!',
+  voiceName: '',
+  speechRate: 0.95,
+  volume: 1,
+  minStaySeconds: 60,
+  duplicateWindowSeconds: 5,
+};
+
+export type LibraryScanDecision =
+  | { action: 'ENTRY' }
+  | { action: 'EXIT' }
+  | { action: 'IGNORED'; message: string }
+  | { action: 'TOO_SOON'; message: string; remainingSeconds: number };
+
+export function mergeAccessDeskSettings(raw: unknown): AccessDeskSettings {
+  const source =
+    raw && typeof raw === 'object' ? (raw as Partial<AccessDeskSettings>) : {};
+  const minStay = clampInt(
+    source.minStaySeconds,
+    0,
+    3600,
+    DEFAULT_ACCESS_DESK.minStaySeconds,
+  );
+  const duplicate = clampInt(
+    source.duplicateWindowSeconds,
+    1,
+    60,
+    DEFAULT_ACCESS_DESK.duplicateWindowSeconds,
+  );
+  const rate = clampNumber(
+    source.speechRate,
+    0.5,
+    1.5,
+    DEFAULT_ACCESS_DESK.speechRate,
+  );
+  const volume = clampNumber(source.volume, 0, 1, DEFAULT_ACCESS_DESK.volume);
+  return {
+    voiceEnabled: source.voiceEnabled !== false,
+    entryText: cleanLine(source.entryText, DEFAULT_ACCESS_DESK.entryText),
+    exitText: cleanLine(source.exitText, DEFAULT_ACCESS_DESK.exitText),
+    voiceName:
+      typeof source.voiceName === 'string' ? source.voiceName.slice(0, 80) : '',
+    speechRate: rate,
+    volume,
+    minStaySeconds: minStay,
+    duplicateWindowSeconds: duplicate,
+  };
+}
+
+/** The latest open visit is the only session a scan may close. */
+export function pickActiveOpenVisit<T extends { entryAt: Date }>(
+  rows: T[],
+): T | null {
+  if (!rows.length) return null;
+  return rows.reduce((latest, row) =>
+    row.entryAt.getTime() > latest.entryAt.getTime() ? row : latest,
+  );
+}
+
+export function decideLibraryScan(input: {
+  memberType: string;
+  openEntryAt: Date | null;
+  lastAcceptedAt: Date | null;
+  now?: Date;
+  minStaySeconds: number;
+  duplicateWindowSeconds: number;
+}): LibraryScanDecision {
+  const now = input.now ?? new Date();
+  const duplicateMs = Math.max(0, input.duplicateWindowSeconds) * 1000;
+  if (
+    input.lastAcceptedAt &&
+    duplicateMs > 0 &&
+    now.getTime() - input.lastAcceptedAt.getTime() >= 0 &&
+    now.getTime() - input.lastAcceptedAt.getTime() < duplicateMs
+  ) {
+    return { action: 'IGNORED', message: DUPLICATE_SCAN_MESSAGE };
+  }
+  if (!input.openEntryAt) return { action: 'ENTRY' };
+  const elapsed = now.getTime() - input.openEntryAt.getTime();
+  const minMs = Math.max(0, input.minStaySeconds) * 1000;
+  if (input.memberType === 'STUDENT' && minMs > 0 && elapsed < minMs) {
+    return {
+      action: 'TOO_SOON',
+      message: TOO_SOON_EXIT_MESSAGE,
+      remainingSeconds: Math.max(1, Math.ceil((minMs - elapsed) / 1000)),
+    };
+  }
+  return { action: 'EXIT' };
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number) {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+function clampNumber(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+) {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function cleanLine(value: unknown, fallback: string) {
+  if (typeof value !== 'string') return fallback;
+  const text = value.trim().slice(0, 180);
+  return text || fallback;
+}

@@ -1189,7 +1189,7 @@ function SettingsForm({
       <p className="text-xs text-slate-500">
         College default
         {defaults
-          ? `: ${defaults.maxBooks} books, ${defaults.loanDays} days, ${defaults.maxRenewals} renewals`
+          ? `: ${defaults.maxBooks} books, ${defaults.loanDays} working days, ${defaults.maxRenewals} renewals`
           : ''}
         . Empty fields follow that default. Reference and rare books still use their own rules.
       </p>
@@ -1203,7 +1203,7 @@ function SettingsForm({
         />
       </label>
       <label className="block">
-        Loan days
+        Working days
         <input
           className="mt-1 h-9 w-full rounded border px-2"
           value={loanDays}

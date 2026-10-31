@@ -152,6 +152,10 @@ export class LibrarySettingsDto {
   @IsOptional()
   @IsString()
   updatedAt?: string;
+
+  @IsOptional()
+  @IsObject()
+  accessDeskSettings?: Record<string, unknown>;
 }
 
 export class MemberSummaryQueryDto {

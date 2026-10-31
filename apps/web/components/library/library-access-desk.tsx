@@ -20,8 +20,11 @@ import {
   Wifi,
 } from 'lucide-react';
 
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { speakLibraryLine, unlockLibrarySpeech } from '@/lib/library-speech';
 import { LibraryDeskSidePanel } from '@/components/library/library-desk-side-panel';
 import { LibraryScannerStage, type ScannerPhase } from '@/components/library/library-scanner-stage';
 import { useBranding } from '@/hooks/use-branding';
@@ -95,7 +98,14 @@ function useLiveClock() {
 function changeLabel(value?: number | null) {
   if (value == null) return undefined;
   const sign = value > 0 ? '+' : '';
-  return `${sign}${value}% from yesterday`;
+  return `${sign}${value}% vs yesterday`;
+}
+
+function scanPhase(action: ScanResult['action']): ScannerPhase {
+  if (action === 'ENTRY') return 'entry';
+  if (action === 'EXIT') return 'exit';
+  if (action === 'TOO_SOON') return 'too-soon';
+  return 'duplicate';
 }
 
 function KpiCard({
@@ -139,60 +149,73 @@ const VISITOR_TYPES = [
 ] as const;
 
 function HourlyFootfallChart({
-  entries,
-  exits,
+  rows,
+  period,
+  onPeriod,
 }: {
-  entries: { hour: number; count: number }[];
-  exits: { hour: number; count: number }[];
+  rows: Array<{ hour: number; entries: number; exits: number }>;
+  period: 'today' | 'week' | 'month';
+  onPeriod: (period: 'today' | 'week' | 'month') => void;
 }) {
-  const slice = entries.filter((row) => row.hour >= 8 && row.hour <= 20);
-  const exitMap = new Map(exits.map((row) => [row.hour, row.count]));
-  const max = Math.max(1, ...slice.map((row) => Math.max(row.count, exitMap.get(row.hour) ?? 0)));
-  const peak = slice.reduce((best, row) => (row.count > best.count ? row : best), slice[0]);
+  const activeHours = rows.filter((row) => row.entries > 0 || row.exits > 0).map((row) => row.hour);
+  const from = activeHours.length ? Math.min(8, ...activeHours) : 8;
+  const to = activeHours.length ? Math.max(20, ...activeHours) : 20;
+  const slice = rows.filter((row) => row.hour >= from && row.hour <= to);
+  const peak = slice.reduce((best, row) => (row.entries > best.entries ? row : best), slice[0]);
+  const chartRows = slice.map((row) => ({
+    ...row,
+    label: `${row.hour}`,
+  }));
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900">Hourly footfall today</h3>
-        <div className="flex gap-3 text-xs text-slate-500">
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-sm bg-sky-500" /> Entries
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-sm bg-emerald-400" /> Exits
-          </span>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-slate-900">Hourly footfall</h3>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-full bg-slate-100 p-0.5 text-xs font-semibold">
+            {(
+              [
+                ['today', 'Today'],
+                ['week', 'This Week'],
+                ['month', 'This Month'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                className={cn(
+                  'rounded-full px-3 py-1',
+                  period === key ? 'bg-white text-sky-800 shadow-sm' : 'text-slate-500',
+                )}
+                onClick={() => onPeriod(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-      <div className="flex h-36 items-end gap-1">
-        {slice.map((row) => {
-          const exitCount = exitMap.get(row.hour) ?? 0;
-          return (
-            <div key={row.hour} className="flex flex-1 items-end justify-center gap-0.5">
-              <div className="flex h-28 w-full flex-col items-center justify-end gap-1">
-                <div className="flex h-full w-full items-end gap-0.5">
-                  <div
-                    className="w-1/2 rounded-t bg-sky-500"
-                    style={{ height: `${Math.max(row.count ? 6 : 0, (row.count / max) * 100)}%` }}
-                    title={`${row.hour}:00 entries ${row.count}`}
-                  />
-                  <div
-                    className="w-1/2 rounded-t bg-emerald-400"
-                    style={{ height: `${Math.max(exitCount ? 6 : 0, (exitCount / max) * 100)}%` }}
-                    title={`${row.hour}:00 exits ${exitCount}`}
-                  />
-                </div>
-                <span className="text-[9px] text-slate-400">{row.hour}</span>
-              </div>
-            </div>
-          );
-        })}
+      <div className="h-52">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartRows}>
+            <CartesianGrid vertical={false} stroke="#e2e8f0" />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis allowDecimals={false} width={28} tick={{ fontSize: 11 }} />
+            <Tooltip
+              formatter={(value, name) => [value ?? 0, name === 'entries' ? 'Entries' : 'Exits']}
+              labelFormatter={(label) => `${label}:00`}
+            />
+            <Bar dataKey="entries" fill="#0284c7" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="exits" fill="#34d399" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
-      {peak && peak.count > 0 ? (
-        <p className="mt-2 text-xs text-slate-500">
-          Peak: {peak.hour}:00–{peak.hour + 1}:00 ({peak.count} entries)
+      {peak && peak.entries > 0 ? (
+        <p className="mt-2 text-xs font-medium text-amber-700">
+          Peak: {peak.hour}:00–{peak.hour + 1}:00 · {peak.entries} entries · {peak.exits} exits
         </p>
       ) : (
-        <p className="mt-2 text-xs text-slate-500">No entries recorded between 8:00 and 20:00.</p>
+        <p className="mt-2 text-xs text-slate-500">No entries in this period.</p>
       )}
     </div>
   );
@@ -221,6 +244,7 @@ export function LibraryAccessDesk() {
   const [scanInput, setScanInput] = useState('');
   const [displayPhase, setDisplayPhase] = useState<ScannerPhase>('idle');
   const [fullscreen, setFullscreen] = useState(false);
+  const [period, setPeriod] = useState<'today' | 'week' | 'month'>('today');
   const [lastScan, setLastScan] = useState<ScanResult | null>(null);
   const [error, setError] = useState('');
   const [visitorOpen, setVisitorOpen] = useState(false);
@@ -235,8 +259,8 @@ export function LibraryAccessDesk() {
   });
 
   const dashboard = useQuery({
-    queryKey: ['library', 'access-desk', 'dashboard'],
-    queryFn: fetchLibraryAccessDeskDashboard,
+    queryKey: ['library', 'access-desk', 'dashboard', period],
+    queryFn: () => fetchLibraryAccessDeskDashboard(period),
     enabled,
     refetchInterval: 15_000,
     retry: 2,
@@ -252,7 +276,7 @@ export function LibraryAccessDesk() {
     },
     onScanResult: (result) => {
       setLastScan(result);
-      setDisplayPhase(result.action === 'ENTRY' ? 'entry' : 'exit');
+      setDisplayPhase(scanPhase(result.action));
       void qc.invalidateQueries({ queryKey: ['library', 'access-desk', 'dashboard'] });
     },
   });
@@ -285,12 +309,14 @@ export function LibraryAccessDesk() {
     mutationFn: (code: string) => scanLibraryAccess(code),
     onSuccess: (result) => {
       setLastScan(result);
-      setDisplayPhase(result.action === 'ENTRY' ? 'entry' : 'exit');
-      playBeep(true);
+      setDisplayPhase(scanPhase(result.action));
+      const accepted = result.action === 'ENTRY' || result.action === 'EXIT';
+      if (result.voice) speakLibraryLine(result.voice);
+      playBeep(accepted);
       clearScanInput();
-      setError('');
+      setError(accepted ? '' : result.message || '');
       void qc.invalidateQueries({ queryKey: ['library', 'access-desk', 'dashboard'] });
-      scheduleReturnToIdle(SUCCESS_DISPLAY_MS);
+      scheduleReturnToIdle(accepted ? SUCCESS_DISPLAY_MS : ERROR_DISPLAY_MS);
       window.setTimeout(() => inputRef.current?.focus(), 0);
     },
     onError: (err) => {
@@ -439,6 +465,7 @@ export function LibraryAccessDesk() {
 
   const handleScanKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
+      unlockLibrarySpeech();
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
         commitScanFromInput(e.currentTarget.value);
@@ -473,6 +500,7 @@ export function LibraryAccessDesk() {
         fullscreen && 'kiosk-fullscreen',
       )}
       onMouseDown={(e) => {
+        unlockLibrarySpeech();
         if (visitorOpenRef.current) return;
         const target = e.target as HTMLElement;
         if (target.closest('[data-kiosk-modal]')) return;
@@ -549,7 +577,11 @@ export function LibraryAccessDesk() {
               <img src={branding.logo} alt="" className="h-10 w-10 rounded-full object-contain" />
             ) : null}
             <div>
-              <p className="text-xs font-semibold text-slate-500">{branding.displayName}</p>
+              <p className="text-xs font-semibold text-sky-700">{branding.productName}</p>
+              <p className="text-[11px] text-slate-500">
+                {branding.displayName}
+                {branding.portalSubtitle ? ` · ${branding.portalSubtitle}` : ''}
+              </p>
               <h1
                 className={cn(
                   'font-bold tracking-tight text-slate-950',
@@ -665,13 +697,14 @@ export function LibraryAccessDesk() {
                 <KpiCard
                   label="Visitors today"
                   value={stats?.visitorsToday ?? '—'}
-                  sub="Total footfall"
+                  sub={changeLabel(stats?.visitorsChange)}
                   icon={UserPlus}
                   tone="bg-violet-50 text-violet-700"
                 />
                 <KpiCard
                   label="Avg. stay time"
                   value={stats ? formatStay(stats.avgStayMinutes) : '—'}
+                  sub={changeLabel(stats?.avgStayChange)}
                   icon={Clock}
                   tone="bg-sky-50 text-sky-700"
                 />
@@ -702,12 +735,23 @@ export function LibraryAccessDesk() {
               }}
             />
 
-            {occ ? (
-              <HourlyFootfallChart entries={occ.hourlyFootfall} exits={occ.hourlyExits ?? []} />
+            {!fullscreen ? (
+              <HourlyFootfallChart
+                rows={
+                  d?.footfall ??
+                  (occ?.hourlyFootfall ?? []).map((row) => ({
+                    hour: row.hour,
+                    entries: row.count,
+                    exits: occ?.hourlyExits?.find((exit) => exit.hour === row.hour)?.count ?? 0,
+                  }))
+                }
+                period={period}
+                onPeriod={setPeriod}
+              />
             ) : null}
           </div>
 
-          <aside className={cn('w-full shrink-0 space-y-4 xl:w-80', fullscreen && 'xl:w-72')}>
+          <aside className={cn('w-full shrink-0 space-y-4 xl:w-80', fullscreen && 'hidden')}>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-sm font-semibold text-slate-900">Quick actions</h3>
               <div className="grid grid-cols-2 gap-2">

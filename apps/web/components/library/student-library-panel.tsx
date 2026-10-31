@@ -120,7 +120,9 @@ export function StudentLibraryPanel() {
       setCheckInMsg(
         result.action === 'ENTRY'
           ? `Checked in${result.zone?.seatLabel ? ` — seat ${result.zone.seatLabel}` : ''}`
-          : `Checked out (${result.visit.durationMinutes ?? 0} min)`,
+          : result.action === 'EXIT'
+            ? `Checked out (${result.visit.durationMinutes ?? 0} min)`
+            : result.message || 'The scan was not recorded.',
       );
       void qc.invalidateQueries({ queryKey: ['library', 'me', 'visits'] });
       void qc.invalidateQueries({ queryKey: ['library', 'me', 'dashboard'] });

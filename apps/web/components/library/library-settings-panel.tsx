@@ -22,9 +22,12 @@ import type {
   CirculationPolicy,
   CategoryRulePolicy,
   FinePolicy,
+  LoanCalendarPolicy,
+  AccessDeskSettings,
   LibrarySettings,
   MemberRolePolicy,
 } from '@/types/library';
+import { libraryVoiceList, speakLibraryLine, unlockLibrarySpeech } from '@/lib/library-speech';
 import { apiErrorMessage } from '@/utils/api-error';
 import {
   COPY_TYPES,
@@ -59,6 +62,13 @@ const MIME_OPTIONS = [
   ['application/zip', 'ZIP'],
 ] as const;
 
+const DEFAULT_LOAN_CALENDAR: LoanCalendarPolicy = {
+  excludeWeekends: true,
+  excludeHolidays: true,
+  renewalWorkingDays: null,
+  allowRenewalWhenOverdue: false,
+};
+
 const DEFAULT_CIRCULATION: CirculationPolicy = {
   student: { loanDays: 14, maxBooks: 3, maxRenewals: 1 },
   faculty: { loanDays: 30, maxBooks: 10, maxRenewals: 2 },
@@ -67,12 +77,38 @@ const DEFAULT_CIRCULATION: CirculationPolicy = {
   reference: { loanDays: 0, maxBooks: 0, allowIssue: false },
   rare: { loanDays: 7, maxBooks: 1, allowIssue: true, requireApproval: true },
   copyIssue: { ...DEFAULT_COPY_ISSUE },
+  loanCalendar: { ...DEFAULT_LOAN_CALENDAR },
 };
 
 const DEFAULT_FINE: FinePolicy = {
   lostBookPenaltyMultiplier: 2,
   damageChargeDefault: 100,
 };
+
+const DEFAULT_ACCESS_DESK: AccessDeskSettings = {
+  voiceEnabled: true,
+  entryText: 'Welcome to Don Bosco Library.',
+  exitText: 'Thank you for visiting Don Bosco Library. Visit again!',
+  voiceName: '',
+  speechRate: 0.95,
+  volume: 1,
+  minStaySeconds: 60,
+  duplicateWindowSeconds: 5,
+};
+
+function accessDeskFrom(raw?: AccessDeskSettings): AccessDeskSettings {
+  return {
+    ...DEFAULT_ACCESS_DESK,
+    ...raw,
+    entryText: raw?.entryText?.trim() || DEFAULT_ACCESS_DESK.entryText,
+    exitText: raw?.exitText?.trim() || DEFAULT_ACCESS_DESK.exitText,
+    voiceEnabled: raw?.voiceEnabled !== false,
+    minStaySeconds: safeNum(raw?.minStaySeconds, 60),
+    duplicateWindowSeconds: safeNum(raw?.duplicateWindowSeconds, 5),
+    speechRate: safeNum(raw?.speechRate, 0.95) || 0.95,
+    volume: raw?.volume == null ? 1 : safeNum(raw.volume, 1),
+  };
+}
 
 const ROLES = [
   ['student', 'Student'],
@@ -116,6 +152,15 @@ function mergePolicy(raw?: CirculationPolicy): CirculationPolicy {
     reference: role('reference', DEFAULT_CIRCULATION.reference) as CategoryRulePolicy,
     rare: role('rare', DEFAULT_CIRCULATION.rare) as CategoryRulePolicy,
     copyIssue: mergeCopyIssue(raw.copyIssue),
+    loanCalendar: {
+      excludeWeekends: raw.loanCalendar?.excludeWeekends ?? DEFAULT_LOAN_CALENDAR.excludeWeekends,
+      excludeHolidays: raw.loanCalendar?.excludeHolidays ?? DEFAULT_LOAN_CALENDAR.excludeHolidays,
+      renewalWorkingDays:
+        raw.loanCalendar?.renewalWorkingDays != null && raw.loanCalendar.renewalWorkingDays > 0
+          ? raw.loanCalendar.renewalWorkingDays
+          : null,
+      allowRenewalWhenOverdue: raw.loanCalendar?.allowRenewalWhenOverdue === true,
+    },
   };
 }
 
@@ -141,6 +186,7 @@ function formFromSettings(s: LibrarySettings): Partial<LibrarySettings> {
     allowedMimeTypes: storedMimes.length ? storedMimes : MIME_OPTIONS.map(([mime]) => mime),
     accessionPrefix: s.accessionPrefix || 'ACC',
     accessionNextSeq: safeNum(s.accessionNextSeq, 1),
+    accessDeskSettings: accessDeskFrom(s.accessDeskSettings),
     updatedAt: s.updatedAt,
   };
 }
@@ -162,6 +208,18 @@ function validate(form: Partial<LibrarySettings>, circulation: CirculationPolicy
   if (safeNum(form.totalSeats) < 1) return 'Seating capacity must be at least 1.';
   if (!form.accessionPrefix?.trim()) return 'Accession prefix is required.';
   if (safeNum(form.accessionNextSeq) < 1) return 'The next accession sequence must be at least 1.';
+  const desk = form.accessDeskSettings;
+  if (desk) {
+    if (desk.minStaySeconds < 0 || desk.minStaySeconds > 3600) {
+      return 'Minimum stay must be between 0 and 3600 seconds.';
+    }
+    if (desk.duplicateWindowSeconds < 1 || desk.duplicateWindowSeconds > 60) {
+      return 'Duplicate scan protection must be between 1 and 60 seconds.';
+    }
+    if (!desk.entryText.trim() || !desk.exitText.trim()) {
+      return 'Entry and exit announcements need text.';
+    }
+  }
   if (safeNum(form.maxUploadMb) < 1) return 'The upload limit must be at least 1 MB.';
   if (!(form.allowedMimeTypes ?? []).length) return 'Choose at least one digital file type.';
   return '';
@@ -171,6 +229,7 @@ export function LibrarySettingsPanel() {
   const enabled = useAuthQueryEnabled();
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('general');
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [message, setMessage] = useState('');
   const [form, setForm] = useState<Partial<LibrarySettings>>({});
   const [circulation, setCirculation] = useState<CirculationPolicy>(DEFAULT_CIRCULATION);
@@ -203,6 +262,14 @@ export function LibrarySettingsPanel() {
     queryFn: fetchLibraryZoneOccupancy,
     enabled,
   });
+
+  useEffect(() => {
+    unlockLibrarySpeech();
+    const load = () => setVoices(libraryVoiceList());
+    load();
+    window.speechSynthesis?.addEventListener('voiceschanged', load);
+    return () => window.speechSynthesis?.removeEventListener('voiceschanged', load);
+  }, []);
 
   useEffect(() => {
     if (!settings.data) return;
@@ -377,6 +444,185 @@ export function LibrarySettingsPanel() {
       {tab === 'general' ? (
         <div className="grid gap-4 xl:grid-cols-2">
           <Card
+            title="Voice announcements"
+            hint="Spoken after a confirmed student entry or exit. Staff and visitors stay silent. A rejected or duplicate scan does not speak."
+          >
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.accessDeskSettings?.voiceEnabled !== false}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    accessDeskSettings: {
+                      ...accessDeskFrom(form.accessDeskSettings),
+                      voiceEnabled: event.target.checked,
+                    },
+                  })
+                }
+              />
+              Enable voice announcements
+            </label>
+            <Field label="Entry announcement">
+              <Input
+                value={form.accessDeskSettings?.entryText ?? DEFAULT_ACCESS_DESK.entryText}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    accessDeskSettings: {
+                      ...accessDeskFrom(form.accessDeskSettings),
+                      entryText: event.target.value,
+                    },
+                  })
+                }
+              />
+            </Field>
+            <Field label="Exit announcement">
+              <Input
+                value={form.accessDeskSettings?.exitText ?? DEFAULT_ACCESS_DESK.exitText}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    accessDeskSettings: {
+                      ...accessDeskFrom(form.accessDeskSettings),
+                      exitText: event.target.value,
+                    },
+                  })
+                }
+              />
+            </Field>
+            <Field label="Voice">
+              <select
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={form.accessDeskSettings?.voiceName ?? ''}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    accessDeskSettings: {
+                      ...accessDeskFrom(form.accessDeskSettings),
+                      voiceName: event.target.value,
+                    },
+                  })
+                }
+              >
+                <option value="">Default English voice</option>
+                {voices.map((voice) => (
+                  <option key={voice.name} value={voice.name}>
+                    {voice.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Speech speed">
+                <Input
+                  type="number"
+                  min={0.5}
+                  max={1.5}
+                  step={0.05}
+                  value={form.accessDeskSettings?.speechRate ?? 0.95}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      accessDeskSettings: {
+                        ...accessDeskFrom(form.accessDeskSettings),
+                        speechRate: safeNum(event.target.value, 0.95),
+                      },
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Volume">
+                <Input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={form.accessDeskSettings?.volume ?? 1}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      accessDeskSettings: {
+                        ...accessDeskFrom(form.accessDeskSettings),
+                        volume: safeNum(event.target.value, 1),
+                      },
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Minimum stay (seconds)">
+                <Input
+                  type="number"
+                  min={0}
+                  max={3600}
+                  value={form.accessDeskSettings?.minStaySeconds ?? 60}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      accessDeskSettings: {
+                        ...accessDeskFrom(form.accessDeskSettings),
+                        minStaySeconds: safeNum(event.target.value, 60),
+                      },
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Duplicate scan window (seconds)">
+                <Input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={form.accessDeskSettings?.duplicateWindowSeconds ?? 5}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      accessDeskSettings: {
+                        ...accessDeskFrom(form.accessDeskSettings),
+                        duplicateWindowSeconds: safeNum(event.target.value, 5),
+                      },
+                    })
+                  }
+                />
+              </Field>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  unlockLibrarySpeech();
+                  const desk = accessDeskFrom(form.accessDeskSettings);
+                  const spoke = speakLibraryLine({
+                    text: desk.entryText,
+                    voiceName: desk.voiceName,
+                    rate: desk.speechRate,
+                    volume: desk.volume,
+                  });
+                  if (!spoke) setMessage('This browser cannot play a voice announcement.');
+                }}
+              >
+                Test entry announcement
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  unlockLibrarySpeech();
+                  const desk = accessDeskFrom(form.accessDeskSettings);
+                  const spoke = speakLibraryLine({
+                    text: desk.exitText,
+                    voiceName: desk.voiceName,
+                    rate: desk.speechRate,
+                    volume: desk.volume,
+                  });
+                  if (!spoke) setMessage('This browser cannot play a voice announcement.');
+                }}
+              >
+                Test exit announcement
+              </Button>
+            </div>
+          </Card>
+          <Card
             title="Library information"
             hint={
               labels?.preset === 'ZEBRA_2UP'
@@ -469,64 +715,132 @@ export function LibrarySettingsPanel() {
       ) : null}
 
       {tab === 'circulation' ? (
-        <Card
-          title="Circulation rules by member type"
-          hint="Student, faculty, and staff limits are applied at issue and renewal. Research scholar limits apply when a member is recorded as a research scholar. Loan days are calendar days. Due dates already on open loans stay as they are."
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-slate-500">
-                <tr>
-                  {['Member type', 'Loan days', 'Max books', 'Max renewals'].map((header) => (
-                    <th key={header} className="px-2 py-2 font-medium">
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {ROLES.map(([key, label]) => (
-                  <tr key={key} className="border-t">
-                    <td className="px-2 py-2 font-medium">{label}</td>
-                    {(['loanDays', 'maxBooks', 'maxRenewals'] as const).map((field) => (
-                      <td key={field} className="px-2 py-2">
-                        <Input
-                          type="number"
-                          min={field === 'loanDays' ? 1 : 0}
-                          className="w-24"
-                          value={circulation[key][field]}
-                          onChange={(event) =>
-                            setCirculation({
-                              ...circulation,
-                              [key]: {
-                                ...circulation[key],
-                                [field]: safeNum(event.target.value, circulation[key][field]),
-                              },
-                            })
-                          }
-                        />
-                      </td>
+        <div className="space-y-4">
+          <Card
+            title="Circulation rules by member type"
+            hint="Student, faculty, teaching staff, and non-teaching staff each have their own working-day loan period. Research scholar limits apply when a member is recorded as a research scholar. Sundays and college holidays come from the academic calendar. Due dates already saved on open loans stay as they are."
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-slate-500">
+                  <tr>
+                    {['Member type', 'Working days', 'Max books', 'Max renewals'].map((header) => (
+                      <th key={header} className="px-2 py-2 font-medium">
+                        {header}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Field label="Fallback renewals when a member type is set to 0">
-            <Input
-              type="number"
-              min={0}
-              className="w-28"
-              value={safeNum(form.maxRenewals)}
-              onChange={(event) => setForm({ ...form, maxRenewals: safeNum(event.target.value) })}
+                </thead>
+                <tbody>
+                  {ROLES.map(([key, label]) => (
+                    <tr key={key} className="border-t">
+                      <td className="px-2 py-2 font-medium">{label}</td>
+                      {(['loanDays', 'maxBooks', 'maxRenewals'] as const).map((field) => (
+                        <td key={field} className="px-2 py-2">
+                          <Input
+                            type="number"
+                            min={field === 'loanDays' ? 1 : 0}
+                            className="w-24"
+                            value={circulation[key][field]}
+                            onChange={(event) =>
+                              setCirculation({
+                                ...circulation,
+                                [key]: {
+                                  ...circulation[key],
+                                  [field]: safeNum(event.target.value, circulation[key][field]),
+                                },
+                              })
+                            }
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Field label="Fallback renewals when a member type is set to 0">
+              <Input
+                type="number"
+                min={0}
+                className="w-28"
+                value={safeNum(form.maxRenewals)}
+                onChange={(event) => setForm({ ...form, maxRenewals: safeNum(event.target.value) })}
+              />
+            </Field>
+            <Toggle
+              label="Block a new issue when the member has an unpaid fine"
+              checked={Boolean(form.blockIssueOnUnpaidFines)}
+              onChange={(checked) => setForm({ ...form, blockIssueOnUnpaidFines: checked })}
             />
-          </Field>
-          <Toggle
-            label="Block a new issue when the member has an unpaid fine"
-            checked={Boolean(form.blockIssueOnUnpaidFines)}
-            onChange={(checked) => setForm({ ...form, blockIssueOnUnpaidFines: checked })}
-          />
-        </Card>
+          </Card>
+          <Card
+            title="Academic calendar"
+            hint="Issue, renewal, and overdue fines count college working days. The academic calendar is the only holiday list. A Sunday that is also a holiday is skipped once. Changing a holiday does not rewrite a due date that was already saved."
+          >
+            <Toggle
+              label="Exclude Sundays and other weekend days"
+              checked={circulation.loanCalendar?.excludeWeekends ?? true}
+              onChange={(checked) =>
+                setCirculation({
+                  ...circulation,
+                  loanCalendar: {
+                    ...(circulation.loanCalendar ?? DEFAULT_LOAN_CALENDAR),
+                    excludeWeekends: checked,
+                  },
+                })
+              }
+            />
+            <Toggle
+              label="Exclude college holidays"
+              checked={circulation.loanCalendar?.excludeHolidays ?? true}
+              onChange={(checked) =>
+                setCirculation({
+                  ...circulation,
+                  loanCalendar: {
+                    ...(circulation.loanCalendar ?? DEFAULT_LOAN_CALENDAR),
+                    excludeHolidays: checked,
+                  },
+                })
+              }
+            />
+            <Field label="Renewal period (working days)">
+              <Input
+                type="number"
+                min={1}
+                className="w-28"
+                placeholder="Member period"
+                value={circulation.loanCalendar?.renewalWorkingDays ?? ''}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  setCirculation({
+                    ...circulation,
+                    loanCalendar: {
+                      ...(circulation.loanCalendar ?? DEFAULT_LOAN_CALENDAR),
+                      renewalWorkingDays: raw === '' ? null : Math.max(1, safeNum(raw, 1)),
+                    },
+                  });
+                }}
+              />
+            </Field>
+            <p className="text-sm text-slate-500">
+              Leave the renewal period empty to use each member type&apos;s working-day loan period.
+            </p>
+            <Toggle
+              label="Allow renewal for overdue books"
+              checked={circulation.loanCalendar?.allowRenewalWhenOverdue === true}
+              onChange={(checked) =>
+                setCirculation({
+                  ...circulation,
+                  loanCalendar: {
+                    ...(circulation.loanCalendar ?? DEFAULT_LOAN_CALENDAR),
+                    allowRenewalWhenOverdue: checked,
+                  },
+                })
+              }
+            />
+          </Card>
+        </div>
       ) : null}
 
       {tab === 'categories' ? (
@@ -547,7 +861,7 @@ export function LibrarySettingsPanel() {
                 }
               />
               {circulation.reference.allowIssue ? (
-                <Field label="Reference loan days">
+                <Field label="Working days">
                   <Input
                     type="number"
                     min={1}
@@ -584,7 +898,7 @@ export function LibrarySettingsPanel() {
                   })
                 }
               />
-              <Field label="Loan days">
+              <Field label="Working days">
                 <Input
                   type="number"
                   min={0}
@@ -719,10 +1033,10 @@ export function LibrarySettingsPanel() {
         <div className="grid gap-4 xl:grid-cols-2">
           <Card
             title="Overdue fines"
-            hint="Fine = overdue days after the grace period × daily rate, capped at the maximum. Calendar days are used. Recorded fines are not recalculated."
+            hint="Fine = overdue working days after the grace period × the daily rate, capped at the maximum. Sundays and college holidays are not charged. Paid and waived fines stay as recorded. A running overdue estimate is corrected when the book is returned."
           >
             <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Fine per day (₹)">
+              <Field label="Fine per overdue working day (₹)">
                 <Input
                   type="number"
                   min={0}
@@ -730,7 +1044,7 @@ export function LibrarySettingsPanel() {
                   onChange={(event) => setForm({ ...form, finePerDay: event.target.value })}
                 />
               </Field>
-              <Field label="Grace days">
+              <Field label="Grace working days">
                 <Input
                   type="number"
                   min={0}
@@ -913,9 +1227,8 @@ export function LibrarySettingsPanel() {
             onChange={(checked) => setForm({ ...form, assistantEnabled: checked })}
           />
           <p className="text-sm text-slate-500">
-            Due dates use calendar days plus the grace period. A separate holiday calendar is not
-            applied to fines or due dates. Floor area and opening hours are not stored on the
-            library settings.
+            Due dates and overdue fines follow the academic calendar. Floor area and opening hours
+            are not stored on the library settings.
           </p>
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <BookOpen className="h-4 w-4" />

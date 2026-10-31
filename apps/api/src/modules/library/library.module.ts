@@ -7,6 +7,7 @@ import { NaacIqacModule } from '../naac-iqac/naac-iqac.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 
 import { StorageModule } from '../../shared/storage/storage.module';
+import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { LibraryController } from './library.controller';
 import { LibraryOpacController } from './library-opac.controller';
 import { KohaImportController } from './koha/koha-import.controller';
@@ -15,6 +16,7 @@ import { LibraryCatalogueReportsController } from './reports/library-catalogue-r
 import { LibraryCatalogueReportsService } from './reports/library-catalogue-reports.service';
 import { LibraryDepartmentInventoryController } from './reports/library-department-inventory.controller';
 import { LibraryDepartmentInventoryService } from './reports/library-department-inventory.service';
+import { LibraryDepartmentDetailReportService } from './reports/library-department-detail.service';
 import { LibraryBarcodeController } from './barcodes/library-barcode.controller';
 import { LibraryBarcodeService } from './barcodes/library-barcode.service';
 
@@ -64,6 +66,7 @@ import { LibrarySchedulerService } from './services/library-scheduler.service';
 import { LibrarySearchService } from './services/library-search.service';
 
 import { LibrarySettingsService } from './services/library-settings.service';
+import { LibraryLoanCalendarService } from './services/library-loan-calendar.service';
 
 import { LibraryVisitorService } from './services/library-visitor.service';
 
@@ -72,7 +75,13 @@ import { LibraryZonesService } from './services/library-zones.service';
 import { ResearchRepositoryService } from './services/research-repository.service';
 
 @Module({
-  imports: [RealtimeModule, CommunicationModule, NaacIqacModule, StorageModule],
+  imports: [
+    RealtimeModule,
+    CommunicationModule,
+    NaacIqacModule,
+    StorageModule,
+    AcademicCalendarModule,
+  ],
   controllers: [
     LibraryController,
     LibraryOpacController,
@@ -84,6 +93,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
 
   providers: [
     LibrarySettingsService,
+    LibraryLoanCalendarService,
 
     LibraryAssetsService,
 
@@ -106,6 +116,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
     KohaImportService,
     LibraryCatalogueReportsService,
     LibraryDepartmentInventoryService,
+    LibraryDepartmentDetailReportService,
     LibraryBarcodeService,
 
     LibraryFinesService,

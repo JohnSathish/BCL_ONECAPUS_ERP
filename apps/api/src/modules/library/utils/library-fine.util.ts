@@ -4,6 +4,7 @@ export type FineCalculationSettings = {
   maxFine: number | { toString(): string };
 };
 
+/** Calendar-day fine. Issue, renewal, return, and reminders use working days instead. */
 export function calculateOverdueFine(
   dueAt: Date,
   asOf: Date,

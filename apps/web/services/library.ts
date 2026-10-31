@@ -110,8 +110,10 @@ export const scanLibraryAccess = (scanCode: string) =>
 export const fetchLibraryOccupancy = () =>
   api.get<OccupancySnapshot>(`${base}/access/occupancy`).then((r) => r.data);
 
-export const fetchLibraryAccessDeskDashboard = () =>
-  api.get<LibraryAccessDeskDashboard>(`${base}/access/desk-dashboard`).then((r) => r.data);
+export const fetchLibraryAccessDeskDashboard = (period: 'today' | 'week' | 'month' = 'today') =>
+  api
+    .get<LibraryAccessDeskDashboard>(`${base}/access/desk-dashboard`, { params: { period } })
+    .then((r) => r.data);
 
 export const fetchLibraryVisits = (params?: Record<string, string | number | undefined>) =>
   api

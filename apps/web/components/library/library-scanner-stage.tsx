@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect, useMemo, type RefObject } from 'react';
+import { useMemo, type RefObject } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, ScanLine, ShieldAlert, UserX } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ export type ScannerPhase =
   | 'verifying'
   | 'entry'
   | 'exit'
+  | 'too-soon'
+  | 'duplicate'
   | 'not-found'
   | 'blocked';
 
@@ -61,14 +63,28 @@ const PHASE_COPY: Record<
   },
   entry: {
     title: 'ENTRY ALLOWED',
-    sub: 'Welcome to the library',
+    sub: 'Welcome to Don Bosco Library.',
     accent: 'text-emerald-800',
     border: 'border-emerald-200',
     bg: 'from-emerald-50 to-white',
   },
   exit: {
     title: 'EXIT RECORDED',
-    sub: 'Thank you — visit recorded successfully',
+    sub: 'Thank you for visiting Don Bosco Library. Visit again!',
+    accent: 'text-sky-800',
+    border: 'border-sky-200',
+    bg: 'from-sky-50 to-white',
+  },
+  'too-soon': {
+    title: 'PLEASE WAIT',
+    sub: 'You have just entered the library. Please wait at least 1 minute before exiting.',
+    accent: 'text-orange-800',
+    border: 'border-orange-200',
+    bg: 'from-orange-50 to-white',
+  },
+  duplicate: {
+    title: 'Ready to Scan Student ID Card',
+    sub: 'Duplicate scan detected. Please wait.',
     accent: 'text-amber-800',
     border: 'border-amber-200',
     bg: 'from-amber-50 to-white',
@@ -236,17 +252,9 @@ export function LibraryScannerStage({
   onBlurRefocus,
 }: Props) {
   const copy = PHASE_COPY[phase];
-  const showResult = (phase === 'entry' || phase === 'exit') && lastScan;
+  const showResult = (phase === 'entry' || phase === 'exit' || phase === 'too-soon') && lastScan;
   const isActiveScan = phase === 'detecting' || phase === 'verifying';
   const isError = phase === 'not-found' || phase === 'blocked';
-
-  useEffect(() => {
-    if (phase === 'entry' && typeof window !== 'undefined' && window.speechSynthesis) {
-      const utter = new SpeechSynthesisUtterance('Welcome to Don Bosco College Library');
-      utter.rate = 0.95;
-      window.speechSynthesis.speak(utter);
-    }
-  }, [phase]);
 
   return (
     <div
@@ -294,7 +302,11 @@ export function LibraryScannerStage({
                 animate={{ scale: 1 }}
                 className={cn(
                   'mb-3 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-bold',
-                  phase === 'entry' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white',
+                  phase === 'entry'
+                    ? 'bg-emerald-500 text-white'
+                    : phase === 'exit'
+                      ? 'bg-sky-600 text-white'
+                      : 'bg-orange-500 text-white',
                 )}
               >
                 <CheckCircle2 className="h-4 w-4" />
@@ -303,7 +315,17 @@ export function LibraryScannerStage({
               <p className="text-2xl font-bold uppercase tracking-wide">
                 {lastScan.profile.fullName}
               </p>
-              <p className="text-sm text-slate-400">{lastScan.profile.registrationNumber}</p>
+              <p className="text-sm text-slate-500">{lastScan.profile.registrationNumber}</p>
+              <p
+                className={cn(
+                  'mt-2 text-sm font-medium',
+                  phase === 'entry' && 'text-emerald-800',
+                  phase === 'exit' && 'text-sky-800',
+                  phase === 'too-soon' && 'text-orange-800',
+                )}
+              >
+                {phase === 'too-soon' ? lastScan.message || copy.sub : copy.sub}
+              </p>
               <dl className="mt-4 grid gap-1 text-sm sm:grid-cols-2">
                 <div>
                   <dt className="text-slate-500">Programme</dt>
@@ -330,6 +352,13 @@ export function LibraryScannerStage({
                       })}
                     </dd>
                   </div>
+                ) : phase === 'too-soon' ? (
+                  <div className="sm:col-span-2">
+                    <dt className="text-slate-500">Wait remaining</dt>
+                    <dd className="font-semibold text-orange-800">
+                      {lastScan.remainingSeconds ?? 60} seconds
+                    </dd>
+                  </div>
                 ) : (
                   <>
                     <div>
@@ -342,7 +371,7 @@ export function LibraryScannerStage({
                     </div>
                     <div>
                       <dt className="text-slate-500">Exit Time</dt>
-                      <dd className="font-mono text-amber-700">
+                      <dd className="font-mono text-sky-700">
                         {lastScan.visit.exitAt
                           ? new Date(lastScan.visit.exitAt).toLocaleTimeString('en-IN', {
                               hour12: true,
@@ -352,14 +381,16 @@ export function LibraryScannerStage({
                     </div>
                     <div className="sm:col-span-2">
                       <dt className="text-slate-500">Duration</dt>
-                      <dd className="font-semibold text-amber-800">
+                      <dd className="font-semibold text-sky-800">
                         {formatDuration(lastScan.visit.durationMinutes)}
                       </dd>
                     </div>
                   </>
                 )}
               </dl>
-              <LibrarianVerifyStrip scan={lastScan} displayMs={resultDisplayMs} />
+              {phase === 'too-soon' ? null : (
+                <LibrarianVerifyStrip scan={lastScan} displayMs={resultDisplayMs} />
+              )}
             </div>
           </motion.div>
         ) : (
@@ -418,6 +449,11 @@ export function LibraryScannerStage({
             <p className={cn('text-xl font-semibold', copy.accent)}>{copy.title}</p>
             <p className="mt-1 max-w-md text-center text-sm text-slate-400">{copy.sub}</p>
 
+            {phase === 'duplicate' ? (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900">
+                Duplicate scan detected. Please wait.
+              </p>
+            ) : null}
             {errorMessage && isError ? (
               <p className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">
                 <AlertTriangle className="h-4 w-4 shrink-0" />

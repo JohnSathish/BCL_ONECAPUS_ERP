@@ -176,6 +176,7 @@ export class LibraryPolicyService {
     });
   }
 
+  /** Calendar-day add. Circulation due dates use LibraryLoanCalendarService. */
   computeDueDate(loanDays: number, from = new Date()): Date {
     const due = new Date(from);
     due.setDate(due.getDate() + loanDays);

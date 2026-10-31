@@ -97,6 +97,7 @@ function fmtDate(iso?: string | null) {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+    timeZone: 'Asia/Kolkata',
   });
 }
 
@@ -1071,7 +1072,7 @@ export function LibraryCirculationDesk() {
               </div>
               <div className="text-sm text-slate-600">
                 <p className="font-medium">Due date</p>
-                <p>{cart[0] ? fmtDate(cart[0].dueAt) : 'Auto, from the member loan period'}</p>
+                <p>{cart[0] ? fmtDate(cart[0].dueAt) : 'Calculated from college working days'}</p>
               </div>
               <Button
                 type="button"
@@ -1126,10 +1127,10 @@ export function LibraryCirculationDesk() {
                   Issued {fmtDate(returnPreview.loan.issuedAt)} · Due{' '}
                   {fmtDate(returnPreview.loan.dueAt)}
                 </p>
-                <p>Overdue days after grace: {returnPreview.overdueDays}</p>
+                <p>Overdue working days after grace: {returnPreview.overdueDays}</p>
                 <p>
-                  Fine rate {money(returnPreview.finePerDay)} per day · Grace{' '}
-                  {returnPreview.graceDays} days · Projected fine{' '}
+                  Fine rate {money(returnPreview.finePerDay)} per overdue working day · Grace{' '}
+                  {returnPreview.graceDays} working days · Projected fine{' '}
                   {money(returnPreview.projectedFine)}
                 </p>
                 <label className="block">
@@ -1534,14 +1535,16 @@ function ConfirmIssueDialog({
               <p className="text-sm text-slate-600">
                 Books after this issue: {after} of {member.maxBooks}
               </p>
-              <p className="text-xs text-slate-500">Due dates follow the member loan period.</p>
+              <p className="text-xs text-slate-500">
+                Due dates count college working days. Sundays and college holidays are skipped.
+              </p>
             </div>
           </div>
           <div className="rounded-xl bg-violet-50 px-4 py-3 text-violet-800">
             <p className="text-lg font-semibold">
               {sameDue ? fmtDate(cart[0].dueAt) : 'See each book'}
             </p>
-            <p className="text-xs">including the loan period</p>
+            <p className="text-xs">college working days</p>
           </div>
         </div>
 

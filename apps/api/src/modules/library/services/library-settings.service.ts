@@ -6,6 +6,7 @@ import {
   DEFAULT_CIRCULATION_POLICY,
   DEFAULT_FINE_POLICY,
 } from '../domain/library-policy.types';
+import { mergeAccessDeskSettings } from '../library-visit.logic';
 
 export const DEFAULT_LIBRARY_CATEGORIES = [
   { code: 'REFERENCE', name: 'Reference Books', sortOrder: 1 },
@@ -59,9 +60,13 @@ export class LibrarySettingsService {
 
   async getSettings(tenantId: string) {
     await this.ensureTenantDefaults(tenantId);
-    return this.prisma.librarySettings.findUniqueOrThrow({
+    const row = await this.prisma.librarySettings.findUniqueOrThrow({
       where: { tenantId },
     });
+    return {
+      ...row,
+      accessDeskSettings: mergeAccessDeskSettings(row.accessDeskSettings),
+    };
   }
 
   async updateSettings(tenantId: string, dto: LibrarySettingsDto) {
@@ -103,6 +108,13 @@ export class LibrarySettingsService {
           : {}),
         accessionPrefix: dto.accessionPrefix,
         accessionNextSeq: dto.accessionNextSeq,
+        ...(dto.accessDeskSettings !== undefined
+          ? {
+              accessDeskSettings: mergeAccessDeskSettings(
+                dto.accessDeskSettings,
+              ),
+            }
+          : {}),
       },
     });
   }

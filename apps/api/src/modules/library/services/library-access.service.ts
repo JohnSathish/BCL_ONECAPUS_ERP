@@ -10,7 +10,10 @@ import { PrismaService } from '../../../database/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import type { ScanAccessDto, VisitQueryDto } from '../dto/library.dto';
 import {
+  decideLibraryScan,
   memberTypeWhere,
+  mergeAccessDeskSettings,
+  pickActiveOpenVisit,
   previousRange,
   startOfDay,
   visitPresentation,
@@ -26,7 +29,15 @@ import { LibrarySettingsService } from './library-settings.service';
 import { LibraryZonesService } from './library-zones.service';
 
 export type ScanResult = {
-  action: 'ENTRY' | 'EXIT';
+  action: 'ENTRY' | 'EXIT' | 'IGNORED' | 'TOO_SOON';
+  message?: string;
+  remainingSeconds?: number;
+  voice?: {
+    text: string;
+    voiceName: string;
+    rate: number;
+    volume: number;
+  } | null;
   profile: LibraryMemberProfile;
   visit: {
     id: string;
@@ -68,6 +79,28 @@ export class LibraryAccessService {
     private readonly settings: LibrarySettingsService,
     private readonly zones: LibraryZonesService,
   ) {}
+
+  private memberVisitWhere(tenantId: string, profile: LibraryMemberProfile) {
+    if (profile.memberType === 'STUDENT') {
+      return {
+        tenantId,
+        memberType: 'STUDENT' as const,
+        studentId: profile.studentId!,
+      };
+    }
+    if (profile.memberType === 'VISITOR') {
+      return {
+        tenantId,
+        memberType: 'VISITOR' as const,
+        visitorId: profile.visitorId!,
+      };
+    }
+    return {
+      tenantId,
+      memberType: profile.memberType,
+      staffProfileId: profile.staffProfileId!,
+    };
+  }
 
   private openVisitWhere(tenantId: string, profile: LibraryMemberProfile) {
     if (profile.memberType === 'STUDENT') {
@@ -144,38 +177,73 @@ export class LibraryAccessService {
   ): Promise<ScanResult> {
     const profile = await this.lookup.lookup(tenantId, dto.scanCode);
     const settings = await this.settings.getSettings(tenantId);
+    const desk = mergeAccessDeskSettings(settings.accessDeskSettings);
     await this.analytics.closeStaleOpenVisits(tenantId);
 
-    const openVisit = await this.prisma.libraryVisit.findFirst({
-      where: this.openVisitWhere(tenantId, profile),
-      orderBy: { entryAt: 'desc' },
-    });
-
-    if (!openVisit && !profile.active) {
-      throw new BadRequestException(
-        'Access restricted — library membership inactive or suspended',
-      );
-    }
-
-    let visit;
-    let action: 'ENTRY' | 'EXIT';
-    let assignedZone: ScanResult['zone'] = null;
-
-    if (openVisit) {
-      const exitAt = new Date();
-      const durationMinutes = Math.max(
-        1,
-        Math.round((exitAt.getTime() - openVisit.entryAt.getTime()) / 60_000),
-      );
-      visit = await this.prisma.libraryVisit.update({
-        where: { id: openVisit.id },
-        data: { exitAt, durationMinutes, exitMethod: 'SCAN' },
+    const lockKey = `${tenantId}:${profile.studentId ?? profile.staffProfileId ?? profile.visitorId ?? profile.memberId}`;
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      const openRows = await tx.libraryVisit.findMany({
+        where: this.openVisitWhere(tenantId, profile),
+        orderBy: { entryAt: 'desc' },
       });
-      action = 'EXIT';
-    } else {
+      const openVisit = pickActiveOpenVisit(openRows);
+      const latest = await tx.libraryVisit.findFirst({
+        where: this.memberVisitWhere(tenantId, profile),
+        orderBy: { entryAt: 'desc' },
+      });
+      const now = new Date();
+      const decision = decideLibraryScan({
+        memberType: profile.memberType,
+        openEntryAt: openVisit?.entryAt ?? null,
+        lastAcceptedAt: latest ? (latest.exitAt ?? latest.entryAt) : null,
+        now,
+        minStaySeconds: desk.minStaySeconds,
+        duplicateWindowSeconds: desk.duplicateWindowSeconds,
+      });
+
+      if (!openVisit && decision.action === 'ENTRY' && !profile.active) {
+        throw new BadRequestException(
+          'Access restricted — library membership inactive or suspended',
+        );
+      }
+
+      if (decision.action === 'IGNORED' || decision.action === 'TOO_SOON') {
+        const held = openVisit ?? latest;
+        if (!held) {
+          throw new BadRequestException(decision.message);
+        }
+        return {
+          action: decision.action,
+          message: decision.message,
+          remainingSeconds:
+            decision.action === 'TOO_SOON'
+              ? decision.remainingSeconds
+              : undefined,
+          visit: held,
+          zone: null as ScanResult['zone'],
+        };
+      }
+
+      if (decision.action === 'EXIT' && openVisit) {
+        const durationMinutes = Math.max(
+          1,
+          Math.round((now.getTime() - openVisit.entryAt.getTime()) / 60_000),
+        );
+        const visit = await tx.libraryVisit.update({
+          where: { id: openVisit.id },
+          data: { exitAt: now, durationMinutes, exitMethod: 'SCAN' },
+        });
+        return {
+          action: 'EXIT' as const,
+          visit,
+          zone: null as ScanResult['zone'],
+        };
+      }
+
       let zoneId: string | undefined = dto.zoneId;
       let seatLabel: string | undefined;
-
+      let assignedZone: ScanResult['zone'] = null;
       if (settings.zonesEnabled) {
         const zone = await this.zones.pickZoneForEntry(tenantId, zoneId);
         if (zone) {
@@ -189,8 +257,7 @@ export class LibraryAccessService {
           };
         }
       }
-
-      visit = await this.prisma.libraryVisit.create({
+      const visit = await tx.libraryVisit.create({
         data: {
           id: randomUUID(),
           tenantId,
@@ -204,13 +271,31 @@ export class LibraryAccessService {
           entryMethod,
         },
       });
-      action = 'ENTRY';
-    }
+      return { action: 'ENTRY' as const, visit, zone: assignedZone };
+    });
 
+    const action = outcome.action;
+    const visit = outcome.visit;
+    const assignedZone = outcome.zone;
     const occupancy = await this.analytics.getOccupancy(tenantId);
     const deskContext = await this.buildDeskContext(tenantId, profile);
+    const speak =
+      (action === 'ENTRY' || action === 'EXIT') &&
+      profile.memberType === 'STUDENT' &&
+      desk.voiceEnabled;
     const result: ScanResult = {
       action,
+      message: 'message' in outcome ? outcome.message : undefined,
+      remainingSeconds:
+        'remainingSeconds' in outcome ? outcome.remainingSeconds : undefined,
+      voice: speak
+        ? {
+            text: action === 'ENTRY' ? desk.entryText : desk.exitText,
+            voiceName: desk.voiceName,
+            rate: desk.speechRate,
+            volume: desk.volume,
+          }
+        : null,
       profile,
       visit: {
         id: visit.id,
@@ -226,11 +311,13 @@ export class LibraryAccessService {
       deskContext,
     };
 
-    this.realtime.broadcastToTenant(
-      tenantId,
-      'library:occupancy:updated',
-      occupancy,
-    );
+    if (action === 'ENTRY' || action === 'EXIT') {
+      this.realtime.broadcastToTenant(
+        tenantId,
+        'library:occupancy:updated',
+        occupancy,
+      );
+    }
     this.realtime.broadcastToTenant(tenantId, 'library:scan:result', result);
 
     return result;
@@ -663,7 +750,10 @@ export class LibraryAccessService {
     };
   }
 
-  async accessDeskDashboard(tenantId: string) {
+  async accessDeskDashboard(
+    tenantId: string,
+    period: 'today' | 'week' | 'month' = 'today',
+  ) {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(startOfDay);
@@ -683,6 +773,9 @@ export class LibraryAccessService {
       booksReturnedToday,
       entriesYesterday,
       exitsYesterday,
+      visitorsToday,
+      visitorsYesterday,
+      completedYesterday,
       autoSignedOutToday,
       openVisitsRaw,
     ] = await Promise.all([
@@ -721,6 +814,28 @@ export class LibraryAccessService {
       this.prisma.libraryVisit.count({
         where: {
           tenantId,
+          memberType: 'VISITOR',
+          entryAt: { gte: startOfDay, lt: endOfDay },
+        },
+      }),
+      this.prisma.libraryVisit.count({
+        where: {
+          tenantId,
+          memberType: 'VISITOR',
+          entryAt: { gte: yesterdayStart, lt: startOfDay },
+        },
+      }),
+      this.prisma.libraryVisit.findMany({
+        where: {
+          tenantId,
+          exitAt: { gte: yesterdayStart, lt: startOfDay },
+          durationMinutes: { not: null },
+        },
+        select: { durationMinutes: true },
+      }),
+      this.prisma.libraryVisit.count({
+        where: {
+          tenantId,
           exitMethod: 'AUTO',
           exitAt: { gte: startOfDay, lt: endOfDay },
         },
@@ -747,6 +862,12 @@ export class LibraryAccessService {
       ? Math.round(
           completedToday.reduce((s, v) => s + (v.durationMinutes ?? 0), 0) /
             completedToday.length,
+        )
+      : 0;
+    const avgStayYesterday = completedYesterday.length
+      ? Math.round(
+          completedYesterday.reduce((s, v) => s + (v.durationMinutes ?? 0), 0) /
+            completedYesterday.length,
         )
       : 0;
 
@@ -892,7 +1013,7 @@ export class LibraryAccessService {
         entriesToday,
         exitsToday,
         currentlyInside: occupancy.totalInside,
-        visitorsToday: entriesToday,
+        visitorsToday,
         avgStayMinutes,
         scansToday: entriesToday + exitsToday,
         booksIssuedToday,
@@ -900,8 +1021,15 @@ export class LibraryAccessService {
         peakHour,
         entriesChange: percentChange(entriesToday, entriesYesterday),
         exitsChange: percentChange(exitsToday, exitsYesterday),
+        visitorsChange: percentChange(visitorsToday, visitorsYesterday),
+        avgStayChange:
+          completedYesterday.length > 0
+            ? percentChange(avgStayMinutes, avgStayYesterday)
+            : null,
         autoSignedOutToday,
       },
+      footfallPeriod: period,
+      footfall: await this.hourlyFootfall(tenantId, period),
       occupancy: {
         ...occupancy,
         maleStaffInside,
@@ -940,6 +1068,29 @@ export class LibraryAccessService {
           : []),
       ],
     };
+  }
+
+  private async hourlyFootfall(
+    tenantId: string,
+    period: 'today' | 'week' | 'month',
+  ) {
+    const range = visitRange({ period });
+    const [entries, exits] = await Promise.all([
+      this.prisma.libraryVisit.findMany({
+        where: { tenantId, entryAt: { gte: range.from, lte: range.to } },
+        select: { entryAt: true },
+      }),
+      this.prisma.libraryVisit.findMany({
+        where: { tenantId, exitAt: { gte: range.from, lte: range.to } },
+        select: { exitAt: true },
+      }),
+    ]);
+    return Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      entries: entries.filter((row) => row.entryAt.getHours() === hour).length,
+      exits: exits.filter((row) => row.exitAt && row.exitAt.getHours() === hour)
+        .length,
+    }));
   }
 }
 

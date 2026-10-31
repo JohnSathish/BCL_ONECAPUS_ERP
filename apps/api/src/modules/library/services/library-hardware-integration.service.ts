@@ -60,7 +60,10 @@ export class LibraryHardwareIntegrationService {
     );
 
     let camsLogId: string | null = null;
-    if (dto.accessPointId) {
+    if (
+      dto.accessPointId &&
+      (result.action === 'ENTRY' || result.action === 'EXIT')
+    ) {
       const point = await this.prisma.accessPoint.findFirst({
         where: { tenantId, id: dto.accessPointId, deletedAt: null },
       });

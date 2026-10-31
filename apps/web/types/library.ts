@@ -36,8 +36,29 @@ export type OccupancySnapshot = {
   femaleStaffInside?: number;
 };
 
+export type LibraryVoiceCue = {
+  text: string;
+  voiceName: string;
+  rate: number;
+  volume: number;
+};
+
+export type AccessDeskSettings = {
+  voiceEnabled: boolean;
+  entryText: string;
+  exitText: string;
+  voiceName: string;
+  speechRate: number;
+  volume: number;
+  minStaySeconds: number;
+  duplicateWindowSeconds: number;
+};
+
 export type ScanResult = {
-  action: 'ENTRY' | 'EXIT';
+  action: 'ENTRY' | 'EXIT' | 'IGNORED' | 'TOO_SOON';
+  message?: string;
+  remainingSeconds?: number;
+  voice?: LibraryVoiceCue | null;
   profile: LibraryMemberProfile;
   visit: {
     id: string;
@@ -75,8 +96,12 @@ export type LibraryAccessDeskDashboard = {
     peakHour?: number | null;
     entriesChange?: number | null;
     exitsChange?: number | null;
+    visitorsChange?: number | null;
+    avgStayChange?: number | null;
     autoSignedOutToday?: number;
   };
+  footfallPeriod?: 'today' | 'week' | 'month';
+  footfall?: Array<{ hour: number; entries: number; exits: number }>;
   occupancy: OccupancySnapshot;
   visitorSummary: {
     maleStudents: number;
@@ -221,6 +246,13 @@ export type CategoryRulePolicy = {
   requireApproval?: boolean;
 };
 
+export type LoanCalendarPolicy = {
+  excludeWeekends: boolean;
+  excludeHolidays: boolean;
+  renewalWorkingDays: number | null;
+  allowRenewalWhenOverdue: boolean;
+};
+
 export type CirculationPolicy = {
   student: MemberRolePolicy;
   faculty: MemberRolePolicy;
@@ -229,6 +261,7 @@ export type CirculationPolicy = {
   reference: CategoryRulePolicy;
   rare: CategoryRulePolicy;
   copyIssue?: Record<string, boolean>;
+  loanCalendar?: LoanCalendarPolicy;
 };
 
 export type FinePolicy = {
@@ -545,6 +578,7 @@ export type LibrarySettings = {
   accessionNextSeq?: number;
   maxUploadMb?: number;
   studentDigitalAccessEnabled?: boolean;
+  accessDeskSettings?: AccessDeskSettings;
   updatedAt?: string;
 };
 

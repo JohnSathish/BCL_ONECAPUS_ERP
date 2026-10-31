@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Megaphone } from 'lucide-react';
 
+import { CircularProgress } from '@/components/dashboard/command-center-ui';
 import type { LibraryAccessDeskDashboard } from '@/types/library';
 
 function Tile({ label, value, tone }: { label: string; value: string | number; tone: string }) {
@@ -64,14 +65,25 @@ export function LibraryDeskSidePanel({ data }: { data?: LibraryAccessDeskDashboa
           </span>
         </div>
         {occupancyPercent != null ? (
-          <div className="mb-3">
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-sky-500"
-                style={{ width: `${occupancyPercent}%` }}
-              />
+          <div className="mb-3 flex items-center gap-3">
+            <CircularProgress
+              value={occupancyPercent}
+              size={88}
+              stroke={8}
+              color="#0284c7"
+              label={`${occupancyPercent}%`}
+              sublabel="occupied"
+            />
+            <div className="text-sm text-slate-600">
+              <p>
+                <span className="font-semibold text-slate-900">{inside}</span> occupied
+              </p>
+              <p>
+                <span className="font-semibold text-slate-900">{occ?.availableSeats ?? 0}</span>{' '}
+                seats free
+              </p>
+              <p className="text-xs text-slate-500">{seats} configured seats</p>
             </div>
-            <p className="mt-1 text-xs text-slate-500">{occupancyPercent}% of configured seats</p>
           </div>
         ) : (
           <p className="mb-3 text-xs text-slate-500">
