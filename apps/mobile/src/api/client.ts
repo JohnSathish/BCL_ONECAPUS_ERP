@@ -30,7 +30,7 @@ type FetchOptions = RequestInit & {
 };
 
 const MOBILE_WRITABLE =
-  /\/(?:library|question-bank)(?:\/|$)|\/auth\/(?:logout|refresh|change-password|permissions\/refresh|sessions\/revoke-all)(?:\/|$)|\/mfa\/(?:setup|verify-setup|disable|email-otp\/send|verify-login)(?:\/|$)|\/(?:export|download|print)(?:\/|$)/;
+  /\/(?:library|question-bank)(?:\/|$)|\/auth\/(?:logout|refresh|change-password|permissions\/refresh|sessions\/revoke-all)(?:\/|$)|\/mfa\/(?:setup|verify-setup|disable|email-otp\/send|verify-login)(?:\/|$)|\/(?:export|download|print)(?:\/|$)|\/staff\/me(?:\/|$)|\/hr\/leave\/(?:applications\/me|summary\/me)(?:\/|$)|\/communication\/notifications(?:\/|$)|\/feedback\/me(?:\/|$)/;
 
 function mobileRestrictedStaffMayMutate(method: string, rawPath: string) {
   const verb = method.toUpperCase();

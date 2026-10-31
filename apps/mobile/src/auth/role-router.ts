@@ -168,7 +168,8 @@ export function resolveMobileRoute(user: SessionUser): MobileRouteDecision {
     };
   }
 
-  if (isLibrary) {
+  const keepPersonalHome = roles.some((role) => role === 'staff' || role === 'faculty');
+  if (isLibrary && !keepPersonalHome) {
     return {
       persona: 'library',
       href: '/(staff)/(tabs)' as Href,

@@ -65,7 +65,7 @@ export function libraryQpReadonlyPermissions(
 }
 
 const WRITABLE_PREFIX =
-  /\/(?:library|question-bank)(?:\/|$)|\/auth\/(?:logout|refresh|change-password|permissions\/refresh|sessions\/revoke-all)(?:\/|$)|\/mfa\/(?:setup|verify-setup|disable|email-otp\/send|verify-login)(?:\/|$)|\/(?:export|download|print)(?:\/|$)/;
+  /\/(?:library|question-bank)(?:\/|$)|\/auth\/(?:logout|refresh|change-password|permissions\/refresh|sessions\/revoke-all)(?:\/|$)|\/mfa\/(?:setup|verify-setup|disable|email-otp\/send|verify-login)(?:\/|$)|\/(?:export|download|print)(?:\/|$)|\/staff\/me(?:\/|$)|\/hr\/leave\/(?:applications\/me|summary\/me)(?:\/|$)|\/communication\/notifications(?:\/|$)|\/feedback\/me(?:\/|$)/;
 
 /** True when this account may send a request that changes data. */
 export function restrictedStaffMayMutate(

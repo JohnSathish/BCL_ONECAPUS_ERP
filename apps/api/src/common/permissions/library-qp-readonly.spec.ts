@@ -81,6 +81,25 @@ describe('library and question-paper read-only access', () => {
     expect(
       restrictedStaffMayMutate('POST', '/api/v1/reports/students/export'),
     ).toBe(true);
+    expect(
+      restrictedStaffMayMutate('POST', '/api/v1/hr/leave/applications/me'),
+    ).toBe(true);
+    expect(
+      restrictedStaffMayMutate(
+        'POST',
+        '/api/v1/communication/notifications/abc/read',
+      ),
+    ).toBe(true);
+    expect(restrictedStaffMayMutate('PATCH', '/api/v1/staff/me/profile')).toBe(
+      true,
+    );
+    expect(
+      restrictedStaffMayMutate(
+        'PATCH',
+        '/api/v1/hr/leave/applications/1/approve',
+      ),
+    ).toBe(false);
+    expect(restrictedStaffMayMutate('POST', '/api/v1/staff')).toBe(false);
   });
 
   it('matches only the three named accounts', () => {

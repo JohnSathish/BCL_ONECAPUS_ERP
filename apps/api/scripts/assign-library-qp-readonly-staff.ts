@@ -14,6 +14,8 @@ import {
 
 const prisma = new PrismaClient();
 const TENANT_SLUG = 'don-bosco-tura';
+/** Personal dashboard roles. Leave, notifications, and profile stay on these. */
+const PERSONAL_ROLES = new Set(['staff', 'faculty']);
 
 async function main() {
   const tenant = await prisma.tenant.findFirst({
@@ -83,6 +85,7 @@ async function main() {
     });
     for (const row of assignments) {
       if (row.role.slug === LIBRARY_QP_READONLY_ROLE) continue;
+      if (PERSONAL_ROLES.has(row.role.slug)) continue;
       await prisma.userRole.update({
         where: { id: row.id },
         data: { deletedAt: new Date() },
@@ -106,7 +109,7 @@ async function main() {
     });
 
     console.log(
-      `Updated ${email}: library and question papers, view only elsewhere`,
+      `Updated ${email}: personal dashboard kept, library and question papers added`,
     );
   }
 }
