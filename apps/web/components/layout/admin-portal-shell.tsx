@@ -5,6 +5,7 @@ import { EnterpriseSidebar } from '@/components/layout/enterprise-sidebar';
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { WorkspaceThemeEffect } from '@/components/layout/workspace-theme-effect';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
+import { LibraryQpReadonlyNotice } from '@/components/permissions/library-qp-readonly-notice';
 import { cn } from '@/utils/cn';
 
 /** Persistent admin chrome — sidebar mounts once per admin session. */
@@ -44,6 +45,7 @@ export function AdminPortalShell({ children }: { children: React.ReactNode }) {
           tabIndex={-1}
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden outline-none"
         >
+          <LibraryQpReadonlyNotice />
           {children}
         </div>
         <MobileBottomNav />

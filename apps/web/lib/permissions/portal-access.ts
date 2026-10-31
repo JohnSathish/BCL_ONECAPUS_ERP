@@ -24,6 +24,7 @@ export const ADMIN_PORTAL_ROLES = new Set([
   'hod',
   'accountant',
   'librarian',
+  'library-qp-readonly',
   'front-office-desk',
   'transport-coordinator',
   'store-keeper',

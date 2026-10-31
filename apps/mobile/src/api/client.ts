@@ -1,5 +1,5 @@
 import { getApiBase, getAppType, mobileHeadersAsync, setAppType } from '@/api/config';
-import { getAccessToken } from '@/auth/session';
+import { getAccessToken, getUserSnapshot } from '@/auth/session';
 import { refreshAccessTokenString } from '@/auth/token-refresh';
 import { emitUpdateRequired } from '@/services/app-update-events';
 
@@ -29,6 +29,16 @@ type FetchOptions = RequestInit & {
   timeoutMs?: number;
 };
 
+const MOBILE_WRITABLE =
+  /\/(?:library|question-bank)(?:\/|$)|\/auth\/(?:logout|refresh|change-password|permissions\/refresh|sessions\/revoke-all)(?:\/|$)|\/mfa\/(?:setup|verify-setup|disable|email-otp\/send|verify-login)(?:\/|$)|\/(?:export|download|print)(?:\/|$)/;
+
+function mobileRestrictedStaffMayMutate(method: string, rawPath: string) {
+  const verb = method.toUpperCase();
+  if (verb === 'GET' || verb === 'HEAD' || verb === 'OPTIONS') return true;
+  const path = (rawPath.split('?')[0] ?? rawPath).replace(/\/+$/, '');
+  return MOBILE_WRITABLE.test(path);
+}
+
 function parseError(data: unknown, fallback: string) {
   if (typeof data === 'object' && data) {
     if ('detail' in data && data.detail) return String(data.detail);
@@ -53,6 +63,19 @@ async function doFetch<T>(path: string, options: FetchOptions): Promise<T> {
   if (!options.skipAuth) {
     const token = options.auth ?? (await getAccessToken());
     if (token) headers.Authorization = `Bearer ${token}`;
+    const snapshot = await getUserSnapshot();
+    const restrictedEmail = (snapshot?.email ?? '').trim().toLowerCase();
+    const restrictedAccount =
+      snapshot?.roles?.includes('library-qp-readonly') ||
+      restrictedEmail === 'rehny@donboscocollege.ac.in' ||
+      restrictedEmail === 'threena@donboscocollege.ac.in' ||
+      restrictedEmail === 'stephen@donboscocollege.ac.in';
+    if (restrictedAccount && !mobileRestrictedStaffMayMutate(method, path)) {
+      throw Object.assign(
+        new Error('This account can change the library and the question paper repository only.'),
+        { status: 403 },
+      );
+    }
   }
 
   const base = apiBase.replace(/\/+$/, '');

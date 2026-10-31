@@ -23,6 +23,7 @@ export type LoginResponse = {
   mfaRequired?: boolean;
   mfaToken?: string;
   user: {
+    email?: string;
     permissions?: string[];
     roles?: string[];
     shiftIds?: string[];
@@ -104,6 +105,7 @@ export async function completeSessionFromTokens(input: SessionTokensInput): Prom
 
   await saveSession(input.accessToken, input.refreshToken);
   await saveUserSnapshot({
+    email: user.email,
     permissions: user.permissions,
     roles: user.roles,
     shiftIds: user.shiftIds,

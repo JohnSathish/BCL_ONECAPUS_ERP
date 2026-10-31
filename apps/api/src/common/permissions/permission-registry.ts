@@ -2,6 +2,11 @@
  * ERP permission registry — keep in sync with apps/api/src/common/permissions/permission-registry.ts
  */
 
+import {
+  LIBRARY_QP_READONLY_ROLE,
+  libraryQpReadonlyPermissions,
+} from './library-qp-readonly';
+
 export const SUPER_ADMIN_ROLES = [
   'college-admin',
   'super-admin',
@@ -817,6 +822,21 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
     defaultHome: '/admin/library',
   },
   {
+    slug: LIBRARY_QP_READONLY_ROLE,
+    name: 'Library and question papers',
+    description:
+      'Full library and question-paper repository. Every other module is view only.',
+    permissions: libraryQpReadonlyPermissions([
+      ...new Set(Object.values(MODULE_PERMISSIONS).flat()),
+      'library:settings',
+      'library:digital:download',
+      'library:research:submit',
+      'staff:portal:self',
+      'notifications:read',
+    ]),
+    defaultHome: '/admin/library',
+  },
+  {
     slug: 'accountant',
     name: 'Accounts Staff',
     description: 'Fee collection, receipts, finance reports',
@@ -1110,6 +1130,7 @@ export function canAccessAdminPortal(
         'hod',
         'accountant',
         'librarian',
+        LIBRARY_QP_READONLY_ROLE,
         'shift-admin',
         'shift-academic-coordinator',
         'shift-attendance-manager',

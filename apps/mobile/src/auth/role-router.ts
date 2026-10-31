@@ -33,7 +33,7 @@ type SessionUser = {
 
 const SHIFT_ADMIN_ROLES = new Set(['shift-admin', 'shift-academic-coordinator']);
 const FACULTY_ROLES = new Set(['faculty', 'staff']);
-const LIBRARY_ROLES = new Set(['librarian', 'library-operator']);
+const LIBRARY_ROLES = new Set(['librarian', 'library-operator', 'library-qp-readonly']);
 const FINANCE_ROLES = new Set(['accountant']);
 
 export function hasSchoolMobileAccess(user: SessionUser) {

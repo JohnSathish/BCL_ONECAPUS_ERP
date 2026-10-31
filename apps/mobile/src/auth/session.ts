@@ -9,6 +9,7 @@ const LAST_LOGIN_KEY = 'oc_last_login_at';
 const REMEMBER_ME_KEY = 'oc_remember_me';
 
 export type StoredUserSnapshot = {
+  email?: string;
   permissions?: string[];
   roles?: string[];
   shiftIds?: string[];

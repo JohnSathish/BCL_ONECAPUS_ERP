@@ -12,6 +12,10 @@ import { API_BASE_URL, API_GET_RETRY_COUNT, API_REQUEST_TIMEOUT_MS } from '@/lib
 import { isRetryableQueryError, normalizeAxiosError, sleep } from '@/lib/http/api-error-types';
 import { unwrapApiPayload } from '@/lib/http/api-envelope';
 import { dispatchLicenseWriteBlocked } from '@/components/licensing/license-write-blocked-banner';
+import {
+  isLibraryQpReadonly,
+  restrictedStaffMayMutate,
+} from '@/lib/permissions/library-qp-readonly';
 import { useAuthStore } from '@/store/auth-store';
 import { getWorkspaceShiftHeader } from '@/store/workspace-store';
 import { shouldAttachWorkspaceShiftHeader } from '@/lib/shared-modules';
@@ -91,6 +95,14 @@ export function createHttpClient(options: CreateClientOptions = {}): AxiosInstan
       const session = useAuthStore.getState().session;
       if (session?.accessToken) {
         config.headers.Authorization = `Bearer ${session.accessToken}`;
+      }
+      if (
+        isLibraryQpReadonly(session?.user.roles, session?.user.email) &&
+        !restrictedStaffMayMutate(config.method ?? 'get', config.url ?? '')
+      ) {
+        throw new Error(
+          'This account can change the library and the question paper repository only.',
+        );
       }
       if (session?.user.tenantSlug) {
         config.headers['X-Tenant-Slug'] = session.user.tenantSlug;

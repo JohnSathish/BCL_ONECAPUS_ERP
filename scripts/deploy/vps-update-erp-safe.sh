@@ -126,6 +126,8 @@ echo "Granting permissions (idempotent)…"
   npx --yes tsx scripts/grant-profile-verification-permissions.ts || true
 "${COMPOSE[@]}" run --rm -e DATABASE_URL="${DATABASE_URL}" api \
   npx --yes tsx scripts/grant-moodle-permissions.ts || true
+"${COMPOSE[@]}" run --rm -e DATABASE_URL="${DATABASE_URL}" api \
+  npx --yes tsx scripts/assign-library-qp-readonly-staff.ts || true
 
 echo "Starting API…"
 "${COMPOSE[@]}" up -d --wait --wait-timeout 180 api

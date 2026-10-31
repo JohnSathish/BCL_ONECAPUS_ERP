@@ -8,6 +8,7 @@ import { ClsModule } from 'nestjs-cls';
 import { HttpProblemJsonExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { RestrictedStaffWriteGuard } from './common/guards/restricted-staff-write.guard';
 import { StepUpGuard } from './common/guards/step-up.guard';
 import { StudentSelfGuard } from './common/guards/student-self.guard';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -223,6 +224,7 @@ import { MoodleModule } from './modules/moodle/moodle.module';
     { provide: APP_GUARD, useClass: AppThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    { provide: APP_GUARD, useClass: RestrictedStaffWriteGuard },
     { provide: APP_GUARD, useClass: ShiftScopeGuard },
     { provide: APP_GUARD, useClass: StepUpGuard },
     { provide: APP_GUARD, useClass: StudentSelfGuard },

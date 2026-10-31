@@ -695,6 +695,13 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
     defaultHome: '/admin/library',
   },
   {
+    slug: 'library-qp-readonly',
+    name: 'Library and question papers',
+    description: 'Full library and question-paper repository. Every other module is view only.',
+    permissions: ['library:read', 'library:manage', 'question-bank:read', 'question-bank:manage'],
+    defaultHome: '/admin/library',
+  },
+  {
     slug: 'accountant',
     name: 'Accounts Staff',
     description: 'Fee collection, receipts, finance reports',
@@ -908,6 +915,7 @@ export function canAccessAdminPortal(roles: string[], permissions: string[] = []
         'hod',
         'accountant',
         'librarian',
+        'library-qp-readonly',
         'shift-admin',
         'shift-academic-coordinator',
         'shift-attendance-manager',
