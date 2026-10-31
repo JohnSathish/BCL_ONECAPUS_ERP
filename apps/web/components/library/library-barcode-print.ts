@@ -219,13 +219,20 @@ export function barcodeLabelDocument(
       : '<script>window.addEventListener("load", function () { window.print(); });</script>';
   const pageWidth = zebra ? '4in' : `${settings.pageWidthMm}mm`;
   const pageHeight = zebra ? '0.98in' : `${settings.pageHeightMm}mm`;
+  // A CSS size wider than it is tall makes Chrome send a landscape print ticket.
+  // The GT800 driver stock is portrait 4.00 × 0.98 inch, so that ticket is rotated
+  // 90 degrees until Printing Preferences is opened and confirmed. size:auto keeps
+  // the driver's saved portrait stock.
+  const pageRule = zebra
+    ? '@page { size: auto; margin: 0; }'
+    : `@page { size: ${pageWidth} ${pageHeight}; margin: 0; }`;
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>Library barcode labels</title>
   <style>
-    @page { size: ${pageWidth} ${pageHeight}; margin: 0; }
+    ${pageRule}
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #fff; color: #000; ${zebra ? 'width: 4in;' : ''} }
     .sheet {

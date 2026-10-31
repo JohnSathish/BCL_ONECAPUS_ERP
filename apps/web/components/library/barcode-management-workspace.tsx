@@ -465,7 +465,7 @@ export function BarcodeManagementWorkspace() {
       <p className="text-xs text-slate-500">
         {summary.data?.note}{' '}
         {template?.preset === 'ZEBRA_2UP'
-          ? 'Each book prints twice on one row: the left sticker for the cover and the right sticker for inside the book. Paper size 4.00 × 0.98 inch, margins None, scale 100%.'
+          ? 'Each book prints twice on one row: the left sticker for the cover and the right sticker for inside the book. The page uses the printer’s saved stock, 4.00 × 0.98 inch portrait. Margins Default, scale 100%.'
           : 'For A4 sheets, set the paper to A4, scale 100% or Actual Size, and turn off browser headers and footers.'}
       </p>
 
@@ -1140,8 +1140,9 @@ function SettingsPanel({
       </div>
       {template.preset === 'ZEBRA_2UP' ? (
         <p className="mt-3 text-xs leading-5 text-slate-500">
-          Zebra GT800 user-defined stock, 4.00 × 0.98 inch, portrait. Each book uses both stickers
-          on the row, so you can paste one on the cover and one inside. Margins None, scale 100%.
+          Zebra GT800 user-defined stock, 4.00 × 0.98 inch, portrait. The print page keeps that
+          orientation, so the labels stay horizontal without opening Printing Preferences each time.
+          Each book uses both stickers on the row. Margins Default, scale 100%.
         </p>
       ) : null}
       <div className="mt-3 grid grid-cols-2 gap-2">
