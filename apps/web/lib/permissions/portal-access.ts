@@ -181,6 +181,14 @@ export function canAccessPath(roles: string[], path: string, permissions: string
   if (path.startsWith('/admissions-portal') || path.startsWith('/school-admissions-portal')) {
     return canAccessApplicantPortal(roles, permissions) || canAccessAdminPortal(roles, permissions);
   }
+  if (path.startsWith('/opac')) {
+    return (
+      canAccessStudentPortal(roles) ||
+      canAccessStaffPortal(roles) ||
+      canAccessAdminPortal(roles, permissions) ||
+      roles.includes('librarian')
+    );
+  }
   // Auth / public app paths only — deny unknown relative links (notification sanitization).
   const publicPrefixes = [
     '/login',

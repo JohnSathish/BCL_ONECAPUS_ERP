@@ -9835,6 +9835,7 @@ model LibrarySettings {
   accessionPrefix           String   @default("ACC") @map("accession_prefix")
   accessionNextSeq          Int      @default(1) @map("accession_next_seq")
   barcodeLabelSettings      Json?    @map("barcode_label_settings")
+  opacSettings              Json?    @map("opac_settings")
   createdAt                 DateTime @default(now()) @map("created_at")
   updatedAt                 DateTime @updatedAt @map("updated_at")
 
@@ -10309,22 +10310,38 @@ model LibraryCopyIncident {
 }
 
 model LibraryReservation {
-  id         String    @id @default(uuid()) @db.Uuid
-  tenantId   String    @map("tenant_id") @db.Uuid
-  bookId     String    @map("book_id") @db.Uuid
-  studentId  String    @map("student_id") @db.Uuid
-  status     String    @default("ACTIVE")
-  reservedAt DateTime  @default(now()) @map("reserved_at")
-  fulfilledAt DateTime? @map("fulfilled_at")
-  cancelledAt DateTime? @map("cancelled_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  bookId         String    @map("book_id") @db.Uuid
+  studentId      String?   @map("student_id") @db.Uuid
+  staffProfileId String?   @map("staff_profile_id") @db.Uuid
+  status         String    @default("ACTIVE")
+  reservedAt     DateTime  @default(now()) @map("reserved_at")
+  fulfilledAt    DateTime? @map("fulfilled_at")
+  cancelledAt    DateTime? @map("cancelled_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   book LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, bookId, status])
   @@index([tenantId, studentId, status])
+  @@index([tenantId, staffProfileId, status])
   @@map("library_reservations")
+  @@schema("library")
+}
+
+model LibraryOpacEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  kind      String
+  actorId   String?  @map("actor_id") @db.Uuid
+  bookId    String?  @map("book_id") @db.Uuid
+  query     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, kind, createdAt])
+  @@map("library_opac_events")
   @@schema("library")
 }
 

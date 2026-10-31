@@ -7,39 +7,80 @@ import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
+import { resolveCopyIssue } from '../domain/library-copy-issue.logic';
+import { mergeCirculationPolicy } from '../domain/library-policy.types';
 import type {
   ReservationListQueryDto,
   ReserveBookDto,
 } from '../dto/library.dto';
+import { LibrarySettingsService } from './library-settings.service';
 
 @Injectable()
 export class LibraryReservationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings: LibrarySettingsService,
+  ) {}
 
   async reserve(user: JwtUser, dto: ReserveBookDto) {
-    let studentId = dto.studentId;
+    let studentId = dto.studentId ?? null;
+    let staffProfileId: string | null = null;
     if (!studentId) {
       const student = await this.prisma.student.findFirst({
         where: { tenantId: user.tid, userId: user.sub, deletedAt: null },
+        select: { id: true },
       });
-      if (!student) {
-        throw new BadRequestException(
-          'Student record required for reservation',
-        );
+      if (student) studentId = student.id;
+      else {
+        const staff = await this.prisma.staffProfile.findFirst({
+          where: {
+            tenantId: user.tid,
+            portalUserId: user.sub,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (!staff) {
+          throw new BadRequestException(
+            'A student or staff record is required for a reservation.',
+          );
+        }
+        staffProfileId = staff.id;
       }
-      studentId = student.id;
     }
 
     const book = await this.prisma.libraryBook.findFirst({
       where: { tenantId: user.tid, id: dto.bookId, deletedAt: null },
-      include: { copies: true },
+      include: { copies: true, category: true },
     });
     if (!book) throw new NotFoundException('Book not found');
 
-    const available = book.copies.some((c) => c.status === 'AVAILABLE');
-    if (available) {
+    const stored = await this.settings.getSettings(user.tid);
+    const policy = mergeCirculationPolicy(stored.circulationPolicy);
+    const decisions = book.copies.map((copy) =>
+      resolveCopyIssue({
+        copyType: copy.copyType,
+        issueAllowed: copy.issueAllowed,
+        categoryCode: book.category?.code,
+        copyIssue: policy.copyIssue,
+        referenceAllow: policy.reference.allowIssue,
+        rareAllow: policy.rare.allowIssue,
+      }),
+    );
+    if (
+      decisions.length === 0 ||
+      decisions.every((decision) => !decision.allowed)
+    ) {
       throw new BadRequestException(
-        'Book has available copies — issue directly instead',
+        'Reference and non-circulating copies cannot be reserved.',
+      );
+    }
+    const issuableOnShelf = book.copies.some(
+      (copy, index) => copy.status === 'AVAILABLE' && decisions[index]?.allowed,
+    );
+    if (issuableOnShelf) {
+      throw new BadRequestException(
+        'An issuable copy is on the shelf. Ask the library desk to issue it instead of reserving.',
       );
     }
 
@@ -47,8 +88,8 @@ export class LibraryReservationService {
       where: {
         tenantId: user.tid,
         bookId: dto.bookId,
-        studentId,
         status: 'ACTIVE',
+        ...(studentId ? { studentId } : { staffProfileId }),
       },
     });
     if (existing) throw new BadRequestException('Already reserved');
@@ -59,6 +100,7 @@ export class LibraryReservationService {
         tenantId: user.tid,
         bookId: dto.bookId,
         studentId,
+        staffProfileId,
         status: 'ACTIVE',
       },
       include: { book: true },
@@ -238,6 +280,10 @@ export class LibraryReservationService {
     return this.enrichReservations(tenantId, rows);
   }
 
+  queuePositionPublic(tenantId: string, bookId: string, reservationId: string) {
+    return this.queuePosition(tenantId, bookId, reservationId);
+  }
+
   private async queuePosition(
     tenantId: string,
     bookId: string,
@@ -256,7 +302,8 @@ export class LibraryReservationService {
     T extends {
       id: string;
       bookId: string;
-      studentId: string;
+      studentId: string | null;
+      staffProfileId?: string | null;
       status: string;
       reservedAt: Date;
       book?: {
@@ -268,14 +315,40 @@ export class LibraryReservationService {
   >(tenantId: string, rows: T[]) {
     if (!rows.length) return [];
 
-    const studentIds = [...new Set(rows.map((r) => r.studentId))];
-    const students = await this.prisma.student.findMany({
-      where: { tenantId, id: { in: studentIds } },
-      include: {
-        masterProfile: { select: { fullName: true } },
-        department: { select: { name: true } },
-      },
-    });
+    const studentIds = [
+      ...new Set(
+        rows.map((r) => r.studentId).filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const staffIds = [
+      ...new Set(
+        rows
+          .map((r) => r.staffProfileId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const [students, staff] = await Promise.all([
+      studentIds.length
+        ? this.prisma.student.findMany({
+            where: { tenantId, id: { in: studentIds } },
+            include: {
+              masterProfile: { select: { fullName: true } },
+              department: { select: { name: true } },
+            },
+          })
+        : Promise.resolve([]),
+      staffIds.length
+        ? this.prisma.staffProfile.findMany({
+            where: { tenantId, id: { in: staffIds } },
+            select: {
+              id: true,
+              fullName: true,
+              employeeCode: true,
+              department: { select: { name: true } },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
 
     const bookIds = [...new Set(rows.map((row) => row.bookId))];
     const active = await this.prisma.libraryReservation.findMany({
@@ -297,12 +370,16 @@ export class LibraryReservationService {
 
     return rows.map((row) => {
       const student = students.find((s) => s.id === row.studentId);
+      const member = staff.find((s) => s.id === row.staffProfileId);
       return {
         ...row,
-        studentName: student?.masterProfile?.fullName ?? 'Student',
-        enrollmentNumber: student?.enrollmentNumber ?? null,
-        department: student?.department?.name ?? null,
-        memberType: 'STUDENT' as const,
+        studentName:
+          student?.masterProfile?.fullName ?? member?.fullName ?? 'Member',
+        enrollmentNumber:
+          student?.enrollmentNumber ?? member?.employeeCode ?? null,
+        department:
+          student?.department?.name ?? member?.department?.name ?? null,
+        memberType: member ? ('STAFF' as const) : ('STUDENT' as const),
         author: row.book?.author ?? null,
         accessionNo: row.book?.accessionNo ?? null,
         expiresOn: null,

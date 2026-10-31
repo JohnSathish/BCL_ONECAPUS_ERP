@@ -1661,6 +1661,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['library:reports', 'library:manage'],
           },
           {
+            label: 'OPAC',
+            href: '/admin/library/opac',
+            permissions: ['library:manage'],
+          },
+          {
             label: 'Settings',
             href: '/admin/library/settings',
             permissions: ['library:settings', 'library:manage'],

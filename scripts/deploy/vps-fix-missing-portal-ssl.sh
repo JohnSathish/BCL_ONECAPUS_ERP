@@ -16,6 +16,7 @@ HOSTS=(
   erp.donboscocollege.ac.in
   admissions.donboscocollege.ac.in
   library.donboscocollege.ac.in
+  opac.donboscocollege.ac.in
   career.donboscocollege.ac.in
   pay.donboscocollege.ac.in
   alumni.donboscocollege.ac.in

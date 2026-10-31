@@ -19,20 +19,28 @@ export class TenantResolverMiddleware implements NestMiddleware {
     const host = loginHost || extractRequestHost(req);
     if (host) {
       const allowUnverified = process.env.ALLOW_UNVERIFIED_DOMAINS === 'true';
-      const domain = await this.prisma.tenantDomain.findFirst({
-        where: {
-          host,
-          deletedAt: null,
-          ...(allowUnverified ? {} : { verified: true }),
-        },
-        include: { tenant: true },
-      });
-      if (
-        domain?.tenant &&
-        !domain.tenant.deletedAt &&
-        domain.tenant.status === 'active'
-      ) {
-        this.cls.set(CLS_TENANT_ID, domain.tenant.id);
+      const candidates = [host];
+      if (host.startsWith('opac.')) {
+        const rest = host.slice('opac.'.length);
+        candidates.push(`erp.${rest}`, rest);
+      }
+      for (const candidate of candidates) {
+        const domain = await this.prisma.tenantDomain.findFirst({
+          where: {
+            host: candidate,
+            deletedAt: null,
+            ...(allowUnverified ? {} : { verified: true }),
+          },
+          include: { tenant: true },
+        });
+        if (
+          domain?.tenant &&
+          !domain.tenant.deletedAt &&
+          domain.tenant.status === 'active'
+        ) {
+          this.cls.set(CLS_TENANT_ID, domain.tenant.id);
+          break;
+        }
       }
     }
 

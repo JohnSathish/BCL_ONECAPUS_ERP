@@ -18,6 +18,10 @@ function isLibraryHost(host: string) {
   return hostname(host).startsWith('library.');
 }
 
+function isOpacHost(host: string) {
+  return hostname(host).startsWith('opac.');
+}
+
 function isAdmissionsHost(host: string) {
   return hostname(host).startsWith('admissions.');
 }
@@ -260,6 +264,21 @@ function libraryHostToErpUrl(request: NextRequest, pathname: string) {
   return url;
 }
 
+function handleOpacHost(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  if (pathname === '/forgot-password' || pathname === '/change-password') {
+    return NextResponse.next();
+  }
+  return handleSubdomainRewrite(request, '/opac', '/opac/login', [
+    '/admin',
+    '/student',
+    '/staff',
+    '/shift',
+    '/library-desk',
+    '/journals-portal',
+  ]);
+}
+
 function handleLibraryHost(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const loginPath = '/library-desk/login';
@@ -491,6 +510,10 @@ export async function middleware(request: NextRequest) {
 
   if (isAlumniHost(host)) {
     return handleAlumniHost(request);
+  }
+
+  if (isOpacHost(host)) {
+    return handleOpacHost(request);
   }
 
   if (isLibraryHost(host)) {

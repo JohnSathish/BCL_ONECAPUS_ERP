@@ -16,6 +16,7 @@ HOSTS=(
   erp.donboscocollege.ac.in
   admissions.donboscocollege.ac.in
   library.donboscocollege.ac.in
+  opac.donboscocollege.ac.in
   career.donboscocollege.ac.in
   pay.donboscocollege.ac.in
   alumni.donboscocollege.ac.in
@@ -125,6 +126,7 @@ wanted_cors = (
     "https://www.donboscocollege.ac.in,"
     "https://admissions.donboscocollege.ac.in,"
     "https://library.donboscocollege.ac.in,"
+    "https://opac.donboscocollege.ac.in,"
     "https://career.donboscocollege.ac.in,"
     "https://pay.donboscocollege.ac.in,"
     "https://alumni.donboscocollege.ac.in,"

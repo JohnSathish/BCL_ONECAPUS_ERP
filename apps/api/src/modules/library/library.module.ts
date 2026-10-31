@@ -8,6 +8,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
 
 import { StorageModule } from '../../shared/storage/storage.module';
 import { LibraryController } from './library.controller';
+import { LibraryOpacController } from './library-opac.controller';
 import { KohaImportController } from './koha/koha-import.controller';
 import { KohaImportService } from './koha/koha-import.service';
 import { LibraryCatalogueReportsController } from './reports/library-catalogue-reports.controller';
@@ -55,6 +56,7 @@ import { LibraryRecommendationService } from './services/library-recommendation.
 import { LibraryReportsService } from './services/library-reports.service';
 import { LibraryEntryExitReportsService } from './services/library-entry-exit-reports.service';
 
+import { LibraryOpacService } from './services/library-opac.service';
 import { LibraryReservationService } from './services/library-reservation.service';
 
 import { LibrarySchedulerService } from './services/library-scheduler.service';
@@ -73,6 +75,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
   imports: [RealtimeModule, CommunicationModule, NaacIqacModule, StorageModule],
   controllers: [
     LibraryController,
+    LibraryOpacController,
     KohaImportController,
     LibraryCatalogueReportsController,
     LibraryDepartmentInventoryController,
@@ -114,6 +117,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
     LibraryPolicyService,
 
     LibraryReservationService,
+    LibraryOpacService,
 
     LibraryReportsService,
     LibraryEntryExitReportsService,
