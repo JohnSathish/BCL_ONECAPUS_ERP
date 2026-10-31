@@ -327,11 +327,11 @@ export function barcodeLabelDocument(
       display: block;
       position: relative;
       width: 4in;
-      height: 0.98in;
+      /* Stay a hair under the 0.98in stock. A full-height row feeds one extra blank label. */
+      height: 0.97in;
       margin: 0;
       padding: 0;
-      overflow: visible;
-      /* Match the driver stock so each row is one label, not a short strip that drifts. */
+      overflow: hidden;
       break-inside: avoid;
       page-break-inside: avoid;
       break-after: page;
@@ -342,14 +342,14 @@ export function barcodeLabelDocument(
       page-break-before: always;
     }
     .sheet.zebra.last {
-      break-after: auto;
-      page-break-after: auto;
+      break-after: avoid;
+      page-break-after: avoid;
     }
     .sheet.zebra .label {
       position: absolute;
       top: 0;
       width: 1.968in;
-      height: 0.98in;
+      height: 0.97in;
       margin: 0;
       border: 0;
       padding: 0.05in 0.08in;
@@ -401,8 +401,8 @@ export function barcodeLabelDocument(
       .sheet { page-break-after: always; break-after: page; }
       .sheet.last { page-break-after: auto; break-after: auto; }
       .sheet.zebra {
-        height: 0.98in;
-        overflow: visible;
+        height: 0.97in;
+        overflow: hidden;
         break-inside: avoid;
         page-break-inside: avoid;
         break-after: page;
@@ -413,8 +413,8 @@ export function barcodeLabelDocument(
         page-break-before: always;
       }
       .sheet.zebra.last {
-        break-after: auto;
-        page-break-after: auto;
+        break-after: avoid;
+        page-break-after: avoid;
       }
       .label.compact { box-shadow: none; }
       .sheet.zebra .label { overflow: hidden; }
