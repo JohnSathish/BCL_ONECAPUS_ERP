@@ -1112,7 +1112,11 @@ function SettingsPanel({
   function setNumber<K extends keyof LibraryBarcodeLabelSettings>(key: K, value: string) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return;
-    onChange({ ...template, [key]: parsed, preset: key === 'preset' ? template.preset : 'CUSTOM' });
+    onChange({
+      ...template,
+      [key]: parsed,
+      preset: template.preset === 'ZEBRA_2UP' ? 'ZEBRA_2UP' : 'CUSTOM',
+    });
   }
   return (
     <section className="rounded-xl border bg-white p-4 text-sm">

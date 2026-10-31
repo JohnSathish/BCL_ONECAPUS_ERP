@@ -348,25 +348,27 @@ export function barcodeLabelDocument(
       height: 0.92in;
       margin: 0;
       border: 0;
-      padding: 0.05in 0.08in 0.045in;
+      padding: 0.04in 0.08in 0.03in;
+      justify-content: flex-start;
       overflow: hidden;
     }
     .sheet.zebra .slot-a { left: 0; }
     .sheet.zebra .slot-b { left: 2.032in; }
     .sheet.zebra .label.compact .bars {
       width: 1.8in;
-      height: 0.46in;
+      height: 0.42in;
       margin: 0 auto;
-      padding: 0 0.08in 0.03in;
-      border-bottom: 0.6pt solid #000;
+      padding: 0 0.06in;
+      border-bottom: 0;
     }
     .sheet.zebra .label.compact .bars svg {
       width: 100%;
-      height: 0.42in;
+      height: 100%;
+      display: block;
     }
     .sheet.zebra .label.compact .foot {
       height: auto;
-      margin-top: 0.035in;
+      margin-top: 0.02in;
       align-items: flex-end;
     }
     .sheet.zebra .label.compact .acc {
@@ -418,7 +420,15 @@ export function barcodeLabelDocument(
 }
 
 function isZebraPair(settings: LibraryBarcodeLabelSettings) {
-  return settings.preset === 'ZEBRA_2UP' && settings.columns === 2 && settings.rows === 1;
+  if (settings.preset === 'ZEBRA_2UP') return true;
+  return (
+    Math.abs(settings.pageWidthMm - 101.6) < 0.2 &&
+    Math.abs(settings.pageHeightMm - 24.89) < 0.2 &&
+    settings.columns === 2 &&
+    settings.rows === 1 &&
+    !settings.showLogo &&
+    !settings.showTitle
+  );
 }
 
 function labelMarkup(
