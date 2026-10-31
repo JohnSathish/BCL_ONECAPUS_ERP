@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { sanitizeDisplayText } from '../../common/utils/display-text.util';
+import { portalHostCandidates } from '../../common/utils/request-host';
 import {
   BRANDING_DEFAULTS,
   resolvePoweredByText,
@@ -111,42 +112,48 @@ export class TenantResolutionService {
 
     const allowUnverified =
       this.config.get<string>('ALLOW_UNVERIFIED_DOMAINS', 'false') === 'true';
+    const candidates = portalHostCandidates(normalized);
+    if (candidates.length === 0) {
+      throw new NotFoundException('Institution portal not found');
+    }
 
-    const domain = await this.prisma.tenantDomain.findFirst({
-      where: {
-        host: normalized,
-        deletedAt: null,
-        ...(allowUnverified ? {} : { verified: true }),
-      },
-      include: {
-        tenant: {
-          include: {
-            branding: true,
-            securitySettings: true,
-            institutions: {
-              where: { deletedAt: null },
-              take: 1,
-              include: {
-                campuses: {
-                  where: { deletedAt: null },
-                  take: 1,
+    for (const candidate of candidates) {
+      const domain = await this.prisma.tenantDomain.findFirst({
+        where: {
+          host: candidate,
+          deletedAt: null,
+          ...(allowUnverified ? {} : { verified: true }),
+        },
+        include: {
+          tenant: {
+            include: {
+              branding: true,
+              securitySettings: true,
+              institutions: {
+                where: { deletedAt: null },
+                take: 1,
+                include: {
+                  campuses: {
+                    where: { deletedAt: null },
+                    take: 1,
+                  },
                 },
               },
             },
           },
         },
-      },
-    });
+      });
 
-    if (
-      !domain?.tenant ||
-      domain.tenant.deletedAt ||
-      domain.tenant.status !== 'active'
-    ) {
-      throw new NotFoundException('Institution portal not found');
+      if (
+        domain?.tenant &&
+        !domain.tenant.deletedAt &&
+        domain.tenant.status === 'active'
+      ) {
+        return domain.tenant;
+      }
     }
 
-    return domain.tenant;
+    throw new NotFoundException('Institution portal not found');
   }
 
   async getLoginContext(host: string): Promise<LoginContextDto> {

@@ -24,6 +24,18 @@ export function normalizeHost(raw: string): string {
   return withoutPort.startsWith('www.') ? withoutPort.slice(4) : withoutPort;
 }
 
+/** OPAC uses the college tenant already stored for erp.* and the apex domain. */
+export function portalHostCandidates(host: string): string[] {
+  const name = normalizeHost(host);
+  if (!name) return [];
+  const candidates = [name];
+  if (name.startsWith('opac.')) {
+    const rest = name.slice('opac.'.length);
+    if (rest) candidates.push(`erp.${rest}`, rest);
+  }
+  return candidates;
+}
+
 export function extractClientIp(req: Request): string {
   const headerFirst = (value: string | string[] | undefined): string | null => {
     if (!value) return null;

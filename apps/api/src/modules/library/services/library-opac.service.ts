@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
+import { portalHostCandidates } from '../../../common/utils/request-host';
 import { PrismaService } from '../../../database/prisma.service';
 import { resolveCopyIssue } from '../domain/library-copy-issue.logic';
 import { opacCopyAvailability } from '../domain/library-opac.logic';
@@ -64,19 +65,16 @@ export class LibraryOpacService {
   ) {}
 
   async tenantIdForHost(hostHeader: string) {
-    const host =
-      hostHeader.split(',')[0]?.trim().split(':')[0]?.toLowerCase() ?? '';
-    if (!host) return null;
-    const candidates = [host];
-    if (host.startsWith('opac.')) {
-      const rest = host.slice('opac.'.length);
-      candidates.push(rest, `erp.${rest}`);
+    const candidates = portalHostCandidates(hostHeader.split(',')[0] ?? '');
+    if (candidates.length === 0) return null;
+    for (const candidate of candidates) {
+      const domain = await this.prisma.tenantDomain.findFirst({
+        where: { host: candidate, deletedAt: null, verified: true },
+        select: { tenantId: true },
+      });
+      if (domain?.tenantId) return domain.tenantId;
     }
-    const domain = await this.prisma.tenantDomain.findFirst({
-      where: { host: { in: candidates }, deletedAt: null, verified: true },
-      select: { tenantId: true },
-    });
-    return domain?.tenantId ?? null;
+    return null;
   }
 
   async home(tenantId: string) {

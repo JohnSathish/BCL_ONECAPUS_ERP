@@ -3,7 +3,10 @@ import { ClsService } from 'nestjs-cls';
 import { NextFunction, Request, Response } from 'express';
 import { PrismaService } from '../../database/prisma.service';
 import { CLS_TENANT_ID } from '../cls/cls.constants';
-import { extractRequestHost } from '../utils/request-host';
+import {
+  extractRequestHost,
+  portalHostCandidates,
+} from '../utils/request-host';
 
 @Injectable()
 export class TenantResolverMiddleware implements NestMiddleware {
@@ -19,11 +22,7 @@ export class TenantResolverMiddleware implements NestMiddleware {
     const host = loginHost || extractRequestHost(req);
     if (host) {
       const allowUnverified = process.env.ALLOW_UNVERIFIED_DOMAINS === 'true';
-      const candidates = [host];
-      if (host.startsWith('opac.')) {
-        const rest = host.slice('opac.'.length);
-        candidates.push(`erp.${rest}`, rest);
-      }
+      const candidates = portalHostCandidates(host);
       for (const candidate of candidates) {
         const domain = await this.prisma.tenantDomain.findFirst({
           where: {
