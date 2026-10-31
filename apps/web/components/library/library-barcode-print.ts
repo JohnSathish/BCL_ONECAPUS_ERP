@@ -327,15 +327,21 @@ export function barcodeLabelDocument(
       display: block;
       position: relative;
       width: 4in;
-      height: 0.98in;
+      height: 0.97in;
+      margin: 0;
       padding: 0;
       overflow: hidden;
+      /* A full-height row plus page-break-after feeds a second blank label. */
+      page-break-after: avoid;
+      break-after: avoid;
+      page-break-before: auto;
+      break-before: auto;
     }
     .sheet.zebra .label {
       position: absolute;
       top: 0;
       width: 1.968in;
-      height: 0.98in;
+      height: 0.97in;
       margin: 0;
       border: 0;
       padding: 0.05in 0.08in 0.045in;
@@ -383,6 +389,12 @@ export function barcodeLabelDocument(
     @media print {
       .sheet { page-break-after: always; break-after: page; }
       .sheet.last { page-break-after: auto; break-after: auto; }
+      .sheet.zebra {
+        page-break-after: avoid;
+        break-after: avoid;
+        page-break-before: auto;
+        break-before: auto;
+      }
       .label.compact { box-shadow: none; }
       .sheet.zebra, .sheet.zebra .label { overflow: hidden; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
