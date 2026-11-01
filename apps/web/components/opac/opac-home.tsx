@@ -111,35 +111,44 @@ export function OpacHome() {
 
   return (
     <div className="space-y-8 pb-10">
-      <section className="bg-gradient-to-br from-slate-900 via-sky-950 to-slate-800 text-white">
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-[1.4fr_0.8fr] lg:items-start">
+      <section className="relative overflow-hidden text-white">
+        <img
+          src="/branding/alumni-campus-hero.png"
+          alt="Don Bosco College, Tura campus"
+          className="absolute inset-0 h-full w-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#061f3d]/95 via-[#0b2e59]/82 to-[#061f3d]/55" />
+        <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-12 lg:grid-cols-[1.4fr_0.8fr] lg:items-center lg:py-16">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f4b400]">
               Welcome to
             </p>
             <h1 className="mt-2 text-3xl font-extrabold uppercase leading-tight sm:text-4xl">
               {data.collegeName}
             </h1>
-            <p className="mt-2 text-lg text-sky-100">
+            <p className="mt-2 text-lg font-medium text-white">
+              Fr. Battista Busolin Memorial Library
+            </p>
+            <p className="mt-1 text-sm text-sky-100">
               Online Library Public Access Catalogue (OPAC)
             </p>
-            <p className="mt-2 max-w-xl text-sm text-slate-200">
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-100">
               Search, discover and explore the library collection of books and research materials.
             </p>
             <form
               onSubmit={(event) => search(event)}
-              className="mt-6 flex flex-col gap-2 sm:flex-row"
+              className="mt-6 flex flex-col gap-2 rounded-2xl bg-white/10 p-2 ring-1 ring-white/20 backdrop-blur-sm sm:flex-row"
             >
               <input
                 value={q}
                 onChange={(event) => setQ(event.target.value)}
                 placeholder="Search by book title, author, ISBN, subject, accession number..."
-                className="h-12 flex-1 rounded-xl border-0 px-4 text-slate-900"
+                className="h-12 flex-1 rounded-xl border-0 px-4 text-slate-900 shadow-sm outline-none ring-2 ring-transparent focus:ring-[#f4b400]"
               />
               <select
                 value={field}
                 onChange={(event) => setField(event.target.value as (typeof fields)[number][0])}
-                className="h-12 rounded-xl px-3 text-slate-900"
+                className="h-12 rounded-xl bg-white px-3 text-slate-900 shadow-sm"
               >
                 {fields.map(([value, label]) => (
                   <option key={value} value={value}>
@@ -149,7 +158,7 @@ export function OpacHome() {
               </select>
               <button
                 type="submit"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 font-semibold"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#f4b400] px-6 font-bold text-[#0b2e59] shadow-lg shadow-black/20 hover:bg-[#ffd15a]"
               >
                 <Search className="h-4 w-4" />
                 Search
@@ -162,8 +171,8 @@ export function OpacHome() {
                   type="button"
                   className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
                     field === value
-                      ? 'bg-white text-slate-900 ring-white'
-                      : 'bg-white/10 text-white ring-white/20'
+                      ? 'bg-[#f4b400] text-[#0b2e59] ring-[#f4b400]'
+                      : 'bg-white/10 text-white ring-white/25 hover:bg-white/20'
                   }`}
                   onClick={() => setField(value)}
                 >
@@ -172,7 +181,7 @@ export function OpacHome() {
               ))}
             </div>
           </div>
-          <div className="rounded-2xl bg-white p-5 text-slate-900 shadow-xl">
+          <div className="rounded-2xl border border-white/40 bg-white p-5 text-slate-900 shadow-2xl shadow-black/30">
             {session ? (
               <div>
                 <h2 className="text-lg font-bold">You are signed in</h2>
@@ -235,7 +244,7 @@ export function OpacHome() {
           {counts.map(([Icon, tone, value, label]) => (
             <div
               key={label}
-              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4"
+              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm"
             >
               <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${tone}`}>
                 <Icon className="h-5 w-5" />
@@ -255,7 +264,7 @@ export function OpacHome() {
             <Link
               key={title}
               href={href}
-              className="rounded-2xl border border-slate-200 bg-white p-4 hover:border-sky-200"
+              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#f4b400] hover:shadow-md"
             >
               <Icon className="h-5 w-5 text-sky-700" />
               <p className="mt-3 font-semibold">{title}</p>
