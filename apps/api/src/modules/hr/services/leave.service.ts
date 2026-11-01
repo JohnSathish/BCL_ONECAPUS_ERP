@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from 'fs/promises';
+import { join } from 'path';
 import {
   BadRequestException,
   Injectable,
@@ -6,11 +8,31 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
+import { resolveUploadRoot } from '../../../common/uploads/upload-paths';
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
+import {
+  CASUAL_LEAVE_ANNUAL_DAYS,
+  chargeableDates,
+  eachDate,
+  evaluateCasualLeave,
+  isCasualLeaveType,
+  isHiddenFromStaffLeave,
+  isPrivilegedLeaveType,
+  staffCanApplyForLeave,
+  utcDateKey,
+} from '../domain/casual-leave.policy';
+import {
+  ensureCasualLeaveType,
+  ensurePrivilegedLeaveTypes,
+  genderAllowsLeave,
+  loadLeaveYear,
+  readCasualLeaveSnapshot,
+} from '../domain/casual-leave.snapshot';
 import {
   ApproveLeaveDto,
   CreateLeaveApplicationDto,
   InitializeLeaveBalancesDto,
+  RecordPrivilegedLeaveDto,
 } from '../dto/leave.dto';
 
 function daysBetween(from: Date, to: Date) {
@@ -152,6 +174,7 @@ export class LeaveService {
       staffProfileId?: string;
       status?: string;
       pendingApproval?: boolean;
+      privilegedOnly?: boolean;
     } = {},
   ) {
     const rows = await this.prisma.staffLeaveApplication.findMany({
@@ -163,6 +186,20 @@ export class LeaveService {
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.pendingApproval
           ? { status: { in: ['PENDING', 'HOD_APPROVED'] } }
+          : {}),
+        ...(filters.privilegedOnly
+          ? {
+              leaveType: {
+                OR: [
+                  {
+                    code: {
+                      in: ['MAT', 'PAT', 'MATERNITY', 'PATERNITY', 'PL'],
+                    },
+                  },
+                  { name: { contains: 'aternity', mode: 'insensitive' } },
+                ],
+              },
+            }
           : {}),
       },
       include: this.include,
@@ -281,29 +318,51 @@ export class LeaveService {
     });
     if (!leaveType) throw new NotFoundException('Leave type not found');
 
+    if (isPrivilegedLeaveType(leaveType)) {
+      throw new BadRequestException(
+        'Maternity and paternity leave are recorded by the Principal from the admin leave page.',
+      );
+    }
+    if (isHiddenFromStaffLeave(leaveType)) {
+      throw new BadRequestException(
+        'Medical leave and earned leave are not open for new applications.',
+      );
+    }
+
     const from = new Date(dto.fromDate);
     const to = new Date(dto.toDate);
-    if (to < from)
+    if (to < from) {
       throw new BadRequestException('To date must be on or after from date');
+    }
 
-    const totalDays = dto.totalDays ?? daysBetween(from, to);
-    const year = from.getFullYear();
-
-    const balance = await this.ensureBalance(
-      user.tid,
-      dto.staffProfileId,
-      dto.leaveTypeId,
-      year,
-      leaveType,
-    );
-    const remaining =
-      Number(balance.allocatedDays) +
-      Number(balance.carriedForward) -
-      Number(balance.usedDays);
-    if (totalDays > remaining) {
-      throw new BadRequestException(
-        `Insufficient leave balance. Remaining: ${remaining} days`,
+    let totalDays = dto.totalDays ?? daysBetween(from, to);
+    if (isCasualLeaveType(leaveType)) {
+      const decision = await this.decideCasualLeave(
+        user.tid,
+        dto.staffProfileId,
+        dto.fromDate,
+        dto.toDate,
       );
+      if (!decision.ok) throw new BadRequestException(decision.message);
+      totalDays = decision.totalDays;
+    } else {
+      const year = from.getFullYear();
+      const balance = await this.ensureBalance(
+        user.tid,
+        dto.staffProfileId,
+        dto.leaveTypeId,
+        year,
+        leaveType,
+      );
+      const remaining =
+        Number(balance.allocatedDays) +
+        Number(balance.carriedForward) -
+        Number(balance.usedDays);
+      if (totalDays > remaining) {
+        throw new BadRequestException(
+          `Insufficient leave balance. Remaining: ${remaining} days`,
+        );
+      }
     }
 
     const created = await this.prisma.staffLeaveApplication.create({
@@ -382,6 +441,19 @@ export class LeaveService {
       return this.enrichApplication(updated);
     }
 
+    let chargeableDays = Number(app.totalDays);
+    if (isCasualLeaveType(app.leaveType)) {
+      const decision = await this.decideCasualLeave(
+        user.tid,
+        app.staffProfileId,
+        utcDateKey(app.fromDate),
+        utcDateKey(app.toDate),
+        app.id,
+      );
+      if (!decision.ok) throw new BadRequestException(decision.message);
+      chargeableDays = decision.totalDays;
+    }
+
     const flow = (app.leaveType.approvalFlow as string[] | null) ?? [
       'HOD',
       'PRINCIPAL',
@@ -399,32 +471,61 @@ export class LeaveService {
         ? 'HOD_APPROVED'
         : `${stageRole.replace(/\s+/g, '_')}_APPROVED`;
 
-    if (isFinal) {
-      const year = app.fromDate.getFullYear();
-      await this.prisma.staffLeaveBalance.updateMany({
-        where: {
-          tenantId: user.tid,
-          staffProfileId: app.staffProfileId,
-          leaveTypeId: app.leaveTypeId,
-          year,
-        },
-        data: { usedDays: { increment: Number(app.totalDays) } },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.staffLeaveApplication.findFirst({
+        where: { id, tenantId: user.tid },
       });
-    }
-
-    const updated = await this.prisma.staffLeaveApplication.update({
-      where: { id },
-      data: {
-        approvalStage: isFinal ? flow.length : nextStage,
-        status: isFinal ? 'APPROVED' : intermediateStatus,
-        reviewedById: user.sub,
-        reviewedByName,
-        reviewedByRole,
-        reviewedAt,
-        approvalRemarks: dto.remarks ?? 'Approved',
-        rejectionReason: null,
-      },
-      include: this.include,
+      if (
+        !current ||
+        ['APPROVED', 'REJECTED', 'CANCELLED'].includes(current.status)
+      ) {
+        throw new BadRequestException('Application already finalized');
+      }
+      if (isFinal && !isPrivilegedLeaveType(app.leaveType)) {
+        const year = Number(utcDateKey(app.fromDate).slice(0, 4));
+        const balance = await this.ensureBalance(
+          user.tid,
+          app.staffProfileId,
+          app.leaveTypeId,
+          year,
+          app.leaveType,
+        );
+        const fresh = await tx.staffLeaveBalance.findUnique({
+          where: { id: balance.id },
+        });
+        const remaining =
+          Number(fresh?.allocatedDays ?? 0) +
+          Number(fresh?.carriedForward ?? 0) -
+          Number(fresh?.usedDays ?? 0);
+        if (chargeableDays > remaining) {
+          throw new BadRequestException(
+            isCasualLeaveType(app.leaveType)
+              ? remaining <= 0
+                ? 'Casual leave balance for this calendar year is exhausted.'
+                : `Casual leave balance is not enough. Remaining: ${remaining} day(s).`
+              : `Insufficient leave balance. Remaining: ${remaining} days`,
+          );
+        }
+        await tx.staffLeaveBalance.update({
+          where: { id: balance.id },
+          data: { usedDays: { increment: chargeableDays } },
+        });
+      }
+      return tx.staffLeaveApplication.update({
+        where: { id },
+        data: {
+          totalDays: chargeableDays,
+          approvalStage: isFinal ? flow.length : nextStage,
+          status: isFinal ? 'APPROVED' : intermediateStatus,
+          reviewedById: user.sub,
+          reviewedByName,
+          reviewedByRole,
+          reviewedAt,
+          approvalRemarks: dto.remarks ?? 'Approved',
+          rejectionReason: null,
+        },
+        include: this.include,
+      });
     });
 
     await this.notifyStaffLeaveDecision({
@@ -482,9 +583,13 @@ export class LeaveService {
 
   async initializeBalances(user: JwtUser, dto: InitializeLeaveBalancesDto) {
     const year = dto.year ?? new Date().getFullYear();
-    const leaveTypes = await this.prisma.staffLeaveType.findMany({
-      where: { tenantId: user.tid, active: true },
-    });
+    await ensureCasualLeaveType(this.prisma, user.tid);
+    await ensurePrivilegedLeaveTypes(this.prisma, user.tid);
+    const leaveTypes = (
+      await this.prisma.staffLeaveType.findMany({
+        where: { tenantId: user.tid, active: true },
+      })
+    ).filter((type) => staffCanApplyForLeave(type));
     const staff = await this.prisma.staffProfile.findMany({
       where: {
         tenantId: user.tid,
@@ -524,6 +629,15 @@ export class LeaveService {
         created += 1;
       }
     }
+    await this.prisma.staffLeaveBalance.updateMany({
+      where: {
+        tenantId: user.tid,
+        year,
+        allocatedDays: { lt: CASUAL_LEAVE_ANNUAL_DAYS },
+        leaveType: { code: { in: ['CL', 'CASUAL'] } },
+      },
+      data: { allocatedDays: CASUAL_LEAVE_ANNUAL_DAYS },
+    });
     return {
       initialized: created,
       staffCount: staff.length,
@@ -553,13 +667,24 @@ export class LeaveService {
       }),
     ]);
 
-    return { ...summary, leaveTypes };
+    return {
+      ...summary,
+      leaveTypes: leaveTypes.filter((type) => staffCanApplyForLeave(type)),
+    };
   }
 
   async listApplicationsForSelf(user: JwtUser) {
     const staff = await this.resolveStaffForPortalUser(user);
     if (!staff) return [];
-    return this.listApplications(user.tid, { staffProfileId: staff.id });
+    const rows = await this.listApplications(user.tid, {
+      staffProfileId: staff.id,
+    });
+    return rows.filter((row) =>
+      staffCanApplyForLeave(
+        (row as { leaveType?: { code?: string; name?: string } }).leaveType ??
+          {},
+      ),
+    );
   }
 
   private async resolveStaffForPortalUser(user: JwtUser) {
@@ -569,7 +694,6 @@ export class LeaveService {
   }
 
   private async portalSummary(tenantId: string, staffProfileId: string) {
-    const year = new Date().getFullYear();
     const mislabelled = await this.prisma.staffLeaveApplication.findMany({
       where: {
         tenantId,
@@ -581,35 +705,300 @@ export class LeaveService {
     if (mislabelled.length) {
       await this.healMislabelledLeadershipApprovals(tenantId, mislabelled);
     }
+    const snapshot = await readCasualLeaveSnapshot(
+      this.prisma,
+      tenantId,
+      staffProfileId,
+    );
+    const balances = await this.listBalances(
+      tenantId,
+      staffProfileId,
+      snapshot.year,
+    );
+    return { ...snapshot, balances };
+  }
 
-    const [balances, pendingRequests] = await Promise.all([
-      this.listBalances(tenantId, staffProfileId, year),
-      this.prisma.staffLeaveApplication.count({
+  async previewForSelf(
+    user: JwtUser,
+    query: { leaveTypeId?: string; fromDate?: string; toDate?: string },
+  ) {
+    const staff = await this.resolveStaffForPortalUser(user);
+    if (!staff) {
+      return {
+        ok: false,
+        totalDays: 0,
+        message: 'Staff profile not linked to your account.',
+      };
+    }
+    if (!query.leaveTypeId || !query.fromDate || !query.toDate) {
+      return {
+        ok: false,
+        totalDays: 0,
+        message: 'Choose the leave type and dates.',
+      };
+    }
+    const leaveType = await this.prisma.staffLeaveType.findFirst({
+      where: { id: query.leaveTypeId, tenantId: user.tid, active: true },
+    });
+    if (!leaveType || !staffCanApplyForLeave(leaveType)) {
+      return {
+        ok: false,
+        totalDays: 0,
+        message:
+          'Choose casual leave. Medical, earned, maternity, and paternity leave are not applied here.',
+      };
+    }
+    if (!isCasualLeaveType(leaveType)) {
+      const from = new Date(query.fromDate);
+      const to = new Date(query.toDate);
+      if (to < from) {
+        return {
+          ok: false,
+          totalDays: 0,
+          message: 'To date must be on or after from date.',
+        };
+      }
+      return { ok: true, totalDays: daysBetween(from, to), message: null };
+    }
+    const decision = await this.decideCasualLeave(
+      user.tid,
+      staff.id,
+      query.fromDate,
+      query.toDate,
+    );
+    return decision.ok
+      ? { ok: true, totalDays: decision.totalDays, message: null }
+      : { ok: false, totalDays: 0, message: decision.message };
+  }
+
+  async searchStaff(tenantId: string, term: string) {
+    const q = term.trim();
+    if (q.length < 2) return [];
+    return this.prisma.staffProfile.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: 'ACTIVE',
+        OR: [
+          { fullName: { contains: q, mode: 'insensitive' } },
+          { employeeCode: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true, fullName: true, employeeCode: true, gender: true },
+      take: 8,
+      orderBy: { fullName: 'asc' },
+    });
+  }
+
+  async recordPrivilegedLeave(
+    user: JwtUser,
+    dto: RecordPrivilegedLeaveDto,
+    file?: Express.Multer.File,
+  ) {
+    await ensurePrivilegedLeaveTypes(this.prisma, user.tid);
+    const leaveType = await this.prisma.staffLeaveType.findFirst({
+      where: { tenantId: user.tid, code: dto.leaveTypeCode, active: true },
+    });
+    if (!leaveType) throw new NotFoundException('Leave type not found');
+    const staff = await this.prisma.staffProfile.findFirst({
+      where: { id: dto.staffProfileId, tenantId: user.tid, deletedAt: null },
+    });
+    if (!staff) throw new NotFoundException('Staff not found');
+    if (!genderAllowsLeave(leaveType.genderRestriction, staff.gender)) {
+      throw new BadRequestException(
+        dto.leaveTypeCode === 'MAT'
+          ? 'Maternity leave is recorded for a female staff member.'
+          : 'Paternity leave is recorded for a male staff member.',
+      );
+    }
+    const from = utcDateKey(dto.fromDate);
+    const to = utcDateKey(dto.toDate);
+    if (to < from) {
+      throw new BadRequestException('To date must be on or after from date.');
+    }
+    const approvalDate = utcDateKey(dto.approvalDate);
+    if (approvalDate > utcDateKey(new Date())) {
+      throw new BadRequestException('Approval date cannot be in the future.');
+    }
+    const reviewer = await this.prisma.user.findFirst({
+      where: { id: user.sub, tenantId: user.tid },
+      select: { displayName: true, email: true },
+    });
+    const reviewedByRole = resolveApproverRoleLabel(user.roles ?? []);
+    const reviewedByName =
+      reviewer?.displayName?.trim() ||
+      reviewer?.email?.split('@')[0] ||
+      reviewedByRole;
+    const overlap = await this.prisma.staffLeaveApplication.findFirst({
+      where: {
+        tenantId: user.tid,
+        staffProfileId: staff.id,
+        status: { notIn: ['REJECTED', 'CANCELLED'] },
+        fromDate: { lte: new Date(`${to}T00:00:00.000Z`) },
+        toDate: { gte: new Date(`${from}T00:00:00.000Z`) },
+      },
+      select: { id: true },
+    });
+    if (overlap) {
+      throw new BadRequestException(
+        'These dates overlap another leave record.',
+      );
+    }
+    const priorRecords = await this.prisma.staffLeaveApplication.count({
+      where: {
+        tenantId: user.tid,
+        staffProfileId: staff.id,
+        leaveTypeId: leaveType.id,
+        status: 'APPROVED',
+      },
+    });
+    const created = await this.prisma.staffLeaveApplication.create({
+      data: {
+        tenantId: user.tid,
+        staffProfileId: staff.id,
+        leaveTypeId: leaveType.id,
+        fromDate: new Date(`${from}T00:00:00.000Z`),
+        toDate: new Date(`${to}T00:00:00.000Z`),
+        totalDays: eachDate(from, to).length,
+        reason: dto.remarks?.trim() || null,
+        status: 'APPROVED',
+        approvalStage: 1,
+        attachmentUrl: dto.attachmentUrl?.trim() || null,
+        reviewedById: user.sub,
+        reviewedByName,
+        reviewedByRole,
+        reviewedAt: new Date(`${approvalDate}T00:00:00.000Z`),
+        approvalRemarks:
+          dto.remarks?.trim() || 'Recorded by the approving authority',
+      },
+      include: this.include,
+    });
+    if (file?.buffer?.length) {
+      const attachmentUrl = await this.saveLeaveDocument(
+        user.tid,
+        created.id,
+        file,
+      );
+      const withFile = await this.prisma.staffLeaveApplication.update({
+        where: { id: created.id },
+        data: { attachmentUrl },
+        include: this.include,
+      });
+      return { ...this.enrichApplication(withFile), priorRecords };
+    }
+    return { ...this.enrichApplication(created), priorRecords };
+  }
+
+  private async decideCasualLeave(
+    tenantId: string,
+    staffProfileId: string,
+    from: string,
+    to: string,
+    excludeApplicationId?: string,
+  ) {
+    const leaveType = await ensureCasualLeaveType(this.prisma, tenantId);
+    const year = Number(utcDateKey(from).slice(0, 4));
+    await this.prisma.staffLeaveBalance.updateMany({
+      where: {
+        tenantId,
+        staffProfileId,
+        year,
+        leaveTypeId: leaveType.id,
+        allocatedDays: { lt: CASUAL_LEAVE_ANNUAL_DAYS },
+      },
+      data: { allocatedDays: CASUAL_LEAVE_ANNUAL_DAYS },
+    });
+    const [balance, calendar, apps] = await Promise.all([
+      this.ensureBalance(
+        tenantId,
+        staffProfileId,
+        leaveType.id,
+        year,
+        leaveType,
+      ),
+      loadLeaveYear(this.prisma, tenantId, year),
+      this.prisma.staffLeaveApplication.findMany({
         where: {
           tenantId,
           staffProfileId,
-          status: { in: ['PENDING', 'HOD_APPROVED'] },
+          status: { notIn: ['REJECTED', 'CANCELLED'] },
+          ...(excludeApplicationId
+            ? { id: { not: excludeApplicationId } }
+            : {}),
+          fromDate: { lte: new Date(`${year}-12-31T00:00:00.000Z`) },
+          toDate: { gte: new Date(`${year}-01-01T00:00:00.000Z`) },
+        },
+        select: {
+          status: true,
+          fromDate: true,
+          toDate: true,
+          leaveType: { select: { code: true, name: true } },
         },
       }),
     ]);
+    const existingCasualDates: string[] = [];
+    const pendingDates: string[] = [];
+    const otherLeaveDates: string[] = [];
+    for (const app of apps) {
+      const span = eachDate(
+        utcDateKey(app.fromDate),
+        utcDateKey(app.toDate),
+      ).filter((day) => day.startsWith(String(year)));
+      if (isCasualLeaveType(app.leaveType)) {
+        const days = chargeableDates(span, calendar.holidays);
+        existingCasualDates.push(...days);
+        if (app.status !== 'APPROVED') pendingDates.push(...days);
+      } else {
+        otherLeaveDates.push(...span);
+      }
+    }
+    return evaluateCasualLeave({
+      from,
+      to,
+      holidays: calendar.holidays,
+      vacations: calendar.vacations,
+      existingCasualDates,
+      otherLeaveDates,
+      allocated: Number(balance.allocatedDays),
+      carried: Number(balance.carriedForward),
+      used: Number(balance.usedDays),
+      pendingDates: [...new Set(pendingDates)],
+    });
+  }
 
-    const byCode = (code: string) => {
-      const row = balances.find((b) => b.leaveType.code.toUpperCase() === code);
-      if (!row) return 0;
-      return (
-        Number(row.allocatedDays) +
-        Number(row.carriedForward) -
-        Number(row.usedDays)
+  private async saveLeaveDocument(
+    tenantId: string,
+    applicationId: string,
+    file: Express.Multer.File,
+  ) {
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('The document must be 5 MB or smaller.');
+    }
+    const name = (file.originalname || '').toLowerCase();
+    const ext =
+      file.mimetype === 'application/pdf' || name.endsWith('.pdf')
+        ? '.pdf'
+        : file.mimetype === 'image/png' || name.endsWith('.png')
+          ? '.png'
+          : file.mimetype === 'image/webp' || name.endsWith('.webp')
+            ? '.webp'
+            : file.mimetype === 'image/jpeg' ||
+                name.endsWith('.jpg') ||
+                name.endsWith('.jpeg')
+              ? '.jpg'
+              : '';
+    if (!ext) {
+      throw new BadRequestException(
+        'Upload a PDF or an image of the supporting document.',
       );
-    };
-
-    return {
-      casual: byCode('CL'),
-      sick: byCode('SL'),
-      earned: byCode('EL'),
-      pendingRequests,
-      balances,
-    };
+    }
+    const relative = join('tenants', tenantId, 'hr', 'leave', applicationId);
+    await mkdir(join(resolveUploadRoot(), relative), { recursive: true });
+    await writeFile(
+      join(resolveUploadRoot(), relative, `document${ext}`),
+      file.buffer,
+    );
+    return `/uploads/${relative.replace(/\\/g, '/')}/document${ext}`;
   }
 
   private async ensureBalance(

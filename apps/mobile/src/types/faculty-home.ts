@@ -98,7 +98,15 @@ export type FacultyHomeSnapshot = {
   }[];
   departmentNotices?: { id: string; title: string; body?: string }[];
   unreadNotificationCount?: number;
-  leaveBalance?: { casual?: number; sick?: number; earned?: number };
+  leaveBalance?: {
+    casual?: number;
+    sick?: number;
+    earned?: number;
+    allocated?: number;
+    availed?: number;
+    pending?: number;
+    balance?: number;
+  };
   payroll?: {
     amount?: number;
     currency?: string;

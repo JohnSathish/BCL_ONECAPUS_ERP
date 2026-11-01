@@ -20,6 +20,7 @@ import {
   computeLeaveDays,
   fetchLeaveApplications,
   fetchLeaveSummary,
+  previewLeave,
   formatLeaveDate,
   formatLeaveStatus,
   leaveStatusColor,
@@ -107,8 +108,14 @@ export default function FacultyLeaveScreen() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [reason, setReason] = useState('');
+  const [preview, setPreview] = useState<{
+    ok: boolean;
+    totalDays: number;
+    message: string | null;
+  } | null>(null);
 
   const leaveTypes = summary?.leaveTypes ?? [];
+  const casual = summary?.casualLeave;
   const dayCount = useMemo(
     () => (fromDate && toDate ? computeLeaveDays(fromDate, toDate) : null),
     [fromDate, toDate],
@@ -136,6 +143,30 @@ export default function FacultyLeaveScreen() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!leaveTypeId || !fromDate || !toDate || dayCount == null) {
+      setPreview(null);
+      return;
+    }
+    let active = true;
+    void previewLeave({ leaveTypeId, fromDate, toDate })
+      .then((result) => {
+        if (active) setPreview(result);
+      })
+      .catch((error) => {
+        if (active) {
+          setPreview({
+            ok: false,
+            totalDays: 0,
+            message: error instanceof Error ? error.message : 'Could not check these dates.',
+          });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [leaveTypeId, fromDate, toDate, dayCount]);
+
   async function onSubmit() {
     if (!leaveTypeId) {
       Alert.alert('Select leave type', 'Choose a leave type before submitting.');
@@ -147,6 +178,13 @@ export default function FacultyLeaveScreen() {
     }
     if (dayCount == null || dayCount < 1) {
       Alert.alert('Invalid dates', 'To date must be on or after from date.');
+      return;
+    }
+    if (preview && !preview.ok) {
+      Alert.alert(
+        'Leave not allowed',
+        preview.message ?? 'These dates are outside the casual leave rules.',
+      );
       return;
     }
     if (!reason.trim()) {
@@ -187,15 +225,17 @@ export default function FacultyLeaveScreen() {
         ) : (
           <>
             <View style={styles.balanceCard}>
-              <Text style={styles.sectionTitle}>Leave Balance</Text>
-              <View style={styles.balanceRow}>
-                <BalanceTile label="CL" value={summary?.casual ?? 0} />
-                <BalanceTile label="SL" value={summary?.sick ?? 0} />
-                <BalanceTile label="EL" value={summary?.earned ?? 0} />
-              </View>
-              <Text style={styles.pendingText}>
-                Pending requests: {summary?.pendingRequests ?? 0}
+              <Text style={styles.sectionTitle}>Casual Leave</Text>
+              <Text style={styles.helperText}>
+                15 days in a calendar year, and not more than 3 working days at a time. Sundays and
+                holidays are not counted.
               </Text>
+              <View style={styles.balanceRow}>
+                <BalanceTile label="Allocation" value={casual?.allocated ?? 15} />
+                <BalanceTile label="Availed" value={casual?.availed ?? 0} />
+                <BalanceTile label="Pending" value={casual?.pending ?? 0} />
+                <BalanceTile label="Balance" value={casual?.balance ?? summary?.casual ?? 0} />
+              </View>
             </View>
 
             <View style={styles.formCard}>
@@ -255,8 +295,12 @@ export default function FacultyLeaveScreen() {
                 </View>
               </View>
 
-              {dayCount != null ? (
-                <Text style={styles.dayCount}>{dayCount} day(s) requested</Text>
+              {preview ? (
+                <Text style={[styles.dayCount, !preview.ok && styles.previewError]}>
+                  {preview.ok
+                    ? `${preview.totalDays} working day(s) will be requested.`
+                    : preview.message}
+                </Text>
               ) : null}
 
               <View style={styles.field}>
@@ -282,16 +326,29 @@ export default function FacultyLeaveScreen() {
               </Pressable>
             </View>
 
-            <View style={styles.historyCard}>
-              <Text style={styles.sectionTitle}>Recent Requests</Text>
-              {applications.length === 0 ? (
-                <Text style={styles.helperText}>No leave requests yet.</Text>
-              ) : (
-                applications.map((application) => (
-                  <ApplicationRow key={application.id} application={application} />
-                ))
-              )}
-            </View>
+            {(
+              [
+                [
+                  'Pending leave',
+                  applications.filter(
+                    (row) => !['APPROVED', 'REJECTED', 'CANCELLED'].includes(row.status),
+                  ),
+                ],
+                ['Approved leave', applications.filter((row) => row.status === 'APPROVED')],
+                ['Rejected leave', applications.filter((row) => row.status === 'REJECTED')],
+              ] as const
+            ).map(([title, rows]) => (
+              <View key={title} style={styles.historyCard}>
+                <Text style={styles.sectionTitle}>{title}</Text>
+                {rows.length === 0 ? (
+                  <Text style={styles.helperText}>None yet.</Text>
+                ) : (
+                  rows.map((application) => (
+                    <ApplicationRow key={application.id} application={application} />
+                  ))
+                )}
+              </View>
+            ))}
           </>
         )}
       </ScrollView>
@@ -364,6 +421,7 @@ const styles = StyleSheet.create({
   },
   reasonInput: { minHeight: 72, textAlignVertical: 'top' },
   dayCount: { fontSize: 12, fontWeight: '700', color: facultyTheme.primaryLight },
+  previewError: { color: '#B91C1C' },
   helperText: { fontSize: 13, color: facultyTheme.textMuted },
   submitBtn: {
     backgroundColor: facultyTheme.primary,

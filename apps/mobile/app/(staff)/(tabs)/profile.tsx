@@ -139,27 +139,34 @@ export default function FacultyProfileScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Leave Balance</Text>
+          <Text style={styles.cardTitle}>Casual Leave</Text>
           <View style={styles.leaveRow}>
             <LeaveCard
               tint="#ECFDF5"
               valueColor="#047857"
-              label="Casual Leave"
-              value={`${leave?.casual ?? 0} days`}
+              label="Allocation"
+              value={`${leave?.allocated ?? 15} days`}
               onPress={() => router.push('/(staff)/leave' as never)}
             />
             <LeaveCard
-              tint="#FEF2F2"
-              valueColor="#BE123C"
-              label="Medical Leave"
-              value={`${leave?.sick ?? 0} days`}
+              tint="#F8FAFC"
+              valueColor="#334155"
+              label="Availed"
+              value={`${leave?.availed ?? 0} days`}
+              onPress={() => router.push('/(staff)/leave' as never)}
+            />
+            <LeaveCard
+              tint="#FFFBEB"
+              valueColor="#B45309"
+              label="Pending"
+              value={`${leave?.pending ?? 0} days`}
               onPress={() => router.push('/(staff)/leave' as never)}
             />
             <LeaveCard
               tint="#EFF6FF"
               valueColor="#1D4ED8"
-              label="Earned Leave"
-              value={`${leave?.earned ?? 0} days`}
+              label="Balance"
+              value={`${leave?.balance ?? leave?.casual ?? 0} days`}
               onPress={() => router.push('/(staff)/leave' as never)}
             />
           </View>
@@ -426,8 +433,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconText: { fontSize: 14 },
-  leaveRow: { flexDirection: 'row', gap: 8 },
-  leaveCard: { flex: 1, borderRadius: 14, padding: 10, gap: 4, minHeight: 78 },
+  leaveRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  leaveCard: { width: '48%', borderRadius: 14, padding: 10, gap: 4, minHeight: 78 },
   leaveValue: { fontSize: 16, fontWeight: '800' },
   leaveLabel: { fontSize: 11, color: '#4B5563', fontWeight: '600' },
   payrollValue: { fontSize: 18, fontWeight: '800', color: facultyTheme.text },

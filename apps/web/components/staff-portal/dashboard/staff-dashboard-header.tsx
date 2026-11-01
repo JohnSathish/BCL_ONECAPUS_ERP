@@ -274,10 +274,14 @@ export function StaffSnapshotCards({ data, loading }: Props) {
         delay={0.1}
       >
         <p>
-          CL <strong>{kpis.leave.casual}</strong> · SL <strong>{kpis.leave.sick}</strong> · EL{' '}
-          <strong>{kpis.leave.earned}</strong>
+          Casual leave balance{' '}
+          <strong>{kpis.leave.casualLeave?.balance ?? kpis.leave.casual}</strong> of{' '}
+          <strong>{kpis.leave.casualLeave?.allocated ?? 15}</strong>
         </p>
-        <p className="text-muted-foreground">Pending: {kpis.leave.pendingRequests}</p>
+        <p className="text-muted-foreground">
+          Availed {kpis.leave.casualLeave?.availed ?? 0} · Pending{' '}
+          {kpis.leave.casualLeave?.pending ?? kpis.leave.pendingRequests}
+        </p>
       </KpiCard>
 
       {STAFF_PORTAL_SALARY_VISIBLE ? (

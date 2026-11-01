@@ -90,10 +90,7 @@ export function FacultyDrawer() {
   const designation = home?.profile?.designation ?? 'Staff';
   const department = home?.profile?.department ?? 'Department';
   const classesToday = home?.workloadSummary?.classesToday ?? 0;
-  const leaveTotal =
-    (home?.leaveBalance?.casual ?? 0) +
-    (home?.leaveBalance?.sick ?? 0) +
-    (home?.leaveBalance?.earned ?? 0);
+  const leaveTotal = home?.leaveBalance?.balance ?? home?.leaveBalance?.casual ?? 0;
   const pending = teaching
     ? (home?.workloadSummary?.attendancePending ?? 0) +
       (home?.workloadSummary?.marksPending ?? 0) +

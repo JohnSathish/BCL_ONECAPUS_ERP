@@ -21,6 +21,7 @@ import {
   getZonedHour,
   getZonedWeekday,
 } from '../../../common/utils/time-greeting';
+import { readCasualLeaveSnapshot } from '../../hr/domain/casual-leave.snapshot';
 
 const PRESENT_ATTENDANCE_STATUSES = new Set([
   'PRESENT',
@@ -1480,31 +1481,17 @@ export class StaffPortalService {
   }
 
   private async getLeaveKpi(tenantId: string, staffProfileId: string) {
-    const year = new Date().getFullYear();
-    const [balances, pending] = await Promise.all([
-      this.prisma.staffLeaveBalance.findMany({
-        where: { tenantId, staffProfileId, year },
-        include: { leaveType: { select: { code: true } } },
-      }),
-      this.prisma.staffLeaveApplication.count({
-        where: {
-          tenantId,
-          staffProfileId,
-          status: { in: ['PENDING', 'HOD_APPROVED'] },
-        },
-      }),
-    ]);
-    const byCode: Record<string, number> = {};
-    for (const b of balances) {
-      const remaining =
-        Number(b.allocatedDays) + Number(b.carriedForward) - Number(b.usedDays);
-      byCode[b.leaveType.code.toUpperCase()] = remaining;
-    }
+    const snapshot = await readCasualLeaveSnapshot(
+      this.prisma,
+      tenantId,
+      staffProfileId,
+    );
     return {
-      casual: byCode['CL'] ?? byCode['CASUAL'] ?? 0,
-      sick: byCode['SL'] ?? byCode['SICK'] ?? byCode['MEDICAL'] ?? 0,
-      earned: byCode['EL'] ?? byCode['EARNED'] ?? 0,
-      pendingRequests: pending,
+      casual: snapshot.casual,
+      sick: 0,
+      earned: 0,
+      pendingRequests: snapshot.pendingRequests,
+      casualLeave: snapshot.casualLeave,
     };
   }
 }

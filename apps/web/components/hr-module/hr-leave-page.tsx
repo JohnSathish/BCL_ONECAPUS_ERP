@@ -9,6 +9,7 @@ import { GlassCard } from '@/components/erp/glass-card';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { Button } from '@/components/ui/button';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { PrivilegedLeavePanel } from '@/components/hr-module/privileged-leave-panel';
 import {
   approveLeaveApplication,
   fetchLeaveApplications,
@@ -59,7 +60,8 @@ export function HrLeavePage() {
         <div>
           <h2 className="text-xl font-bold tracking-tight">Leave Management</h2>
           <p className="text-sm text-muted-foreground">
-            Approval queue, balances, and leave liability.
+            Casual leave is 15 days in a calendar year. Medical leave and earned leave stay on
+            record, and maternity or paternity leave is entered here by the Principal.
           </p>
         </div>
         <div className="flex gap-2">
@@ -158,6 +160,8 @@ export function HrLeavePage() {
           </div>
         )}
       </GlassCard>
+
+      <PrivilegedLeavePanel />
 
       <GlassCard className="p-4">
         <h3 className="mb-3 font-semibold">Leave Balances ({new Date().getFullYear()})</h3>

@@ -28,6 +28,7 @@ import {
   CreateLeaveApplicationDto,
   InitializeLeaveBalancesDto,
   PortalCreateLeaveDto,
+  RecordPrivilegedLeaveDto,
 } from './dto/leave.dto';
 import {
   AcceptOfferDto,
@@ -99,12 +100,41 @@ export class HrController {
     @Query('staffProfileId') staffProfileId?: string,
     @Query('status') status?: string,
     @Query('pendingApproval') pendingApproval?: string,
+    @Query('privileged') privileged?: string,
   ) {
     return this.leave.listApplications(user.tid, {
       staffProfileId,
       status,
       pendingApproval: pendingApproval === 'true',
+      privilegedOnly: privileged === 'true',
     });
+  }
+
+  @Get('leave/staff-options')
+  @RequireAnyPermission(
+    'payroll:manage',
+    'staff:read',
+    'staff-attendance:leave-admin',
+  )
+  leaveStaffOptions(@CurrentUser() user: JwtUser, @Query('q') q = '') {
+    return this.leave.searchStaff(user.tid, q);
+  }
+
+  @Post('leave/applications/record')
+  @RequireAnyPermission('payroll:manage', 'staff-attendance:leave-admin')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  recordPrivilegedLeave(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: RecordPrivilegedLeaveDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.leave.recordPrivilegedLeave(user, dto, file);
   }
 
   @Post('leave/applications')
@@ -135,6 +165,17 @@ export class HrController {
   @RequireAnyPermission('staff:portal:self')
   portalLeaveSummary(@CurrentUser() user: JwtUser) {
     return this.leave.portalSummaryForSelf(user);
+  }
+
+  @Get('leave/preview/me')
+  @RequireAnyPermission('staff:portal:self')
+  portalLeavePreview(
+    @CurrentUser() user: JwtUser,
+    @Query('leaveTypeId') leaveTypeId?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return this.leave.previewForSelf(user, { leaveTypeId, fromDate, toDate });
   }
 
   @Patch('leave/applications/:id/approve')

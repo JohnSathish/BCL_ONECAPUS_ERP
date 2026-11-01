@@ -67,6 +67,31 @@ export class ApproveLeaveDto {
   remarks?: string;
 }
 
+export class RecordPrivilegedLeaveDto {
+  @IsUUID()
+  staffProfileId!: string;
+
+  @IsIn(['MAT', 'PAT'])
+  leaveTypeCode!: 'MAT' | 'PAT';
+
+  @IsDateString()
+  fromDate!: string;
+
+  @IsDateString()
+  toDate!: string;
+
+  @IsDateString()
+  approvalDate!: string;
+
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+
+  @IsOptional()
+  @IsString()
+  attachmentUrl?: string;
+}
+
 export class InitializeLeaveBalancesDto {
   @IsOptional()
   @IsNumber()

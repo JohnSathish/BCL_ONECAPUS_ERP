@@ -198,8 +198,12 @@ export class MobileHomeService {
       unreadNotificationCount: dashboard.unreadNotificationCount ?? 0,
       leaveBalance: {
         casual: leave?.casual ?? 0,
-        sick: leave?.sick ?? 0,
-        earned: leave?.earned ?? 0,
+        sick: 0,
+        earned: 0,
+        allocated: leave?.casualLeave?.allocated ?? 15,
+        availed: leave?.casualLeave?.availed ?? 0,
+        pending: leave?.casualLeave?.pending ?? 0,
+        balance: leave?.casualLeave?.balance ?? leave?.casual ?? 0,
       },
       payroll: {
         amount: salary?.currentMonthSalary ?? 0,

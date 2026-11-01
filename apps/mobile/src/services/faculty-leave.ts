@@ -7,11 +7,20 @@ export type LeaveTypeOption = {
   yearlyLimit?: number | string | null;
 };
 
+export type CasualLeaveSnapshot = {
+  year: number;
+  allocated: number;
+  availed: number;
+  pending: number;
+  balance: number;
+};
+
 export type LeaveSummary = {
   casual: number;
   sick: number;
   earned: number;
   pendingRequests: number;
+  casualLeave?: CasualLeaveSnapshot;
   leaveTypes?: LeaveTypeOption[];
 };
 
@@ -40,6 +49,13 @@ export function fetchLeaveSummary() {
 
 export function fetchLeaveApplications() {
   return apiFetch<LeaveApplication[]>('/v1/hr/leave/applications/me');
+}
+
+export function previewLeave(params: { leaveTypeId: string; fromDate: string; toDate: string }) {
+  const query = new URLSearchParams(params).toString();
+  return apiFetch<{ ok: boolean; totalDays: number; message: string | null }>(
+    `/v1/hr/leave/preview/me?${query}`,
+  );
 }
 
 export function applyLeave(payload: {

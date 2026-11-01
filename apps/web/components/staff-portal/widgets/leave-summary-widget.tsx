@@ -31,23 +31,24 @@ export function LeaveSummaryWidget({
           Manage
         </Link>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
+      <div className="mt-4 grid grid-cols-2 gap-2 text-center text-sm">
         <div className="rounded-lg bg-background/50 p-2">
-          <p className="text-lg font-bold">{leave?.casual ?? 0}</p>
-          <p className="text-[10px] text-muted-foreground">CL</p>
+          <p className="text-lg font-bold">{leave?.casualLeave?.allocated ?? 15}</p>
+          <p className="text-[10px] text-muted-foreground">CL allocation</p>
         </div>
         <div className="rounded-lg bg-background/50 p-2">
-          <p className="text-lg font-bold">{leave?.sick ?? 0}</p>
-          <p className="text-[10px] text-muted-foreground">SL</p>
+          <p className="text-lg font-bold">{leave?.casualLeave?.availed ?? 0}</p>
+          <p className="text-[10px] text-muted-foreground">Availed</p>
         </div>
         <div className="rounded-lg bg-background/50 p-2">
-          <p className="text-lg font-bold">{leave?.earned ?? 0}</p>
-          <p className="text-[10px] text-muted-foreground">EL</p>
+          <p className="text-lg font-bold">{leave?.casualLeave?.pending ?? 0}</p>
+          <p className="text-[10px] text-muted-foreground">Pending</p>
+        </div>
+        <div className="rounded-lg bg-background/50 p-2">
+          <p className="text-lg font-bold">{leave?.casualLeave?.balance ?? leave?.casual ?? 0}</p>
+          <p className="text-[10px] text-muted-foreground">Balance</p>
         </div>
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">
-        Pending requests: {leave?.pendingRequests ?? 0}
-      </p>
       <Link
         href="/staff/leave"
         className={cn(buttonVariants({ size: 'sm' }), 'mt-3 w-full rounded-xl text-xs')}

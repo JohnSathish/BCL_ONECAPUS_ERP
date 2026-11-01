@@ -90,6 +90,13 @@ export type StaffDashboardKpis = {
     sick: number;
     earned: number;
     pendingRequests: number;
+    casualLeave?: {
+      year: number;
+      allocated: number;
+      availed: number;
+      pending: number;
+      balance: number;
+    };
   };
   salary: {
     currentMonthSalary: number;

@@ -43,7 +43,7 @@ export function NonTeachingStaffHomeScreen() {
   const notifications = home?.notifications ?? [];
   const calendarEvents = home?.calendarEvents ?? [];
   const unread = home?.unreadNotificationCount ?? 0;
-  const leaveTotal = (leave?.casual ?? 0) + (leave?.sick ?? 0) + (leave?.earned ?? 0);
+  const leaveTotal = leave?.balance ?? leave?.casual ?? 0;
   const profileCompletion = profile?.profileCompletion ?? 0;
   const payslipLabel = payroll?.payslipAvailable ? 'Ready' : (payroll?.status ?? 'Processing');
 
@@ -95,7 +95,7 @@ export function NonTeachingStaffHomeScreen() {
           </View>
 
           <View style={styles.summaryRow}>
-            <SummaryChip label="Leave Balance" value={String(leaveTotal)} />
+            <SummaryChip label="Casual Leave" value={String(leaveTotal)} />
             <SummaryChip label="Unread Alerts" value={String(unread)} urgent={unread > 0} />
             {STAFF_PORTAL_SALARY_VISIBLE ? (
               <SummaryChip label="Payslip" value={payslipLabel} />
@@ -159,10 +159,11 @@ export function NonTeachingStaffHomeScreen() {
             style={[styles.dualCard, styles.flex]}
             onPress={() => router.push('/(staff)/leave' as never)}
           >
-            <Text style={styles.dualTitle}>Leave Balance</Text>
-            <LeaveLine label="Casual Leave" value={leave?.casual ?? 0} />
-            <LeaveLine label="Medical Leave" value={leave?.sick ?? 0} />
-            <LeaveLine label="Earned Leave" value={leave?.earned ?? 0} />
+            <Text style={styles.dualTitle}>Casual Leave</Text>
+            <LeaveLine label="Allocation" value={leave?.allocated ?? 15} />
+            <LeaveLine label="Availed" value={leave?.availed ?? 0} />
+            <LeaveLine label="Pending" value={leave?.pending ?? 0} />
+            <LeaveLine label="Balance" value={leave?.balance ?? leave?.casual ?? 0} />
             <Text style={styles.payLink}>Apply leave →</Text>
           </Pressable>
           {STAFF_PORTAL_SALARY_VISIBLE ? (

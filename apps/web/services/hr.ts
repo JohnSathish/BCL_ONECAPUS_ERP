@@ -16,6 +16,7 @@ export type LeaveApplication = {
   toDate: string;
   totalDays: string | number;
   reason?: string;
+  attachmentUrl?: string | null;
   status: string;
   statusLabel?: string;
   reviewedByName?: string | null;
@@ -56,6 +57,7 @@ export async function fetchLeaveApplications(params?: {
   staffProfileId?: string;
   status?: string;
   pendingApproval?: boolean;
+  privileged?: boolean;
 }) {
   const { data } = await api.get<LeaveApplication[]>('/v1/hr/leave/applications', {
     params,
@@ -94,9 +96,71 @@ export async function portalApplyLeave(body: {
   return data;
 }
 
+export type CasualLeaveSnapshot = {
+  year: number;
+  allocated: number;
+  availed: number;
+  pending: number;
+  balance: number;
+};
+
+export type PortalLeaveSummary = {
+  casual: number;
+  sick: number;
+  earned: number;
+  pendingRequests: number;
+  casualLeave?: CasualLeaveSnapshot;
+  leaveTypes?: Array<{
+    id: string;
+    code: string;
+    name: string;
+    yearlyLimit?: number | string | null;
+  }>;
+};
+
 export async function fetchPortalLeaveSummary() {
-  const { data } = await api.get('/v1/hr/leave/summary/me');
-  return data as { casual: number; sick: number; earned: number; pendingRequests: number };
+  const { data } = await api.get<PortalLeaveSummary>('/v1/hr/leave/summary/me');
+  return data;
+}
+
+export async function previewPortalLeave(params: {
+  leaveTypeId: string;
+  fromDate: string;
+  toDate: string;
+}) {
+  const { data } = await api.get<{ ok: boolean; totalDays: number; message: string | null }>(
+    '/v1/hr/leave/preview/me',
+    { params },
+  );
+  return data;
+}
+
+export async function searchLeaveStaff(q: string) {
+  const { data } = await api.get<
+    Array<{ id: string; fullName: string; employeeCode: string; gender?: string | null }>
+  >('/v1/hr/leave/staff-options', { params: { q } });
+  return data ?? [];
+}
+
+export async function recordPrivilegedLeave(body: {
+  staffProfileId: string;
+  leaveTypeCode: 'MAT' | 'PAT';
+  fromDate: string;
+  toDate: string;
+  approvalDate: string;
+  remarks?: string;
+  file?: File | null;
+}) {
+  const form = new FormData();
+  form.set('staffProfileId', body.staffProfileId);
+  form.set('leaveTypeCode', body.leaveTypeCode);
+  form.set('fromDate', body.fromDate);
+  form.set('toDate', body.toDate);
+  form.set('approvalDate', body.approvalDate);
+  if (body.remarks) form.set('remarks', body.remarks);
+  if (body.file) form.set('file', body.file);
+  const { data } = await api.post('/v1/hr/leave/applications/record', form);
+  return data as LeaveApplication & { priorRecords?: number };
 }
 
 export async function fetchPortalLeaveApplications() {

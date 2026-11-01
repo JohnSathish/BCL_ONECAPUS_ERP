@@ -449,9 +449,9 @@ export function StaffMobileDashboard({ data, loading }: Props) {
               Leave Balance
             </p>
             <p className="mt-0.5 text-lg font-bold">
-              {kpis.leave.casual + kpis.leave.sick + kpis.leave.earned}
+              {kpis.leave.casualLeave?.balance ?? kpis.leave.casual}
             </p>
-            <p className="text-xs text-muted-foreground">CL · SL · EL combined</p>
+            <p className="text-xs text-muted-foreground">Casual leave days left</p>
           </MobileCard>
         </div>
       ) : null}

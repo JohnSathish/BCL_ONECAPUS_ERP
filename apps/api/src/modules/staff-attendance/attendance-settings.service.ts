@@ -385,12 +385,14 @@ export class AttendanceSettingsService {
 
   private async ensureDefaultLeaveTypes(tenantId: string) {
     for (const leave of [
-      ['CL', 'Casual Leave', 12],
+      ['CL', 'Casual Leave', 15],
       ['SL', 'Sick Leave', 12],
       ['EL', 'Earned Leave', 15],
       ['OD', 'On Duty', 0],
       ['LOP', 'Loss of Pay', 0],
-    ]) {
+      ['MAT', 'Maternity Leave', null],
+      ['PAT', 'Paternity Leave', null],
+    ] as const) {
       const exists = await this.db().staffLeaveType.findFirst({
         where: { tenantId, code: leave[0] },
       });
@@ -401,7 +403,26 @@ export class AttendanceSettingsService {
             code: leave[0],
             name: leave[1],
             yearlyLimit: leave[2],
+            ...(leave[0] === 'MAT'
+              ? {
+                  genderRestriction: 'FEMALE',
+                  attachmentRequired: true,
+                  approvalFlow: ['PRINCIPAL'],
+                }
+              : {}),
+            ...(leave[0] === 'PAT'
+              ? {
+                  genderRestriction: 'MALE',
+                  attachmentRequired: true,
+                  approvalFlow: ['PRINCIPAL'],
+                }
+              : {}),
           },
+        });
+      } else if (leave[0] === 'CL' && Number(exists.yearlyLimit ?? 0) < 15) {
+        await this.db().staffLeaveType.update({
+          where: { id: exists.id },
+          data: { yearlyLimit: 15 },
         });
       }
     }
