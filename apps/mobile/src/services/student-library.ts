@@ -37,10 +37,20 @@ export type OpacCatalogueHit = {
   id: string;
   title: string;
   author: string | null;
+  isbn?: string | null;
+  publisher?: string | null;
   publicationYear?: string | null;
+  bookType?: string | null;
+  subject?: string | null;
+  language?: string | null;
+  pages?: number | null;
+  callNumber?: string | null;
+  coverImageUrl?: string | null;
   available: number;
   total: number;
+  borrowed?: number;
   reference: number;
+  availability?: 'available' | 'issued' | 'reference' | 'unavailable';
 };
 
 export type OpacCopy = {
@@ -62,19 +72,33 @@ export type OpacBook = {
   subject: string | null;
   department: string | null;
   classificationNumber: string | null;
+  language?: string | null;
+  category?: string | null;
+  coverImageUrl?: string | null;
   available: number;
   total: number;
+  borrowed?: number;
   reference: number;
   copies: OpacCopy[];
 };
 
 export type OpacAccount = {
+  reservationEnabled?: boolean;
+  profile?: {
+    name?: string;
+    code?: string | null;
+    card?: string | null;
+    department?: string | null;
+    memberType?: string;
+    status?: string;
+  };
   announcements?: { text: string; date?: string }[];
   stats?: {
     borrowed?: number;
     overdue?: number;
     reservations?: number;
     outstandingFine?: number | null;
+    totalBorrowed?: number;
   };
   loans?: {
     id: string;
@@ -97,11 +121,64 @@ export type OpacDigitalItem = {
   externalUrl?: string | null;
 };
 
-export function searchMyLibrary(q: string) {
-  const params = new URLSearchParams({ q, field: 'all', limit: '12' });
-  return apiFetch<{ items: OpacCatalogueHit[]; total: number }>(
+export type OpacSearchField =
+  | 'all'
+  | 'title'
+  | 'author'
+  | 'isbn'
+  | 'accession'
+  | 'call'
+  | 'publisher'
+  | 'subject';
+
+export function searchMyLibrary(input: {
+  q: string;
+  field?: OpacSearchField;
+  page?: number;
+  year?: string;
+  availability?: 'available' | 'borrowed' | 'reference';
+  material?: 'book' | 'journal';
+}) {
+  const params = new URLSearchParams({
+    q: input.q,
+    field: input.field ?? 'all',
+    page: String(input.page ?? 1),
+    limit: '20',
+  });
+  if (input.year) params.set('year', input.year);
+  if (input.availability) params.set('availability', input.availability);
+  if (input.material) params.set('material', input.material);
+  return apiFetch<{ items: OpacCatalogueHit[]; total: number; page: number }>(
     `/v1/opac/catalogue?${params.toString()}`,
   );
+}
+
+export function reserveOpacBook(bookId: string) {
+  return apiFetch('/v1/opac/reservations', {
+    method: 'POST',
+    body: JSON.stringify({ bookId }),
+  });
+}
+
+export function libraryRequestMessage(error: unknown) {
+  const status =
+    typeof error === 'object' && error && 'status' in error
+      ? Number((error as { status?: number }).status)
+      : 0;
+  const message = error instanceof Error ? error.message : '';
+  console.warn('[opac]', status || 'network', message || error);
+  if (status === 401 || /session expired/i.test(message)) {
+    return 'Your session has expired. Sign in again.';
+  }
+  if (status === 408 || /internet|could not reach|network/i.test(message)) {
+    return 'Unable to connect. Please check your internet connection.';
+  }
+  if (status === 404) {
+    return 'The catalogue could not be loaded. Please try again in a little while.';
+  }
+  if (status >= 500) return 'Something went wrong. Please try again.';
+  if (message && !/request failed/i.test(message)) return message;
+  return 'Something went wrong. Please try again.';
 }
 
 export function fetchOpacBook(id: string) {
