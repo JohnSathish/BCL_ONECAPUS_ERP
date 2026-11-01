@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { FormEvent, useState } from 'react';
 import {
+  Bell,
   BookOpen,
   Building2,
+  ChevronRight,
   Clock3,
   FolderOpen,
+  GraduationCap,
   Library,
   Mail,
   MapPin,
@@ -17,8 +20,9 @@ import {
   Phone,
   Scale,
   Search,
-  Sparkles,
+  Star,
   Tags,
+  Users,
 } from 'lucide-react';
 import { LoginForm } from '@/components/auth/login-form';
 import { BookCard } from '@/components/opac/book-card';
@@ -87,7 +91,7 @@ export function OpacHome() {
   }
 
   if (home.isLoading) {
-    return <p className="px-4 py-8 text-sm text-slate-500">Loading the catalogue…</p>;
+    return <div className="min-h-[70vh] animate-pulse bg-[#0B2B55]/10" aria-hidden />;
   }
   if (home.isError || !home.data) {
     return <p className="px-4 py-8 text-sm text-red-700">The catalogue could not be loaded.</p>;
@@ -102,53 +106,92 @@ export function OpacHome() {
     [Building2, 'text-rose-700 bg-rose-50', data.cards.departments, 'Departments with Titles'],
   ] as const;
   const tiles = [
-    [Building2, 'Browse by Department', 'Explore books by department', '/opac/departments'],
-    [BookOpen, 'Browse by Subject', 'Explore books by subject', '/opac/search?field=subject'],
-    [FolderOpen, 'Browse by Category', 'Open the catalogue search', '/opac/search'],
-    [MonitorSmartphone, 'Digital Library', 'E-books, papers and resources', '/opac/digital'],
-    [Sparkles, 'New Arrivals', 'Recently added books', '/opac/search?sort=recent'],
+    [
+      Building2,
+      'bg-blue-50 text-[#1765F5]',
+      'Browse by Department',
+      'Titles grouped by department',
+      '/opac/departments',
+    ],
+    [
+      BookOpen,
+      'bg-emerald-50 text-emerald-600',
+      'Browse by Subject',
+      'Search the subject headings',
+      '/opac/search?field=subject',
+    ],
+    [
+      Tags,
+      'bg-violet-50 text-violet-600',
+      'Browse by Category',
+      'Open the full catalogue',
+      '/opac/search',
+    ],
+    [
+      MonitorSmartphone,
+      'bg-sky-50 text-sky-600',
+      'Digital Library',
+      'Published digital resources',
+      '/opac/digital',
+    ],
+    [
+      Bell,
+      'bg-rose-50 text-rose-500',
+      'New Arrivals',
+      'Recently added books',
+      '/opac/search?sort=recent',
+    ],
+    [
+      Star,
+      'bg-amber-50 text-amber-500',
+      'Most Popular',
+      'Most borrowed titles',
+      '/opac/search?sort=borrowed',
+    ],
   ] as const;
 
   return (
     <div className="space-y-8 pb-10">
       <section className="relative overflow-hidden text-white">
         <img
-          src="/branding/alumni-campus-hero.png"
-          alt="Don Bosco College, Tura campus"
-          className="absolute inset-0 h-full w-full object-cover object-center"
+          src="/branding/opac-library-hero.jpg"
+          alt="Library shelves"
+          className="absolute inset-0 h-full w-full object-cover object-[72%_center]"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#061f3d]/95 via-[#0b2e59]/82 to-[#061f3d]/55" />
-        <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-12 lg:grid-cols-[1.4fr_0.8fr] lg:items-center lg:py-16">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#061833]/94 via-[#0B2B55]/82 to-[#0B2B55]/45" />
+        <div className="relative mx-auto grid max-w-7xl gap-8 px-4 pb-20 pt-10 lg:grid-cols-[1.35fr_0.72fr] lg:items-center lg:pb-24 lg:pt-14">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f4b400]">
-              Welcome to
-            </p>
-            <h1 className="mt-2 text-3xl font-extrabold uppercase leading-tight sm:text-4xl">
+            <p className="text-sm font-medium text-white/90">Welcome to</p>
+            <h1 className="mt-2 max-w-xl text-3xl font-extrabold uppercase leading-[1.05] tracking-tight sm:text-5xl">
               {data.collegeName}
             </h1>
-            <p className="mt-2 text-lg font-medium text-white">
+            <p className="mt-3 text-lg font-semibold text-white">
               Fr. Battista Busolin Memorial Library
             </p>
-            <p className="mt-1 text-sm text-sky-100">
-              Online Library Public Access Catalogue (OPAC)
-            </p>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-100">
-              Search, discover and explore the library collection of books and research materials.
+            <p className="mt-1 text-sm text-sky-100">Online Public Access Catalogue (OPAC)</p>
+            <p className="mt-4 flex max-w-xl gap-2 text-sm leading-relaxed text-slate-100">
+              <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB800]" aria-hidden />
+              Search, discover and explore the library collection of books, journals, reference
+              materials and digital resources.
             </p>
             <form
               onSubmit={(event) => search(event)}
-              className="mt-6 flex flex-col gap-2 rounded-2xl bg-white/10 p-2 ring-1 ring-white/20 backdrop-blur-sm sm:flex-row"
+              className="mt-6 flex flex-col gap-2 rounded-2xl bg-white p-2 shadow-xl sm:flex-row sm:items-center sm:rounded-full sm:p-1.5"
             >
-              <input
-                value={q}
-                onChange={(event) => setQ(event.target.value)}
-                placeholder="Search by book title, author, ISBN, subject, accession number..."
-                className="h-12 flex-1 rounded-xl border-0 px-4 text-slate-900 shadow-sm outline-none ring-2 ring-transparent focus:ring-[#f4b400]"
-              />
+              <label className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+                <input
+                  value={q}
+                  onChange={(event) => setQ(event.target.value)}
+                  placeholder="Search by book title, author, ISBN, subject, accession number..."
+                  className="h-12 w-full rounded-full border-0 bg-transparent pl-10 pr-3 text-sm text-[#14213D] outline-none"
+                />
+              </label>
               <select
                 value={field}
                 onChange={(event) => setField(event.target.value as (typeof fields)[number][0])}
-                className="h-12 rounded-xl bg-white px-3 text-slate-900 shadow-sm"
+                aria-label="Search field"
+                className="h-11 rounded-full border border-[#DCE5F0] bg-white px-3 text-sm text-[#14213D]"
               >
                 {fields.map(([value, label]) => (
                   <option key={value} value={value}>
@@ -158,21 +201,22 @@ export function OpacHome() {
               </select>
               <button
                 type="submit"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#f4b400] px-6 font-bold text-[#0b2e59] shadow-lg shadow-black/20 hover:bg-[#ffd15a]"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#1765F5] px-5 text-sm font-semibold text-white hover:bg-[#0f52d4]"
               >
                 <Search className="h-4 w-4" />
                 Search
               </button>
             </form>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+              <span className="font-semibold text-white/80">Popular Searches:</span>
               {chips.map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                  className={`rounded-full px-2.5 py-1 font-semibold ${
                     field === value
-                      ? 'bg-[#f4b400] text-[#0b2e59] ring-[#f4b400]'
-                      : 'bg-white/10 text-white ring-white/25 hover:bg-white/20'
+                      ? 'bg-white text-[#0B2B55]'
+                      : 'text-white/90 underline-offset-2 hover:underline'
                   }`}
                   onClick={() => setField(value)}
                 >
@@ -181,7 +225,7 @@ export function OpacHome() {
               ))}
             </div>
           </div>
-          <div className="rounded-2xl border border-white/40 bg-white p-5 text-slate-900 shadow-2xl shadow-black/30">
+          <div id="library-login" className="rounded-2xl bg-white p-5 text-[#14213D] shadow-2xl">
             {session ? (
               <div>
                 <h2 className="text-lg font-bold">You are signed in</h2>
@@ -197,20 +241,32 @@ export function OpacHome() {
               </div>
             ) : (
               <>
-                <h2 className="text-lg font-bold">Login to Your Library Account</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Students and staff use the same college password.
-                </p>
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EAF3FF] text-[#1765F5]">
+                    <BookOpen className="h-5 w-5" aria-hidden />
+                  </span>
+                  <span>
+                    <h2 className="text-lg font-bold">Login to Your Library Account</h2>
+                    <p className="text-sm text-[#64748B]">
+                      Students and staff use the same college credentials.
+                    </p>
+                  </span>
+                </div>
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   {(['student', 'staff'] as const).map((kind) => (
                     <button
                       key={kind}
                       type="button"
-                      className={`h-10 rounded-lg text-sm font-semibold ${
-                        member === kind ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-lg text-sm font-semibold ${
+                        member === kind ? 'bg-[#1765F5] text-white' : 'bg-[#F3F7FC] text-[#64748B]'
                       }`}
                       onClick={() => setMember(kind)}
                     >
+                      {kind === 'student' ? (
+                        <GraduationCap className="h-4 w-4" aria-hidden />
+                      ) : (
+                        <Users className="h-4 w-4" aria-hidden />
+                      )}
                       {kind === 'student' ? 'Student Login' : 'Staff Login'}
                     </button>
                   ))}
@@ -229,7 +285,7 @@ export function OpacHome() {
                   <Link href="/forgot-password" className="font-semibold text-sky-800">
                     Forgot Password?
                   </Link>
-                  <Link href="/opac/info" className="font-semibold text-sky-800">
+                  <Link href="/opac/info#help" className="font-semibold text-sky-800">
                     Login Help
                   </Link>
                 </div>
@@ -240,35 +296,42 @@ export function OpacHome() {
       </section>
 
       <div className="mx-auto max-w-7xl space-y-8 px-4">
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <section className="relative z-10 -mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {counts.map(([Icon, tone, value, label]) => (
             <div
               key={label}
-              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm"
+              className="flex items-center gap-3 rounded-2xl border border-[#DCE5F0] bg-white px-4 py-4 shadow-sm"
             >
-              <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${tone}`}>
-                <Icon className="h-5 w-5" />
+              <span className={`flex h-11 w-11 items-center justify-center rounded-full ${tone}`}>
+                <Icon className="h-5 w-5" aria-hidden />
               </span>
               <span>
-                <span className="block text-xl font-extrabold text-slate-950">
+                <span className="block text-xl font-extrabold text-[#14213D]">
                   {value.toLocaleString('en-IN')}
                 </span>
-                <span className="block text-xs text-slate-500">{label}</span>
+                <span className="block text-xs text-[#64748B]">{label}</span>
               </span>
             </div>
           ))}
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {tiles.map(([Icon, title, caption, href]) => (
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {tiles.map(([Icon, tone, title, caption, href]) => (
             <Link
               key={title}
               href={href}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#f4b400] hover:shadow-md"
+              className="group flex items-center gap-3 rounded-2xl border border-[#DCE5F0] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              <Icon className="h-5 w-5 text-sky-700" />
-              <p className="mt-3 font-semibold">{title}</p>
-              <p className="text-sm text-slate-500">{caption}</p>
+              <span
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${tone}`}
+              >
+                <Icon className="h-5 w-5" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-[#14213D]">{title}</span>
+                <span className="block truncate text-xs text-[#64748B]">{caption}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-[#94A3B8] transition group-hover:translate-x-0.5 group-hover:text-[#1765F5]" />
             </Link>
           ))}
         </section>

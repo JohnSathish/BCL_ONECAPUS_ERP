@@ -67,12 +67,30 @@ export function OpacInfo() {
   ];
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Library information</h1>
-      <p className="text-sm text-slate-600">
-        Loan periods, fines, and reservation limits come from Library Settings. A reference or
-        non-circulating copy cannot be issued or reserved.
-      </p>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <section id="about" className="scroll-mt-28">
+        <h1 className="text-2xl font-bold">About the library</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          Fr. Battista Busolin Memorial Library at {info.data.collegeName}. Loan periods, fines, and
+          reservation limits come from Library Settings. A reference or non-circulating copy cannot
+          be issued or reserved.
+        </p>
+      </section>
+      <section
+        id="help"
+        className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-4 text-sm"
+      >
+        <h2 className="font-semibold">Help</h2>
+        <p className="mt-2 text-slate-600">
+          Search the catalogue from Home, then open a title to see which copies are available. Sign
+          in with the same college ID and password used for the ERP. There is no separate library
+          password.
+        </p>
+      </section>
+      <section
+        id="membership"
+        className="scroll-mt-28 overflow-hidden rounded-2xl border border-slate-200 bg-white"
+      >
+        <h2 className="px-3 pt-3 text-base font-semibold">Membership</h2>
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
@@ -94,31 +112,37 @@ export function OpacInfo() {
             ))}
           </tbody>
         </table>
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
-          <h2 className="font-semibold">Fines</h2>
-          <p className="mt-2">
-            ₹{rules.finePerDay} per{' '}
-            {rules.workingDayLoans === false ? 'day' : 'overdue working day'} after{' '}
-            {rules.graceDays} grace days.
-          </p>
-          <p>Maximum fine on one loan: ₹{rules.maxFine}.</p>
+      </section>
+      <section id="rules" className="scroll-mt-28 space-y-3">
+        <h2 className="text-lg font-semibold">Library rules</h2>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
+            <h2 className="font-semibold">Fines</h2>
+            <p className="mt-2">
+              ₹{rules.finePerDay} per{' '}
+              {rules.workingDayLoans === false ? 'day' : 'overdue working day'} after{' '}
+              {rules.graceDays} grace days.
+            </p>
+            <p>Maximum fine on one loan: ₹{rules.maxFine}.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
+            <h2 className="font-semibold">Reservations</h2>
+            <p className="mt-2">Up to {rules.maxReservations} active reservations.</p>
+            <p>An unused reservation expires after {rules.reservationDays} days.</p>
+            <p className="mt-2 text-slate-600">
+              Reference issue is{' '}
+              {rules.referenceIssue ? 'allowed by the current category rule' : 'not allowed'}. Rare
+              issue is {rules.rareIssue ? 'allowed by the current category rule' : 'not allowed'}.
+              Each physical copy can still have its own issue permission.
+            </p>
+          </div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
-          <h2 className="font-semibold">Reservations</h2>
-          <p className="mt-2">Up to {rules.maxReservations} active reservations.</p>
-          <p>An unused reservation expires after {rules.reservationDays} days.</p>
-          <p className="mt-2 text-slate-600">
-            Reference issue is{' '}
-            {rules.referenceIssue ? 'allowed by the current category rule' : 'not allowed'}. Rare
-            issue is {rules.rareIssue ? 'allowed by the current category rule' : 'not allowed'}.
-            Each physical copy can still have its own issue permission.
-          </p>
-        </div>
-      </div>
+      </section>
       {info.data.settings.hours.length ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
+        <section
+          id="hours"
+          className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-4 text-sm"
+        >
           <h2 className="font-semibold">Hours</h2>
           <ul className="mt-2 space-y-1">
             {info.data.settings.hours.map((row) => (
@@ -127,9 +151,20 @@ export function OpacInfo() {
               </li>
             ))}
           </ul>
-        </div>
-      ) : null}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
+        </section>
+      ) : (
+        <section
+          id="hours"
+          className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-4 text-sm"
+        >
+          <h2 className="font-semibold">Opening hours</h2>
+          <p className="mt-2 text-slate-500">The librarian has not published opening hours yet.</p>
+        </section>
+      )}
+      <section
+        id="contact"
+        className="scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-4 text-sm"
+      >
         <h2 className="font-semibold">Contact</h2>
         <p className="mt-2">{info.data.collegeName}</p>
         {info.data.address ? <p>{info.data.address}</p> : null}
@@ -140,7 +175,7 @@ export function OpacInfo() {
         !info.data.settings.contactEmail ? (
           <p className="text-slate-500">The librarian has not published a public contact yet.</p>
         ) : null}
-      </div>
+      </section>
     </div>
   );
 }

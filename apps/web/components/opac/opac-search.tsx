@@ -15,12 +15,13 @@ export function OpacSearch() {
   const availability = params.get('availability') ?? '';
   const departmentId = params.get('departmentId') ?? '';
   const year = params.get('year') ?? '';
+  const material = params.get('material') ?? '';
   const page = Number(params.get('page') ?? '1') || 1;
   const [draft, setDraft] = useState(q);
   useEffect(() => setDraft(q), [q]);
 
   const result = useQuery({
-    queryKey: ['opac', 'search', q, field, sort, availability, departmentId, year, page],
+    queryKey: ['opac', 'search', q, field, sort, availability, departmentId, year, material, page],
     queryFn: () =>
       searchOpac({
         q: q || undefined,
@@ -29,6 +30,7 @@ export function OpacSearch() {
         availability: availability || undefined,
         departmentId: departmentId || undefined,
         year: year || undefined,
+        material: material || undefined,
         page,
         limit: 12,
       }),
