@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Param,
@@ -569,6 +571,30 @@ export class LibraryController {
   @RequirePermissions('library:manage')
   createBook(@CurrentUser() user: JwtUser, @Body() dto: CreateBookDto) {
     return this.catalogue.createBook(user.tid, dto);
+  }
+
+  @Post('books/:id/cover')
+  @RequirePermissions('library:manage')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  setBookCover(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Choose a cover image.');
+    return this.catalogue.setBookCover(user.tid, id, file);
+  }
+
+  @Delete('books/:id/cover')
+  @RequirePermissions('library:manage')
+  clearBookCover(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.catalogue.clearBookCover(user.tid, id);
   }
 
   @Patch('books/:id')

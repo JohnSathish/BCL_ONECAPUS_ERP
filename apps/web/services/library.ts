@@ -180,6 +180,15 @@ export const createLibraryBook = (payload: Record<string, unknown>) =>
 export const updateLibraryBook = (id: string, payload: Record<string, unknown>) =>
   api.patch<LibraryBook>(`${base}/books/${id}`, payload).then((r) => r.data);
 
+export const uploadLibraryBookCover = (id: string, file: File) => {
+  const body = new FormData();
+  body.append('file', file);
+  return api.post<LibraryBook>(`${base}/books/${id}/cover`, body).then((r) => r.data);
+};
+
+export const removeLibraryBookCover = (id: string) =>
+  api.delete<LibraryBook>(`${base}/books/${id}/cover`).then((r) => r.data);
+
 export const addLibraryCopy = (payload: { bookId: string; barcode: string; copyNumber?: number }) =>
   api.post(`${base}/copies`, payload).then((r) => r.data);
 

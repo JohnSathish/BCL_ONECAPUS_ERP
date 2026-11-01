@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { useAuthQueryEnabled } from '@/hooks/use-auth';
 import {
   createAccessionBook,
+  uploadLibraryBookCover,
   fetchLibraryCategories,
   fetchLibrarySettings,
   fetchNextAccessionNo,
@@ -185,7 +186,33 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState('');
   const [savedLabels, setSavedLabels] = useState<ReturnType<typeof labelsFor>>([]);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState('');
+  const coverInput = useRef<HTMLInputElement>(null);
   const saving = useRef(false);
+
+  function chooseCover(file: File | null) {
+    if (
+      file &&
+      !['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type) &&
+      !/\.(jpe?g|png|webp)$/i.test(file.name)
+    ) {
+      if (coverInput.current) coverInput.current.value = '';
+      setNotice('Choose a JPEG, PNG, or WebP cover.');
+      return;
+    }
+    if (file && file.size > 5 * 1024 * 1024) {
+      if (coverInput.current) coverInput.current.value = '';
+      setNotice('The cover must be 5 MB or smaller.');
+      return;
+    }
+    if (!file && coverInput.current) coverInput.current.value = '';
+    setCoverPreview((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return file ? URL.createObjectURL(file) : '';
+    });
+    setCoverFile(file);
+  }
 
   const nextAcc = useQuery({
     queryKey: ['library', 'accession', 'next'],
@@ -350,6 +377,15 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
     const popup = mode === 'print' ? window.open('', '_blank') : null;
     try {
       const book = await save.mutateAsync();
+      let coverNote = '';
+      if (coverFile) {
+        try {
+          await uploadLibraryBookCover(book.id, coverFile);
+          chooseCover(null);
+        } catch (error) {
+          coverNote = ` The cover was not saved: ${apiErrorMessage(error)}`;
+        }
+      }
       const labels = labelsFor(book, {
         callNumber: form.classificationNumber,
         department: (departments.data ?? []).find(
@@ -358,7 +394,9 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
       });
       const numbers = labels.map((label) => label.accessionNo).join(', ');
       setSavedLabels(labels);
-      setNotice(`Saved. Accession ${labels.length === 1 ? 'number' : 'numbers'}: ${numbers}`);
+      setNotice(
+        `Saved. Accession ${labels.length === 1 ? 'number' : 'numbers'}: ${numbers}${coverNote}`,
+      );
       void qc.invalidateQueries({ queryKey: ['library'] });
       if (mode === 'print' && popup) writeLibraryBarcodeLabels(popup, labels);
       else popup?.close();
@@ -480,6 +518,26 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
               placeholder="Enter author name(s) (use comma for multiple authors)"
               onChange={(e) => set('author', e.target.value)}
             />
+          </Field>
+          <Field label="Cover page">
+            <input
+              ref={coverInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5"
+              onChange={(event) => chooseCover(event.target.files?.[0] ?? null)}
+            />
+            <span className="block text-xs text-slate-500">
+              Optional. JPEG, PNG, or WebP, up to 5 MB.
+            </span>
+            {coverPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={coverPreview}
+                alt="Selected cover"
+                className="mt-2 h-36 w-28 rounded object-cover"
+              />
+            ) : null}
           </Field>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">

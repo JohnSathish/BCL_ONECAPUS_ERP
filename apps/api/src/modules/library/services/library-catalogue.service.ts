@@ -19,7 +19,10 @@ import type {
 } from '../dto/library.dto';
 import { mergeCirculationPolicy } from '../domain/library-policy.types';
 import { copyTypeForBookType } from '../domain/library-copy-issue.logic';
+import { LibraryAssetsService } from './library-assets.service';
 import { LibrarySettingsService } from './library-settings.service';
+import { unlink } from 'fs/promises';
+import { resolvePublicUploadFsPath } from '../../../common/uploads/upload-paths';
 import {
   accessionSeries,
   availabilityToStatuses,
@@ -31,6 +34,7 @@ export class LibraryCatalogueService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: LibrarySettingsService,
+    private readonly assets: LibraryAssetsService,
   ) {}
 
   async listCategories(tenantId: string) {
@@ -468,6 +472,64 @@ export class LibraryCatalogueService {
     }
 
     return this.getBook(tenantId, book.id);
+  }
+
+  async setBookCover(tenantId: string, id: string, file: Express.Multer.File) {
+    const book = await this.getBook(tenantId, id);
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Choose a cover image.');
+    }
+    const name = (file.originalname || '').toLowerCase();
+    if (
+      !['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(
+        file.mimetype,
+      )
+    ) {
+      if (name.endsWith('.png')) file.mimetype = 'image/png';
+      else if (name.endsWith('.webp')) file.mimetype = 'image/webp';
+      else if (name.endsWith('.jpg') || name.endsWith('.jpeg')) {
+        file.mimetype = 'image/jpeg';
+      }
+    }
+    const ext =
+      file.mimetype === 'image/png'
+        ? '.png'
+        : file.mimetype === 'image/webp'
+          ? '.webp'
+          : '.jpg';
+    file.originalname = `cover${ext}`;
+    const saved = await this.assets.saveFile(tenantId, file, {
+      segment: 'covers',
+      assetId: id,
+      maxUploadMb: 5,
+      allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    });
+    await this.removeStoredCover(book.coverImageUrl, saved.filePath);
+    return this.prisma.libraryBook.update({
+      where: { id },
+      data: { coverImageUrl: saved.filePath },
+      include: { category: true, copies: true },
+    });
+  }
+
+  async clearBookCover(tenantId: string, id: string) {
+    const book = await this.getBook(tenantId, id);
+    await this.removeStoredCover(book.coverImageUrl, null);
+    return this.prisma.libraryBook.update({
+      where: { id },
+      data: { coverImageUrl: null },
+      include: { category: true, copies: true },
+    });
+  }
+
+  private async removeStoredCover(
+    current: string | null | undefined,
+    next: string | null,
+  ) {
+    if (!current || current === next || !current.includes('/library/covers/')) {
+      return;
+    }
+    await unlink(resolvePublicUploadFsPath(current)).catch(() => undefined);
   }
 
   async updateBook(tenantId: string, id: string, dto: UpdateBookDto) {

@@ -36,7 +36,9 @@ import {
   fetchLibraryCatalogueSummary,
   fetchLibraryBook,
   fetchLibraryBooks,
+  removeLibraryBookCover,
   updateLibraryBook,
+  uploadLibraryBookCover,
 } from '@/services/library';
 import { CopyCirculationEditor } from './library-copy-editor';
 import type { LibraryBook } from '@/types/library';
@@ -126,6 +128,9 @@ export function LibraryCatalogueWorkspace() {
     publisher: '',
     edition: '',
   });
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState('');
+  const [removeCover, setRemoveCover] = useState(false);
   const [notice, setNotice] = useState('');
   const [exporting, setExporting] = useState(false);
 
@@ -160,9 +165,18 @@ export function LibraryCatalogueWorkspace() {
   });
 
   const saveMut = useMutation({
-    mutationFn: () => updateLibraryBook(detail!.id, editForm),
-    onSuccess: () => {
+    mutationFn: async () => {
+      let book = await updateLibraryBook(detail!.id, editForm);
+      if (removeCover && !coverFile) book = await removeLibraryBookCover(detail!.id);
+      if (coverFile) book = await uploadLibraryBookCover(detail!.id, coverFile);
+      return book;
+    },
+    onSuccess: (book) => {
       setNotice('Book details saved. The accession number was not changed.');
+      setDetail(book);
+      setCoverFile(null);
+      setCoverPreview('');
+      setRemoveCover(false);
       setEditing(false);
       void qc.invalidateQueries({ queryKey: ['library', 'catalogue'] });
     },
@@ -230,6 +244,30 @@ export function LibraryCatalogueWorkspace() {
       publisher: book.publisher ?? '',
       edition: book.edition ?? '',
     });
+    setCoverFile(null);
+    setCoverPreview('');
+    setRemoveCover(false);
+  }
+
+  function chooseCover(file: File | null) {
+    if (
+      file &&
+      !['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type) &&
+      !/\.(jpe?g|png|webp)$/i.test(file.name)
+    ) {
+      setNotice('Choose a JPEG, PNG, or WebP cover.');
+      return;
+    }
+    if (file && file.size > 5 * 1024 * 1024) {
+      setNotice('The cover must be 5 MB or smaller.');
+      return;
+    }
+    setCoverPreview((current) => {
+      if (current.startsWith('blob:')) URL.revokeObjectURL(current);
+      return file ? URL.createObjectURL(file) : '';
+    });
+    setCoverFile(file);
+    if (file) setRemoveCover(false);
   }
 
   return (
@@ -702,6 +740,15 @@ export function LibraryCatalogueWorkspace() {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
             <h3 className="text-lg font-semibold">{detail.title}</h3>
+            <div className="mt-3">
+              <Cover
+                book={{
+                  ...detail,
+                  coverImageUrl: removeCover ? null : coverPreview || detail.coverImageUrl,
+                }}
+                large
+              />
+            </div>
             {editing && canManage ? (
               <form
                 className="mt-3 grid gap-2"
@@ -735,6 +782,32 @@ export function LibraryCatalogueWorkspace() {
                   onChange={(event) => setEditForm({ ...editForm, edition: event.target.value })}
                   placeholder="Edition"
                 />
+                <label className="block space-y-1 text-sm">
+                  <span className="font-medium text-slate-700">Cover page</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                    className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5"
+                    onChange={(event) => chooseCover(event.target.files?.[0] ?? null)}
+                  />
+                  <span className="block text-xs text-slate-500">
+                    JPEG, PNG, or WebP, up to 5 MB.
+                  </span>
+                </label>
+                {detail.coverImageUrl && !coverFile ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setRemoveCover((current) => !current);
+                      setCoverFile(null);
+                      setCoverPreview('');
+                    }}
+                  >
+                    {removeCover ? 'Keep current cover' : 'Remove cover'}
+                  </Button>
+                ) : null}
                 <p className="text-xs text-slate-500">
                   Accession numbers stay on the Book Accession page.
                 </p>

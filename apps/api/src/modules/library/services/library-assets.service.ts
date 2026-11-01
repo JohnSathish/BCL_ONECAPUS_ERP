@@ -55,7 +55,7 @@ export class LibraryAssetsService {
     tenantId: string,
     file: Express.Multer.File,
     opts: {
-      segment: 'digital-assets' | 'research';
+      segment: 'digital-assets' | 'research' | 'covers';
       assetId?: string;
       maxUploadMb: number;
       allowedMimeTypes: string[];
@@ -89,7 +89,7 @@ export class LibraryAssetsService {
   resolveAbsolutePath(
     tenantId: string,
     filePath: string,
-    segment: 'digital-assets' | 'research',
+    segment: 'digital-assets' | 'research' | 'covers',
   ) {
     const prefix = `/uploads/tenants/${tenantId}/library/${segment}/`;
     if (!filePath?.startsWith(prefix)) {
@@ -107,7 +107,7 @@ export class LibraryAssetsService {
   openDownloadStream(
     tenantId: string,
     filePath: string,
-    segment: 'digital-assets' | 'research',
+    segment: 'digital-assets' | 'research' | 'covers',
     fileName?: string,
   ) {
     const abs = this.resolveAbsolutePath(tenantId, filePath, segment);
