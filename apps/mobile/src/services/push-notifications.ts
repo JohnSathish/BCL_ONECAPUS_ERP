@@ -49,6 +49,16 @@ function isExpoPushToken(token: string) {
   return token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken[');
 }
 
+/** Expo on iOS returns the APNs device token as 64 hex characters. */
+function isApnsDeviceToken(token: string) {
+  return /^[0-9a-f]{64}$/i.test(token);
+}
+
+function alertsAllowed(settings: Notifications.NotificationPermissionsStatus) {
+  if (settings.status === 'granted') return true;
+  return settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+}
+
 export async function ensureAndroidDefaultChannel() {
   if (Platform.OS !== 'android') return;
   // Android keeps the first importance forever. Recreate the channel so a
@@ -72,17 +82,15 @@ export async function requestPushPermissions(): Promise<boolean> {
   }
   await ensureAndroidDefaultChannel();
   const current = await Notifications.getPermissionsAsync();
-  if (
-    current.status === 'granted' ||
-    current.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
-  ) {
-    return true;
-  }
-  const asked = await Notifications.requestPermissionsAsync();
-  return (
-    asked.status === 'granted' ||
-    asked.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
-  );
+  if (alertsAllowed(current)) return true;
+  const asked = await Notifications.requestPermissionsAsync({
+    ios: {
+      allowAlert: true,
+      allowBadge: true,
+      allowSound: true,
+    },
+  });
+  return alertsAllowed(asked);
 }
 
 /**
@@ -101,14 +109,10 @@ export async function getNativePushToken(): Promise<string | null> {
     try {
       const deviceToken = await Notifications.getDevicePushTokenAsync();
       const raw = deviceToken?.data != null ? String(deviceToken.data).trim() : '';
-      // A raw APNs device token is 64 hex characters. FCM HTTP v1 needs the
-      // Firebase registration token, which contains a colon. Keep FCM tokens
-      // even when the platform reports type "ios".
-      if (deviceToken?.type === 'ios' && raw && !raw.includes(':')) {
-        console.warn(
-          '[push] iOS returned an APNs device token. FCM needs a Firebase registration token from a build that includes GoogleService-Info.plist.',
-        );
-        return null;
+      // iOS returns the APNs device token. Android returns an FCM registration
+      // token. The college API exchanges the APNs token before it talks to FCM.
+      if (raw && isApnsDeviceToken(raw)) {
+        return raw;
       }
       if (raw && !isExpoPushToken(raw)) {
         return raw;
@@ -151,8 +155,12 @@ export async function collectDeviceMeta() {
 export async function registerDeviceWithPush(appType: 'STUDENT' | 'STAFF') {
   const deviceId = await getDeviceId();
   const meta = await collectDeviceMeta();
-  const pushToken = await getNativePushToken();
   const school = await getSchoolConfig();
+  let pushToken = await getNativePushToken();
+  // School apps keep their own push path. A raw APNs token is for the college app.
+  if (isSchoolSisConfig(school) && pushToken && isApnsDeviceToken(pushToken)) {
+    pushToken = null;
+  }
   const path = isSchoolSisConfig(school)
     ? '/v1/school-mobile/devices/register'
     : '/v1/mobile-app/devices/register';
@@ -168,7 +176,9 @@ export async function registerDeviceWithPush(appType: 'STUDENT' | 'STAFF') {
   });
   if (!pushToken) {
     console.warn(
-      '[push] Device registered without FCM token — enable notifications and ensure google-services.json is in the APK',
+      Platform.OS === 'ios'
+        ? '[push] iPhone registered without an Apple push token — allow notifications for this app'
+        : '[push] Device registered without an FCM token — allow notifications and ship google-services.json in the Android build',
     );
   }
   return { deviceId, pushToken };

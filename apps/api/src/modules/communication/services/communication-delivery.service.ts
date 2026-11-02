@@ -9,7 +9,7 @@ import { CommunicationSmsService } from './communication-sms.service';
 import { CommunicationTemplateRendererService } from './communication-template-renderer.service';
 import { BrandedEmailLayoutService } from './branded-email-layout.service';
 import { UserNotificationsService } from './user-notifications.service';
-import { FcmPushService } from './fcm-push.service';
+import { COLLEGE_IOS_BUNDLE_ID, FcmPushService } from './fcm-push.service';
 import { CommunicationWhatsAppService } from './communication-whatsapp.service';
 import { resolveNotificationLink } from '../utils/notification-link.util';
 import {
@@ -460,6 +460,7 @@ export class CommunicationDeliveryService {
           const result = await this.fcm.sendToTokens(tokens, {
             title: subject,
             body: bodyText ?? subject,
+            apnsBundleId: COLLEGE_IOS_BUNDLE_ID,
             imageUrl: imageAttachment
               ? this.toAbsoluteUrl(imageAttachment.url)
               : undefined,
@@ -503,6 +504,19 @@ export class CommunicationDeliveryService {
               attachmentCount: String(attachments.length),
             },
           });
+
+          if (result.replacedTokens?.length) {
+            for (const swap of result.replacedTokens) {
+              await this.prisma.mobileDevice.updateMany({
+                where: {
+                  tenantId,
+                  userId: recipient.userId,
+                  pushToken: swap.from,
+                },
+                data: { pushToken: swap.to },
+              });
+            }
+          }
 
           if (result.invalidTokens?.length) {
             await this.prisma.mobileDevice.updateMany({

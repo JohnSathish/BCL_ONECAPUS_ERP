@@ -76,7 +76,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: process.env.EXPO_PUBLIC_APP_NAME ?? 'Don Bosco College, Tura',
   slug: 'onecampus-mobile',
-  version: '1.0.49',
+  version: '1.0.50',
   scheme: ['onecampus', 'schoolerp'],
   // Play large-screen guidance: do not lock to portrait in the manifest.
   orientation: 'default',
@@ -101,8 +101,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'edu.onecampus.mobile',
-    // Casual leave follows the college rule of 15 days, at most three at a time (1.0.49).
-    buildNumber: '31',
+    // iOS notices use the production APNs gateway (1.0.50).
+    buildNumber: '32',
     ...(hasGoogleServiceInfo && googleServiceInfoFile
       ? { googleServicesFile: googleServiceInfoFile }
       : {}),
@@ -121,7 +121,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'edu.onecampus.mobile',
-    versionCode: 69,
+    versionCode: 70,
     edgeToEdgeEnabled: true,
     allowBackup: false,
     ...(hasGoogleServices && googleServicesFile ? { googleServicesFile } : {}),
@@ -214,6 +214,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         icon: './assets/bcl-onecampus-logo.png',
         color: '#1e3a8a',
         defaultChannel: 'onecampus_default',
+        // The plugin defaults to the APNs sandbox. TestFlight and the App Store
+        // only deliver on the production gateway.
+        mode: isDevClientBuild ? 'development' : 'production',
+        enableBackgroundRemoteNotifications: true,
       },
     ],
     [

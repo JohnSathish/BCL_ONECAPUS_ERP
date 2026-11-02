@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
-import { FcmPushService } from '../../communication/services/fcm-push.service';
+import {
+  COLLEGE_IOS_BUNDLE_ID,
+  FcmPushService,
+} from '../../communication/services/fcm-push.service';
 import { UserNotificationsService } from '../../communication/services/user-notifications.service';
 
 @Injectable()
@@ -87,6 +90,7 @@ export class PrincipalCommsNotifyService {
       const result = await this.fcm.sendToTokens(tokens, {
         title,
         body: `${categoryLabel}: ${input.subject || '(no subject)'}`,
+        apnsBundleId: COLLEGE_IOS_BUNDLE_ID,
         data: {
           type: 'PRINCIPAL_MAIL',
           link: webLink,
@@ -95,6 +99,14 @@ export class PrincipalCommsNotifyService {
           mobilePath: `/(principal)/mail/${input.messageId}`,
         },
       });
+      if (result.replacedTokens?.length) {
+        for (const swap of result.replacedTokens) {
+          await this.prisma.mobileDevice.updateMany({
+            where: { tenantId: input.tenantId, pushToken: swap.from },
+            data: { pushToken: swap.to },
+          });
+        }
+      }
       if (!result.ok) {
         this.logger.warn(
           `FCM new-mail send incomplete: ${result.error ?? 'unknown'}`,

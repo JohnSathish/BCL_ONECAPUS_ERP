@@ -9,9 +9,19 @@ type FcmSendResult = {
   error?: string;
   /** Tokens FCM reported as permanently invalid — caller should deactivate. */
   invalidTokens?: string[];
+  /** APNs device token replaced by the Firebase registration token FCM accepted. */
+  replacedTokens?: Array<{ from: string; to: string }>;
   successCount?: number;
   failureCount?: number;
 };
+
+/** College campus app. School apps must not reuse this bundle for APNs import. */
+export const COLLEGE_IOS_BUNDLE_ID = 'edu.onecampus.mobile';
+
+/** Expo iOS `getDevicePushTokenAsync` returns this 64-character APNs token. */
+export function isApnsDeviceToken(token: string): boolean {
+  return /^[0-9a-f]{64}$/i.test(token.trim());
+}
 
 const ANDROID_CHANNEL_ID = 'onecampus_default';
 
@@ -25,6 +35,8 @@ function isExpoPushToken(token: string) {
 export class FcmPushService {
   private readonly logger = new Logger(FcmPushService.name);
   private cachedToken: { value: string; expiresAt: number } | null = null;
+  /** APNs hex token → FCM registration token, for the life of this process. */
+  private readonly apnsImportCache = new Map<string, string>();
 
   constructor(private readonly config: ConfigService) {}
 
@@ -104,6 +116,12 @@ export class FcmPushService {
       data?: Record<string, string>;
       imageUrl?: string;
       androidChannelId?: string;
+      /**
+       * When set, 64-hex iOS tokens are exchanged for an FCM registration token
+       * before send. College callers pass COLLEGE_IOS_BUNDLE_ID. Callers that
+       * omit it leave raw APNs tokens untouched.
+       */
+      apnsBundleId?: string;
     },
   ): Promise<FcmSendResult> {
     const unique = [...new Set(tokens.map((t) => t.trim()).filter(Boolean))];
@@ -156,6 +174,8 @@ export class FcmPushService {
     let failures = 0;
     let successes = 0;
     const invalidTokens: string[] = [...expoTokens];
+    const replacedTokens: Array<{ from: string; to: string }> = [];
+    let apnsImportFailed = false;
 
     for (const pushToken of fcmTokens) {
       const publicImage =
@@ -168,8 +188,28 @@ export class FcmPushService {
         );
       }
 
+      let deliverToken = pushToken;
+      if (isApnsDeviceToken(pushToken)) {
+        if (!payload.apnsBundleId) {
+          failures++;
+          apnsImportFailed = true;
+          continue;
+        }
+        const imported = await this.fcmTokenForApns(
+          pushToken,
+          payload.apnsBundleId,
+          token,
+        );
+        if (!imported) {
+          failures++;
+          apnsImportFailed = true;
+          continue;
+        }
+        deliverToken = imported;
+      }
+
       const message: Record<string, unknown> = {
-        token: pushToken,
+        token: deliverToken,
         notification: {
           title: payload.title,
           body: payload.body,
@@ -200,6 +240,7 @@ export class FcmPushService {
                 body: payload.body,
               },
               sound: 'default',
+              'interruption-level': 'active',
               ...(publicImage ? { 'mutable-content': 1 } : {}),
             },
           },
@@ -243,15 +284,22 @@ export class FcmPushService {
       } else {
         successes++;
         lastRef = body.name;
+        if (deliverToken !== pushToken) {
+          replacedTokens.push({ from: pushToken, to: deliverToken });
+        }
       }
     }
 
+    const importError = apnsImportFailed
+      ? 'An iPhone Apple push token could not be registered with Firebase'
+      : undefined;
     if (successes === 0) {
       return {
         ok: false,
         provider: 'fcm',
-        error: 'All FCM deliveries failed',
+        error: importError ?? 'All FCM deliveries failed',
         invalidTokens,
+        replacedTokens: replacedTokens.length ? replacedTokens : undefined,
         successCount: 0,
         failureCount: failures,
       };
@@ -260,9 +308,60 @@ export class FcmPushService {
       ok: true,
       provider: 'fcm',
       providerRef: lastRef,
+      error: failures > 0 ? importError : undefined,
       invalidTokens: invalidTokens.length ? invalidTokens : undefined,
+      replacedTokens: replacedTokens.length ? replacedTokens : undefined,
       successCount: successes,
       failureCount: failures,
     };
+  }
+
+  /**
+   * FCM HTTP v1 accepts a Firebase registration token. Expo on iOS only gives
+   * the APNs device token, so exchange it once and cache the FCM token.
+   * Production tokens use the APNs production gateway (TestFlight and App Store).
+   */
+  private async fcmTokenForApns(
+    apnsToken: string,
+    bundleId: string,
+    accessToken: string,
+  ): Promise<string | null> {
+    const cached = this.apnsImportCache.get(apnsToken);
+    if (cached) return cached;
+    const sandbox =
+      this.config.get<string>('APNS_USE_SANDBOX', 'false') === 'true';
+    try {
+      const res = await fetch('https://iid.googleapis.com/iid/v1:batchImport', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          access_token_auth: 'true',
+        },
+        body: JSON.stringify({
+          application: bundleId,
+          sandbox,
+          apns_tokens: [apnsToken],
+        }),
+      });
+      const body = (await res.json()) as {
+        results?: Array<{ registration_token?: string; status?: string }>;
+      };
+      const row = body.results?.[0];
+      const registration = row?.registration_token?.trim();
+      if (!res.ok || !registration || (row?.status && row.status !== 'OK')) {
+        this.logger.warn(
+          `APNs token import failed (${res.status}${row?.status ? ` ${row.status}` : ''})`,
+        );
+        return null;
+      }
+      this.apnsImportCache.set(apnsToken, registration);
+      return registration;
+    } catch (err) {
+      this.logger.warn(
+        `APNs token import failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return null;
+    }
   }
 }

@@ -8,7 +8,10 @@ import { randomUUID } from 'crypto';
 import type { MobileAppUpdatePolicy } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CacheService } from '../../shared/cache/cache.service';
-import { FcmPushService } from '../communication/services/fcm-push.service';
+import {
+  COLLEGE_IOS_BUNDLE_ID,
+  FcmPushService,
+} from '../communication/services/fcm-push.service';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import type {
   SaveAppUpdatePolicyDto,
@@ -415,7 +418,18 @@ export class AppUpdatePolicyService {
       while (next < chunks.length) {
         const chunk = chunks[next++];
         try {
-          const result = await this.fcm.sendToTokens(chunk, payload);
+          const result = await this.fcm.sendToTokens(chunk, {
+            ...payload,
+            apnsBundleId: COLLEGE_IOS_BUNDLE_ID,
+          });
+          if (result.replacedTokens?.length) {
+            for (const swap of result.replacedTokens) {
+              await this.prisma.mobileDevice.updateMany({
+                where: { tenantId, pushToken: swap.from },
+                data: { pushToken: swap.to },
+              });
+            }
+          }
           delivered += result.successCount ?? 0;
           if (result.invalidTokens?.length)
             invalid.push(...result.invalidTokens);
