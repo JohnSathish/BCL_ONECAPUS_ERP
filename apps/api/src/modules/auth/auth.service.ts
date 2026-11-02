@@ -21,6 +21,8 @@ import { AccessDeviceService } from '../administration/services/access-device.se
 import { SecurityNotifyService } from '../administration/services/security-notify.service';
 import { SuspiciousLoginService } from '../administration/services/suspicious-login.service';
 import { MfaService } from './mfa/mfa.service';
+import { AdminEmailOtpService } from './admin-email-otp/admin-email-otp.service';
+import type { AdminEmailOtpChallengeResponse } from './auth.types';
 import {
   resolveLoginHintFromRoles,
   facultyDepartmentEmailHint,
@@ -67,6 +69,8 @@ export type LoginDeviceMeta = {
   accessDeviceId?: string;
   lastActivityAt?: string;
   isNewDevice?: boolean;
+  /** Presented trusted-device token. Never stored on the issued session. */
+  adminTrustToken?: string;
 };
 
 type IssueTokensOptions = {
@@ -95,6 +99,7 @@ export class AuthService {
     private readonly accessDevices: AccessDeviceService,
     private readonly suspiciousLogin: SuspiciousLoginService,
     private readonly securityNotify: SecurityNotifyService,
+    private readonly adminEmailOtp: AdminEmailOtpService,
   ) {}
 
   private hashToken(token: string) {
@@ -671,6 +676,25 @@ export class AuthService {
     });
   }
 
+  /** Ends every refresh session except the browser that is calling. */
+  async revokeOtherSessions(
+    userId: string,
+    currentRefreshToken?: string,
+  ): Promise<{ revoked: true }> {
+    const hashed = currentRefreshToken
+      ? this.hashToken(currentRefreshToken)
+      : undefined;
+    await this.prisma.refreshSession.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+        ...(hashed ? { hashedToken: { not: hashed } } : {}),
+      },
+      data: { revokedAt: new Date() },
+    });
+    return { revoked: true };
+  }
+
   async issueSessionForUser(
     tenantId: string,
     userId: string,
@@ -949,7 +973,7 @@ export class AuthService {
     challengeAnswer: number,
     meta?: LoginDeviceMeta,
     rememberMe?: boolean,
-  ): Promise<AuthSessionResponse> {
+  ): Promise<AuthSessionResponse | AdminEmailOtpChallengeResponse> {
     const ip = meta?.ipAddress ?? 'unknown';
     const trimmed = loginId.trim();
     const normalizedEmail = trimmed.includes('@')
@@ -1068,6 +1092,19 @@ export class AuthService {
     const userForSession = { ...user, mustResetPassword };
 
     const roles = user.roles.map((r) => r.role.slug);
+    const emailOtp = await this.adminEmailOtp.prepareLogin({
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      userId: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      roles,
+      trustToken: meta?.adminTrustToken,
+      rememberMe,
+      meta,
+    });
+    if (emailOtp) return emailOtp;
+
     const mfaRequired =
       user.mfaEnabled ||
       (await this.mfa.isRequiredForUser(tenant.id, user.id, roles));

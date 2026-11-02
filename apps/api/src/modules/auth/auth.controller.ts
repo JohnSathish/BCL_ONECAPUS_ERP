@@ -28,9 +28,14 @@ import {
 import { TenantResolutionService } from '../tenants/tenant-resolution.service';
 import {
   clearRefreshCookie,
+  readAdminTrustToken,
   readRefreshTokenFromRequest,
   setRefreshCookie,
 } from './auth-cookie.util';
+import {
+  isAdminEmailOtpChallenge,
+  type AuthSessionResponse,
+} from './auth.types';
 import { AuthService } from './auth.service';
 import type { LoginDeviceMeta } from './auth.service';
 import { ChallengeService } from './challenge.service';
@@ -60,10 +65,7 @@ export class AuthController {
     return this.config.get<string>('NODE_ENV') === 'production';
   }
 
-  private applyRefreshCookie(
-    res: Response,
-    session: Awaited<ReturnType<AuthService['login']>>,
-  ) {
+  private applyRefreshCookie(res: Response, session: AuthSessionResponse) {
     setRefreshCookie(
       res,
       session.refreshToken,
@@ -83,7 +85,7 @@ export class AuthController {
   private respondSession(
     req: Request,
     res: Response,
-    session: Awaited<ReturnType<AuthService['login']>>,
+    session: AuthSessionResponse,
   ) {
     this.applyRefreshCookie(res, session);
     return this.auth.toPublicSession(session, {
@@ -192,16 +194,29 @@ export class AuthController {
         throw new UnauthorizedException('Invalid credentials');
       }
     }
+    const headerToken = req.headers['x-admin-device-token'];
+    const headerTrust = Array.isArray(headerToken)
+      ? headerToken[0]
+      : headerToken;
     const session = await this.auth.login(
       tenantId,
       dto.email ?? dto.identifier ?? '',
       dto.password,
       dto.challengeToken,
       dto.challengeAnswer,
-      this.mobileMeta(req, dto),
+      {
+        ...this.mobileMeta(req, dto),
+        adminTrustToken:
+          readAdminTrustToken(
+            req.cookies as Record<string, string | undefined>,
+          ) || (typeof headerTrust === 'string' ? headerTrust : undefined),
+      },
       dto.rememberMe,
     );
-    if ('mfaRequired' in session && session.mfaRequired) {
+    if (isAdminEmailOtpChallenge(session)) {
+      return session;
+    }
+    if (session.mfaRequired) {
       return session;
     }
     return this.respondSession(req, res, session);
@@ -295,6 +310,14 @@ export class AuthController {
       { mustResetPassword: false },
     );
     return this.respondSession(req, res, session);
+  }
+
+  @Post('sessions/revoke-others')
+  async revokeOtherSessions(@CurrentUser() user: JwtUser, @Req() req: Request) {
+    const refreshToken = readRefreshTokenFromRequest(
+      req.cookies as Record<string, string | undefined>,
+    );
+    return this.auth.revokeOtherSessions(user.sub, refreshToken);
   }
 
   @Post('sessions/revoke-all')

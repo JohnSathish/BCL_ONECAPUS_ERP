@@ -1,5 +1,21 @@
 import type { AuthSession, LoginPayload } from '@/types/auth';
 import type { LoginChallenge, LoginContext } from '@/types/login-context';
+
+export type AdminEmailOtpChallenge = {
+  emailOtpRequired: true;
+  challengeId: string;
+  maskedEmail: string;
+  expiresAt: string;
+  resendAvailableAt: string;
+  expiresInSeconds: number;
+  resendAfterSeconds: number;
+};
+
+export function isAdminEmailOtpChallenge(
+  session: AuthSession | AdminEmailOtpChallenge,
+): session is AdminEmailOtpChallenge {
+  return (session as AdminEmailOtpChallenge).emailOtpRequired === true;
+}
 import { getLoginRequestHeaders } from '@/lib/login-host';
 import { publicClient } from '@/lib/http/public-client';
 import { type ApiStartupRetryOptions, withApiStartupRetry } from '@/lib/http/wait-for-api';
@@ -25,10 +41,32 @@ export async function fetchLoginChallenge(
   }, options);
 }
 
-export async function login(payload: LoginPayload): Promise<AuthSession> {
+export async function login(payload: LoginPayload): Promise<AuthSession | AdminEmailOtpChallenge> {
   const { data } = await publicClient.post<AuthSession>(`/v1/auth/login`, payload, {
     headers: getLoginRequestHeaders(),
   });
+  return data;
+}
+
+export async function verifyAdminEmailOtp(payload: {
+  challengeId: string;
+  code: string;
+  trustDevice?: boolean;
+}): Promise<AuthSession> {
+  const { data } = await publicClient.post<AuthSession>(
+    `/v1/auth/admin-email-otp/verify`,
+    payload,
+    { headers: getLoginRequestHeaders() },
+  );
+  return data;
+}
+
+export async function resendAdminEmailOtp(challengeId: string): Promise<AdminEmailOtpChallenge> {
+  const { data } = await publicClient.post<AdminEmailOtpChallenge>(
+    `/v1/auth/admin-email-otp/resend`,
+    { challengeId },
+    { headers: getLoginRequestHeaders() },
+  );
   return data;
 }
 

@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Monitor,
   Settings2,
+  ShieldCheck,
   Smartphone,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -34,6 +35,11 @@ const LINKS = [
     href: '/admin/administration/device-login/devices',
     label: 'Devices',
     icon: Smartphone,
+  },
+  {
+    href: '/admin/administration/device-login/trusted-devices',
+    label: 'Trusted devices',
+    icon: ShieldCheck,
   },
   {
     href: '/admin/administration/device-login/failed',

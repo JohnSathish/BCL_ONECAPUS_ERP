@@ -13,6 +13,9 @@ import { JwtStrategy } from './jwt.strategy';
 import { LoginAttemptService } from './login-attempt.service';
 import { MfaService } from './mfa/mfa.service';
 import { MfaController } from './mfa/mfa.controller';
+import { AdminEmailOtpService } from './admin-email-otp/admin-email-otp.service';
+import { AdminEmailOtpController } from './admin-email-otp/admin-email-otp.controller';
+import { CommunicationModule } from '../communication/communication.module';
 import { StepUpService } from './step-up.service';
 import { StepUpController } from './step-up.controller';
 import { AuthQrService } from './login-methods/auth-qr.service';
@@ -25,6 +28,7 @@ import { LoginMethodsController } from './login-methods/login-methods.controller
     SecurityCommonModule,
     CryptoModule,
     DeviceSecurityModule,
+    CommunicationModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -37,6 +41,7 @@ import { LoginMethodsController } from './login-methods/login-methods.controller
   controllers: [
     AuthController,
     MfaController,
+    AdminEmailOtpController,
     StepUpController,
     LoginMethodsController,
   ],
@@ -46,6 +51,7 @@ import { LoginMethodsController } from './login-methods/login-methods.controller
     LoginAttemptService,
     JwtStrategy,
     MfaService,
+    AdminEmailOtpService,
     StepUpService,
     AuthQrService,
     AuthRfidService,

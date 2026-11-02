@@ -34,3 +34,19 @@ export type AuthSessionResponse = {
   mfaRequired?: boolean;
   mfaToken?: string;
 };
+
+export type AdminEmailOtpChallengeResponse = {
+  emailOtpRequired: true;
+  challengeId: string;
+  maskedEmail: string;
+  expiresAt: string;
+  resendAvailableAt: string;
+  expiresInSeconds: number;
+  resendAfterSeconds: number;
+};
+
+export function isAdminEmailOtpChallenge(
+  session: AuthSessionResponse | AdminEmailOtpChallengeResponse,
+): session is AdminEmailOtpChallengeResponse {
+  return (session as AdminEmailOtpChallengeResponse).emailOtpRequired === true;
+}

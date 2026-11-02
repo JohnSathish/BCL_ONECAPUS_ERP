@@ -5,18 +5,16 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import {
-  canAccessAdminPortal,
-  canAccessApplicantPortal,
-  canAccessPath,
-  resolveHomePath,
-} from '@/lib/permissions/portal-access';
-import { resolveSchoolSisHomePath } from '@/lib/school-sis/portal-access';
 import { getWebDeviceFingerprint } from '@/lib/device-fingerprint';
-import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import type { ApiStartupRetryOptions } from '@/lib/http/wait-for-api';
-import { fetchLoginChallenge, fetchLoginContext, login } from '@/services/auth';
-import { useAuthStore } from '@/store/auth-store';
+import {
+  fetchLoginChallenge,
+  fetchLoginContext,
+  isAdminEmailOtpChallenge,
+  login,
+} from '@/services/auth';
+import { finishWebLogin } from '@/lib/auth/finish-web-login';
+import { writeStoredAdminEmailOtp } from '@/lib/auth/admin-email-otp';
 import type { LoginChallenge, LoginContext } from '@/types/login-context';
 import { LoginDynamicFavicon } from '@/components/branding/login-dynamic-favicon';
 import { SCHOOL_PORTAL_LOGO_SRC } from '@/lib/school-admissions-branding';
@@ -67,8 +65,6 @@ export function LoginForm({
   identifierLabel,
 }: LoginFormProps) {
   const router = useRouter();
-  const setSession = useAuthStore((s) => s.setSession);
-  const setPrefs = useAuthStore((s) => s.setPrefs);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
@@ -212,50 +208,27 @@ export function LoginForm({
           rememberMe: values.rememberMe,
           ...fingerprint,
         });
-        setSession(session);
-        setPrefs({ rememberMe: values.rememberMe });
-        useAuthStore.getState().setBootstrapping(false);
-        tokenRefreshManager.scheduleProactiveRefresh(session);
-        if (session.user.mustResetPassword) {
-          // Soft navigate so the in-memory session (not persisted) survives.
-          // SessionProvider also bootstraps /change-password from the refresh cookie.
-          router.replace('/change-password');
+        if (isAdminEmailOtpChallenge(session)) {
+          writeStoredAdminEmailOtp({
+            challengeId: session.challengeId,
+            maskedEmail: session.maskedEmail,
+            expiresAt: session.expiresAt,
+            resendAvailableAt: session.resendAvailableAt,
+            rememberMe: Boolean(values.rememberMe),
+            returnPath: postLoginPath ?? queryNextPath,
+          });
+          router.push('/login/admin-verify');
           return;
         }
-        const roles = session.user.roles ?? [];
-        const permissions = session.user.permissions ?? [];
-        const schoolSession =
-          context?.institutionType === 'SCHOOL' ||
-          schoolSis ||
-          context?.schoolProduct === 'SECONDARY_SIS';
-        const secondarySis = schoolSis || context?.schoolProduct === 'SECONDARY_SIS';
-        const schoolHome = secondarySis
-          ? resolveSchoolSisHomePath(roles, permissions)
-          : schoolSession
-            ? canAccessAdminPortal(roles, permissions)
-              ? '/admin'
-              : canAccessApplicantPortal(roles, permissions)
-                ? '/school-admissions-portal/dashboard'
-                : '/admin'
-            : null;
-        const requestedPath = postLoginPath ?? queryNextPath;
-        const destination =
-          (requestedPath && canAccessPath(roles, requestedPath, permissions)
-            ? requestedPath
-            : null) ??
-          schoolHome ??
-          resolveHomePath(roles, permissions);
-        // School student home has no portal shell — keep the in-memory session.
-        if (
-          destination === '/school-sis-portal/me' ||
-          destination.startsWith('/school-sis-portal/') ||
-          destination === '/change-password'
-        ) {
-          router.replace(destination);
-          return;
-        }
-        // Full navigation avoids client chunk mismatch and post-login render loops on portal shells.
-        window.location.assign(destination);
+        finishWebLogin({
+          session,
+          rememberMe: Boolean(values.rememberMe),
+          router,
+          context,
+          schoolSis,
+          postLoginPath,
+          queryNextPath,
+        });
       } catch (err) {
         if (isApiUnavailableError(err)) {
           setError(
@@ -339,8 +312,6 @@ export function LoginForm({
       queryNextPath,
       resetField,
       router,
-      setSession,
-      setPrefs,
     ],
   );
 

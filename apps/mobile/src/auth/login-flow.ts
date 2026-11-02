@@ -22,6 +22,7 @@ export type LoginResponse = {
   refreshToken: string;
   mfaRequired?: boolean;
   mfaToken?: string;
+  emailOtpRequired?: boolean;
   user: {
     email?: string;
     permissions?: string[];
@@ -196,6 +197,12 @@ export async function performLogin(input: {
       ...deviceMeta,
     }),
   });
+
+  if (session.emailOtpRequired) {
+    throw new Error(
+      'This admin account needs the email verification code. Sign in on the college website to enter it.',
+    );
+  }
 
   if (session.mfaRequired) {
     throw new Error(
