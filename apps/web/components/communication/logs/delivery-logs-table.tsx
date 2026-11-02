@@ -70,6 +70,7 @@ export function DeliveryLogsTable({
               <th className="px-4 py-3">Campaign</th>
               <th className="px-4 py-3">Channel</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Details</th>
               <th className="px-4 py-3">Time</th>
               {showRetry ? <th className="px-4 py-3" /> : null}
             </tr>
@@ -83,6 +84,9 @@ export function DeliveryLogsTable({
                 <td className="px-4 py-3">{log.campaign?.name ?? '—'}</td>
                 <td className="px-4 py-3">{log.channel}</td>
                 <td className="px-4 py-3">{log.status}</td>
+                <td className="max-w-md px-4 py-3 text-xs text-muted-foreground">
+                  {log.errorMessage ?? '—'}
+                </td>
                 <td className="px-4 py-3">
                   {new Date(log.sentAt ?? log.createdAt).toLocaleString()}
                 </td>

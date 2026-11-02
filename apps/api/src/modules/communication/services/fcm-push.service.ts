@@ -11,8 +11,17 @@ type FcmSendResult = {
   invalidTokens?: string[];
   /** APNs device token replaced by the Firebase registration token FCM accepted. */
   replacedTokens?: Array<{ from: string; to: string }>;
+  /** One row per stored token, in send order, so logs can name the failing phone. */
+  deliveries?: FcmTokenDelivery[];
   successCount?: number;
   failureCount?: number;
+};
+
+export type FcmTokenDelivery = {
+  token: string;
+  accepted: boolean;
+  /** Firebase or Apple error code, e.g. THIRD_PARTY_AUTH_ERROR or APNS_IMPORT_FAILED. */
+  error?: string;
 };
 
 /** College campus app. School apps must not reuse this bundle for APNs import. */
@@ -175,6 +184,11 @@ export class FcmPushService {
     let successes = 0;
     const invalidTokens: string[] = [...expoTokens];
     const replacedTokens: Array<{ from: string; to: string }> = [];
+    const deliveries: FcmTokenDelivery[] = expoTokens.map((t) => ({
+      token: t,
+      accepted: false,
+      error: 'EXPO_TOKEN',
+    }));
     let apnsImportFailed = false;
 
     for (const pushToken of fcmTokens) {
@@ -193,6 +207,11 @@ export class FcmPushService {
         if (!payload.apnsBundleId) {
           failures++;
           apnsImportFailed = true;
+          deliveries.push({
+            token: pushToken,
+            accepted: false,
+            error: 'APNS_TOKEN_NOT_SUPPORTED',
+          });
           continue;
         }
         const imported = await this.fcmTokenForApns(
@@ -200,12 +219,17 @@ export class FcmPushService {
           payload.apnsBundleId,
           token,
         );
-        if (!imported) {
+        if ('error' in imported) {
           failures++;
           apnsImportFailed = true;
+          deliveries.push({
+            token: pushToken,
+            accepted: false,
+            error: imported.error,
+          });
           continue;
         }
-        deliverToken = imported;
+        deliverToken = imported.token;
       }
 
       const message: Record<string, unknown> = {
@@ -281,12 +305,18 @@ export class FcmPushService {
         ) {
           invalidTokens.push(pushToken);
         }
+        deliveries.push({
+          token: pushToken,
+          accepted: false,
+          error: (errCode || `HTTP_${res.status}`).slice(0, 80),
+        });
       } else {
         successes++;
         lastRef = body.name;
         if (deliverToken !== pushToken) {
           replacedTokens.push({ from: pushToken, to: deliverToken });
         }
+        deliveries.push({ token: pushToken, accepted: true });
       }
     }
 
@@ -300,6 +330,7 @@ export class FcmPushService {
         error: importError ?? 'All FCM deliveries failed',
         invalidTokens,
         replacedTokens: replacedTokens.length ? replacedTokens : undefined,
+        deliveries,
         successCount: 0,
         failureCount: failures,
       };
@@ -311,6 +342,7 @@ export class FcmPushService {
       error: failures > 0 ? importError : undefined,
       invalidTokens: invalidTokens.length ? invalidTokens : undefined,
       replacedTokens: replacedTokens.length ? replacedTokens : undefined,
+      deliveries,
       successCount: successes,
       failureCount: failures,
     };
@@ -325,9 +357,9 @@ export class FcmPushService {
     apnsToken: string,
     bundleId: string,
     accessToken: string,
-  ): Promise<string | null> {
+  ): Promise<{ token: string } | { error: string }> {
     const cached = this.apnsImportCache.get(apnsToken);
-    if (cached) return cached;
+    if (cached) return { token: cached };
     const sandbox =
       this.config.get<string>('APNS_USE_SANDBOX', 'false') === 'true';
     try {
@@ -344,24 +376,36 @@ export class FcmPushService {
           apns_tokens: [apnsToken],
         }),
       });
-      const body = (await res.json()) as {
+      const text = await res.text();
+      let body: {
         results?: Array<{ registration_token?: string; status?: string }>;
-      };
+        error?: string | { message?: string; status?: string };
+      } = {};
+      try {
+        body = JSON.parse(text) as typeof body;
+      } catch {
+        // Non-JSON error page; the HTTP status is reported below.
+      }
       const row = body.results?.[0];
       const registration = row?.registration_token?.trim();
       if (!res.ok || !registration || (row?.status && row.status !== 'OK')) {
+        const topError =
+          typeof body.error === 'string'
+            ? body.error
+            : (body.error?.status ?? body.error?.message);
+        const reason = row?.status ?? topError ?? `HTTP_${res.status}`;
         this.logger.warn(
-          `APNs token import failed (${res.status}${row?.status ? ` ${row.status}` : ''})`,
+          `APNs token import failed (${res.status} ${reason}) for bundle ${bundleId} sandbox=${sandbox}`,
         );
-        return null;
+        return { error: `APNS_IMPORT_${reason}`.slice(0, 80) };
       }
       this.apnsImportCache.set(apnsToken, registration);
-      return registration;
+      return { token: registration };
     } catch (err) {
       this.logger.warn(
         `APNs token import failed: ${err instanceof Error ? err.message : String(err)}`,
       );
-      return null;
+      return { error: 'APNS_IMPORT_NETWORK' };
     }
   }
 }

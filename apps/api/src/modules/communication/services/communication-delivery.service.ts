@@ -429,13 +429,43 @@ export class CommunicationDeliveryService {
               tenantId,
               userId: recipient.userId,
               status: 'ACTIVE',
-              pushToken: { not: null },
             },
-            select: { id: true, pushToken: true },
+            select: {
+              id: true,
+              pushToken: true,
+              platform: true,
+              appVersion: true,
+            },
           });
           const tokens = devices
             .map((d) => d.pushToken)
             .filter((t): t is string => Boolean(t));
+          if (!tokens.length) {
+            await this.logDelivery({
+              tenantId,
+              campaignId,
+              recipientId: recipient.id,
+              channel,
+              status: 'FAILED',
+              provider: 'fcm',
+              errorMessage: devices.length
+                ? `No push token on ${devices
+                    .map((d) => `${d.platform} ${d.appVersion ?? ''}`.trim())
+                    .join(', ')}`
+                : 'No mobile app device registered',
+              metadata: {
+                fcmAccepted: 0,
+                fcmRejected: 0,
+                devices: devices.map((d) => ({
+                  platform: d.platform,
+                  appVersion: d.appVersion,
+                  hasToken: false,
+                })),
+              },
+            });
+            failedCount++;
+            continue;
+          }
           const inboxRow = await this.prisma.userNotification.findFirst({
             where: {
               tenantId,
@@ -533,9 +563,32 @@ export class CommunicationDeliveryService {
             result.successCount ?? (result.ok ? tokens.length : 0);
           const rejected =
             result.failureCount ?? (result.ok ? 0 : tokens.length);
+          const outcomeByToken = new Map(
+            (result.deliveries ?? []).map((d) => [d.token, d]),
+          );
+          const deviceRows = devices.map((d) => {
+            const outcome = d.pushToken
+              ? outcomeByToken.get(d.pushToken.trim())
+              : undefined;
+            return {
+              platform: d.platform,
+              appVersion: d.appVersion,
+              hasToken: Boolean(d.pushToken),
+              accepted: outcome?.accepted ?? false,
+              ...(outcome?.error ? { error: outcome.error } : {}),
+            };
+          });
+          const deviceSummary = deviceRows
+            .map((d) => {
+              const label = `${d.platform} ${d.appVersion ?? ''}`.trim();
+              if (!d.hasToken) return `${label}: no push token`;
+              if (d.accepted) return `${label}: accepted`;
+              return `${label}: rejected${d.error ? ` (${d.error})` : ''}`;
+            })
+            .join('; ');
           const detail =
-            rejected > 0
-              ? `FCM accepted ${accepted} device(s) and rejected ${rejected}. ${result.error ?? ''}`.trim()
+            rejected > 0 || deviceRows.some((d) => !d.hasToken)
+              ? deviceSummary || result.error
               : result.error;
           await this.logDelivery({
             tenantId,
@@ -550,6 +603,7 @@ export class CommunicationDeliveryService {
               fcmAccepted: accepted,
               fcmRejected: rejected,
               deviceDeliveryConfirmed: false,
+              devices: deviceRows,
             },
           });
           if (result.ok) sentCount++;
