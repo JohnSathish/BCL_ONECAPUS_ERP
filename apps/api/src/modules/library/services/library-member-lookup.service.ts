@@ -5,6 +5,7 @@ import {
   programmeKind,
   staffKind,
 } from '../domain/library-member-status.logic';
+import { phoneDigitsFromScan } from '../domain/library-member-scan.logic';
 import { LibraryQrService } from './library-qr.service';
 
 export type LibraryMemberType =
@@ -54,7 +55,31 @@ export class LibraryMemberLookupService {
     const { code } = this.qr.resolveScanCode(scanCode);
     if (!code) throw new NotFoundException('Invalid scan code');
 
-    const student = await this.prisma.student.findFirst({
+    const include = {
+      masterProfile: true,
+      department: { select: { name: true } },
+      programVersion: {
+        include: {
+          program: { select: { name: true, code: true, level: true } },
+        },
+      },
+      academicStanding: {
+        select: { currentSemesterSequence: true, lifecycleState: true },
+      },
+      academicProfile: {
+        include: {
+          admissionBatch: {
+            include: { entrySession: { select: { name: true } } },
+          },
+        },
+      },
+    };
+
+    // Exact card / roll / enrollment first. A roll number such as HI26-15 also
+    // contains digits; those must not be compared to mobile numbers in the same
+    // query, or findFirst can return a different student whose phone merely
+    // contains the fragment (HI26-15 → 2615 → 9862615600).
+    let student = await this.prisma.student.findFirst({
       where: {
         tenantId,
         deletedAt: null,
@@ -65,35 +90,24 @@ export class LibraryMemberLookupService {
           { rollNumber: { equals: code, mode: 'insensitive' } },
           { applicationNumber: { equals: code, mode: 'insensitive' } },
           { admissionNumber: { equals: code, mode: 'insensitive' } },
-          {
-            masterProfile: {
-              mobileNumber: {
-                contains: code.replace(/\D/g, '').slice(-10),
-              },
-            },
-          },
         ],
       },
-      include: {
-        masterProfile: true,
-        department: { select: { name: true } },
-        programVersion: {
-          include: {
-            program: { select: { name: true, code: true, level: true } },
-          },
-        },
-        academicStanding: {
-          select: { currentSemesterSequence: true, lifecycleState: true },
-        },
-        academicProfile: {
-          include: {
-            admissionBatch: {
-              include: { entrySession: { select: { name: true } } },
-            },
-          },
-        },
-      },
+      include,
     });
+
+    const phoneDigits = phoneDigitsFromScan(code);
+    if (!student && phoneDigits) {
+      student = await this.prisma.student.findFirst({
+        where: {
+          tenantId,
+          deletedAt: null,
+          masterProfile: {
+            mobileNumber: { contains: phoneDigits },
+          },
+        },
+        include,
+      });
+    }
 
     if (student) {
       const lifecycle = student.academicStanding?.lifecycleState ?? 'ACTIVE';
