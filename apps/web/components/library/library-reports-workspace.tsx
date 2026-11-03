@@ -84,6 +84,9 @@ export function LibraryReportsWorkspace() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" asChild>
+            <Link href="/admin/library/circulation-report">Circulation Report</Link>
+          </Button>
           <Input
             type="date"
             aria-label="From"

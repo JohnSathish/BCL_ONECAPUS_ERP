@@ -13,6 +13,9 @@ import { LibraryOpacController } from './library-opac.controller';
 import { KohaImportController } from './koha/koha-import.controller';
 import { KohaImportService } from './koha/koha-import.service';
 import { LibraryCatalogueReportsController } from './reports/library-catalogue-reports.controller';
+import { LibraryCirculationReportsController } from './reports/library-circulation-reports.controller';
+import { LibraryCirculationReportsService } from './reports/library-circulation-reports.service';
+import { LibraryCirculationLedgerService } from './services/library-circulation-ledger.service';
 import { LibraryCatalogueReportsService } from './reports/library-catalogue-reports.service';
 import { LibraryDepartmentInventoryController } from './reports/library-department-inventory.controller';
 import { LibraryDepartmentInventoryService } from './reports/library-department-inventory.service';
@@ -87,6 +90,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
     LibraryOpacController,
     KohaImportController,
     LibraryCatalogueReportsController,
+    LibraryCirculationReportsController,
     LibraryDepartmentInventoryController,
     LibraryBarcodeController,
   ],
@@ -122,6 +126,8 @@ import { ResearchRepositoryService } from './services/research-repository.servic
     LibraryFinesService,
 
     LibraryCirculationService,
+    LibraryCirculationLedgerService,
+    LibraryCirculationReportsService,
 
     LibraryCopyIncidentsService,
 

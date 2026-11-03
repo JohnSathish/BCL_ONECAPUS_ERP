@@ -10110,6 +10110,7 @@ model LibraryBookCopy {
 
   incidents LibraryCopyIncident[] @relation("IncidentCopy")
   replacementIncidents LibraryCopyIncident[] @relation("ReplacementCopy")
+  circulationTransactions LibraryCirculationTransaction[]
 
   @@unique([tenantId, barcode])
   @@unique([tenantId, bookId, copyNumber])
@@ -10314,8 +10315,9 @@ model LibraryLoan {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  copy  LibraryBookCopy @relation(fields: [copyId], references: [id], onDelete: Restrict)
-  fines LibraryFine[]
+  copy         LibraryBookCopy                 @relation(fields: [copyId], references: [id], onDelete: Restrict)
+  fines        LibraryFine[]
+  transactions LibraryCirculationTransaction[]
 
   @@index([tenantId, status])
   @@index([tenantId, studentId, status])
@@ -10345,6 +10347,60 @@ model LibraryFine {
   @@index([tenantId, loanId])
   @@index([tenantId, paidAt, waivedAt])
   @@map("library_fines")
+  @@schema("library")
+}
+
+/// Append-only history of every issue, renewal and return. A database trigger
+/// rejects UPDATE and DELETE. Borrower and staff names are snapshots taken at
+/// the time of the transaction, so history survives later profile changes.
+model LibraryCirculationTransaction {
+  id              String    @id @default(uuid()) @db.Uuid
+  seqNo           Int       @unique @default(autoincrement()) @map("seq_no")
+  tenantId        String    @map("tenant_id") @db.Uuid
+  loanId          String    @map("loan_id") @db.Uuid
+  copyId          String    @map("copy_id") @db.Uuid
+  transactionType String    @map("transaction_type")
+  occurredAt      DateTime  @map("occurred_at")
+  memberType      String    @map("member_type")
+  studentId       String?   @map("student_id") @db.Uuid
+  staffProfileId  String?   @map("staff_profile_id") @db.Uuid
+  borrowerName    String?   @map("borrower_name")
+  borrowerCode    String?   @map("borrower_code")
+  departmentId    String?   @map("department_id") @db.Uuid
+  departmentName  String?   @map("department_name")
+  semesterNo      Int?      @map("semester_no")
+  issuedAt        DateTime  @map("issued_at")
+  previousDueAt   DateTime? @map("previous_due_at")
+  dueAt           DateTime? @map("due_at")
+  renewalNumber   Int       @default(0) @map("renewal_number")
+  returnedAt      DateTime? @map("returned_at")
+  returnedByType  String?   @map("returned_by_type")
+  returnedByName  String?   @map("returned_by_name")
+  returnedByCode  String?   @map("returned_by_code")
+  returnedByStudentId String? @map("returned_by_student_id") @db.Uuid
+  returnedByStaffId   String? @map("returned_by_staff_id") @db.Uuid
+  processedById   String?   @map("processed_by_id") @db.Uuid
+  processedByName String?   @map("processed_by_name")
+  bookCondition   String?   @map("book_condition")
+  isLate          Boolean   @default(false) @map("is_late")
+  daysLate        Int?      @map("days_late")
+  fineAmount      Decimal?  @map("fine_amount") @db.Decimal(10, 2)
+  fineId          String?   @map("fine_id") @db.Uuid
+  remarks         String?
+  source          String    @default("DESK")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  loan LibraryLoan     @relation(fields: [loanId], references: [id], onDelete: Restrict)
+  copy LibraryBookCopy @relation(fields: [copyId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, transactionType, occurredAt])
+  @@index([tenantId, loanId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, staffProfileId])
+  @@index([tenantId, departmentId])
+  @@index([tenantId, processedById])
+  @@map("library_circulation_transactions")
   @@schema("library")
 }
 

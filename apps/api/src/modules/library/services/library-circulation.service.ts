@@ -9,14 +9,24 @@ import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
 import { PrismaService } from '../../../database/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import type { IssueBookDto, ReturnBookDto } from '../dto/library.dto';
-import { mergeCirculationPolicy } from '../domain/library-policy.types';
+import {
+  mergeCirculationPolicy,
+  mergeFinePolicy,
+} from '../domain/library-policy.types';
 import { resolveCopyIssue } from '../domain/library-copy-issue.logic';
 import {
   collegeDateIso,
   renewalPeriodDays,
 } from '../domain/library-loan-calendar.logic';
 import { computeReadingScore } from '../domain/library-reading-score';
+import {
+  isLateReturn,
+  normalizeReturner,
+  type BookCondition,
+} from '../domain/library-circulation-ledger.logic';
 import { LibraryCatalogueService } from './library-catalogue.service';
+import { LibraryCirculationLedgerService } from './library-circulation-ledger.service';
+import { incidentCharge } from './library-copy-incidents.service';
 import { LibraryFinesService } from './library-fines.service';
 import {
   LibraryMemberLookupService,
@@ -43,6 +53,7 @@ export class LibraryCirculationService {
     private readonly qr: LibraryQrService,
     private readonly realtime: RealtimeGateway,
     private readonly loanCalendar: LibraryLoanCalendarService,
+    private readonly ledger: LibraryCirculationLedgerService,
   ) {}
 
   private resolveCopyBarcode(raw: string) {
@@ -354,7 +365,7 @@ export class LibraryCirculationService {
         );
       }
       const loanId = randomUUID();
-      return tx.libraryLoan.create({
+      const created = await tx.libraryLoan.create({
         data: {
           id: loanId,
           tenantId: user.tid,
@@ -369,6 +380,14 @@ export class LibraryCirculationService {
         },
         include: { copy: { include: { book: true } } },
       });
+      await this.ledger.record(tx, {
+        loan: created,
+        type: 'ISSUE',
+        occurredAt: created.issuedAt,
+        processedById: user.sub,
+        dueAt: created.dueAt,
+      });
+      return created;
     });
 
     await this.logActivity(user.tid, user.sub, 'ISSUE', {
@@ -393,6 +412,10 @@ export class LibraryCirculationService {
 
     if (!loan) throw new NotFoundException('No active loan for this copy');
 
+    const condition: BookCondition = dto.condition ?? 'GOOD';
+    const borrower = await this.ledger.borrower(this.prisma, loan);
+    const returner = await this.resolveReturner(user.tid, dto, borrower);
+
     const settings = await this.settings.getSettings(user.tid);
     const returnedAt = new Date();
     const assessment = await this.loanCalendar.assess(
@@ -403,6 +426,15 @@ export class LibraryCirculationService {
     );
     const fineAmount = assessment.fine;
     const overdueDays = assessment.overdueDays;
+    const damageCharge =
+      condition === 'GOOD'
+        ? 0
+        : incidentCharge(
+            condition,
+            dto.damageCharge,
+            mergeFinePolicy(settings.finePolicy),
+            copy.book.price,
+          );
 
     const result = await this.prisma.$transaction(async (tx) => {
       const closed = await tx.libraryLoan.updateMany({
@@ -423,8 +455,48 @@ export class LibraryCirculationService {
 
       await tx.libraryBookCopy.update({
         where: { id: copy.id },
-        data: { status: 'AVAILABLE' },
+        data: { status: condition === 'GOOD' ? 'AVAILABLE' : condition },
       });
+
+      let chargeFine: { id: string } | null = null;
+      if (condition !== 'GOOD') {
+        await tx.libraryCopyIncident.create({
+          data: {
+            id: randomUUID(),
+            tenantId: user.tid,
+            copyId: copy.id,
+            loanId: loan.id,
+            incidentType: condition,
+            status: 'OPEN',
+            notes: dto.remarks?.trim() || null,
+            chargeAmount: damageCharge,
+            reportedById: user.sub,
+          },
+        });
+        if (damageCharge > 0) {
+          chargeFine = await tx.libraryFine.create({
+            data: {
+              id: randomUUID(),
+              tenantId: user.tid,
+              loanId: loan.id,
+              amount: damageCharge,
+              reason:
+                condition === 'LOST' ? 'Lost book penalty' : 'Damage charge',
+            },
+          });
+        }
+        await tx.libraryAuditLog.create({
+          data: {
+            id: randomUUID(),
+            tenantId: user.tid,
+            actorId: user.sub,
+            action: condition,
+            entityType: 'COPY',
+            entityId: copy.id,
+            metadata: { bookTitle: copy.book.title, charge: damageCharge },
+          },
+        });
+      }
 
       const openFine = loan.fines.find((f) => !f.paidAt && !f.waivedAt);
       let fine = openFine ?? null;
@@ -459,30 +531,94 @@ export class LibraryCirculationService {
         });
       }
 
-      return { loan: updatedLoan, fine, overdueDays };
+      const overdueCharged = fineAmount > 0 ? fineAmount : 0;
+      const totalCharged = overdueCharged + damageCharge;
+      await this.ledger.record(
+        tx,
+        {
+          loan,
+          type: 'RETURN',
+          occurredAt: returnedAt,
+          processedById: user.sub,
+          dueAt: loan.dueAt,
+          renewalNumber: loan.renewalCount,
+          returnedAt,
+          returner,
+          bookCondition: condition,
+          isLate: isLateReturn(loan.dueAt, returnedAt),
+          daysLate: overdueDays,
+          fineAmount: totalCharged > 0 ? totalCharged : null,
+          fineId:
+            (overdueCharged > 0 ? fine?.id : null) ?? chargeFine?.id ?? null,
+          remarks: dto.remarks,
+        },
+        borrower,
+      );
+
+      return { loan: updatedLoan, fine, overdueDays, chargeFine };
     });
 
     await this.logActivity(user.tid, user.sub, 'RETURN', {
-      memberName: 'Member',
+      memberName: borrower.name ?? 'Member',
       bookTitle: copy.book.title,
       accessionNumber: copy.accessionNumber || copy.barcode,
     });
 
-    await this.reservations
-      .fulfillNext(user.tid, copy.bookId)
-      .then(async (fulfilled) => {
-        if (fulfilled?.id) {
-          await this.notifications.notifyReservationReady(
-            user.tid,
-            fulfilled.id,
-          );
-        }
-      });
+    if (condition === 'GOOD') {
+      await this.reservations
+        .fulfillNext(user.tid, copy.bookId)
+        .then(async (fulfilled) => {
+          if (fulfilled?.id) {
+            await this.notifications.notifyReservationReady(
+              user.tid,
+              fulfilled.id,
+            );
+          }
+        });
+    }
 
     return result;
   }
 
-  async renewLoan(user: JwtUser, copyBarcode: string) {
+  /** The person who physically brought the book back. Defaults to the borrower. */
+  private async resolveReturner(
+    tenantId: string,
+    dto: ReturnBookDto,
+    borrower: { name: string | null; code: string | null },
+  ) {
+    let returner;
+    try {
+      returner = normalizeReturner(
+        {
+          type: dto.returnedByType,
+          name: dto.returnedByName,
+          code: dto.returnedByCode,
+        },
+        borrower,
+      );
+    } catch {
+      throw new BadRequestException(
+        'Enter the name or ID of the person returning the book.',
+      );
+    }
+    let studentId: string | null = null;
+    let staffId: string | null = null;
+    if (returner.type !== 'BORROWER' && returner.code) {
+      const found = await this.lookup
+        .lookup(tenantId, returner.code)
+        .catch(() => null);
+      if (found?.studentId) studentId = found.studentId;
+      if (found?.staffProfileId) staffId = found.staffProfileId;
+      if (found && !returner.name) returner.name = found.fullName;
+    }
+    return { ...returner, studentId, staffId };
+  }
+
+  async renewLoan(
+    user: JwtUser,
+    copyBarcode: string,
+    source: 'DESK' | 'OPAC' = 'DESK',
+  ) {
     const barcode = this.resolveCopyBarcode(copyBarcode);
     const copy = await this.catalogue.findCopyByBarcode(user.tid, barcode);
 
@@ -553,19 +689,38 @@ export class LibraryCirculationService {
       period,
     );
 
-    const renewed = await this.prisma.libraryLoan.updateMany({
-      where: { id: loan.id, status: 'ACTIVE', renewalCount: loan.renewalCount },
-      data: {
+    const renewedAt = new Date();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const renewed = await tx.libraryLoan.updateMany({
+        where: {
+          id: loan.id,
+          status: 'ACTIVE',
+          renewalCount: loan.renewalCount,
+        },
+        data: {
+          dueAt: newDue,
+          renewalCount: { increment: 1 },
+        },
+      });
+      if (renewed.count !== 1) {
+        throw new BadRequestException(
+          'This loan was just renewed or returned.',
+        );
+      }
+      await this.ledger.record(tx, {
+        loan,
+        type: 'RENEW',
+        occurredAt: renewedAt,
+        processedById: user.sub,
+        previousDueAt: loan.dueAt,
         dueAt: newDue,
-        renewalCount: { increment: 1 },
-      },
-    });
-    if (renewed.count !== 1) {
-      throw new BadRequestException('This loan was just renewed or returned.');
-    }
-    const updated = await this.prisma.libraryLoan.findFirstOrThrow({
-      where: { id: loan.id },
-      include: { copy: { include: { book: true } } },
+        renewalNumber: loan.renewalCount + 1,
+        source,
+      });
+      return tx.libraryLoan.findFirstOrThrow({
+        where: { id: loan.id },
+        include: { copy: { include: { book: true } } },
+      });
     });
 
     await this.logActivity(user.tid, user.sub, 'RENEW', {

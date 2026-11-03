@@ -225,13 +225,25 @@ export const issueLibraryBook = (memberScan: string, copyBarcode: string, receip
     })
     .then((r) => r.data);
 
-export const returnLibraryBook = (copyBarcode: string) =>
+export type ReturnBookPayload = {
+  copyBarcode: string;
+  /** Who physically brought the book back. Defaults to the borrower. */
+  returnedByType?: 'BORROWER' | 'STUDENT' | 'STAFF' | 'OTHER';
+  returnedByName?: string;
+  returnedByCode?: string;
+  condition?: 'GOOD' | 'DAMAGED' | 'LOST';
+  damageCharge?: number;
+  remarks?: string;
+};
+
+export const returnLibraryBook = (payload: ReturnBookPayload) =>
   api
     .post<{
       loan: LibraryLoan;
       fine: { id: string; amount: number | string } | null;
+      chargeFine: { id: string; amount: number | string } | null;
       overdueDays: number;
-    }>(`${base}/circulation/return`, { copyBarcode })
+    }>(`${base}/circulation/return`, payload)
     .then((r) => r.data);
 
 export const fetchOverdueLoans = () =>

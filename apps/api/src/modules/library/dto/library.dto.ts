@@ -467,6 +467,38 @@ export class ReturnBookDto {
   @IsString()
   @IsNotEmpty()
   copyBarcode!: string;
+
+  /** BORROWER (default) | STUDENT | STAFF | OTHER — who physically brought the book. */
+  @IsOptional()
+  @IsIn(['BORROWER', 'STUDENT', 'STAFF', 'OTHER'])
+  returnedByType?: 'BORROWER' | 'STUDENT' | 'STAFF' | 'OTHER';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  returnedByName?: string;
+
+  /** Roll number, staff ID or other identification of the returner. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  returnedByCode?: string;
+
+  @IsOptional()
+  @IsIn(['GOOD', 'DAMAGED', 'LOST'])
+  condition?: 'GOOD' | 'DAMAGED' | 'LOST';
+
+  /** Lost or damaged charge. Left empty, the library fine policy decides. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  damageCharge?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  remarks?: string;
 }
 
 export class ReserveBookDto {

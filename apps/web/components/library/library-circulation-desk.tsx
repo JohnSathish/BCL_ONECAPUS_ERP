@@ -48,7 +48,6 @@ import {
   issueLibraryBook,
   payLibraryFine,
   renewLibraryLoan,
-  reportLibraryCopyIncident,
   returnLibraryBook,
   waiveLibraryFine,
 } from '@/services/library';
@@ -137,7 +136,12 @@ export function LibraryCirculationDesk() {
   const [returnCode, setReturnCode] = useState('');
   const [returnPreview, setReturnPreview] = useState<LibraryReturnPreview | null>(null);
   const [condition, setCondition] = useState<'GOOD' | 'DAMAGED' | 'LOST'>('GOOD');
-  const [conditionNote, setConditionNote] = useState('');
+  const [returnRemarks, setReturnRemarks] = useState('');
+  const [returnerType, setReturnerType] = useState<'BORROWER' | 'STUDENT' | 'STAFF' | 'OTHER'>(
+    'BORROWER',
+  );
+  const [returnerName, setReturnerName] = useState('');
+  const [returnerCode, setReturnerCode] = useState('');
   const [damageCharge, setDamageCharge] = useState('');
   const [renewCode, setRenewCode] = useState('');
   const [renewPreview, setRenewPreview] = useState<LibraryRenewPreview | null>(null);
@@ -431,48 +435,53 @@ export function LibraryCirculationDesk() {
     if (!returnPreview) return;
     setBusy(true);
     setNotice('');
+    const someoneElse = returnerType !== 'BORROWER';
+    if (someoneElse && !returnerName.trim() && !returnerCode.trim()) {
+      setNotice('Enter the name or ID of the person returning the book.');
+      setBusy(false);
+      return;
+    }
     try {
       const charge = damageCharge.trim() ? Number(damageCharge) : 0;
-      if (condition !== 'GOOD' && charge > 0) {
-        await reportLibraryCopyIncident({
-          copyBarcode: returnPreview.book.barcode,
-          incidentType: condition,
-          notes: conditionNote || undefined,
-          chargeAmount: charge,
-        });
-        setNotice(
-          `Closed the loan for ${returnPreview.book.title} and recorded a ${condition.toLowerCase()} charge of ${money(charge)}.`,
-        );
-      } else {
-        const result = await returnLibraryBook(returnPreview.book.barcode);
-        const fineId = result.fine?.id;
-        if (condition === 'GOOD' && action === 'pay' && fineId)
-          await payLibraryFine(fineId, 'Collected at return');
-        if (condition === 'GOOD' && action === 'waive' && fineId)
-          await waiveLibraryFine(fineId, 'Waived at return');
-        if (condition !== 'GOOD') {
-          await reportLibraryCopyIncident({
-            copyBarcode: returnPreview.book.barcode,
-            incidentType: condition,
-            notes: conditionNote || undefined,
-            chargeAmount: 0,
-          });
-        }
-        setNotice(
-          condition !== 'GOOD'
-            ? `Returned ${returnPreview.book.title} as ${condition.toLowerCase()}. ${result.fine ? 'The overdue fine stays pending.' : 'No overdue fine was due.'}`
-            : action === 'pay'
-              ? `Returned ${returnPreview.book.title} and recorded the fine payment.`
-              : action === 'waive'
-                ? `Returned ${returnPreview.book.title}. The overdue fine was waived.`
-                : `Returned ${returnPreview.book.title}. ${result.fine ? 'The fine stays pending.' : 'No fine was due.'}`,
-        );
-      }
+      const result = await returnLibraryBook({
+        copyBarcode: returnPreview.book.barcode,
+        condition,
+        damageCharge: condition === 'GOOD' ? undefined : charge,
+        returnedByType: returnerType,
+        returnedByName: someoneElse ? returnerName.trim() || undefined : undefined,
+        returnedByCode: someoneElse ? returnerCode.trim() || undefined : undefined,
+        remarks: returnRemarks.trim() || undefined,
+      });
+      const fineId = result.fine?.id;
+      if (action === 'pay' && fineId) await payLibraryFine(fineId, 'Collected at return');
+      if (action === 'waive' && fineId) await waiveLibraryFine(fineId, 'Waived at return');
+      const by = someoneElse
+        ? ` Brought back by ${returnerName.trim() || returnerCode.trim()}.`
+        : '';
+      const fineText =
+        action === 'pay'
+          ? 'The overdue fine was collected.'
+          : action === 'waive'
+            ? 'The overdue fine was waived.'
+            : result.fine
+              ? 'The overdue fine stays pending.'
+              : 'No overdue fine was due.';
+      setNotice(
+        condition !== 'GOOD'
+          ? `Returned ${returnPreview.book.title} as ${condition.toLowerCase()}${
+              charge > 0 ? ` with a charge of ${money(charge)}` : ''
+            }. ${fineText}${by}`
+          : `Returned ${returnPreview.book.title}. ${fineText}${by}`,
+      );
       setReturnPreview(null);
       setReturnCode('');
       setCondition('GOOD');
-      setConditionNote('');
+      setReturnRemarks('');
+      setReturnerType('BORROWER');
+      setReturnerName('');
+      setReturnerCode('');
       setDamageCharge('');
+      window.setTimeout(() => returnRef.current?.focus(), 0);
       void qc.invalidateQueries({ queryKey: ['library', 'circulation'] });
     } catch (error) {
       setNotice(apiErrorMessage(error));
@@ -1093,29 +1102,109 @@ export function LibraryCirculationDesk() {
             </Button>
           </div>
           {returnPreview ? (
-            <div className="mt-4 grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
-              <div className="space-y-2 text-sm">
-                <p className="text-lg font-semibold">{returnPreview.book.title}</p>
-                <p>
+            <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr_0.7fr]">
+              <div className="space-y-1.5 rounded-xl border border-slate-200 p-4 text-sm">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Borrower Information
+                </h3>
+                <p className="text-base font-semibold text-slate-900">
+                  {returnPreview.member?.fullName || 'Borrower not recorded'}
+                </p>
+                <p className="text-slate-600">
+                  {returnPreview.member?.registrationNumber || 'No ID'}
+                  {returnPreview.member?.department ? ` · ${returnPreview.member.department}` : ''}
+                </p>
+                <div className="my-2 border-t" />
+                <p className="font-medium text-slate-900">{returnPreview.book.title}</p>
+                <p className="text-slate-600">
                   Accession {returnPreview.book.accessionNo} ·{' '}
                   {returnPreview.book.author || 'Author not recorded'}
                 </p>
-                <p>
-                  Member {returnPreview.member?.fullName || 'Not recorded'} ·{' '}
-                  {returnPreview.member?.registrationNumber || 'No ID'}
-                </p>
-                <p>
+                <p className="text-slate-600">
                   Issued {fmtDate(returnPreview.loan.issuedAt)} · Due{' '}
                   {fmtDate(returnPreview.loan.dueAt)}
+                  {returnPreview.loan.renewalCount
+                    ? ` · Renewed ${returnPreview.loan.renewalCount}×`
+                    : ''}
                 </p>
-                <p>Overdue working days after grace: {returnPreview.overdueDays}</p>
-                <p>
-                  Fine rate {money(returnPreview.finePerDay)} per overdue working day · Grace{' '}
-                  {returnPreview.graceDays} working days · Projected fine{' '}
-                  {money(returnPreview.projectedFine)}
+                <p className="text-slate-600">
+                  Overdue working days after grace: {returnPreview.overdueDays}
                 </p>
+                <p
+                  className={
+                    returnPreview.projectedFine > 0 ? 'font-medium text-rose-700' : 'text-slate-600'
+                  }
+                >
+                  Outstanding fine {money(returnPreview.projectedFine)} (
+                  {money(returnPreview.finePerDay)} per overdue working day, grace{' '}
+                  {returnPreview.graceDays} days)
+                </p>
+              </div>
+
+              <div className="space-y-3 rounded-xl border border-slate-200 p-4 text-sm">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Return Information
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-slate-500">Return date and time</p>
+                    <p className="font-medium">
+                      {new Date().toLocaleString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        timeZone: 'Asia/Kolkata',
+                      })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Received by</p>
+                    <p className="font-medium">
+                      {session?.user.displayName?.trim() || session?.user.email || 'You'}
+                    </p>
+                  </div>
+                </div>
                 <label className="block">
-                  Condition
+                  <span className="text-xs text-slate-500">Returned by</span>
+                  <select
+                    className="mt-1 h-10 w-full rounded-md border px-3"
+                    value={returnerType}
+                    onChange={(event) =>
+                      setReturnerType(
+                        event.target.value as 'BORROWER' | 'STUDENT' | 'STAFF' | 'OTHER',
+                      )
+                    }
+                  >
+                    <option value="BORROWER">The borrower</option>
+                    <option value="STUDENT">Another student</option>
+                    <option value="STAFF">A staff member</option>
+                    <option value="OTHER">Someone else</option>
+                  </select>
+                </label>
+                {returnerType !== 'BORROWER' ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input
+                      placeholder="Name of person returning"
+                      value={returnerName}
+                      onChange={(event) => setReturnerName(event.target.value)}
+                    />
+                    <Input
+                      placeholder={
+                        returnerType === 'STUDENT'
+                          ? 'Roll number (optional)'
+                          : returnerType === 'STAFF'
+                            ? 'Staff ID (optional)'
+                            : 'ID or phone (optional)'
+                      }
+                      value={returnerCode}
+                      onChange={(event) => setReturnerCode(event.target.value)}
+                    />
+                  </div>
+                ) : null}
+                <label className="block">
+                  <span className="text-xs text-slate-500">Book condition</span>
                   <select
                     className="mt-1 h-10 w-full rounded-md border px-3"
                     value={condition}
@@ -1129,20 +1218,24 @@ export function LibraryCirculationDesk() {
                   </select>
                 </label>
                 {condition !== 'GOOD' ? (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input
-                      placeholder="Condition note"
-                      value={conditionNote}
-                      onChange={(event) => setConditionNote(event.target.value)}
-                    />
-                    <Input
-                      placeholder="Damage charge, leave blank for none"
-                      value={damageCharge}
-                      onChange={(event) => setDamageCharge(event.target.value)}
-                    />
-                  </div>
+                  <Input
+                    inputMode="decimal"
+                    placeholder="Damage or replacement charge (₹), blank for none"
+                    value={damageCharge}
+                    onChange={(event) => setDamageCharge(event.target.value)}
+                  />
                 ) : null}
+                <label className="block">
+                  <span className="text-xs text-slate-500">Remarks</span>
+                  <Input
+                    className="mt-1"
+                    placeholder="Optional"
+                    value={returnRemarks}
+                    onChange={(event) => setReturnRemarks(event.target.value)}
+                  />
+                </label>
               </div>
+
               <div className="flex flex-col gap-2">
                 <Button type="button" disabled={busy} onClick={() => void confirmReturn('return')}>
                   Confirm Return
@@ -1150,7 +1243,7 @@ export function LibraryCirculationDesk() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={busy || returnPreview.projectedFine <= 0 || condition !== 'GOOD'}
+                  disabled={busy || returnPreview.projectedFine <= 0}
                   onClick={() => void confirmReturn('pay')}
                 >
                   Return and Collect Fine
@@ -1158,7 +1251,7 @@ export function LibraryCirculationDesk() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={busy || returnPreview.projectedFine <= 0 || condition !== 'GOOD'}
+                  disabled={busy || returnPreview.projectedFine <= 0}
                   onClick={() => void confirmReturn('return')}
                 >
                   Record Fine as Pending
@@ -1166,7 +1259,7 @@ export function LibraryCirculationDesk() {
                 <Button
                   type="button"
                   variant="ghost"
-                  disabled={busy || returnPreview.projectedFine <= 0 || condition !== 'GOOD'}
+                  disabled={busy || returnPreview.projectedFine <= 0}
                   onClick={() => void confirmReturn('waive')}
                 >
                   Mark Fine Waived

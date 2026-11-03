@@ -1641,6 +1641,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['library:reports', 'library:manage'],
           },
           {
+            label: 'Circulation Report',
+            href: '/admin/library/circulation-report',
+            permissions: ['library:reports', 'library:manage'],
+          },
+          {
             label: 'Reports',
             href: '/admin/library/reports',
             permissions: ['library:reports', 'library:manage'],

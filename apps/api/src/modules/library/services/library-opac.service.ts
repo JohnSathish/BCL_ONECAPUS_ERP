@@ -560,7 +560,11 @@ export class LibraryOpacService {
         'Another member is waiting for this title, so it cannot be renewed online.',
       );
     }
-    const renewed = await this.circulation.renewLoan(user, copy.barcode);
+    const renewed = await this.circulation.renewLoan(
+      user,
+      copy.barcode,
+      'OPAC',
+    );
     await this.event(user.tid, 'RENEW', user.sub, copy.bookId, null);
     return renewed;
   }

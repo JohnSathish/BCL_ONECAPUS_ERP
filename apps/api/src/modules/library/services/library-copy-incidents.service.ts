@@ -14,9 +14,28 @@ import type {
   ReplaceCopyIncidentDto,
   ReportCopyIncidentDto,
 } from '../dto/library.dto';
+import { isLateReturn } from '../domain/library-circulation-ledger.logic';
 import { LibraryCatalogueService } from './library-catalogue.service';
+import { LibraryCirculationLedgerService } from './library-circulation-ledger.service';
 import { LibraryQrService } from './library-qr.service';
 import { LibrarySettingsService } from './library-settings.service';
+
+/** Charge for a lost or damaged copy when the librarian does not enter one. */
+export function incidentCharge(
+  type: 'LOST' | 'DAMAGED',
+  entered: number | undefined | null,
+  finePolicy: ReturnType<typeof mergeFinePolicy>,
+  bookPrice: Prisma.Decimal | number | null | undefined,
+): number {
+  const charge =
+    entered ??
+    (type === 'DAMAGED'
+      ? finePolicy.damageChargeDefault
+      : bookPrice
+        ? Number(bookPrice) * finePolicy.lostBookPenaltyMultiplier
+        : finePolicy.damageChargeDefault * 2);
+  return charge < 0 ? 0 : charge;
+}
 
 @Injectable()
 export class LibraryCopyIncidentsService {
@@ -25,6 +44,7 @@ export class LibraryCopyIncidentsService {
     private readonly catalogue: LibraryCatalogueService,
     private readonly qr: LibraryQrService,
     private readonly settings: LibrarySettingsService,
+    private readonly ledger: LibraryCirculationLedgerService,
   ) {}
 
   private resolveBarcode(raw: string) {
@@ -193,15 +213,12 @@ export class LibraryCopyIncidentsService {
       where: { tenantId: user.tid, copyId: copy.id, status: 'ACTIVE' },
     });
 
-    let charge =
-      dto.chargeAmount ??
-      (type === 'DAMAGED'
-        ? finePolicy.damageChargeDefault
-        : copy.book.price
-          ? Number(copy.book.price) * finePolicy.lostBookPenaltyMultiplier
-          : finePolicy.damageChargeDefault * 2);
-
-    if (charge < 0) charge = 0;
+    const charge = incidentCharge(
+      type as 'LOST' | 'DAMAGED',
+      dto.chargeAmount,
+      finePolicy,
+      copy.book.price,
+    );
 
     const result = await this.prisma.$transaction(async (tx) => {
       const incident = await tx.libraryCopyIncident.create({
@@ -226,19 +243,24 @@ export class LibraryCopyIncidentsService {
         data: { status: type === 'LOST' ? 'LOST' : 'DAMAGED' },
       });
 
+      const closedAt = new Date();
       if (activeLoan) {
-        await tx.libraryLoan.update({
-          where: { id: activeLoan.id },
+        const closed = await tx.libraryLoan.updateMany({
+          where: { id: activeLoan.id, status: 'ACTIVE' },
           data: {
             status: 'RETURNED',
-            returnedAt: new Date(),
+            returnedAt: closedAt,
             returnedById: user.sub,
           },
         });
+        if (closed.count !== 1) {
+          throw new BadRequestException('This loan has already been returned.');
+        }
       }
 
+      let chargeFineId: string | null = null;
       if (charge > 0 && activeLoan) {
-        await tx.libraryFine.create({
+        const fine = await tx.libraryFine.create({
           data: {
             id: randomUUID(),
             tenantId: user.tid,
@@ -246,6 +268,25 @@ export class LibraryCopyIncidentsService {
             amount: charge,
             reason: type === 'LOST' ? 'Lost book penalty' : 'Damage charge',
           },
+        });
+        chargeFineId = fine.id;
+      }
+
+      if (activeLoan) {
+        await this.ledger.record(tx, {
+          loan: activeLoan,
+          type: 'RETURN',
+          occurredAt: closedAt,
+          processedById: user.sub,
+          dueAt: activeLoan.dueAt,
+          renewalNumber: activeLoan.renewalCount,
+          returnedAt: closedAt,
+          bookCondition: type as 'LOST' | 'DAMAGED',
+          isLate: isLateReturn(activeLoan.dueAt, closedAt),
+          fineAmount: charge > 0 ? charge : null,
+          fineId: chargeFineId,
+          remarks: dto.notes,
+          source: 'INCIDENT',
         });
       }
 
