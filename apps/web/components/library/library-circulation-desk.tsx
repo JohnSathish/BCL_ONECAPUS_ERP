@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -9,14 +9,13 @@ import {
   BookOpen,
   Calendar,
   History,
-  Info,
   Library,
+  Printer,
   RotateCcw,
   Search,
   Settings,
   UserPlus,
   Users,
-  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -41,7 +40,6 @@ import {
   fetchLibraryBooks,
   fetchLibraryCategories,
   fetchLibraryDeskContext,
-  fetchLibraryIssuePreview,
   fetchLibraryMemberSummary,
   fetchLibraryMembers,
   fetchLibraryRenewPreview,
@@ -65,19 +63,14 @@ import { apiErrorMessage } from '@/utils/api-error';
 import { COPY_TYPE_LABELS, type CopyType } from './library-copy-rules';
 
 type Tab = 'issue' | 'return' | 'renew' | 'history';
-type IssueLine = {
+type IssuedLine = {
+  loanId: string;
   barcode: string;
   accession: string;
   title: string;
   author: string;
-  category: string;
-  copyType: string;
-  callNumber: string;
-  publisher: string;
-  edition: string;
-  publicationYear: string;
-  coverImageUrl: string;
   dueAt: string;
+  issuedAt: string;
 };
 
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
@@ -117,6 +110,7 @@ export function LibraryCirculationDesk() {
   const qc = useQueryClient();
   const memberRef = useRef<HTMLInputElement>(null);
   const bookRef = useRef<HTMLInputElement>(null);
+  const issuingRef = useRef(false);
   const returnRef = useRef<HTMLInputElement>(null);
   const renewRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<Tab>('issue');
@@ -137,8 +131,9 @@ export function LibraryCirculationDesk() {
   const [bookQuery, setBookQuery] = useState('');
   const [member, setMember] = useState<LibraryMemberSummary | null>(null);
   const [book, setBook] = useState<LibraryBookPreview | null>(null);
-  const [cart, setCart] = useState<IssueLine[]>([]);
-  const [confirmIssue, setConfirmIssue] = useState(false);
+  const [issuedNow, setIssuedNow] = useState<IssuedLine[]>([]);
+  const [visit, setVisit] = useState<{ memberId: string; receiptNo: string } | null>(null);
+  const [autoPrint, setAutoPrint] = useState(false);
   const [returnCode, setReturnCode] = useState('');
   const [returnPreview, setReturnPreview] = useState<LibraryReturnPreview | null>(null);
   const [condition, setCondition] = useState<'GOOD' | 'DAMAGED' | 'LOST'>('GOOD');
@@ -155,7 +150,6 @@ export function LibraryCirculationDesk() {
   const [receiptWidth, setReceiptWidth] = useState<IssueReceiptWidth>(80);
   const [lastReceipt, setLastReceipt] = useState<IssueReceiptSlip | null>(null);
   const [recentMembers, setRecentMembers] = useState<LibraryMemberSummary[]>([]);
-  const [checked, setChecked] = useState<string[]>([]);
   const [confirmRenewOpen, setConfirmRenewOpen] = useState(false);
   const [memberTerm, setMemberTerm] = useState('');
   const [bookTerm, setBookTerm] = useState('');
@@ -240,6 +234,7 @@ export function LibraryCirculationDesk() {
   useEffect(() => {
     const saved = window.localStorage.getItem('library-receipt-width');
     if (saved === '58' || saved === '80') setReceiptWidth(Number(saved) as IssueReceiptWidth);
+    setAutoPrint(window.localStorage.getItem('library-auto-print-receipt') === '1');
   }, []);
 
   async function loadMember(code: string) {
@@ -257,6 +252,13 @@ export function LibraryCirculationDesk() {
           ...current.filter((item) => item.profile.memberId !== summary.profile.memberId),
         ].slice(0, 5),
       );
+      if (visit?.memberId !== summary.profile.memberId) {
+        setVisit({ memberId: summary.profile.memberId, receiptNo: newIssueReceiptNo() });
+        setIssuedNow([]);
+        setLastReceipt(null);
+      }
+      setBook(null);
+      setBookQuery('');
       bookRef.current?.focus();
     } catch (error) {
       setMember(null);
@@ -283,133 +285,102 @@ export function LibraryCirculationDesk() {
     }
   }
 
-  async function addBook() {
-    if (!member || !book) {
-      setNotice('Select a member and an available copy first.');
+  function visitReceipt(
+    forMember: LibraryMemberSummary,
+    lines: IssuedLine[],
+    receiptNo: string,
+  ): IssueReceiptSlip {
+    return receiptSlip({
+      width: receiptWidth,
+      receiptNo,
+      issuedAt: lines[0]?.issuedAt || new Date().toISOString(),
+      issuedBy: session?.user.displayName?.trim() || session?.user.email || '',
+      member: forMember,
+      collegeName: branding.displayName,
+      address: collegeAddress(branding.displayName, branding.branding?.address),
+      logoUrl: absoluteAsset(branding.logo),
+      books: lines,
+      notes,
+    });
+  }
+
+  /** Issues the scanned copy to the loaded member straight away. The server re-checks every rule. */
+  async function issueCopy(code: string) {
+    const scan = code.trim();
+    if (!scan || issuingRef.current) return;
+    if (!member) {
+      setNotice('Scan the member card first, then scan the book.');
+      memberRef.current?.focus();
       return;
     }
-    if (book.copy.status !== 'AVAILABLE') {
-      setNotice(
-        `This copy is ${book.copy.status.replaceAll('_', ' ').toLowerCase()} and cannot be issued.`,
-      );
+    if (blockReason) {
+      setNotice(blockReason);
+      bookRef.current?.select();
       return;
     }
-    if (book.issueAllowed === false) {
-      setNotice(book.issueMessage || 'Issue is not permitted for this copy.');
-      return;
-    }
-    if (cart.some((line) => line.barcode === book.copy.barcode)) {
-      setNotice('That copy is already in the issue list.');
-      return;
-    }
-    if (member.borrowedCount + cart.length >= member.maxBooks) {
-      setNotice(`Borrowing limit reached (${member.borrowedCount} of ${member.maxBooks}).`);
-      return;
-    }
-    const scan = member.profile.registrationNumber || member.profile.memberId;
+    const memberScan = member.profile.registrationNumber || member.profile.memberId;
+    const receiptNo =
+      visit?.memberId === member.profile.memberId ? visit.receiptNo : newIssueReceiptNo();
+    issuingRef.current = true;
+    setBusy(true);
+    setNotice('');
     try {
-      const preview = await fetchLibraryIssuePreview(scan, book.copy.barcode);
-      setCart((current) => [
-        ...current,
-        {
-          barcode: book.copy.barcode,
-          accession: book.book.accessionNo,
-          title: book.book.title,
-          author: book.book.author || '',
-          category: book.book.category || '',
-          copyType: copyTypeName(book.copy.copyType),
-          callNumber: book.book.callNumber || '',
-          publisher: book.book.publisher || '',
-          edition: book.book.edition || '',
-          publicationYear: book.book.publicationYear || '',
-          coverImageUrl: book.book.coverImageUrl || '',
-          dueAt: preview.dueAt,
-        },
-      ]);
-      setChecked((current) => [...current, book.copy.barcode]);
+      const { loan } = await issueLibraryBook(memberScan, scan, receiptNo);
+      const storedReceipt = loan.receiptNo || receiptNo;
+      const line: IssuedLine = {
+        loanId: loan.id,
+        barcode: loan.copy.barcode,
+        accession: accessionOf(loan),
+        title: loan.copy.book.title,
+        author: loan.copy.book.author || '',
+        dueAt: loan.dueAt,
+        issuedAt: loan.issuedAt,
+      };
+      const lines = [...(visit?.memberId === member.profile.memberId ? issuedNow : []), line];
+      setIssuedNow(lines);
+      setVisit({ memberId: member.profile.memberId, receiptNo: storedReceipt });
+      const refreshed = await fetchLibraryMemberSummary(memberScan).catch(() => null);
+      if (refreshed) setMember(refreshed);
+      const slip = visitReceipt(refreshed ?? member, lines, storedReceipt);
+      setLastReceipt(slip);
+      const printed = autoPrint ? printIssueReceipt(slip) : true;
+      setNotice(
+        `Issued "${line.title}" (${line.accession}) to ${member.profile.fullName}. Due ${fmtDate(line.dueAt)}.${
+          printed ? '' : ' Allow pop-up windows to print the receipt.'
+        }`,
+      );
       setBook(null);
       setBookQuery('');
-      bookRef.current?.focus();
+      void qc.invalidateQueries({ queryKey: ['library', 'circulation'] });
     } catch (error) {
       setNotice(apiErrorMessage(error));
+    } finally {
+      issuingRef.current = false;
+      setBusy(false);
+      window.setTimeout(() => {
+        bookRef.current?.focus();
+        bookRef.current?.select();
+      }, 0);
     }
   }
 
-  async function issueCart() {
-    if (!member || !cart.length) return;
-    const scan = member.profile.registrationNumber || member.profile.memberId;
-    setBusy(true);
-    setNotice('');
-    const issued: Array<IssueLine & { loanId: string; issuedAt: string }> = [];
-    const receiptNo = newIssueReceiptNo();
-    let storedReceipt = receiptNo;
-    try {
-      for (const line of cart) {
-        const result = await issueLibraryBook(scan, line.barcode, receiptNo);
-        storedReceipt = result.loan.receiptNo || storedReceipt;
-        issued.push({
-          ...line,
-          loanId: result.loan.id,
-          issuedAt: result.loan.issuedAt,
-        });
-      }
-      const slip = receiptSlip({
-        width: receiptWidth,
-        receiptNo: storedReceipt,
-        issuedAt: issued[0]?.issuedAt || new Date().toISOString(),
-        issuedBy: session?.user.displayName?.trim() || session?.user.email || '',
-        member,
-        collegeName: branding.displayName,
-        address: collegeAddress(branding.displayName, branding.branding?.address),
-        logoUrl: absoluteAsset(branding.logo),
-        books: issued,
-        notes,
-      });
-      setLastReceipt(slip);
-      const opened = printIssueReceipt(slip);
-      setNotice(
-        `Issued ${issued.length} ${issued.length === 1 ? 'book' : 'books'} to ${member.profile.fullName}.${
-          opened ? '' : ' Allow pop-up windows to print the receipt.'
-        }`,
-      );
-      setCart([]);
-      setChecked([]);
-      setNotes('');
-      setBook(null);
-      setBookQuery('');
-      setMember(null);
-      setMemberQuery('');
-      setMemberTerm('');
-      setConfirmIssue(false);
-      memberRef.current?.focus();
-      void qc.invalidateQueries({ queryKey: ['library', 'circulation'] });
-    } catch (error) {
-      if (issued.length) {
-        setLastReceipt(
-          receiptSlip({
-            width: receiptWidth,
-            receiptNo: storedReceipt,
-            issuedAt: issued[0]?.issuedAt || new Date().toISOString(),
-            issuedBy: session?.user.displayName?.trim() || session?.user.email || '',
-            member,
-            collegeName: branding.displayName,
-            address: collegeAddress(branding.displayName, branding.branding?.address),
-            logoUrl: absoluteAsset(branding.logo),
-            books: issued,
-            notes,
-          }),
-        );
-      }
-      setNotice(
-        `${issued.length ? `Issued ${issued.map((line) => line.accession).join(', ')} before the next copy failed. ` : ''}${apiErrorMessage(error)}`,
-      );
-      setCart((current) =>
-        current.filter((line) => !issued.some((done) => done.accession === line.accession)),
-      );
-      setConfirmIssue(false);
-    } finally {
-      setBusy(false);
-    }
+  function printVisitReceipt() {
+    if (!member || !issuedNow.length || !visit) return;
+    const slip = visitReceipt(member, issuedNow, visit.receiptNo);
+    setLastReceipt(slip);
+    if (!printIssueReceipt(slip)) setNotice('Allow pop-up windows to print the receipt.');
+  }
+
+  function finishMember() {
+    setMember(null);
+    setMemberQuery('');
+    setMemberTerm('');
+    setIssuedNow([]);
+    setVisit(null);
+    setNotes('');
+    setBook(null);
+    setBookQuery('');
+    memberRef.current?.focus();
   }
 
   function reprintFromHistory(loan: LibraryLoan) {
@@ -870,23 +841,33 @@ export function LibraryCirculationDesk() {
                   <Input
                     ref={bookRef}
                     className={librarySearchInputClass}
-                    placeholder="Scan book barcode or search title, author, accession no."
+                    placeholder={
+                      bookMode === 'scan'
+                        ? 'Scan book barcode — it is issued to the member immediately'
+                        : 'Search title, author, accession no.'
+                    }
                     value={bookQuery}
                     onChange={(event) => {
                       setBookQuery(event.target.value);
                       setBook(null);
                     }}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter') void loadBook(bookQuery);
+                      if (event.key !== 'Enter') return;
+                      event.preventDefault();
+                      if (bookMode === 'scan') void issueCopy(event.currentTarget.value);
+                      else void loadBook(bookQuery);
                     }}
                   />
                 </div>
                 <Button
                   type="button"
                   className={librarySearchButtonClass}
-                  onClick={() => void loadBook(bookQuery)}
+                  disabled={busy}
+                  onClick={() =>
+                    bookMode === 'scan' ? void issueCopy(bookQuery) : void loadBook(bookQuery)
+                  }
                 >
-                  Search
+                  {bookMode === 'scan' ? 'Issue' : 'Search'}
                 </Button>
               </div>
               {bookChoices.length && !book ? (
@@ -945,97 +926,86 @@ export function LibraryCirculationDesk() {
                   type="button"
                   disabled={
                     !book ||
+                    !member ||
+                    busy ||
                     book.copy.status !== 'AVAILABLE' ||
                     book.issueAllowed === false ||
                     Boolean(blockReason)
                   }
-                  onClick={() => void addBook()}
+                  onClick={() => book && void issueCopy(book.copy.barcode)}
                 >
-                  Add to Issue List
+                  Issue Book
                 </Button>
               </div>
             </section>
           </div>
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-slate-900">3. Books to Issue</h2>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setCart((current) => current.filter((line) => !checked.includes(line.barcode)))
-                }
-              >
-                Clear Selected
-              </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold text-slate-900">
+                3. Issued This Visit
+                {member && issuedNow.length ? (
+                  <span className="ml-2 text-sm font-normal text-slate-500">
+                    {member.profile.fullName} · {issuedNow.length}{' '}
+                    {issuedNow.length === 1 ? 'book' : 'books'}
+                  </span>
+                ) : null}
+              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!issuedNow.length || !member}
+                  onClick={printVisitReceipt}
+                >
+                  <Printer className="mr-1 h-4 w-4" /> Print Receipt
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!member}
+                  onClick={finishMember}
+                >
+                  Done — next member
+                </Button>
+              </div>
             </div>
-            {cart.length ? (
+            {issuedNow.length ? (
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
+                <table className="w-full min-w-[640px] text-left text-sm">
                   <thead className="text-xs text-slate-500">
                     <tr>
-                      {[
-                        '',
-                        '#',
-                        'Accession No.',
-                        'Book Title',
-                        'Author',
-                        'Category',
-                        'Due Date',
-                        'Actions',
-                      ].map((header) => (
-                        <th key={header || 'check'} className="py-2 pr-3 font-medium">
+                      {['#', 'Accession No.', 'Book Title', 'Author', 'Due Date'].map((header) => (
+                        <th key={header} className="py-2 pr-3 font-medium">
                           {header}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {cart.map((line, index) => (
-                      <tr key={line.barcode} className="border-t">
-                        <td className="py-2">
-                          <input
-                            type="checkbox"
-                            checked={checked.includes(line.barcode)}
-                            onChange={(event) =>
-                              setChecked((current) =>
-                                event.target.checked
-                                  ? [...current, line.barcode]
-                                  : current.filter((id) => id !== line.barcode),
-                              )
-                            }
-                          />
-                        </td>
+                    {issuedNow.map((line, index) => (
+                      <tr key={line.loanId} className="border-t">
                         <td className="py-2">{index + 1}</td>
                         <td className="py-2 font-mono text-xs">{line.accession}</td>
                         <td className="py-2">{line.title}</td>
                         <td className="py-2">{line.author || '—'}</td>
-                        <td className="py-2">{line.category || '—'}</td>
                         <td className="py-2">{fmtDate(line.dueAt)}</td>
-                        <td className="py-2">
-                          <button
-                            type="button"
-                            className="text-rose-600"
-                            onClick={() =>
-                              setCart((current) =>
-                                current.filter((item) => item.barcode !== line.barcode),
-                              )
-                            }
-                          >
-                            Remove
-                          </button>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                <p className="mt-2 text-xs text-slate-500">
+                  Scanned a wrong book? Take it back on the Return Book tab.
+                </p>
               </div>
             ) : (
               <div className="py-10 text-center text-sm text-slate-500">
                 <Library className="mx-auto mb-2 h-10 w-10 text-slate-300" />
-                No books selected
-                <p className="mt-1">Search and add books to the issue list.</p>
+                No books issued yet
+                <p className="mt-1">
+                  Scan the member card, then scan each book. Every scanned book is issued at once.
+                </p>
               </div>
             )}
             <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t pt-4">
@@ -1070,18 +1040,29 @@ export function LibraryCirculationDesk() {
                   ))}
                 </div>
               </div>
-              <div className="text-sm text-slate-600">
-                <p className="font-medium">Due date</p>
-                <p>{cart[0] ? fmtDate(cart[0].dueAt) : 'Calculated from college working days'}</p>
-              </div>
-              <Button
-                type="button"
-                disabled={!cart.length || Boolean(blockReason) || busy}
-                onClick={() => setConfirmIssue(true)}
-              >
-                Issue Books to Member ({cart.length})
-              </Button>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={autoPrint}
+                  onChange={(event) => {
+                    setAutoPrint(event.target.checked);
+                    window.localStorage.setItem(
+                      'library-auto-print-receipt',
+                      event.target.checked ? '1' : '0',
+                    );
+                  }}
+                />
+                Print receipt after each scan
+              </label>
             </div>
+            {rules ? (
+              <p className="mt-3 text-xs text-slate-500">
+                Loan period: students {rules.studentLoanDays} working days, faculty{' '}
+                {rules.facultyLoanDays} working days, counted from the day after issue. Sundays and
+                holidays on the published academic calendar are skipped. A member&apos;s own
+                membership period overrides this.
+              </p>
+            ) : null}
           </section>
         </div>
       ) : null}
@@ -1359,18 +1340,6 @@ export function LibraryCirculationDesk() {
           />
         </div>
       ) : null}
-
-      {confirmIssue && member && cart.length ? (
-        <ConfirmIssueDialog
-          member={member}
-          cart={cart}
-          collegeName={branding.displayName}
-          notes={notes}
-          busy={busy}
-          onClose={() => setConfirmIssue(false)}
-          onConfirm={() => void issueCart()}
-        />
-      ) : null}
     </div>
   );
 }
@@ -1379,229 +1348,6 @@ function dayChange(current?: number, previous?: number) {
   if (current == null || previous == null || previous <= 0) return null;
   const value = Math.round(((current - previous) / previous) * 1000) / 10;
   return { text: `${value > 0 ? '+' : ''}${value}%`, up: value >= 0 };
-}
-
-function ConfirmIssueDialog({
-  member,
-  cart,
-  collegeName,
-  notes,
-  busy,
-  onClose,
-  onConfirm,
-}: {
-  member: LibraryMemberSummary;
-  cart: IssueLine[];
-  collegeName: string;
-  notes: string;
-  busy: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  const overdue = member.activeLoans.filter((loan) => new Date(loan.dueAt) < new Date()).length;
-  const after = member.borrowedCount + cart.length;
-  const sameDue = cart.every((line) => line.dueAt === cart[0]?.dueAt);
-  const code = member.profile.registrationNumber || member.profile.memberId;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div
-        role="dialog"
-        aria-labelledby="confirm-issue-title"
-        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <BookOpen className="h-5 w-5" />
-            </span>
-            <div>
-              <h2 id="confirm-issue-title" className="text-lg font-semibold text-slate-900">
-                Confirm Issue
-              </h2>
-              <p className="text-sm text-slate-500">
-                Please review the details before issuing the book to the member.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            aria-label="Close"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-            <div className="flex items-start gap-3">
-              {member.profile.photoUrl ? (
-                <img
-                  src={member.profile.photoUrl}
-                  alt=""
-                  className="h-14 w-14 rounded-full object-cover"
-                />
-              ) : (
-                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
-                  {initials(member.profile.fullName)}
-                </span>
-              )}
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-slate-900">{member.profile.fullName}</p>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      member.profile.active
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {member.profile.active ? 'Active' : member.membershipStatus}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  {code} · {memberKind(member.profile.memberType)}
-                </p>
-                <p className="mt-2 text-sm text-slate-600">
-                  Department: {member.profile.department || '—'}
-                </p>
-                <p className="text-sm text-slate-600">{collegeName}</p>
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              <Metric
-                icon={<BookOpen className="h-4 w-4 text-blue-600" />}
-                value={`${member.borrowedCount} / ${member.maxBooks}`}
-                label="Currently Issued"
-              />
-              <Metric
-                icon={<AlertTriangle className="h-4 w-4 text-rose-500" />}
-                value={String(overdue)}
-                label="Overdue Books"
-              />
-              <Metric
-                icon={<span className="text-sm font-semibold text-amber-600">₹</span>}
-                value={money(member.outstandingFine)}
-                label="Outstanding Fine"
-              />
-            </div>
-          </section>
-
-          <div className="space-y-3">
-            {cart.map((line) => (
-              <section key={line.barcode} className="rounded-2xl border border-slate-200 p-4">
-                <div className="flex gap-3">
-                  {line.coverImageUrl ? (
-                    <img
-                      src={line.coverImageUrl}
-                      alt=""
-                      className="h-24 w-16 shrink-0 rounded-md border object-cover"
-                    />
-                  ) : (
-                    <span className="flex h-24 w-16 shrink-0 items-center justify-center rounded-md border bg-slate-50 text-slate-400">
-                      <BookOpen className="h-6 w-6" />
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-900">{line.title}</p>
-                    <p className="text-sm text-slate-500">Author: {line.author || '—'}</p>
-                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-                      <Field label="Accession No." value={line.accession || '—'} />
-                      <Field label="Publisher" value={line.publisher || '—'} />
-                      <Field label="Call No." value={line.callNumber || '—'} />
-                      <Field label="Publication Year" value={line.publicationYear || '—'} />
-                      <Field label="Copy type" value={line.copyType || '—'} />
-                      <Field label="Book Category" value={line.category || '—'} />
-                      <Field label="Edition" value={line.edition || '—'} />
-                    </dl>
-                    {!sameDue ? (
-                      <p className="mt-2 text-xs text-slate-500">Due {fmtDate(line.dueAt)}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </section>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-50 text-violet-600">
-              <Calendar className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="font-semibold text-slate-900">Due Date</p>
-              <p className="text-sm text-slate-600">
-                Books after this issue: {after} of {member.maxBooks}
-              </p>
-              <p className="text-xs text-slate-500">
-                Due dates count college working days. Sundays and college holidays are skipped.
-              </p>
-            </div>
-          </div>
-          <div className="rounded-xl bg-violet-50 px-4 py-3 text-violet-800">
-            <p className="text-lg font-semibold">
-              {sameDue ? fmtDate(cart[0].dueAt) : 'See each book'}
-            </p>
-            <p className="text-xs">college working days</p>
-          </div>
-        </div>
-
-        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-slate-700">
-          <p className="flex items-start gap-2">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-            <span>
-              This will count as {cart.length} {cart.length === 1 ? 'book' : 'books'} out of{' '}
-              {member.maxBooks} allowed for this member.
-            </span>
-          </p>
-          <p className="mt-1 pl-6">
-            The member will be required to return {cart.length === 1 ? 'the book' : 'each book'} on
-            or before the due date.
-          </p>
-          {notes ? <p className="mt-1 pl-6">Receipt note: {notes}</p> : null}
-        </div>
-
-        <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
-            <X className="mr-1 h-4 w-4" /> Cancel
-          </Button>
-          <Button type="button" disabled={busy} onClick={onConfirm}>
-            <BookOpen className="mr-1 h-4 w-4" /> Confirm Issue
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Metric({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
-  return (
-    <div>
-      <div className="flex items-center justify-center gap-1 text-sm font-semibold text-slate-900">
-        {icon}
-        {value}
-      </div>
-      <p className="mt-1 text-[11px] text-slate-500">{label}</p>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
-      <dd className="font-medium text-slate-800">{value}</dd>
-    </div>
-  );
-}
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 function memberKind(type: LibraryMemberSummary['profile']['memberType']) {

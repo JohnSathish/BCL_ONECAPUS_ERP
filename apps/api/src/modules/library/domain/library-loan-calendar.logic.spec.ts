@@ -37,6 +37,18 @@ describe('library loan calendar', () => {
     expect(due).not.toBe(addCalendarDays(ISSUE, 14));
   });
 
+  it('gives 20 November for 15 working days issued on Tuesday 3 November', () => {
+    const issued = '2026-11-03';
+    expect(parseDateOnly(issued).getUTCDay()).toBe(2);
+    expect(addWorkingDays(issued, 15, sunday)).toBe('2026-11-20');
+    const oneHoliday = new Set(['2026-11-12']);
+    expect(
+      addWorkingDays(issued, 15, (iso) =>
+        isLoanDayClosed(iso, sundayRules, oneHoliday),
+      ),
+    ).toBe('2026-11-21');
+  });
+
   it('issues across several college holidays and Sundays', () => {
     const holidays = new Set(['2026-11-04', '2026-11-05']);
     const due = addWorkingDays(ISSUE, 14, (iso) =>
