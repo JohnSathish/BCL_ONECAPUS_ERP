@@ -55,6 +55,7 @@ model Tenant {
   accessDevices                 AccessDevice[]
   adminEmailOtpChallenges       AdminEmailOtpChallenge[]
   adminTrustedDevices           AdminTrustedDevice[]
+  erpUserAccounts               ErpUserAccount[]
   ipGeoCaches                   IpGeoCache[]
   backupSchedules               BackupSchedule[]
   backupRuns                    BackupRun[]
@@ -388,6 +389,8 @@ model User {
   mfaRecoveryCodes               UserMfaRecoveryCode[]
   adminEmailOtpChallenges        AdminEmailOtpChallenge[]
   adminTrustedDevices            AdminTrustedDevice[]
+  erpAccount                     ErpUserAccount?             @relation("ErpAccountUser")
+  erpAccountsCreated             ErpUserAccount[]            @relation("ErpAccountCreatedBy")
   impersonationsAsAdmin          ImpersonationSession[]      @relation("ImpersonationAdmin")
   impersonationsAsTarget         ImpersonationSession[]      @relation("ImpersonationTarget")
   auditLogs                      AuditLog[]                  @relation("AuditActor")
@@ -1305,6 +1308,36 @@ model AdminTrustedDevice {
   @@schema("platform")
 }
 
+/// Marks a platform user as a separate ERP portal (administrative) account.
+/// Student, staff, faculty and parent logins never have a row here.
+model ErpUserAccount {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  userId           String    @unique @map("user_id") @db.Uuid
+  accountCode      String    @map("account_code")
+  employeeId       String?   @map("employee_id")
+  departmentId     String?   @map("department_id") @db.Uuid
+  designation      String?
+  erpAccessEnabled Boolean   @default(true) @map("erp_access_enabled")
+  lockedAt         DateTime? @map("locked_at")
+  deactivatedAt    DateTime? @map("deactivated_at")
+  createdById      String?   @map("created_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User        @relation("ErpAccountUser", fields: [userId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdBy  User?       @relation("ErpAccountCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, accountCode])
+  @@unique([tenantId, employeeId])
+  @@index([tenantId])
+  @@index([departmentId])
+  @@map("erp_user_accounts")
+  @@schema("platform")
+}
+
 model ImpersonationSession {
   id           String    @id @default(uuid()) @db.Uuid
   tenantId     String    @map("tenant_id") @db.Uuid
@@ -1739,6 +1772,7 @@ model Department {
   shiftDepartmentConfigs ShiftDepartmentConfig[]
   departmentActivities DepartmentActivity[]
   websiteProfile   WebsiteDepartmentProfile?
+  erpUserAccounts  ErpUserAccount[]
 
   @@index([tenantId])
   @@index([institutionId])

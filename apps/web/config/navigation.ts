@@ -2438,6 +2438,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['users:read', 'rbac:manage'],
           },
           {
+            label: 'ERP Users',
+            href: '/admin/administration/erp-users',
+            permissions: ['users:read', 'users:manage'],
+          },
+          {
             label: 'Portal Users',
             href: '/admin/administration/portal-users',
             permissions: ['users:read', 'users:manage'],

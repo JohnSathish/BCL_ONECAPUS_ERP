@@ -20,6 +20,7 @@ import { PasswordPolicyService } from '../../common/security/password-policy.ser
 import { AccessDeviceService } from '../administration/services/access-device.service';
 import { SecurityNotifyService } from '../administration/services/security-notify.service';
 import { SuspiciousLoginService } from '../administration/services/suspicious-login.service';
+import { erpAccessBlockReason } from '../administration/domain/erp-users.logic';
 import { MfaService } from './mfa/mfa.service';
 import { AdminEmailOtpService } from './admin-email-otp/admin-email-otp.service';
 import type { AdminEmailOtpChallengeResponse } from './auth.types';
@@ -207,6 +208,37 @@ export class AuthService {
     }
     if (!op.center.emailVerifiedAt) {
       throw new ForbiddenException('Verify your email before login.');
+    }
+  }
+
+  /** Failed ERP-account sign-ins also go to the Audit Logs module. */
+  private async auditErpLoginFailure(
+    tenantId: string,
+    userId: string,
+    reason: string,
+    ipAddress: string,
+  ) {
+    try {
+      const account = await this.prisma.erpUserAccount.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (!account) return;
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId,
+          userId,
+          module: 'auth',
+          action: 'erp_user.login_failed',
+          entityType: 'user',
+          entityId: userId,
+          metadata: { reason, ipAddress },
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `ERP login failure audit skipped: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -1046,7 +1078,33 @@ export class AuthService {
         ipAddress: ip,
         userAgent: meta?.userAgent,
       });
+      await this.auditErpLoginFailure(tenant.id, user.id, 'bad_password', ip);
       throw new UnauthorizedException(failure.message);
+    }
+
+    const erpAccount = await this.prisma.erpUserAccount.findUnique({
+      where: { userId: user.id },
+      select: { erpAccessEnabled: true },
+    });
+    const erpBlock = erpAccessBlockReason(erpAccount, user);
+    if (erpBlock) {
+      await this.recordLoginEvent({
+        tenantId,
+        userId: user.id,
+        identifier: normalizedEmail,
+        method: 'password',
+        outcome: 'failure',
+        reason: 'erp_access_blocked',
+        ipAddress: ip,
+        userAgent: meta?.userAgent,
+      });
+      await this.auditErpLoginFailure(
+        tenant.id,
+        user.id,
+        'erp_access_blocked',
+        ip,
+      );
+      throw new UnauthorizedException(erpBlock);
     }
 
     if (user.accountStatus && user.accountStatus !== 'active') {
@@ -1280,6 +1338,18 @@ export class AuthService {
         activeSession.user.deletedAt ||
         activeSession.user.accountStatus === 'disabled'
       ) {
+        await this.prisma.refreshSession.updateMany({
+          where: { userId: activeSession.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        throw new UnauthorizedException('ACCOUNT_DISABLED');
+      }
+
+      const erpAccount = await this.prisma.erpUserAccount.findUnique({
+        where: { userId: activeSession.userId },
+        select: { erpAccessEnabled: true },
+      });
+      if (erpAccessBlockReason(erpAccount, activeSession.user)) {
         await this.prisma.refreshSession.updateMany({
           where: { userId: activeSession.userId, revokedAt: null },
           data: { revokedAt: new Date() },

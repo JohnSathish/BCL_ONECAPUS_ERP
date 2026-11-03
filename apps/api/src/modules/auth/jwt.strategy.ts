@@ -4,6 +4,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../database/prisma.service';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
+import { erpAccessBlockReason } from '../administration/domain/erp-users.logic';
 
 type JwtPayload = {
   sub: string;
@@ -40,12 +41,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         tenantId: payload.tid,
         deletedAt: null,
       },
+      include: { erpAccount: { select: { erpAccessEnabled: true } } },
     });
 
     if (!user) {
       throw new UnauthorizedException('Session invalid or user deactivated');
     }
     if (!user.isActive || user.accountStatus === 'disabled') {
+      throw new UnauthorizedException('ACCOUNT_DISABLED');
+    }
+    if (erpAccessBlockReason(user.erpAccount, user)) {
       throw new UnauthorizedException('ACCOUNT_DISABLED');
     }
 

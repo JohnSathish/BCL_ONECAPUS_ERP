@@ -8,6 +8,7 @@ import { DeviceSecurityController } from './controllers/device-security.controll
 import { RollNumberSettingsController } from './controllers/roll-number-settings.controller';
 import { StudentDisplaySettingsController } from './controllers/student-display-settings.controller';
 import { AuditController } from './controllers/audit.controller';
+import { ErpUsersController } from './controllers/erp-users.controller';
 import { RbacController } from './controllers/rbac.controller';
 import { SecurityController } from './controllers/security.controller';
 import { UsersController } from './controllers/users.controller';
@@ -16,6 +17,7 @@ import { ImportCenterService } from './import/import-center.service';
 import { PortalUsersImportHandler } from './import/portal-users-import.handler';
 import { AuditService } from './services/audit.service';
 import { DeviceSecurityService } from './services/device-security.service';
+import { ErpUsersService } from './services/erp-users.service';
 import { RbacService } from './services/rbac.service';
 import { RollNumberSettingsService } from './services/roll-number-settings.service';
 import { StudentDisplaySettingsService } from './services/student-display-settings.service';
@@ -34,6 +36,7 @@ import { UsersService } from './services/users.service';
   ],
   controllers: [
     UsersController,
+    ErpUsersController,
     RbacController,
     AuditController,
     SecurityController,
@@ -49,6 +52,7 @@ import { UsersService } from './services/users.service';
     StudentDisplaySettingsService,
     UserProvisioningService,
     UsersService,
+    ErpUsersService,
     RbacService,
     AuditService,
     SecurityService,
