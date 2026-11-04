@@ -290,6 +290,14 @@ function ProfileSummarySidebar({
           <dt className="text-muted-foreground">Status</dt>
           <dd className="font-medium">{profile.studentStatus ?? profile.academicStatus}</dd>
         </div>
+        <div>
+          <dt className="text-muted-foreground">Aadhaar</dt>
+          <dd className="truncate font-medium">{profile.nationalId?.trim() || '—'}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Blood group</dt>
+          <dd className="font-medium">{profile.bloodGroup?.trim() || '—'}</dd>
+        </div>
       </dl>
       <div>
         <div className="mb-0.5 flex justify-between text-[10px] text-muted-foreground">

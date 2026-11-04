@@ -109,9 +109,15 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
     dateOfBirth: profile.dateOfBirth?.slice(0, 10) ?? '',
     gender: normalizeGenderCode(profile.gender) || profile.gender || '',
     maritalStatus: profile.maritalStatus ?? '',
+    nationalId: (profile.nationalId ?? '').replace(/\D/g, '').slice(0, 12),
+    bloodGroupLookupId: profile.bloodGroupLookupId ?? '',
     studentStatus: profile.studentStatus ?? 'STUDYING',
     rfidNumber: profile.rfidNumber ?? '',
     departmentId: profile.departmentId ?? '',
+  });
+  const bloodGroups = useQuery({
+    queryKey: ['master-lookups', 'BLOOD_GROUP'],
+    queryFn: () => fetchMasterLookups('BLOOD_GROUP'),
   });
   const departments = useQuery({
     queryKey: ['org', 'departments', 'academic'],
@@ -121,14 +127,25 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
     id: d.id,
     label: d.name,
   }));
-  const savePayload = useMemo(
-    () => ({
-      ...form,
-      email: form.email.trim() || undefined,
-      departmentId: form.departmentId || undefined,
-    }),
-    [form],
-  );
+  const aadhaarDigits = form.nationalId.replace(/\D/g, '');
+  const aadhaarError =
+    aadhaarDigits.length > 0 && aadhaarDigits.length !== 12
+      ? 'Aadhaar must be exactly 12 digits'
+      : '';
+  const savePayload = useMemo(() => {
+    const { nationalId: _nationalId, ...rest } = form;
+    return {
+      ...rest,
+      email: rest.email.trim() || undefined,
+      departmentId: rest.departmentId || undefined,
+      bloodGroupLookupId: rest.bloodGroupLookupId || null,
+      ...(aadhaarDigits.length === 12
+        ? { nationalId: aadhaarDigits }
+        : aadhaarDigits.length === 0
+          ? { nationalId: null }
+          : {}),
+    };
+  }, [form, aadhaarDigits]);
   const { message, saving } = useDebouncedSave(profile.id, 'basic', savePayload, canEdit);
   const qc = useQueryClient();
   const [photoMessage, setPhotoMessage] = useState('');
@@ -227,6 +244,46 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
                 {o.label}
               </option>
             ))}
+          </select>
+        </Field>
+        <Field label="Aadhaar Number">
+          <input
+            className={inputClass}
+            disabled={!canEdit}
+            inputMode="numeric"
+            maxLength={12}
+            placeholder="12-digit Aadhaar"
+            value={form.nationalId}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                nationalId: e.target.value.replace(/\D/g, '').slice(0, 12),
+              }))
+            }
+          />
+          {aadhaarError ? (
+            <p className="mt-1 text-[11px] text-destructive">{aadhaarError}</p>
+          ) : null}
+        </Field>
+        <Field label="Blood Group">
+          <select
+            className={inputClass}
+            disabled={!canEdit || bloodGroups.isLoading}
+            value={form.bloodGroupLookupId}
+            onChange={(e) => setForm((f) => ({ ...f, bloodGroupLookupId: e.target.value }))}
+          >
+            <option value="">Select blood group</option>
+            {(bloodGroups.data ?? []).map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.label}
+              </option>
+            ))}
+            {form.bloodGroupLookupId &&
+            !(bloodGroups.data ?? []).some((row) => row.id === form.bloodGroupLookupId) ? (
+              <option value={form.bloodGroupLookupId}>
+                {profile.bloodGroup || 'Saved blood group'}
+              </option>
+            ) : null}
           </select>
         </Field>
         <Field label="Student Status">

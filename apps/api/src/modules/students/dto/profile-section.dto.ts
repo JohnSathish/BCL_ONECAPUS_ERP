@@ -8,9 +8,11 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -37,7 +39,15 @@ export class UpdateBasicSectionDto {
   @IsOptional() @IsString() dateOfBirth?: string;
   @IsOptional() @IsString() gender?: string;
   @IsOptional() @IsString() maritalStatus?: string;
-  @IsOptional() @IsUUID() bloodGroupLookupId?: string;
+  @IsOptional()
+  @ValidateIf((_, value) => value != null && String(value).trim() !== '')
+  @IsString()
+  @Matches(/^\d{12}$/, { message: 'Aadhaar must be exactly 12 digits' })
+  nationalId?: string | null;
+  @IsOptional()
+  @ValidateIf((_, value) => value != null && String(value).trim() !== '')
+  @IsUUID()
+  bloodGroupLookupId?: string | null;
   @IsOptional() @IsString() studentStatus?: string;
   @IsOptional() @IsUUID() programVersionId?: string;
   @IsOptional() @IsUUID() departmentId?: string;

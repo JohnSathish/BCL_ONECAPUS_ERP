@@ -42,6 +42,7 @@ export const DEFAULT_PROFILE_SECTIONS: ProfileSectionDef[] = [
       { fieldKey: 'mobileNumber', sortOrder: 6 },
       { fieldKey: 'dateOfBirth', sortOrder: 7 },
       { fieldKey: 'gender', sortOrder: 8 },
+      { fieldKey: 'nationalId', sortOrder: 13 },
       { fieldKey: 'maritalStatus', sortOrder: 9 },
       { fieldKey: 'bloodGroupLookupId', sortOrder: 10 },
       { fieldKey: 'photoPath', sortOrder: 11 },

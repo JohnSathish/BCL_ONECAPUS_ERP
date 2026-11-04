@@ -344,6 +344,7 @@ export class StudentProfileSectionsService {
           dateOfBirth: student.masterProfile?.dateOfBirth,
           gender: student.masterProfile?.gender,
           maritalStatus: student.masterProfile?.maritalStatus,
+          nationalId: student.masterProfile?.nationalId,
           bloodGroupLookupId: student.masterProfile?.bloodGroupLookupId,
           studentStatus: student.masterProfile?.studentStatus ?? 'STUDYING',
           photoPath: student.masterProfile?.photoPath,
@@ -568,6 +569,17 @@ export class StudentProfileSectionsService {
       ? await this.loadAcademicLabels(tenantId, studentId)
       : null;
 
+    let nationalId: string | null | undefined;
+    if (dto.nationalId !== undefined) {
+      const digits = dto.nationalId
+        ? String(dto.nationalId).replace(/\D/g, '')
+        : '';
+      if (digits && !/^\d{12}$/.test(digits)) {
+        throw new BadRequestException('Aadhaar must be exactly 12 digits');
+      }
+      nationalId = digits || null;
+    }
+
     const contactEmail =
       dto.email === undefined
         ? undefined
@@ -634,8 +646,9 @@ export class StudentProfileSectionsService {
         ...(dto.studentStatus !== undefined
           ? { studentStatus: dto.studentStatus }
           : {}),
+        ...(nationalId !== undefined ? { nationalId } : {}),
         ...(dto.bloodGroupLookupId !== undefined
-          ? { bloodGroupLookupId: dto.bloodGroupLookupId }
+          ? { bloodGroupLookupId: dto.bloodGroupLookupId || null }
           : {}),
         ...(dto.dateOfBirth !== undefined
           ? { dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : null }
