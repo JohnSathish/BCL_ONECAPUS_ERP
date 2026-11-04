@@ -44,6 +44,8 @@ export type ProfileChangeRequest = {
     oldValue?: string | null;
     newValue?: string | null;
     approvalStatus: string;
+    fieldLabel?: string;
+    displayValue?: string;
     autoApproved?: boolean;
   }>;
 };

@@ -22,18 +22,72 @@ import { isExcelImportedStudent } from '../domain/class12-subjects.util';
 
 function serializeValue(value: unknown): string | null {
   if (value == null || value === '') return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
 
+function comparableValue(fieldKey: string, value: unknown): string | null {
+  const serialized = serializeValue(value);
+  if (fieldKey !== 'dateOfBirth' || serialized == null) return serialized;
+  const parsed = parseValue(serialized);
+  const asDate = new Date(String(parsed));
+  if (Number.isNaN(asDate.getTime())) return serialized;
+  return asDate.toISOString().slice(0, 10);
+}
+
 function parseValue(raw: string | null | undefined) {
   if (raw == null) return null;
+  const trimmed = raw.trim();
+  if (trimmed === '') return null;
+  // Aadhaar, mobile, and ABC IDs are digit strings. JSON.parse would turn them
+  // into numbers and can change the value the student typed.
+  if (/^\d+$/.test(trimmed)) return trimmed;
+  const looksStructured =
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    trimmed === 'null' ||
+    trimmed === 'true' ||
+    trimmed === 'false';
+  if (!looksStructured) return raw;
   try {
-    return JSON.parse(raw);
+    return JSON.parse(trimmed);
   } catch {
     return raw;
   }
 }
+
+const PROFILE_FIELD_LABELS: Record<string, string> = {
+  nationalId: 'Aadhaar number',
+  bloodGroupLookupId: 'Blood group',
+  fullName: 'Full name',
+  mobileNumber: 'Mobile number',
+  alternateMobile: 'Alternate mobile',
+  email: 'Personal email',
+  dateOfBirth: 'Date of birth',
+  gender: 'Gender',
+  abcId: 'ABC ID',
+  panNumber: 'PAN',
+  categoryLookupId: 'Category',
+  religionLookupId: 'Religion',
+  nationalityLookupId: 'Nationality',
+  maritalStatus: 'Marital status',
+  whatsappNumber: 'WhatsApp number',
+  emergencyContactMobile: 'Emergency mobile',
+  bankDetails: 'Bank details',
+  emergencyContact: 'Emergency contact',
+  boardExam: 'Class XII',
+  subjectMarks: 'Class XII subjects',
+  current: 'Current address',
+  permanent: 'Permanent address',
+  FATHER: 'Father',
+  MOTHER: 'Mother',
+  GUARDIAN: 'Guardian',
+};
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Keep existing DB value when client sends blank/undefined (never wipe with null). */
 function coalesceText(value: unknown): string | null | undefined {
@@ -333,6 +387,8 @@ export class StudentProfileChangeRequestService {
     });
     if (!student) throw new NotFoundException('Student not found');
 
+    await this.reconcilePendingItems(tenantId, studentId);
+
     const sectionKeys = [
       'personal',
       'contact',
@@ -398,6 +454,7 @@ export class StudentProfileChangeRequestService {
     for (const row of sectionsArr) {
       sections[row.key] = row.data;
     }
+    this.overlayPendingValues(sections, changeRequests);
 
     const lookupsByType: Record<
       string,
@@ -672,11 +729,17 @@ export class StudentProfileChangeRequestService {
         );
       }
 
-      const oldValue = serializeValue(
+      const previous =
         (snapshot?.data as any)?.[change.fieldKey] ??
-          (snapshot?.data as any)?.data?.[change.fieldKey],
-      );
+        (snapshot?.data as any)?.data?.[change.fieldKey];
+      const oldValue = serializeValue(previous);
       const newValue = serializeValue(change.newValue);
+      if (
+        comparableValue(change.fieldKey, previous) ===
+        comparableValue(change.fieldKey, change.newValue)
+      ) {
+        continue;
+      }
       const auto = mode === 'AUTO_APPROVE';
 
       const item = await this.db().studentProfileChangeItem.create({
@@ -700,6 +763,19 @@ export class StudentProfileChangeRequestService {
       } else {
         pendingCount += 1;
       }
+    }
+
+    if (pendingCount + autoCount === 0) {
+      await this.db().studentProfileChangeRequest.delete({
+        where: { id: request.id },
+      });
+      return {
+        id: request.id,
+        status: 'UNCHANGED',
+        items: [],
+        pendingCount: 0,
+        autoCount: 0,
+      };
     }
 
     const status =
@@ -751,14 +827,31 @@ export class StudentProfileChangeRequestService {
       take?: number;
     },
   ) {
-    return this.db().studentProfileChangeRequest.findMany({
+    // "PENDING" means a field still needs a decision. Mixed saves are stored as
+    // PARTIALLY_APPROVED, so filtering the request status alone hides them.
+    const awaitingReview = query.status === 'PENDING';
+    if (awaitingReview) {
+      await this.reconcilePendingItems(tenantId, query.studentId);
+    }
+    const rows = await this.db().studentProfileChangeRequest.findMany({
       where: {
         tenantId,
-        ...(query.status ? { status: query.status } : {}),
         ...(query.studentId ? { studentId: query.studentId } : {}),
-        ...(query.sectionKey
-          ? { items: { some: { sectionKey: query.sectionKey } } }
-          : {}),
+        ...(awaitingReview
+          ? {
+              items: {
+                some: {
+                  approvalStatus: { in: ['PENDING', 'NEEDS_INFO'] },
+                  ...(query.sectionKey ? { sectionKey: query.sectionKey } : {}),
+                },
+              },
+            }
+          : {
+              ...(query.status ? { status: query.status } : {}),
+              ...(query.sectionKey
+                ? { items: { some: { sectionKey: query.sectionKey } } }
+                : {}),
+            }),
       },
       include: {
         items: true,
@@ -776,6 +869,7 @@ export class StudentProfileChangeRequestService {
       orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }],
       take: query.take ?? 200,
     });
+    return this.decorateRequests(tenantId, rows);
   }
 
   async reviewItem(
@@ -940,7 +1034,7 @@ export class StudentProfileChangeRequestService {
 
   private async refreshRequestStatus(
     requestId: string,
-    reviewerId: string,
+    reviewerId?: string | null,
     remarks?: string,
   ) {
     const items = await this.db().studentProfileChangeItem.findMany({
@@ -969,18 +1063,130 @@ export class StudentProfileChangeRequestService {
       where: { id: requestId },
       data: {
         status,
-        reviewedById: reviewerId,
+        ...(reviewerId ? { reviewedById: reviewerId } : {}),
         reviewedAt: new Date(),
         ...(remarks ? { remarks } : {}),
       },
     });
   }
 
+  /**
+   * Write Aadhaar (and any other auto-approve field) that was left pending,
+   * and drop no-op rows so the office queue only lists real decisions.
+   */
+  private async reconcilePendingItems(tenantId: string, studentId?: string) {
+    const items = await this.db().studentProfileChangeItem.findMany({
+      where: {
+        tenantId,
+        approvalStatus: { in: ['PENDING', 'NEEDS_INFO'] },
+        ...(studentId ? { request: { studentId } } : {}),
+      },
+      include: { request: { select: { id: true, studentId: true } } },
+      orderBy: { createdAt: 'asc' },
+      take: studentId ? 100 : 300,
+    });
+    if (!items.length) return;
+
+    const modeCache = new Map<string, string>();
+    const touched = new Set<string>();
+    for (const item of items) {
+      const same = (item.oldValue ?? null) === (item.newValue ?? null);
+      const cacheKey = `${item.sectionKey}::${item.fieldKey}`;
+      if (!modeCache.has(cacheKey)) {
+        modeCache.set(
+          cacheKey,
+          await this.policy.getMode(tenantId, item.sectionKey, item.fieldKey),
+        );
+      }
+      const mode = modeCache.get(cacheKey);
+      const shouldApply = mode === 'AUTO_APPROVE' && !same;
+      if (!shouldApply && !same) continue;
+      try {
+        if (shouldApply) {
+          await this.applyItem(tenantId, item.request.studentId, item, null);
+        }
+        await this.db().studentProfileChangeItem.update({
+          where: { id: item.id },
+          data: {
+            approvalStatus: 'AUTO_APPROVED',
+            autoApproved: true,
+            reviewedAt: new Date(),
+            appliedAt: new Date(),
+          },
+        });
+        touched.add(item.requestId);
+      } catch {
+        // Leave the row pending so the office can still see and approve it.
+      }
+    }
+    for (const requestId of touched) {
+      await this.refreshRequestStatus(requestId);
+    }
+  }
+
+  private overlayPendingValues(
+    sections: Record<string, unknown>,
+    changeRequests: unknown,
+  ) {
+    const requests = Array.isArray(changeRequests) ? [...changeRequests] : [];
+    requests.reverse();
+    for (const req of requests) {
+      for (const item of (req as any).items ?? []) {
+        if (!['PENDING', 'NEEDS_INFO'].includes(item.approvalStatus)) continue;
+        const section = sections[item.sectionKey];
+        if (!section || typeof section !== 'object' || Array.isArray(section)) {
+          continue;
+        }
+        const value = parseValue(item.newValue);
+        if (value == null || value === '') continue;
+        (section as Record<string, unknown>)[item.fieldKey] = value;
+      }
+    }
+  }
+
+  private async decorateRequests(tenantId: string, rows: any[]) {
+    const lookupIds = new Set<string>();
+    for (const row of rows) {
+      for (const item of row.items ?? []) {
+        const value = parseValue(item.newValue);
+        if (typeof value === 'string' && UUID_RE.test(value)) {
+          lookupIds.add(value);
+        }
+      }
+    }
+    const lookups = lookupIds.size
+      ? await this.prisma.masterLookup.findMany({
+          where: { tenantId, id: { in: [...lookupIds] } },
+          select: { id: true, label: true },
+        })
+      : [];
+    const labels = new Map(lookups.map((row) => [row.id, row.label]));
+    return rows.map((row) => ({
+      ...row,
+      items: (row.items ?? []).map((item: any) => {
+        const parsed = parseValue(item.newValue);
+        const asText =
+          parsed == null
+            ? ''
+            : typeof parsed === 'object'
+              ? JSON.stringify(parsed)
+              : String(parsed);
+        const displayValue =
+          (typeof parsed === 'string' && labels.get(parsed)) || asText || '—';
+        return {
+          ...item,
+          fieldLabel: PROFILE_FIELD_LABELS[item.fieldKey] ?? item.fieldKey,
+          displayValue,
+        };
+      }),
+    }));
+  }
+
   private async applyItem(
     tenantId: string,
     studentId: string,
     item: any,
-    actorId: string,
+    actorId: string | null,
   ) {
     const value = parseValue(item.newValue);
     const section = item.sectionKey;

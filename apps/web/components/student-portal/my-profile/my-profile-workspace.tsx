@@ -743,6 +743,14 @@ function PersonalForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
     return Array.from(byValue.values());
   }, [bootstrap.lookups.gender, bootstrap.staticOptions.genderFallback]);
 
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      nationalId: String(data.nationalId || prev.nationalId || ''),
+      bloodGroupLookupId: String(data.bloodGroupLookupId || prev.bloodGroupLookupId || ''),
+    }));
+  }, [data.nationalId, data.bloodGroupLookupId]);
+
   const set = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     onDirty();
@@ -1530,8 +1538,9 @@ function ReviewSubmitPanel({
         onJump={(href) => router.push(href)}
       />
       <p className="mt-4 text-sm text-muted-foreground">
-        Tip: Save each section with <strong>Save & Submit</strong> as you go. Auto-approve fields
-        apply immediately; Aadhaar, Class XII, and documents wait for office verification.
+        Tip: Save each section with <strong>Save & Submit</strong> as you go. Aadhaar is stored on
+        your profile immediately. Blood group and other fields that still need a decision are
+        approved under Admin → Students → Profile Verification → Pending Profile Updates.
       </p>
       <div className="mt-4">
         <Button onClick={() => mut.mutate()} disabled={mut.isPending}>

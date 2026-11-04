@@ -247,7 +247,9 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
         <div>
           <h1 className="text-xl font-semibold">{title}</h1>
           <p className="text-sm text-muted-foreground print:hidden">
-            Review student self-service updates. Academic, fee, and exam fields stay locked.
+            {mode === 'pending'
+              ? 'Approve blood group and any other student update still waiting for a decision. Aadhaar is saved on the profile directly. Academic, fee, and exam fields stay locked.'
+              : 'Review student self-service updates. Academic, fee, and exam fields stay locked.'}
           </p>
         </div>
         {mode === 'completion' ? (
@@ -359,6 +361,7 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
             rows={requestRows}
             loading={pendingQ.isLoading || classXiiQ.isLoading || historyQ.isLoading}
             showActions={mode !== 'history'}
+            pendingOnly={mode !== 'history'}
             selectable={mode !== 'history'}
             selected={selected}
             onToggle={(id, on) => setSelected((prev) => ({ ...prev, [id]: on }))}
@@ -850,6 +853,7 @@ function RequestTable({
   rows,
   loading,
   showActions,
+  pendingOnly,
   selectable,
   selected,
   onToggle,
@@ -859,6 +863,7 @@ function RequestTable({
   rows: ProfileChangeRequest[];
   loading: boolean;
   showActions: boolean;
+  pendingOnly?: boolean;
   selectable: boolean;
   selected: Record<string, boolean>;
   onToggle: (id: string, on: boolean) => void;
@@ -901,9 +906,28 @@ function RequestTable({
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{row.status}</span>
               </td>
               <td className="px-3 py-2 text-xs">
-                {(row.items ?? [])
-                  .map((i) => `${i.sectionKey}.${i.fieldKey} (${i.approvalStatus})`)
-                  .join(', ') || '—'}
+                <div className="space-y-1">
+                  {(row.items ?? [])
+                    .filter(
+                      (item) =>
+                        !pendingOnly ||
+                        item.approvalStatus === 'PENDING' ||
+                        item.approvalStatus === 'NEEDS_INFO',
+                    )
+                    .map((item) => (
+                      <p key={item.id}>
+                        <span className="font-medium">
+                          {item.fieldLabel ?? `${item.sectionKey}.${item.fieldKey}`}
+                        </span>
+                        {': '}
+                        {item.displayValue ?? item.newValue ?? '—'}
+                        <span className="text-muted-foreground">
+                          {' '}
+                          ({item.approvalStatus.replaceAll('_', ' ')})
+                        </span>
+                      </p>
+                    ))}
+                </div>
               </td>
               <td className="px-3 py-2 text-xs">
                 {row.submittedAt ? new Date(row.submittedAt).toLocaleString() : '—'}
@@ -942,7 +966,7 @@ function RequestTable({
           {!loading && rows.length === 0 ? (
             <tr>
               <td colSpan={colSpan} className="px-3 py-8 text-center text-muted-foreground">
-                No records.
+                {pendingOnly ? 'No profile updates are waiting for approval.' : 'No records.'}
               </td>
             </tr>
           ) : null}

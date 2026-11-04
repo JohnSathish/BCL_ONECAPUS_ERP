@@ -19,6 +19,15 @@ export type ProfileBootstrap = {
   sections: Record<string, any>;
   completion: ProfileCompletion;
   verificationStatus: string;
+  changeRequests?: Array<{
+    id: string;
+    status?: string;
+    items?: Array<{
+      sectionKey: string;
+      fieldKey: string;
+      approvalStatus?: string;
+    }>;
+  }>;
   profileUpdate?: {
     enabled: boolean;
     canEdit: boolean;
@@ -31,6 +40,7 @@ export type ProfileBootstrap = {
   visibleSections?: { bank?: boolean };
   lookups?: {
     gender?: Array<{ id?: string; code?: string | null; label: string }>;
+    bloodGroup?: Array<{ id: string; code?: string | null; label: string }>;
   };
   staticOptions?: {
     board?: string[];

@@ -49,12 +49,13 @@ export class StudentProfileUpdatePolicyService {
         skipDuplicates: true,
       });
     }
-    // Gender must be student-editable and apply immediately — many profiles lack it.
+    // Gender and Aadhaar must apply immediately. Existing tenant rows keep the
+    // old "approval required" mode unless we correct them here.
     await this.db().studentProfileUpdatePolicy.updateMany({
       where: {
         tenantId,
         sectionKey: 'personal',
-        fieldKey: 'gender',
+        fieldKey: { in: ['gender', 'nationalId'] },
         OR: [
           {
             approvalMode: {

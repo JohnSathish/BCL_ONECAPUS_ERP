@@ -76,6 +76,16 @@ function genderIcon(value: string) {
   return '⊘';
 }
 
+const AWAITING_FIELD: Record<string, string> = {
+  aadhaar: 'nationalId',
+  abcId: 'abcId',
+  bloodGroup: 'bloodGroupLookupId',
+  mobile: 'mobileNumber',
+  email: 'email',
+  dob: 'dateOfBirth',
+  gender: 'gender',
+};
+
 function verificationLabel(value?: string | null) {
   const text = String(value ?? '')
     .replace(/_/g, ' ')
@@ -91,6 +101,7 @@ export default function CompleteProfileScreen() {
   const [email, setEmail] = useState('');
   const [aadhaar, setAadhaar] = useState('');
   const [gender, setGender] = useState('');
+  const [bloodGroupLookupId, setBloodGroupLookupId] = useState('');
   const [abcId, setAbcId] = useState('');
   const [abcIdLocked, setAbcIdLocked] = useState(false);
   const [bank, setBank] = useState({
@@ -146,6 +157,7 @@ export default function CompleteProfileScreen() {
     setEmail(String(personal.email ?? ''));
     setAadhaar(String(personal.nationalId ?? ''));
     setGender(normalizeGenderCode(String(personal.gender ?? '')));
+    setBloodGroupLookupId(String(personal.bloodGroupLookupId ?? ''));
     const existingAbc = String(personal.abcId ?? '').trim();
     setAbcId(existingAbc);
     setAbcIdLocked(Boolean(existingAbc));
@@ -337,6 +349,11 @@ export default function CompleteProfileScreen() {
           fieldKey: 'nationalId',
           newValue: aadhaar.replace(/\s/g, '') || null,
         },
+        {
+          sectionKey: 'personal',
+          fieldKey: 'bloodGroupLookupId',
+          newValue: bloodGroupLookupId || null,
+        },
       ];
       if (!abcIdLocked) {
         changes.push({
@@ -347,7 +364,7 @@ export default function CompleteProfileScreen() {
       }
       await submitMyProfileChanges(changes);
       setMessage(
-        'Personal details saved. Gender updates immediately. Email can be used for login. ABC ID and Aadhaar are recorded for office verification.',
+        'Personal details saved. Aadhaar, gender, email, and blood group are stored on your profile when they do not need office approval.',
       );
       await refresh();
     } catch (e) {
@@ -525,6 +542,18 @@ export default function CompleteProfileScreen() {
     }
   }
 
+  const awaitingFields = useMemo(() => {
+    const keys = new Set<string>();
+    for (const request of bootstrap?.changeRequests ?? []) {
+      for (const item of request.items ?? []) {
+        if (item.approvalStatus === 'PENDING' || item.approvalStatus === 'NEEDS_INFO') {
+          keys.add(`${item.sectionKey}.${item.fieldKey}`);
+        }
+      }
+    }
+    return keys;
+  }, [bootstrap?.changeRequests]);
+
   const completion = bootstrap?.completion;
   const student = bootstrap?.student;
   const docs: Array<{ id: string; documentType: string; verificationStatus?: string }> =
@@ -579,29 +608,58 @@ export default function CompleteProfileScreen() {
                 Please complete the following details to keep your records accurate.
               </Text>
               <View style={styles.checkGrid}>
-                {completion?.checks?.map((check) => (
-                  <View
-                    key={check.key}
-                    style={[
-                      styles.checkChip,
-                      check.filled ? styles.checkDone : styles.checkPending,
-                    ]}
-                  >
-                    <Text style={styles.checkIcon}>{CHECK_ICONS[check.key] ?? '•'}</Text>
-                    <View style={styles.checkCopy}>
-                      <Text style={styles.checkLabel}>{check.label}</Text>
-                      <Text
-                        style={[
-                          styles.checkState,
-                          check.filled ? styles.checkStateDone : styles.checkStatePending,
-                        ]}
-                      >
-                        {check.filled ? 'Completed' : 'Pending'}
-                      </Text>
+                {completion?.checks?.map((check) => {
+                  const fieldKey = AWAITING_FIELD[check.key];
+                  const awaiting =
+                    !check.filled &&
+                    Boolean(
+                      fieldKey &&
+                      (awaitingFields.has(`personal.${fieldKey}`) ||
+                        awaitingFields.has(`contact.${fieldKey}`)),
+                    );
+                  const state = check.filled
+                    ? 'Completed'
+                    : awaiting
+                      ? 'Awaiting approval'
+                      : 'Not filled';
+                  return (
+                    <View
+                      key={check.key}
+                      style={[
+                        styles.checkChip,
+                        check.filled
+                          ? styles.checkDone
+                          : awaiting
+                            ? styles.checkAwaiting
+                            : styles.checkPending,
+                      ]}
+                    >
+                      <Text style={styles.checkIcon}>{CHECK_ICONS[check.key] ?? '•'}</Text>
+                      <View style={styles.checkCopy}>
+                        <Text style={styles.checkLabel}>{check.label}</Text>
+                        <Text
+                          style={[
+                            styles.checkState,
+                            check.filled
+                              ? styles.checkStateDone
+                              : awaiting
+                                ? styles.checkStateAwaiting
+                                : styles.checkStatePending,
+                          ]}
+                        >
+                          {state}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
+              {awaitingFields.size ? (
+                <Text style={styles.hint}>
+                  Awaiting approval is reviewed by the office under Students, Profile Verification,
+                  Pending Profile Updates.
+                </Text>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -669,6 +727,38 @@ export default function CompleteProfileScreen() {
             />
           </View>
           <Text style={styles.example}>Use an email you can open</Text>
+          <Text style={styles.label}>Blood Group *</Text>
+          <View style={styles.chipRow}>
+            {(bootstrap?.lookups?.bloodGroup ?? []).map((opt) => {
+              const active = bloodGroupLookupId === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  style={[
+                    styles.chip,
+                    active && styles.chipActive,
+                    !canEditProfile && { opacity: 0.5 },
+                  ]}
+                  disabled={!canEditProfile}
+                  onPress={() => setBloodGroupLookupId(opt.id)}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {!(bootstrap?.lookups?.bloodGroup ?? []).length ? (
+            <Text style={styles.hint}>
+              Blood group options are not set up yet. Ask the office to add them under master data.
+            </Text>
+          ) : (
+            <Text style={styles.hint}>
+              Saved with your profile. If it stays on Awaiting approval, the office approves it
+              under Pending Profile Updates.
+            </Text>
+          )}
           <Text style={styles.label}>Aadhaar Number *</Text>
           <TextInput
             style={styles.input}
@@ -1188,12 +1278,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkPending: { backgroundColor: '#FEF2F2' },
+  checkAwaiting: { backgroundColor: '#FEF3C7' },
   checkDone: { backgroundColor: '#ECFDF5' },
   checkIcon: { fontSize: 16 },
   checkCopy: { flex: 1 },
   checkLabel: { fontSize: 12, fontWeight: '800', color: studentTheme.text },
   checkState: { fontSize: 11, fontWeight: '700', marginTop: 2 },
   checkStatePending: { color: '#DC2626' },
+  checkStateAwaiting: { color: '#B45309' },
   checkStateDone: { color: '#059669' },
   sectionTitle: { fontSize: 16, fontWeight: '800', color: studentTheme.text },
   sectionHint: { fontSize: 12, color: studentTheme.textMuted, marginTop: -4 },

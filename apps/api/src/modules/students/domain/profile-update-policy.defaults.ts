@@ -90,7 +90,7 @@ export const DEFAULT_PROFILE_UPDATE_POLICIES: ProfilePolicySeed[] = [
   {
     sectionKey: 'personal',
     fieldKey: 'nationalId',
-    approvalMode: 'APPROVAL_REQUIRED',
+    approvalMode: 'AUTO_APPROVE',
     mandatory: true,
     sortOrder: 110,
   },
