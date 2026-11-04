@@ -946,10 +946,12 @@ export class StudentProfileSectionsService {
 
     if (dto.tura && this.hasAddressContent(dto.tura)) {
       await upsertAddr('TURA', dto.tura);
+      await upsertAddr('CURRENT', dto.tura);
     }
 
     if (dto.homeSameAsTura && dto.tura && this.hasAddressContent(dto.tura)) {
       await upsertAddr('HOME', dto.tura);
+      await upsertAddr('PERMANENT', dto.tura);
       await this.ensureProfile(tenantId, studentId);
       await this.prisma.studentProfile.update({
         where: { studentId },
@@ -958,6 +960,7 @@ export class StudentProfileSectionsService {
     } else {
       if (dto.home && this.hasAddressContent(dto.home)) {
         await upsertAddr('HOME', dto.home);
+        await upsertAddr('PERMANENT', dto.home);
       }
       if (dto.homeSameAsTura === false) {
         await this.ensureProfile(tenantId, studentId);

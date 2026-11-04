@@ -49,13 +49,13 @@ export class StudentProfileUpdatePolicyService {
         skipDuplicates: true,
       });
     }
-    // Gender and Aadhaar must apply immediately. Existing tenant rows keep the
-    // old "approval required" mode unless we correct them here.
+    // Gender, Aadhaar, and date of birth must apply immediately. Existing tenant
+    // rows keep the old "approval required" mode unless we correct them here.
     await this.db().studentProfileUpdatePolicy.updateMany({
       where: {
         tenantId,
         sectionKey: 'personal',
-        fieldKey: { in: ['gender', 'nationalId'] },
+        fieldKey: { in: ['gender', 'nationalId', 'dateOfBirth'] },
         OR: [
           {
             approvalMode: {

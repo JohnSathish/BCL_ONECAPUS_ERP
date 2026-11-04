@@ -26,6 +26,7 @@ import {
   type Class12SubjectOption,
   type ProfileBootstrap,
 } from '@/services/student-profile';
+import { DateField } from '@/components/ui/date-field';
 import { useSyncGuard } from '@/state/sync-guard';
 import { GENDER_OPTIONS, normalizeGenderCode } from '@/utils/gender';
 
@@ -102,6 +103,7 @@ export default function CompleteProfileScreen() {
   const [aadhaar, setAadhaar] = useState('');
   const [gender, setGender] = useState('');
   const [bloodGroupLookupId, setBloodGroupLookupId] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [abcId, setAbcId] = useState('');
   const [abcIdLocked, setAbcIdLocked] = useState(false);
   const [bank, setBank] = useState({
@@ -163,6 +165,7 @@ export default function CompleteProfileScreen() {
     });
     setGender(normalizeGenderCode(String(personal.gender ?? '')));
     setBloodGroupLookupId((current) => String(personal.bloodGroupLookupId || current || ''));
+    setDateOfBirth(String(personal.dateOfBirth ?? '').slice(0, 10));
     const existingAbc = String(personal.abcId ?? '').trim();
     setAbcId(existingAbc);
     setAbcIdLocked(Boolean(existingAbc));
@@ -358,6 +361,11 @@ export default function CompleteProfileScreen() {
           sectionKey: 'personal',
           fieldKey: 'bloodGroupLookupId',
           newValue: bloodGroupLookupId || null,
+        },
+        {
+          sectionKey: 'personal',
+          fieldKey: 'dateOfBirth',
+          newValue: dateOfBirth || null,
         },
       ];
       if (!abcIdLocked) {
@@ -732,6 +740,16 @@ export default function CompleteProfileScreen() {
             />
           </View>
           <Text style={styles.example}>Use an email you can open</Text>
+          <DateField
+            label="Date of Birth *"
+            value={dateOfBirth}
+            onChange={setDateOfBirth}
+            placeholder="Select date of birth"
+            maximumDate={new Date()}
+            accentColor={studentTheme.primary}
+            mutedColor={studentTheme.textMuted}
+            borderColor={studentTheme.border}
+          />
           <Text style={styles.label}>Blood Group *</Text>
           <View style={styles.chipRow}>
             {(bootstrap?.lookups?.bloodGroup ?? []).map((opt) => {

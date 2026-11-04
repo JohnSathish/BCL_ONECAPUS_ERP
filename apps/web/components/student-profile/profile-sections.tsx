@@ -551,8 +551,14 @@ export function AddressSection({
   profile: StudentProfile;
   canEdit: boolean;
 }) {
-  const tura = profile.addresses?.find((a) => a.addressType === 'TURA');
-  const home = profile.addresses?.find((a) => a.addressType === 'HOME');
+  const withContent = (types: string[]) =>
+    types
+      .map((type) => profile.addresses?.find((a) => a.addressType === type))
+      .find((row) => row && (row.line1 || row.city || row.district || row.pinCode));
+  const tura =
+    withContent(['CURRENT', 'TURA']) ?? profile.addresses?.find((a) => a.addressType === 'TURA');
+  const home =
+    withContent(['PERMANENT', 'HOME']) ?? profile.addresses?.find((a) => a.addressType === 'HOME');
   const [form, setForm] = useState({
     homeSameAsTura: false,
     tura: {
@@ -639,10 +645,10 @@ export function GuardiansSection({
       contactNumber: g('MOTHER')?.contactNumber ?? '',
     },
     localGuardian: {
-      fullName: g('LOCAL_GUARDIAN')?.fullName ?? '',
-      age: g('LOCAL_GUARDIAN')?.age ?? undefined,
-      occupation: g('LOCAL_GUARDIAN')?.occupation ?? '',
-      contactNumber: g('LOCAL_GUARDIAN')?.contactNumber ?? '',
+      fullName: (g('LOCAL_GUARDIAN') ?? g('GUARDIAN'))?.fullName ?? '',
+      age: (g('LOCAL_GUARDIAN') ?? g('GUARDIAN'))?.age ?? undefined,
+      occupation: (g('LOCAL_GUARDIAN') ?? g('GUARDIAN'))?.occupation ?? '',
+      contactNumber: (g('LOCAL_GUARDIAN') ?? g('GUARDIAN'))?.contactNumber ?? '',
     },
   });
   const { message, saving } = useDebouncedSave(profile.id, 'guardians', form, canEdit);

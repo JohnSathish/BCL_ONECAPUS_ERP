@@ -119,6 +119,26 @@ export class StudentProfileChangeRequestService {
     return this.prisma as unknown as Record<string, any>;
   }
 
+  /** Mobile blood group chips need lookup rows. Create the standard set once. */
+  private async ensureBloodGroups(tenantId: string) {
+    const existing = await this.prisma.masterLookup.count({
+      where: { tenantId, lookupType: 'BLOOD_GROUP', isActive: true },
+    });
+    if (existing > 0) return;
+    const groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    await this.prisma.masterLookup.createMany({
+      data: groups.map((label, index) => ({
+        tenantId,
+        lookupType: 'BLOOD_GROUP',
+        code: label.replace('+', '_POS').replace('-', '_NEG'),
+        label,
+        sortOrder: index + 1,
+        isActive: true,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
   async getCompletion(tenantId: string, studentId: string) {
     const [profile, guardians, addresses, boardExam, documents, abcAccount] =
       await Promise.all([
@@ -338,7 +358,9 @@ export class StudentProfileChangeRequestService {
           FATHER: guardians.find((g) => g.guardianType === 'FATHER') ?? null,
           MOTHER: guardians.find((g) => g.guardianType === 'MOTHER') ?? null,
           GUARDIAN:
-            guardians.find((g) => g.guardianType === 'GUARDIAN') ?? null,
+            guardians.find((g) => g.guardianType === 'GUARDIAN') ??
+            guardians.find((g) => g.guardianType === 'LOCAL_GUARDIAN') ??
+            null,
         },
       };
     }
@@ -387,6 +409,7 @@ export class StudentProfileChangeRequestService {
     });
     if (!student) throw new NotFoundException('Student not found');
 
+    await this.ensureBloodGroups(tenantId);
     await this.reconcilePendingItems(tenantId, studentId);
 
     const sectionKeys = [
@@ -1400,8 +1423,9 @@ export class StudentProfileChangeRequestService {
         }) as any,
       });
     } else if (section === 'address' && value && typeof value === 'object') {
-      const addressType = field === 'permanent' ? 'PERMANENT' : 'CURRENT';
-      const legacyType = field === 'permanent' ? 'HOME' : 'TURA';
+      // Mobile saves current/permanent. The ERP profile screen reads TURA/HOME.
+      const addressTypes =
+        field === 'permanent' ? ['PERMANENT', 'HOME'] : ['CURRENT', 'TURA'];
       const next = {
         line1: coalesceText((value as any).line1),
         line2: coalesceText((value as any).line2),
@@ -1410,47 +1434,41 @@ export class StudentProfileChangeRequestService {
         district: coalesceText((value as any).district),
         pinCode: coalesceText((value as any).pinCode),
       };
-      await this.prisma.studentAddress.upsert({
-        where: { studentId_addressType: { studentId, addressType } },
-        create: {
-          tenantId,
-          studentId,
-          addressType,
-          ...next,
-        },
-        update: next,
-      });
-      // Keep legacy TURA/HOME rows in sync when present so admin/import views stay consistent.
-      const legacy = await this.prisma.studentAddress.findFirst({
-        where: { tenantId, studentId, addressType: legacyType },
-      });
-      if (legacy) {
-        await this.prisma.studentAddress.update({
-          where: { id: legacy.id },
-          data: next,
+      for (const addressType of addressTypes) {
+        await this.prisma.studentAddress.upsert({
+          where: { studentId_addressType: { studentId, addressType } },
+          create: {
+            tenantId,
+            studentId,
+            addressType,
+            ...next,
+          },
+          update: next,
         });
       }
     } else if (section === 'guardians' && value && typeof value === 'object') {
-      await this.prisma.studentGuardian.upsert({
-        where: {
-          studentId_guardianType: { studentId, guardianType: field },
-        },
-        create: {
-          tenantId,
-          studentId,
-          guardianType: field,
-          fullName: (value as any).fullName ?? null,
-          occupation: (value as any).occupation ?? null,
-          contactNumber: (value as any).contactNumber ?? null,
-          email: (value as any).email ?? null,
-        },
-        update: {
-          fullName: (value as any).fullName ?? null,
-          occupation: (value as any).occupation ?? null,
-          contactNumber: (value as any).contactNumber ?? null,
-          email: (value as any).email ?? null,
-        },
-      });
+      const guardianTypes =
+        field === 'GUARDIAN' ? ['GUARDIAN', 'LOCAL_GUARDIAN'] : [field];
+      const guardianData = {
+        fullName: (value as any).fullName ?? null,
+        occupation: (value as any).occupation ?? null,
+        contactNumber: (value as any).contactNumber ?? null,
+        email: (value as any).email ?? null,
+      };
+      for (const guardianType of guardianTypes) {
+        await this.prisma.studentGuardian.upsert({
+          where: {
+            studentId_guardianType: { studentId, guardianType },
+          },
+          create: {
+            tenantId,
+            studentId,
+            guardianType,
+            ...guardianData,
+          },
+          update: guardianData,
+        });
+      }
     } else if (section === 'class_xii' && field === 'boardExam') {
       await this.prisma.studentBoardExam.updateMany({
         where: { tenantId, studentId },
