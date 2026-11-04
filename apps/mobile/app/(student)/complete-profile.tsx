@@ -155,9 +155,14 @@ export default function CompleteProfileScreen() {
     const personal = data.sections?.personal ?? {};
     setMobile(String(personal.mobileNumber ?? ''));
     setEmail(String(personal.email ?? ''));
-    setAadhaar(String(personal.nationalId ?? ''));
+    setAadhaar((current) => {
+      const fromServer = String(personal.nationalId ?? '')
+        .replace(/\D/g, '')
+        .slice(0, 12);
+      return fromServer || current;
+    });
     setGender(normalizeGenderCode(String(personal.gender ?? '')));
-    setBloodGroupLookupId(String(personal.bloodGroupLookupId ?? ''));
+    setBloodGroupLookupId((current) => String(personal.bloodGroupLookupId || current || ''));
     const existingAbc = String(personal.abcId ?? '').trim();
     setAbcId(existingAbc);
     setAbcIdLocked(Boolean(existingAbc));

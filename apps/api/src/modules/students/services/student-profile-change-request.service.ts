@@ -741,6 +741,13 @@ export class StudentProfileChangeRequestService {
         continue;
       }
       const auto = mode === 'AUTO_APPROVE';
+      // A blank Aadhaar must not erase a number already stored on the profile.
+      if (
+        change.fieldKey === 'nationalId' &&
+        (change.newValue == null || String(change.newValue).trim() === '')
+      ) {
+        continue;
+      }
 
       const item = await this.db().studentProfileChangeItem.create({
         data: {
@@ -750,16 +757,36 @@ export class StudentProfileChangeRequestService {
           fieldKey: change.fieldKey,
           oldValue,
           newValue,
-          approvalStatus: auto ? 'AUTO_APPROVED' : 'PENDING',
-          autoApproved: auto,
-          reviewedAt: auto ? new Date() : null,
-          appliedAt: auto ? new Date() : null,
+          approvalStatus: 'PENDING',
+          autoApproved: false,
         },
       });
 
       if (auto) {
-        await this.applyItem(user.tid, studentId, item, user.sub);
-        autoCount += 1;
+        try {
+          await this.applyItem(user.tid, studentId, item, user.sub);
+          await this.db().studentProfileChangeItem.update({
+            where: { id: item.id },
+            data: {
+              approvalStatus: 'AUTO_APPROVED',
+              autoApproved: true,
+              reviewedAt: new Date(),
+              appliedAt: new Date(),
+            },
+          });
+          autoCount += 1;
+        } catch (error) {
+          if (error instanceof BadRequestException) throw error;
+          const message =
+            error instanceof Error
+              ? error.message
+              : 'Could not save this field';
+          await this.db().studentProfileChangeItem.update({
+            where: { id: item.id },
+            data: { reviewRemarks: message.slice(0, 500) },
+          });
+          pendingCount += 1;
+        }
       } else {
         pendingCount += 1;
       }
@@ -1075,6 +1102,7 @@ export class StudentProfileChangeRequestService {
    * and drop no-op rows so the office queue only lists real decisions.
    */
   private async reconcilePendingItems(tenantId: string, studentId?: string) {
+    await this.reapplyMissedProfileWrites(tenantId, studentId);
     const items = await this.db().studentProfileChangeItem.findMany({
       where: {
         tenantId,
@@ -1117,6 +1145,94 @@ export class StudentProfileChangeRequestService {
         touched.add(item.requestId);
       } catch {
         // Leave the row pending so the office can still see and approve it.
+      }
+    }
+    for (const requestId of touched) {
+      await this.refreshRequestStatus(requestId);
+    }
+  }
+
+  /**
+   * Auto-approved Aadhaar (and blood group) sometimes stayed off the profile,
+   * so the text box reloaded empty and the office queue had nothing to approve.
+   * Write the value again, or put the row back to pending when the write fails.
+   */
+  private async reapplyMissedProfileWrites(
+    tenantId: string,
+    studentId?: string,
+  ) {
+    const items = await this.db().studentProfileChangeItem.findMany({
+      where: {
+        tenantId,
+        sectionKey: 'personal',
+        fieldKey: { in: ['nationalId', 'bloodGroupLookupId', 'gender'] },
+        approvalStatus: { in: ['AUTO_APPROVED', 'APPROVED'] },
+        ...(studentId ? { request: { studentId } } : {}),
+      },
+      include: { request: { select: { id: true, studentId: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: studentId ? 30 : 200,
+    });
+    if (!items.length) return;
+
+    const seen = new Set<string>();
+    const touched = new Set<string>();
+    for (const item of items) {
+      const ownerId = item.request?.studentId as string | undefined;
+      if (!ownerId) continue;
+      const dedupe = `${ownerId}::${item.fieldKey}`;
+      if (seen.has(dedupe)) continue;
+      seen.add(dedupe);
+
+      const parsed = parseValue(item.newValue);
+      if (parsed == null || String(parsed).trim() === '') continue;
+
+      const profile = await this.prisma.studentProfile.findFirst({
+        where: { tenantId, studentId: ownerId },
+        select: {
+          nationalId: true,
+          bloodGroupLookupId: true,
+          gender: true,
+        },
+      });
+      const current =
+        item.fieldKey === 'nationalId'
+          ? profile?.nationalId
+          : item.fieldKey === 'bloodGroupLookupId'
+            ? profile?.bloodGroupLookupId
+            : profile?.gender;
+      if (current && String(current).trim()) continue;
+
+      try {
+        await this.applyItem(tenantId, ownerId, item, null);
+        const saved = await this.prisma.studentProfile.findFirst({
+          where: { tenantId, studentId: ownerId },
+          select: {
+            nationalId: true,
+            bloodGroupLookupId: true,
+            gender: true,
+          },
+        });
+        const after =
+          item.fieldKey === 'nationalId'
+            ? saved?.nationalId
+            : item.fieldKey === 'bloodGroupLookupId'
+              ? saved?.bloodGroupLookupId
+              : saved?.gender;
+        if (after && String(after).trim()) continue;
+        throw new Error('Profile field was not saved');
+      } catch {
+        await this.db().studentProfileChangeItem.update({
+          where: { id: item.id },
+          data: {
+            approvalStatus: 'PENDING',
+            autoApproved: false,
+            appliedAt: null,
+            reviewRemarks:
+              'Saved status did not update the profile. Approve it again from Pending Profile Updates.',
+          },
+        });
+        touched.add(item.requestId);
       }
     }
     for (const requestId of touched) {
@@ -1223,8 +1339,16 @@ export class StudentProfileChangeRequestService {
           if (field === 'gender' && next) {
             next = normalizeGenderCode(next) || next.toUpperCase();
           }
-          // Never wipe an existing value with blank from the client.
-          if (next !== null || value === null) data[field] = next;
+          if (field === 'nationalId' && next) {
+            next = next.replace(/\D/g, '');
+            if (!/^\d{12}$/.test(next)) {
+              throw new BadRequestException(
+                'Aadhaar must be exactly 12 digits',
+              );
+            }
+          }
+          // A blank submission must not erase a value already on the profile.
+          if (next) data[field] = next;
         }
         if (field === 'dateOfBirth' && value) {
           data.dateOfBirth = new Date(String(value));
