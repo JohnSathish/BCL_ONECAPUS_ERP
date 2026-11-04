@@ -309,14 +309,18 @@ export class UserProvisioningService {
 
     const passwordHash = await bcrypt.hash(plainPassword, 12);
 
-    const history = await this.prisma.passwordHistory.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: historyCount,
-    });
-    for (const h of history) {
-      if (await bcrypt.compare(plainPassword, h.passwordHash)) {
-        throw new BadRequestException('Password was used recently');
+    // Student resets reuse the college roll number. That value is already in
+    // password history from account creation, so the reuse check must not block it.
+    if (!skipPolicy) {
+      const history = await this.prisma.passwordHistory.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: historyCount,
+      });
+      for (const h of history) {
+        if (await bcrypt.compare(plainPassword, h.passwordHash)) {
+          throw new BadRequestException('Password was used recently');
+        }
       }
     }
 
