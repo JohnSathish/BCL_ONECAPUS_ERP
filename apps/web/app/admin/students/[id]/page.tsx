@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Suspense, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -8,11 +7,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { StudentProfileDashboard } from '@/components/students-module/profile/student-profile-dashboard';
-import { buttonVariants } from '@/components/ui/button';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { fetchStudentProfile } from '@/services/students';
 import { hasAnyPermission } from '@/lib/permissions/portal-access';
-import { cn } from '@/utils/cn';
 
 export default function StudentProfilePage() {
   const session = useRequireAuth();
@@ -44,34 +41,17 @@ export default function StudentProfilePage() {
   const data = profile.data;
 
   return (
-    <DashboardShell role="admin" title={data?.fullName ?? 'Student profile'}>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <Link
-          href="/admin/students"
-          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'h-7 text-xs')}
-        >
-          ← Students
-        </Link>
-        {data ? (
-          <div className="flex flex-wrap gap-1.5">
-            <Link
-              href={`/admin/students/${studentId}/academic`}
-              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'h-7 text-xs')}
-            >
-              Academic engine
-            </Link>
-            <Link
-              href={`/admin/students/subject-registration?student=${studentId}`}
-              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'h-7 text-xs')}
-            >
-              Subject registration
-            </Link>
-          </div>
-        ) : null}
-      </div>
-
+    <DashboardShell role="admin" title={data?.fullName ?? 'Student profile'} pageHeader={false}>
       {profile.isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading profile…</p>
+        <div className="space-y-4" aria-busy="true" aria-label="Loading student profile">
+          <div className="h-28 animate-pulse rounded-xl border border-slate-200 bg-white" />
+          <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,43fr)_minmax(0,30fr)_minmax(0,27fr)]">
+            <div className="h-96 animate-pulse rounded-xl border border-slate-200 bg-white" />
+            <div className="h-96 animate-pulse rounded-xl border border-slate-200 bg-white" />
+            <div className="h-96 animate-pulse rounded-xl bg-blue-100/70" />
+          </div>
+        </div>
       ) : profile.isError || !data ? (
         <QueryErrorPanel
           title="Unable to load student profile"

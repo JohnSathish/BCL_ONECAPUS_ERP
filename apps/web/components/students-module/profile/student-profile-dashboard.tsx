@@ -2,11 +2,28 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Award,
+  BookOpen,
+  CalendarCheck,
+  ChevronDown,
+  CreditCard,
+  Download,
+  FileText,
+  GraduationCap,
+  IdCard,
+  LayoutDashboard,
+  Library,
+  MessageSquare,
+  Nfc,
+  ScrollText,
+  SunMedium,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
 
 import { ErpWorkspace, ErpWorkspaceGrid } from '@/components/erp/erp-workspace-shell';
-import { QueryErrorPanel } from '@/components/erp/query-error-panel';
 import { StudentPhotoUpload } from '@/components/student-records/student-photo-upload';
 import {
   AcademicSection,
@@ -30,11 +47,33 @@ import { StudentSubjectsTab } from '@/components/students-module/profile/student
 import { StudentRollShiftHistoryCard } from '@/components/students-module/profile/student-roll-shift-history-card';
 import { AcademicChangeHistoryPanel } from '@/components/students-module/profile/academic-change-history-panel';
 import { AdminStudentIdCardPanel } from '@/components/id-cards/admin-student-id-card-panel';
-import { buttonVariants } from '@/components/ui/button';
-import { uploadStudentPhoto } from '@/services/students';
+import { Button, buttonVariants } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { StudentProfile } from '@/types/students';
 import { LEGACY_SECTION_TO_TAB, PROFILE_TABS, type ProfileTabKey } from '@/types/student-profile';
 import { cn } from '@/utils/cn';
+
+const TAB_ICONS: Record<ProfileTabKey, typeof LayoutDashboard> = {
+  overview: LayoutDashboard,
+  academic: GraduationCap,
+  subjects: BookOpen,
+  attendance: CalendarCheck,
+  fees: Wallet,
+  documents: FileText,
+  'id-card': CreditCard,
+  communication: MessageSquare,
+  rfid: Nfc,
+  certificates: Award,
+  library: Library,
+  promotion: TrendingUp,
+  remarks: MessageSquare,
+  audit: ScrollText,
+};
 
 function parseTab(tabParam: string | null, sectionParam: string | null): ProfileTabKey {
   if (tabParam === 'edit') return 'academic';
@@ -52,22 +91,6 @@ function primaryStudentId(
   profile: Pick<StudentProfile, 'rollNumber' | 'enrollmentNumber'>,
 ): string {
   return profile.rollNumber?.trim() || profile.enrollmentNumber;
-}
-
-function profileIdentitySubtitle(
-  profile: Pick<StudentProfile, 'rollNumber' | 'enrollmentNumber' | 'batch' | 'semester'>,
-): string {
-  const primary = primaryStudentId(profile);
-  const enrollment = profile.enrollmentNumber?.trim();
-  const showEnrollment =
-    Boolean(enrollment) && enrollment !== primary && Boolean(profile.rollNumber?.trim());
-  const parts = [
-    primary,
-    showEnrollment ? `Enroll ${enrollment}` : null,
-    profile.batch || null,
-    `Sem ${profile.semester}`,
-  ].filter(Boolean);
-  return parts.join(' · ');
 }
 
 function ProfileTabStub({
@@ -110,13 +133,36 @@ function ProfileTabPanel({
   switch (tab) {
     case 'overview':
       return (
-        <div className="grid gap-3 xl:grid-cols-2">
-          <BasicSection profile={profile} canEdit={canEdit} />
-          <AcademicIdentitySection profile={profile} canEdit={canEdit} />
-          <StudentRollShiftHistoryCard studentId={profile.id} />
-          <CategorySection profile={profile} canEdit={canEdit} />
-          <AddressSection profile={profile} canEdit={canEdit} />
-          <GuardiansSection profile={profile} canEdit={canEdit} />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,43fr)_minmax(0,30fr)_minmax(0,27fr)]">
+            <BasicSection profile={profile} canEdit={canEdit} />
+            <div className="space-y-4">
+              <AcademicIdentitySection profile={profile} canEdit={canEdit} />
+              <SectionCard title="Roll Number & Shift">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Roll Number</p>
+                    <p className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm">
+                      {primaryStudentId(profile)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Shift</p>
+                    <p className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                      {profile.shift || '—'}
+                    </p>
+                  </div>
+                </div>
+              </SectionCard>
+              <CategorySection profile={profile} canEdit={canEdit} />
+            </div>
+            <ProfileSummarySidebar profile={profile} />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <AddressSection profile={profile} canEdit={canEdit} />
+            <GuardiansSection profile={profile} canEdit={canEdit} />
+            <StudentRollShiftHistoryCard studentId={profile.id} />
+          </div>
         </div>
       );
     case 'academic':
@@ -231,107 +277,104 @@ function ProfileTabPanel({
   }
 }
 
-function ProfileSummarySidebar({
-  profile,
-  canEdit,
-  onRefresh,
-}: {
-  profile: StudentProfile;
-  canEdit: boolean;
-  onRefresh: () => void;
-}) {
+function ProfileSummarySidebar({ profile }: { profile: StudentProfile }) {
   const completionPercent = profile.completion?.completionPercent ?? 0;
   const enrollments = profile.sectionEnrollments?.filter(
     (e) => Number(e.semesterSequence) === Number(profile.semester),
   );
-  const photoMut = useMutation({
-    mutationFn: (file: File) => uploadStudentPhoto(profile.id, file),
-    onSuccess: () => onRefresh(),
-  });
+
+  const studying = (profile.studentStatus ?? '').toUpperCase() === 'STUDYING';
+  const active =
+    (profile.admissionStatus ?? profile.academicStatus ?? '').toUpperCase() === 'ACTIVE' ||
+    studying;
 
   return (
-    <aside className="glass-card space-y-2.5 rounded-xl border border-border/50 p-3 shadow-sm">
-      <div className="text-center">
-        <StudentPhotoUpload
-          photoPath={profile.photoPath}
-          disabled={!canEdit || photoMut.isPending}
-          pending={photoMut.isPending}
-          onSelect={(file: File) => photoMut.mutate(file)}
-        />
-        {photoMut.isError ? (
-          <QueryErrorPanel title="Photo upload failed" error={photoMut.error} />
-        ) : null}
-        <h2 className="mt-2 text-sm font-semibold leading-tight">
-          <StudentName name={profile.fullName} displayFullName={profile.displayFullName} />
-        </h2>
-        <p className="text-[11px] text-muted-foreground">
-          {primaryStudentId(profile)}
-          {profile.rollNumber?.trim() &&
-          profile.enrollmentNumber?.trim() &&
-          profile.enrollmentNumber.trim() !== profile.rollNumber.trim()
-            ? ` · Enroll ${profile.enrollmentNumber}`
-            : null}
+    <aside className="space-y-4">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="bg-gradient-to-br from-blue-700 to-blue-600 px-4 py-5 text-white">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-white/15 p-1">
+              <StudentPhotoUpload
+                photoPath={profile.photoPath}
+                size="lg"
+                hideButton
+                disabled
+                onSelect={() => undefined}
+              />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold leading-snug">
+                <StudentName name={profile.fullName} displayFullName={profile.displayFullName} />
+              </h2>
+              <p className="mt-0.5 font-mono text-xs text-blue-100">{primaryStudentId(profile)}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-50">
+                  {active
+                    ? 'Active'
+                    : profile.admissionStatus || profile.academicStatus || 'Status'}
+                </span>
+                <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold">
+                  {studying ? 'Studying' : profile.studentStatus || '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <dl className="space-y-2 px-4 py-3 text-sm">
+          {(
+            [
+              ['Programme', profile.programme],
+              ['Batch', profile.batch],
+              ['Semester', profile.semester ? `Sem ${profile.semester}` : null],
+              ['Shift', profile.shift],
+              ['Department', profile.departmentName],
+              ['Blood Group', profile.bloodGroup],
+            ] as const
+          ).map(([label, value]) => (
+            <div key={label} className="flex items-start justify-between gap-3">
+              <dt className="text-xs text-slate-500">{label}</dt>
+              <dd className="text-right text-xs font-medium text-slate-900">{value || '—'}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="border-t border-slate-100 px-4 py-3">
+          <div className="mb-1.5 flex justify-between text-xs">
+            <span className="font-medium text-slate-700">Profile Completion</span>
+            <span className="font-semibold text-blue-700">{completionPercent}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-blue-600"
+              style={{ width: `${completionPercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p className="text-sm font-semibold text-slate-900">
+          Registered Subjects{enrollments?.length ? ` (${enrollments.length})` : ''}
         </p>
-      </div>
-      <dl className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px]">
-        <div>
-          <dt className="text-muted-foreground">Programme</dt>
-          <dd className="truncate font-medium">{profile.programme ?? '—'}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Batch</dt>
-          <dd className="font-medium">{profile.batch ?? '—'}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Semester</dt>
-          <dd className="font-medium">Sem {profile.semester}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Status</dt>
-          <dd className="font-medium">{profile.studentStatus ?? profile.academicStatus}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Aadhaar</dt>
-          <dd className="truncate font-medium">{profile.nationalId?.trim() || '—'}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Blood group</dt>
-          <dd className="font-medium">{profile.bloodGroup?.trim() || '—'}</dd>
-        </div>
-      </dl>
-      <div>
-        <div className="mb-0.5 flex justify-between text-[10px] text-muted-foreground">
-          <span>Profile completion</span>
-          <span>{completionPercent}%</span>
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full bg-gradient-to-r from-primary to-violet-500"
-            style={{ width: `${completionPercent}%` }}
-          />
-        </div>
-      </div>
-      {enrollments && enrollments.length > 0 ? (
-        <div>
-          <p className="mb-1 text-[10px] font-medium text-muted-foreground">
-            Sem {profile.semester} subjects ({enrollments.length})
-          </p>
-          <ul className="max-h-40 space-y-0.5 overflow-y-auto text-[10px]">
+        {enrollments && enrollments.length > 0 ? (
+          <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto text-xs">
             {[...enrollments]
               .sort((a, b) => {
                 const rank = (c?: string | null) => (c === 'MAJOR' || c === 'MINOR' ? 0 : 1);
                 return rank(a.category) - rank(b.category);
               })
-              .slice(0, 10)
-              .map((e) => (
-                <li key={`${e.registrationId}-${e.courseCode}`} className="truncate">
-                  <span className="font-mono text-muted-foreground">{e.courseCode}</span>{' '}
-                  {e.courseTitle}
+              .map((item) => (
+                <li key={`${item.registrationId}-${item.courseCode}`} className="leading-snug">
+                  <span className="font-mono font-semibold text-blue-800">{item.courseCode}</span>{' '}
+                  <span className="text-slate-800">{item.courseTitle}</span>
+                  {item.category ? (
+                    <span className="text-slate-500"> — {item.category}</span>
+                  ) : null}
                 </li>
               ))}
           </ul>
-        </div>
-      ) : null}
+        ) : (
+          <p className="mt-2 text-xs text-slate-500">No subjects registered for this semester.</p>
+        )}
+      </div>
     </aside>
   );
 }
@@ -364,79 +407,146 @@ export function StudentProfileDashboard({ profile, canEdit, onRefresh }: Props) 
     [router, searchParams],
   );
 
-  const badges = useMemo(() => {
-    const items: { label: string; tone: 'default' | 'success' | 'warning' }[] = [];
-    if (profile.admissionStatus) items.push({ label: profile.admissionStatus, tone: 'default' });
-    if (profile.academicStatus) {
-      items.push({
-        label: profile.academicStatus,
-        tone: profile.academicStatus === 'ACTIVE' ? 'success' : 'warning',
-      });
-    }
-    if (profile.studentStatus) items.push({ label: profile.studentStatus, tone: 'default' });
-    if (profile.shift) items.push({ label: profile.shift, tone: 'default' });
-    return items;
-  }, [profile]);
+  const active =
+    (profile.admissionStatus ?? '').toUpperCase() === 'ACTIVE' ||
+    (profile.academicStatus ?? '').toUpperCase() === 'ACTIVE';
 
   return (
-    <ErpWorkspace className="space-y-2">
-      <div className="glass-card flex flex-wrap items-center gap-2 rounded-xl border border-border/50 px-3 py-2">
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-bold">
-            <StudentName name={profile.fullName} displayFullName={profile.displayFullName} />
-          </h1>
-          <p className="text-[11px] text-muted-foreground">{profileIdentitySubtitle(profile)}</p>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {badges.map((b) => (
-            <span
-              key={b.label}
-              className={cn(
-                'rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
-                b.tone === 'success' && 'bg-emerald-500/15 text-emerald-700',
-                b.tone === 'warning' && 'bg-amber-500/15 text-amber-800',
-                b.tone === 'default' && 'bg-muted text-muted-foreground',
-              )}
+    <ErpWorkspace className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-5">
+        <p className="mb-2 text-xs text-slate-500">
+          <Link href="/admin/students" className="hover:text-blue-700">
+            Students
+          </Link>
+          <span className="px-1.5">/</span>
+          <span className="text-slate-700">Student Profile</span>
+        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+                <StudentName name={profile.fullName} displayFullName={profile.displayFullName} />
+              </h1>
+              <span
+                className={cn(
+                  'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                  active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600',
+                )}
+              >
+                {active
+                  ? 'Active'
+                  : profile.admissionStatus || profile.academicStatus || 'Inactive'}
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+              <span className="inline-flex items-center gap-1 font-mono">
+                <IdCard className="h-3.5 w-3.5 text-slate-400" />
+                {primaryStudentId(profile)}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
+                {profile.programme || '—'}
+              </span>
+              <span>Batch: {profile.batch || '—'}</span>
+              <span>Sem {profile.semester}</span>
+              <span className="inline-flex items-center gap-1">
+                <SunMedium className="h-3.5 w-3.5 text-amber-500" />
+                {profile.shift || '—'}
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/admin/students"
+              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'h-9')}
             >
-              {b.label}
-            </span>
-          ))}
+              Back to List
+            </Link>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => setTabWithUrl('id-card')}
+            >
+              <CreditCard className="mr-1.5 h-4 w-4" />
+              ID Card
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'h-9')}
+              >
+                <Download className="mr-1.5 h-4 w-4" />
+                Download
+                <ChevronDown className="ml-1 h-3.5 w-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setTabWithUrl('id-card')}>
+                  ID card
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setTabWithUrl('documents')}>
+                  Documents
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setTabWithUrl('overview');
+                window.dispatchEvent(new Event('student-profile-edit'));
+                document
+                  .getElementById('student-basic-information')
+                  ?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              Edit Profile
+            </Button>
+          </div>
         </div>
       </div>
 
       <div
-        className="sticky top-0 z-20 flex gap-0.5 overflow-x-auto rounded-xl border border-border/50 bg-muted/20 p-0.5 scrollbar-none"
+        className="sticky top-0 z-20 flex gap-1 overflow-x-auto border-b border-slate-200 bg-white/95 px-1 scrollbar-none"
         role="tablist"
       >
-        {PROFILE_TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.key}
-            onClick={() => setTabWithUrl(t.key)}
-            className={cn(
-              'shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors',
-              tab === t.key
-                ? 'bg-background text-primary shadow-sm ring-1 ring-border/60'
-                : 'text-muted-foreground hover:bg-background/60 hover:text-foreground',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
+        {PROFILE_TABS.map((item) => {
+          const Icon = TAB_ICONS[item.key];
+          const selected = tab === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setTabWithUrl(item.key)}
+              className={cn(
+                'inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-medium transition-colors sm:text-sm',
+                selected
+                  ? 'border-blue-600 text-blue-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800',
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </button>
+          );
+        })}
       </div>
 
       <ErpWorkspaceGrid
-        className={cn(tab === 'academic' && 'lg:grid-cols-[minmax(0,1fr)_minmax(240px,280px)]')}
+        className={cn(
+          tab === 'overview'
+            ? 'lg:grid-cols-1'
+            : tab === 'academic' && 'lg:grid-cols-[minmax(0,1fr)_minmax(240px,280px)]',
+        )}
         main={
           <div role="tabpanel" className="min-w-0">
             <ProfileTabPanel tab={tab} profile={profile} canEdit={canEdit} onRefresh={onRefresh} />
           </div>
         }
-        sidebar={
-          <ProfileSummarySidebar profile={profile} canEdit={canEdit} onRefresh={onRefresh} />
-        }
+        sidebar={tab === 'overview' ? null : <ProfileSummarySidebar profile={profile} />}
       />
     </ErpWorkspace>
   );

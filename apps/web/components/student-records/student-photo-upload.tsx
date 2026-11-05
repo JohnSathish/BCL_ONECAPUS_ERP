@@ -10,9 +10,20 @@ type Props = {
   disabled?: boolean;
   onSelect: (file: File) => void;
   pending?: boolean;
+  buttonLabel?: string;
+  size?: 'md' | 'lg';
+  hideButton?: boolean;
 };
 
-export function StudentPhotoUpload({ photoPath, disabled, onSelect, pending }: Props) {
+export function StudentPhotoUpload({
+  photoPath,
+  disabled,
+  onSelect,
+  pending,
+  buttonLabel = 'Upload photo',
+  size = 'md',
+  hideButton = false,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const resolvedPhoto = photoPath?.startsWith('blob:')
     ? photoPath
@@ -20,7 +31,13 @@ export function StudentPhotoUpload({ photoPath, disabled, onSelect, pending }: P
 
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+      <div
+        className={
+          size === 'lg'
+            ? 'flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm'
+            : 'flex h-16 w-16 items-center justify-center overflow-hidden rounded-md border border-border bg-muted'
+        }
+      >
         {resolvedPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={resolvedPhoto} alt="Student" className="h-full w-full object-cover" />
@@ -28,29 +45,31 @@ export function StudentPhotoUpload({ photoPath, disabled, onSelect, pending }: P
           <span className="text-[10px] text-muted-foreground">No photo</span>
         )}
       </div>
-      <div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          disabled={disabled || pending}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onSelect(file);
-            e.target.value = '';
-          }}
-        />
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={disabled || pending}
-          onClick={() => inputRef.current?.click()}
-        >
-          {pending ? 'Uploading…' : 'Upload photo'}
-        </Button>
-      </div>
+      {hideButton ? null : (
+        <div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            disabled={disabled || pending}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onSelect(file);
+              e.target.value = '';
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={disabled || pending}
+            onClick={() => inputRef.current?.click()}
+          >
+            {pending ? 'Uploading…' : buttonLabel}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

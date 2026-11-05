@@ -41,6 +41,18 @@ import { resolveUploadAssetUrl } from '@/lib/branding-asset';
 import { GENDER_OPTIONS, normalizeGenderCode } from '@/lib/students/gender';
 import { ExternalLink } from 'lucide-react';
 const STUDENT_STATUSES = ['STUDYING', 'ALUMNI', 'LEAVING', 'DETAINED', 'DROPPED'] as const;
+const MARITAL_OPTIONS = [
+  { value: 'SINGLE', label: 'Single' },
+  { value: 'MARRIED', label: 'Married' },
+] as const;
+
+function normalizeMaritalStatus(value: string | null | undefined) {
+  const raw = (value ?? '').trim();
+  const key = raw.toUpperCase();
+  if (key === 'SINGLE' || key === 'UNMARRIED') return 'SINGLE';
+  if (key === 'MARRIED') return 'MARRIED';
+  return raw;
+}
 
 const DOC_TYPES = [
   'MARKSHEETS_STD_X_ONWARDS',
@@ -108,7 +120,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
     mobileNumber: profile.mobileNumber ?? '',
     dateOfBirth: profile.dateOfBirth?.slice(0, 10) ?? '',
     gender: normalizeGenderCode(profile.gender) || profile.gender || '',
-    maritalStatus: profile.maritalStatus ?? '',
+    maritalStatus: normalizeMaritalStatus(profile.maritalStatus),
     nationalId: (profile.nationalId ?? '').replace(/\D/g, '').slice(0, 12),
     bloodGroupLookupId: profile.bloodGroupLookupId ?? '',
     studentStatus: profile.studentStatus ?? 'STUDYING',
@@ -146,8 +158,72 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
           : {}),
     };
   }, [form, aadhaarDigits]);
-  const { message, saving } = useDebouncedSave(profile.id, 'basic', savePayload, canEdit);
   const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [baseline, setBaseline] = useState(form);
+  const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
+  const saveMut = useMutation({
+    mutationFn: () => updateStudentProfileSection(profile.id, 'basic', savePayload),
+    onSuccess: () => {
+      setBaseline(form);
+      setEditing(false);
+      void qc.invalidateQueries({ queryKey: ['students', profile.id, 'profile'] });
+    },
+  });
+  useEffect(() => {
+    if (dirty || saveMut.isPending) return;
+    const next = {
+      applicationNumber: profile.applicationNumber ?? '',
+      admissionNumber: profile.admissionNumber ?? '',
+      enrollmentNumber: profile.enrollmentNumber,
+      fullName: profile.fullName,
+      email: profile.email ?? '',
+      mobileNumber: profile.mobileNumber ?? '',
+      dateOfBirth: profile.dateOfBirth?.slice(0, 10) ?? '',
+      gender: normalizeGenderCode(profile.gender) || profile.gender || '',
+      maritalStatus: normalizeMaritalStatus(profile.maritalStatus),
+      nationalId: (profile.nationalId ?? '').replace(/\D/g, '').slice(0, 12),
+      bloodGroupLookupId: profile.bloodGroupLookupId ?? '',
+      studentStatus: profile.studentStatus ?? 'STUDYING',
+      rfidNumber: profile.rfidNumber ?? '',
+      departmentId: profile.departmentId ?? '',
+    };
+    const serialized = JSON.stringify(next);
+    setForm((current) => (JSON.stringify(current) === serialized ? current : next));
+    setBaseline((current) => (JSON.stringify(current) === serialized ? current : next));
+  }, [
+    profile.applicationNumber,
+    profile.admissionNumber,
+    profile.enrollmentNumber,
+    profile.fullName,
+    profile.email,
+    profile.mobileNumber,
+    profile.dateOfBirth,
+    profile.gender,
+    profile.maritalStatus,
+    profile.nationalId,
+    profile.bloodGroupLookupId,
+    profile.studentStatus,
+    profile.rfidNumber,
+    profile.departmentId,
+    dirty,
+    saveMut.isPending,
+  ]);
+  useEffect(() => {
+    const openEditor = () => setEditing(true);
+    window.addEventListener('student-profile-edit', openEditor);
+    return () => window.removeEventListener('student-profile-edit', openEditor);
+  }, []);
+  useEffect(() => {
+    if (!dirty) return;
+    const onLeave = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onLeave);
+    return () => window.removeEventListener('beforeunload', onLeave);
+  }, [dirty]);
+  const locked = !canEdit || !editing;
   const [photoMessage, setPhotoMessage] = useState('');
   const photoMut = useMutation({
     mutationFn: (file: File) => uploadStudentPhoto(profile.id, file),
@@ -163,56 +239,99 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
     },
   });
 
+  const saveMessage = saveMut.isError
+    ? apiErrorMessage(saveMut.error, 'Save failed')
+    : saveMut.isSuccess && !dirty
+      ? 'Saved'
+      : '';
   const footerMessage = photoMut.isError
     ? apiErrorMessage(photoMut.error, 'Photo upload failed')
     : photoMut.isPending
       ? 'Uploading photo…'
-      : photoMessage || (saving ? 'Saving…' : message);
-  const footerIsError =
-    photoMut.isError || Boolean(message && message !== 'Saved' && !message.startsWith('Saving'));
+      : photoMessage || (saveMut.isPending ? 'Saving…' : saveMessage);
+  const footerIsError = photoMut.isError || saveMut.isError;
 
   return (
     <SectionCard
+      id="student-basic-information"
       title="Basic Information"
-      description="Identity, contact, and enrollment identifiers"
-      footer={footerMessage}
-      footerClassName={footerIsError ? 'text-destructive' : undefined}
+      description="Identity, contact and personal details"
+      action={
+        canEdit ? (
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+            onClick={() => setEditing((open) => !open)}
+          >
+            {editing ? 'Close' : 'Edit'}
+          </button>
+        ) : null
+      }
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className={footerIsError ? 'text-destructive' : undefined}>{footerMessage}</span>
+          {editing ? (
+            <span className="flex gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium"
+                onClick={() => {
+                  setForm(baseline);
+                  setEditing(false);
+                  saveMut.reset();
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                disabled={!dirty || saveMut.isPending || Boolean(aadhaarError)}
+                onClick={() => saveMut.mutate()}
+              >
+                {saveMut.isPending ? 'Saving…' : 'Save changes'}
+              </button>
+            </span>
+          ) : null}
+        </div>
+      }
     >
       <div className="mb-4">
         <StudentPhotoUpload
           photoPath={profile.photoPath}
+          size="lg"
+          buttonLabel="Update Photo"
           disabled={!canEdit || photoMut.isPending}
           onSelect={(file: File) => {
             photoMut.mutate(file);
           }}
         />
       </div>
-      <FieldGrid>
+      <FieldGrid columns="pair">
         {(
           [
             ['Application Number', 'applicationNumber'],
             ['Admission Number', 'admissionNumber'],
             ['Enrollment / Admission No.', 'enrollmentNumber'],
             ['Full Name', 'fullName'],
-            ['Personal email', 'email'],
-            ['Mobile', 'mobileNumber'],
+            ['Personal Email', 'email'],
+            ['Mobile Number', 'mobileNumber'],
             ['Date of Birth', 'dateOfBirth'],
-            ['Marital Status', 'maritalStatus'],
             ['RFID Number', 'rfidNumber'],
           ] as const
         ).map(([label, key]) => (
-          <Field key={key} label={label}>
+          <Field key={key} label={label} required={key === 'fullName' || key === 'dateOfBirth'}>
             {key === 'dateOfBirth' ? (
               <DateInput
                 className={inputClass}
-                disabled={!canEdit}
+                disabled={locked}
                 value={form.dateOfBirth}
                 onChange={(dateOfBirth) => setForm((f) => ({ ...f, dateOfBirth }))}
               />
             ) : (
               <input
                 className={inputClass}
-                disabled={!canEdit}
+                disabled={locked || key === 'enrollmentNumber'}
                 type={key === 'email' ? 'email' : 'text'}
                 value={form[key]}
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
@@ -226,10 +345,29 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
             ) : null}
           </Field>
         ))}
-        <Field label="Gender">
+        <Field label="Marital Status">
           <select
             className={inputClass}
-            disabled={!canEdit}
+            disabled={locked}
+            value={form.maritalStatus}
+            onChange={(e) => setForm((f) => ({ ...f, maritalStatus: e.target.value }))}
+          >
+            <option value="">Select marital status</option>
+            {MARITAL_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+            {form.maritalStatus &&
+            !MARITAL_OPTIONS.some((option) => option.value === form.maritalStatus) ? (
+              <option value={form.maritalStatus}>{form.maritalStatus}</option>
+            ) : null}
+          </select>
+        </Field>
+        <Field label="Gender" required>
+          <select
+            className={inputClass}
+            disabled={locked}
             value={normalizeGenderCode(form.gender) || form.gender || ''}
             onChange={(e) =>
               setForm((f) => ({
@@ -249,7 +387,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
         <Field label="Aadhaar Number">
           <input
             className={inputClass}
-            disabled={!canEdit}
+            disabled={locked}
             inputMode="numeric"
             maxLength={12}
             placeholder="12-digit Aadhaar"
@@ -268,7 +406,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
         <Field label="Blood Group">
           <select
             className={inputClass}
-            disabled={!canEdit || bloodGroups.isLoading}
+            disabled={locked || bloodGroups.isLoading}
             value={form.bloodGroupLookupId}
             onChange={(e) => setForm((f) => ({ ...f, bloodGroupLookupId: e.target.value }))}
           >
@@ -289,7 +427,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
         <Field label="Student Status">
           <select
             className={inputClass}
-            disabled={!canEdit}
+            disabled={locked}
             value={form.studentStatus}
             onChange={(e) => setForm((f) => ({ ...f, studentStatus: e.target.value }))}
           >
@@ -306,7 +444,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
         <Field label="Batch">
           <input className={inputClass} disabled value={profile.batch ?? ''} />
         </Field>
-        <Field label="Current Semester">
+        <Field label="Current Semester" required>
           <input className={inputClass} disabled value={String(profile.semester)} />
         </Field>
         <Field label="Shift">
@@ -316,7 +454,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
           <SearchableDepartmentSelect
             value={form.departmentId}
             options={departmentOptions}
-            disabled={!canEdit || departments.isLoading}
+            disabled={locked || departments.isLoading}
             placeholder="Select academic department"
             onChange={(departmentId) => setForm((f) => ({ ...f, departmentId }))}
           />
@@ -367,7 +505,7 @@ export function AcademicIdentitySection({
       description="NEP / UGC identifiers and ERP student reference"
       footer={saving ? 'Saving…' : message}
     >
-      <FieldGrid>
+      <FieldGrid columns="pair">
         <Field label="ABC ID">
           <input
             className={inputClass}

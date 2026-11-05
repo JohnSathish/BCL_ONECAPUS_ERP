@@ -74,18 +74,34 @@ export function SectionCard({
   children,
   footer,
   footerClassName,
+  action,
+  id,
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
   footerClassName?: string;
+  action?: React.ReactNode;
+  id?: string;
 }) {
   return (
-    <div className="glass-card overflow-hidden rounded-xl border border-border/50 bg-card/80">
-      <div className="border-b border-border/50 px-4 py-3 sm:px-5">
-        <h2 className="text-sm font-semibold sm:text-base">{title}</h2>
-        {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
+    <div
+      id={id}
+      className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm dark:border-border dark:bg-card"
+    >
+      <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5 dark:border-border/60">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-slate-900 sm:text-[15px] dark:text-foreground">
+            {title}
+          </h2>
+          {description ? (
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-muted-foreground">
+              {description}
+            </p>
+          ) : null}
+        </div>
+        {action}
       </div>
       <div className="space-y-3 p-4 sm:p-5">{children}</div>
       {footer ? (
@@ -102,18 +118,44 @@ export function SectionCard({
   );
 }
 
-export function FieldGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">{children}</div>;
+export function FieldGrid({
+  children,
+  columns = 'wide',
+}: {
+  children: React.ReactNode;
+  columns?: 'pair' | 'wide';
+}) {
+  return (
+    <div
+      className={cn(
+        'grid gap-3',
+        columns === 'pair' ? 'sm:grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-3',
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({
+  label,
+  children,
+  required,
+}: {
+  label: string;
+  children: React.ReactNode;
+  required?: boolean;
+}) {
   return (
-    <label className="block space-y-1 text-sm">
-      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+    <label className="block space-y-1.5 text-sm">
+      <span className="text-xs font-medium text-slate-600 dark:text-muted-foreground">
+        {label}
+        {required ? <span className="ml-0.5 text-red-500">*</span> : null}
+      </span>
       {children}
     </label>
   );
 }
 
 export const inputClass =
-  'h-9 w-full rounded-lg border border-border/60 bg-background px-3 text-sm';
+  'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-700 dark:border-border dark:bg-background dark:text-foreground dark:disabled:bg-muted/40';
