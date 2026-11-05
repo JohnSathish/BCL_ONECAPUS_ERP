@@ -44,13 +44,13 @@ export function emailInfoRows(
     .map(
       (row) => `
       <tr>
-        <td style="padding:10px 14px;border-bottom:1px solid #e8eef5;font-size:12px;color:#64748b;width:38%;vertical-align:top;">${row.label}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e8eef5;font-size:14px;color:#0f172a;font-weight:600;vertical-align:top;">${row.value}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #e8eef5;font-size:12px;letter-spacing:0.02em;color:#64748b;width:38%;vertical-align:top;background:#f8fafc;">${row.label}</td>
+        <td style="padding:12px 16px;border-bottom:1px solid #e8eef5;font-size:14px;color:#0f172a;font-weight:600;vertical-align:top;">${row.value}</td>
       </tr>`,
     )
     .join('');
   return `
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:16px 0;border:1px solid #dbe4f0;border-radius:12px;overflow:hidden;background:#ffffff;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:18px 0;border:1px solid #dbe4f0;border-radius:14px;overflow:hidden;background:#ffffff;">
     ${cells}
   </table>`;
 }
@@ -59,8 +59,8 @@ export function emailCtaButton(label: string, href = '{{login_url}}'): string {
   return `
   <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 8px;">
     <tr>
-      <td align="center" bgcolor="#1d4ed8" style="border-radius:10px;">
-        <a href="${href}" target="_blank" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;font-family:Segoe UI,Arial,sans-serif;">
+      <td align="center" bgcolor="#0f3c89" style="border-radius:12px;">
+        <a href="${href}" target="_blank" style="display:inline-block;padding:14px 26px;font-size:15px;font-weight:700;letter-spacing:0.01em;color:#ffffff;text-decoration:none;border-radius:12px;font-family:Segoe UI,Arial,sans-serif;">
           ${label}
         </a>
       </td>

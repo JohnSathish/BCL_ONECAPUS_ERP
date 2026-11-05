@@ -155,65 +155,59 @@ export class BrandedEmailLayoutService {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="color-scheme" content="light dark"/>
-  <meta name="supported-color-schemes" content="light dark"/>
+  <meta name="color-scheme" content="light"/>
   <title>${title}</title>
   <style>
-    @media (prefers-color-scheme: dark) {
-      .email-shell { background:#0f172a !important; }
-      .email-card { background:#1e293b !important; }
-      .email-body, .email-body p, .email-body td { color:#e2e8f0 !important; }
-      .email-footer { background:#0b1220 !important; color:#94a3b8 !important; }
-      .email-title { color:#f8fafc !important; }
-    }
     @media only screen and (max-width: 620px) {
       .email-container { width:100% !important; }
-      .email-pad { padding:20px 16px !important; }
+      .email-pad { padding:22px 16px !important; }
     }
   </style>
 </head>
-<body class="email-shell" style="margin:0;padding:0;background:#eef2f7;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef2f7;padding:24px 12px;">
+<body class="email-shell" style="margin:0;padding:0;background:#e8eef6;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${title} — ${name}</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#e8eef6;padding:28px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" class="email-container" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(15,23,42,0.08);" bgcolor="#ffffff">
+        <table role="presentation" class="email-container" cellpadding="0" cellspacing="0" width="600" style="width:600px;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #d7e2f0;" bgcolor="#ffffff">
           <tr>
-            <td style="background:${primary};padding:22px 28px;">
+            <td style="background:${primary};padding:26px 28px 22px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td width="72" valign="middle">${logoBlock}</td>
                   <td valign="middle" style="padding-left:14px;">
-                    <div style="font-size:18px;font-weight:700;color:#ffffff;line-height:1.3;">${name}</div>
-                    <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:4px;">${tagline}</div>
+                    <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.75);">Official message</div>
+                    <div style="font-size:20px;font-weight:700;color:#ffffff;line-height:1.25;margin-top:4px;">${name}</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,0.88);margin-top:4px;">${tagline}</div>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
           <tr>
-            <td style="height:4px;background:${accent};font-size:0;line-height:0;">&nbsp;</td>
+            <td style="height:3px;background:${accent};font-size:0;line-height:0;">&nbsp;</td>
           </tr>
           <tr>
-            <td class="email-card email-pad" style="padding:28px 32px 8px;background:#ffffff;">
-              <h1 class="email-title" style="margin:0 0 18px;font-size:22px;line-height:1.3;color:#0f172a;font-weight:700;">${title}</h1>
-              <div class="email-body" style="font-size:15px;line-height:1.65;color:#334155;">
+            <td class="email-card email-pad" style="padding:28px 32px 12px;background:#ffffff;">
+              <h1 class="email-title" style="margin:0 0 16px;font-size:22px;line-height:1.35;color:#0f2744;font-weight:700;">${title}</h1>
+              <div class="email-body" style="font-size:15px;line-height:1.7;color:#334155;">
                 ${body}
               </div>
             </td>
           </tr>
           <tr>
-            <td class="email-footer email-pad" style="padding:22px 32px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+            <td class="email-footer email-pad" style="padding:20px 32px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td width="48" valign="top">
                     ${
                       logo
-                        ? `<img src="${logo}" alt="${name}" width="40" height="40" style="display:block;width:40px;height:40px;border-radius:8px;object-fit:contain;"/>`
+                        ? `<img src="${logo}" alt="${name}" width="40" height="40" style="display:block;width:40px;height:40px;border-radius:10px;object-fit:contain;background:#ffffff;"/>`
                         : ''
                     }
                   </td>
-                  <td valign="top" style="padding-left:10px;font-size:12px;line-height:1.6;color:#64748b;">
-                    <strong style="color:#334155;">${name}</strong><br/>
+                  <td valign="top" style="padding-left:12px;font-size:12px;line-height:1.65;color:#64748b;">
+                    <strong style="color:#0f2744;font-size:13px;">${name}</strong><br/>
                     ${contactBits || 'Official campus communication'}
                     ${customFooter ? `<div style="margin-top:10px;">${customFooter}</div>` : ''}
                     ${poweredBy}
