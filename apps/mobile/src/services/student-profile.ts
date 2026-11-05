@@ -56,6 +56,7 @@ export type ProfileBootstrap = {
 
 export type ClassXiiPayload = {
   boardName?: string | null;
+  boardNameOther?: string | null;
   schoolName?: string | null;
   boardRollNumber?: string | null;
   registrationNumber?: string | null;

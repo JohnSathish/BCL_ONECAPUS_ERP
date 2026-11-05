@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
 import { useStudentPortal } from '@/components/student-portal/student-portal-context';
@@ -138,6 +139,7 @@ export default function CompleteProfileScreen() {
   const [savingEmergency, setSavingEmergency] = useState(false);
   const [classXii, setClassXii] = useState({
     boardName: '',
+    boardNameOther: '',
     schoolName: '',
     boardRollNumber: '',
     registrationNumber: '',
@@ -222,6 +224,7 @@ export default function CompleteProfileScreen() {
     const exam = data.sections?.class_xii ?? null;
     setClassXii({
       boardName: String(exam?.boardName ?? ''),
+      boardNameOther: String(exam?.boardNameOther ?? ''),
       schoolName: String(exam?.schoolName ?? ''),
       boardRollNumber: String(exam?.boardRollNumber ?? ''),
       registrationNumber: String(exam?.registrationNumber ?? ''),
@@ -590,6 +593,10 @@ export default function CompleteProfileScreen() {
       if (!classXii.boardName.trim() || !classXii.stream.trim() || !classXii.examYear.trim()) {
         throw new Error('Board, stream, and year of passing are required');
       }
+      const othersBoard = ['OTHERS', 'OTHER'].includes(classXii.boardName.trim().toUpperCase());
+      if (othersBoard && !classXii.boardNameOther.trim()) {
+        throw new Error('Enter the board name');
+      }
       const subjectPayload = subjects
         .filter((s) => s.subjectName.trim())
         .map((s) => ({
@@ -607,6 +614,9 @@ export default function CompleteProfileScreen() {
       }
       await upsertMyClassXii({
         boardName: classXii.boardName || null,
+        boardNameOther: ['OTHERS', 'OTHER'].includes(classXii.boardName.trim().toUpperCase())
+          ? classXii.boardNameOther.trim()
+          : undefined,
         schoolName: classXii.schoolName || null,
         boardRollNumber: classXii.boardRollNumber || null,
         registrationNumber: classXii.registrationNumber || null,
@@ -842,23 +852,44 @@ export default function CompleteProfileScreen() {
           />
           <Text style={styles.label}>Blood Group *</Text>
           <Pressable
-            style={[styles.fieldRow, !canEditProfile && { opacity: 0.5 }]}
+            style={[styles.bloodSelect, !canEditProfile && { opacity: 0.5 }]}
             disabled={!canEditProfile}
             onPress={() => setBloodPickerOpen(true)}
           >
-            <Text style={styles.fieldIcon}>🩸</Text>
+            <View style={styles.bloodIconWrap}>
+              <Text style={styles.bloodIcon}>🩸</Text>
+            </View>
             <Text
-              style={{
-                flex: 1,
-                fontSize: 16,
-                color: bloodGroupLookupId ? studentTheme.text : '#94a3b8',
-              }}
+              style={[styles.bloodSelectText, !bloodGroupLookupId && styles.bloodSelectPlaceholder]}
             >
               {bloodOptions.find((opt) => opt.id === bloodGroupLookupId)?.label ||
-                'Select blood group'}
+                'Select your blood group'}
             </Text>
+            <Text style={styles.bloodChevron}>▾</Text>
           </Pressable>
-          <Text style={styles.hint}>A+, A-, B+, B-, AB+, AB-, O+, or O-.</Text>
+          <Text style={styles.example}>Choose your blood group</Text>
+          <View style={styles.bloodGrid}>
+            {bloodOptions.map((opt) => {
+              const active = opt.id === bloodGroupLookupId;
+              return (
+                <Pressable
+                  key={opt.id}
+                  style={[
+                    styles.bloodChip,
+                    active && styles.bloodChipOn,
+                    !canEditProfile && { opacity: 0.5 },
+                  ]}
+                  disabled={!canEditProfile}
+                  onPress={() => setBloodGroupLookupId(opt.id)}
+                >
+                  {active ? <Text style={styles.bloodCheck}>✓</Text> : null}
+                  <Text style={[styles.bloodChipText, active && styles.bloodChipTextOn]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <Text style={styles.label}>Aadhaar Number *</Text>
           <TextInput
             style={styles.input}
@@ -893,74 +924,103 @@ export default function CompleteProfileScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Category & Reservation</Text>
-          <Text style={styles.sectionHint}>
-            Category, religion, tribe, denomination, and reservation details
-          </Text>
-          {(
-            [
-              ['category', 'Category'],
-              ['religion', 'Religion'],
-              ['tribe', 'Tribe'],
-              ['denomination', 'Denomination'],
-            ] as const
-          ).map(([key, label]) => {
-            const selected = reservationLists[key].find((row) => row.id === reservationValues[key]);
-            return (
-              <View key={key}>
-                <Text style={styles.label}>{label}</Text>
-                <Pressable
-                  style={[styles.fieldRow, !canEditProfile && { opacity: 0.5 }]}
-                  disabled={!canEditProfile}
-                  onPress={() => {
-                    setReservationSearch('');
-                    setReservationPicker(key);
-                  }}
-                >
-                  <Text
-                    style={{
-                      flex: 1,
-                      fontSize: 16,
-                      color: selected ? studentTheme.text : '#94a3b8',
+        <View style={[styles.card, styles.reserveCard]}>
+          <View style={styles.reserveHeader}>
+            <View style={[styles.reserveIconBox, styles.reserveHeaderIcon]}>
+              <Ionicons name="people-outline" size={20} color={studentTheme.primary} />
+            </View>
+            <View style={styles.reserveHeaderText}>
+              <Text style={styles.reserveTitle}>Category & Reservation</Text>
+              <Text style={styles.reserveSubtitle}>
+                Category, religion, tribe, denomination, and reservation details
+              </Text>
+            </View>
+          </View>
+          <View style={styles.reserveBody}>
+            {(
+              [
+                ['category', 'Category', 'pricetag-outline', 'Select category'],
+                ['religion', 'Religion', 'home-outline', 'Select religion'],
+                ['tribe', 'Tribe', 'people-outline', 'Select tribe'],
+                ['denomination', 'Denomination', 'layers-outline', 'Select denomination'],
+              ] as const
+            ).map(([key, label, icon, placeholder]) => {
+              const selected = reservationLists[key].find(
+                (row) => row.id === reservationValues[key],
+              );
+              return (
+                <View key={key}>
+                  <Text style={styles.reserveLabel}>{label}</Text>
+                  <Pressable
+                    style={[styles.reserveField, !canEditProfile && { opacity: 0.5 }]}
+                    disabled={!canEditProfile}
+                    onPress={() => {
+                      setReservationSearch('');
+                      setReservationPicker(key);
                     }}
                   >
-                    {selected?.label || `Select ${label.toLowerCase()}`}
-                  </Text>
-                </Pressable>
-              </View>
-            );
-          })}
-          {(
-            [
-              ['Differently Abled', differentlyAbled, setDifferentlyAbled],
-              ['Economically Weaker Section (EWS)', ews, setEws],
-            ] as const
-          ).map(([label, checked, setChecked]) => (
+                    <Ionicons name={icon} size={18} color={studentTheme.primaryLight} />
+                    <Text style={[styles.reserveFieldText, !selected && styles.reservePlaceholder]}>
+                      {selected?.label || placeholder}
+                    </Text>
+                    {key === 'category' ? null : (
+                      <Ionicons name="chevron-down" size={18} color="#94A3B8" />
+                    )}
+                  </Pressable>
+                </View>
+              );
+            })}
+            {(
+              [
+                [
+                  'Differently Abled',
+                  differentlyAbled ? 'Yes' : 'No',
+                  differentlyAbled,
+                  setDifferentlyAbled,
+                  'accessibility-outline',
+                ],
+                [
+                  'Economically Weaker Section (EWS)',
+                  ews ? 'Selected' : 'Not selected',
+                  ews,
+                  setEws,
+                  'cash-outline',
+                ],
+              ] as const
+            ).map(([label, status, checked, setChecked, icon]) => (
+              <Pressable
+                key={label}
+                style={[styles.reserveOption, !canEditProfile && { opacity: 0.5 }]}
+                disabled={!canEditProfile}
+                onPress={() => setChecked(!checked)}
+              >
+                <View style={styles.reserveIconBox}>
+                  <Ionicons name={icon} size={20} color={studentTheme.primary} />
+                </View>
+                <View style={styles.reserveOptionCopy}>
+                  <Text style={styles.reserveOptionTitle}>{label}</Text>
+                  <Text style={styles.reserveOptionStatus}>{status}</Text>
+                </View>
+                <View style={[styles.reserveCheck, checked && styles.reserveCheckOn]}>
+                  {checked ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
+                </View>
+              </Pressable>
+            ))}
             <Pressable
-              key={label}
-              style={[styles.checkRow, !canEditProfile && { opacity: 0.5 }]}
-              disabled={!canEditProfile}
-              onPress={() => setChecked(!checked)}
+              style={({ pressed }) => [
+                styles.reserveSave,
+                pressed && !savingReservation && { opacity: 0.88 },
+                (savingReservation || !canEditProfile) && { opacity: 0.6 },
+              ]}
+              onPress={() => void onSaveReservation()}
+              disabled={savingReservation || !canEditProfile}
             >
-              <View style={[styles.checkBox, checked && styles.checkBoxOn]}>
-                {checked ? <Text style={styles.checkTick}>✓</Text> : null}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.checkTitle}>{label}</Text>
-                <Text style={styles.hint}>{checked ? 'Yes' : 'No'}</Text>
-              </View>
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
+              <Text style={styles.reserveSaveText}>
+                {savingReservation ? 'Saving…' : 'Save category and reservation'}
+              </Text>
             </Pressable>
-          ))}
-          <Pressable
-            style={[styles.button, !canEditProfile && { opacity: 0.5 }]}
-            onPress={() => void onSaveReservation()}
-            disabled={savingReservation || !canEditProfile}
-          >
-            <Text style={styles.buttonText}>
-              {savingReservation ? 'Saving…' : 'Save category and reservation'}
-            </Text>
-          </Pressable>
+          </View>
         </View>
 
         {bootstrap?.visibleSections?.bank ? (
@@ -1147,6 +1207,18 @@ export default function CompleteProfileScreen() {
               );
             })}
           </View>
+          {['OTHERS', 'OTHER'].includes(classXii.boardName.trim().toUpperCase()) ? (
+            <>
+              <Text style={styles.label}>Enter Board Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={classXii.boardNameOther}
+                placeholder="e.g. Assam State School Education Board"
+                placeholderTextColor="#94a3b8"
+                onChangeText={(t) => setClassXii((p) => ({ ...p, boardNameOther: t }))}
+              />
+            </>
+          ) : null}
           <Text style={styles.label}>Stream *</Text>
           <View style={styles.chipRow}>
             {CLASS12_STREAMS.map((s) => {
@@ -1439,17 +1511,28 @@ export default function CompleteProfileScreen() {
                 ListEmptyComponent={
                   <Text style={styles.hint}>Blood group options are not available yet.</Text>
                 }
-                renderItem={({ item }) => (
-                  <Pressable
-                    style={styles.pickerRow}
-                    onPress={() => {
-                      setBloodGroupLookupId(item.id);
-                      setBloodPickerOpen(false);
-                    }}
-                  >
-                    <Text style={{ color: studentTheme.text, fontSize: 16 }}>{item.label}</Text>
-                  </Pressable>
-                )}
+                renderItem={({ item }) => {
+                  const selected = item.id === bloodGroupLookupId;
+                  return (
+                    <Pressable
+                      style={[styles.pickerRow, selected && styles.bloodPickerOn]}
+                      onPress={() => {
+                        setBloodGroupLookupId(item.id);
+                        setBloodPickerOpen(false);
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: selected ? studentTheme.primary : studentTheme.text,
+                          fontSize: 16,
+                          fontWeight: selected ? '800' : '500',
+                        }}
+                      >
+                        {selected ? `✓  ${item.label}` : item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                }}
               />
               <Pressable style={styles.secondaryButton} onPress={() => setBloodPickerOpen(false)}>
                 <Text style={styles.secondaryButtonText}>Cancel</Text>
@@ -1595,6 +1678,49 @@ const styles = StyleSheet.create({
     borderColor: studentTheme.primary,
     backgroundColor: `${studentTheme.primary}18`,
   },
+  bloodSelect: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+  },
+  bloodIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bloodIcon: { fontSize: 16 },
+  bloodSelectText: { flex: 1, fontSize: 15, fontWeight: '600', color: studentTheme.text },
+  bloodSelectPlaceholder: { color: '#94A3B8', fontWeight: '500' },
+  bloodChevron: { fontSize: 16, color: '#94A3B8', paddingHorizontal: 4 },
+  bloodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  bloodChip: {
+    flexGrow: 1,
+    flexBasis: '22%',
+    minWidth: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 999,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+  },
+  bloodChipOn: { backgroundColor: studentTheme.primary, borderColor: studentTheme.primary },
+  bloodChipText: { fontSize: 14, fontWeight: '700', color: '#334155' },
+  bloodChipTextOn: { color: '#fff' },
+  bloodCheck: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  bloodPickerOn: { backgroundColor: '#EFF6FF' },
   chipText: { fontSize: 12, fontWeight: '600', color: studentTheme.textMuted },
   chipTextActive: { color: studentTheme.primary },
   subjectCard: {
@@ -1676,4 +1802,76 @@ const styles = StyleSheet.create({
   },
   checkTick: { color: '#fff', fontSize: 14, fontWeight: '800' },
   checkTitle: { fontSize: 14, fontWeight: '700', color: studentTheme.text },
+  reserveCard: { padding: 0, overflow: 'hidden' },
+  reserveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#EAF2FF',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  reserveHeaderText: { flex: 1, gap: 2 },
+  reserveTitle: { fontSize: 16, fontWeight: '800', color: '#0F2744' },
+  reserveSubtitle: { fontSize: 12, lineHeight: 16, color: '#64748B' },
+  reserveIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#E8F1FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reserveHeaderIcon: { backgroundColor: '#F7FAFF' },
+  reserveBody: { padding: 14, gap: 12 },
+  reserveLabel: { marginBottom: 6, fontSize: 13, fontWeight: '700', color: '#0F2744' },
+  reserveField: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+  },
+  reserveFieldText: { flex: 1, fontSize: 15, fontWeight: '600', color: studentTheme.text },
+  reservePlaceholder: { color: '#94A3B8', fontWeight: '500' },
+  reserveOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#D6E6FF',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#F5F9FF',
+  },
+  reserveOptionCopy: { flex: 1 },
+  reserveOptionTitle: { fontSize: 14, fontWeight: '800', color: '#0F2744' },
+  reserveOptionStatus: { marginTop: 2, fontSize: 12, color: '#64748B' },
+  reserveCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reserveCheckOn: { borderColor: studentTheme.primary, backgroundColor: studentTheme.primary },
+  reserveSave: {
+    marginTop: 4,
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: studentTheme.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  reserveSaveText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 });
