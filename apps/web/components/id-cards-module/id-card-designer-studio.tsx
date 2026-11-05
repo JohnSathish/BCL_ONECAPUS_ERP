@@ -590,9 +590,9 @@ export function IdCardDesignerStudio() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] min-h-[640px] flex-col overflow-hidden rounded-xl border border-border bg-background">
+    <div className="flex h-[calc(100dvh-4rem)] min-h-[640px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
       {/* Top toolbar */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2">
         <Link
           href="/admin/id-cards/templates"
           className="text-xs text-muted-foreground hover:text-foreground"
@@ -613,7 +613,10 @@ export function IdCardDesignerStudio() {
           onChange={(e) => setTemplateName(e.target.value)}
           placeholder="Template name"
         />
-        <div className="flex gap-1">
+        <span className="hidden rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-white md:inline">
+          CR80 · {CR80_WIDTH_MM}×{CR80_HEIGHT_MM} mm · 300 DPI
+        </span>
+        <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5">
           {(['front', 'back', 'both'] as DesignerViewMode[]).map((m) => (
             <Button
               key={m}
@@ -720,7 +723,7 @@ export function IdCardDesignerStudio() {
       </div>
 
       {/* Alignment + style bar */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/15 px-4 py-1.5 text-xs">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-1.5 text-xs">
         <span className="font-medium text-muted-foreground">Style preset</span>
         <select
           className="h-7 rounded border border-border bg-background px-2 text-xs"
@@ -832,7 +835,7 @@ export function IdCardDesignerStudio() {
 
       <div className="flex min-h-0 flex-1">
         {/* Left panel */}
-        <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-muted/10">
+        <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
           <div className="flex border-b border-border text-[10px] font-semibold uppercase">
             {(['components', 'templates', 'layers'] as const).map((tab) => (
               <button
@@ -917,7 +920,7 @@ export function IdCardDesignerStudio() {
         {/* Center canvas */}
         <main
           ref={canvasHostRef}
-          className="relative flex min-w-0 flex-1 flex-col overflow-auto bg-slate-200/40 dark:bg-slate-900/40"
+          className="relative flex min-w-0 flex-1 flex-col overflow-auto bg-slate-100 bg-[radial-gradient(circle_at_1px_1px,#cbd5e1_1px,transparent_0)] [background-size:18px_18px]"
         >
           <div className="sticky top-0 z-10 flex">
             <div style={{ width: DESIGNER_RULER_SIZE }} />
@@ -928,13 +931,23 @@ export function IdCardDesignerStudio() {
               <DesignerRulerVertical zoom={zoom} heightPx={canvasSize.height} />
               <div className="flex flex-wrap items-start justify-center gap-8">
                 {(viewMode === 'front' || viewMode === 'both') && (
-                  <div className="shadow-2xl ring-1 ring-black/10">
-                    <Cr80CardFront {...frontCanvasProps} />
+                  <div>
+                    <div className="shadow-2xl ring-1 ring-slate-900/10">
+                      <Cr80CardFront {...frontCanvasProps} />
+                    </div>
+                    <p className="mt-2 text-center text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                      Front · live data
+                    </p>
                   </div>
                 )}
                 {(viewMode === 'back' || viewMode === 'both') && (
-                  <div className="shadow-2xl ring-1 ring-black/10">
-                    <Cr80CardBack {...backCanvasProps} />
+                  <div>
+                    <div className="shadow-2xl ring-1 ring-slate-900/10">
+                      <Cr80CardBack {...backCanvasProps} />
+                    </div>
+                    <p className="mt-2 text-center text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                      Back · live data
+                    </p>
                   </div>
                 )}
               </div>
@@ -943,8 +956,22 @@ export function IdCardDesignerStudio() {
         </main>
 
         {/* Right properties */}
-        <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-border bg-muted/10 p-3 text-xs">
-          <p className="font-semibold">Properties</p>
+        <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-white p-3 text-xs">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            Inspector
+          </p>
+          <p className="mb-2 font-semibold text-slate-900">
+            {selectedElement
+              ? selectedElement.label || selectedElement.fieldKey || selectedElement.type
+              : selectedBackground
+                ? 'Background'
+                : 'Card'}
+          </p>
+          {selectedElement?.fieldKey ? (
+            <p className="mb-2 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-800">
+              Bound to live {selectedElement.fieldKey}
+            </p>
+          ) : null}
           <DesignerPropertiesPanel
             selectedElement={selectedElement}
             selectedBackground={selectedBackground}
@@ -1085,7 +1112,7 @@ export function IdCardDesignerStudio() {
       </div>
 
       {/* Bottom bar */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-border bg-muted/30 px-4 py-2 text-xs">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-slate-200 bg-white px-3 py-2 text-xs">
         <span className="font-medium text-muted-foreground">Zoom:</span>
         {ZOOM_PRESETS.map((z) => (
           <Button

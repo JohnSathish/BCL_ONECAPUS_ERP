@@ -1,6 +1,20 @@
 'use client';
 
-import { Image, Search } from 'lucide-react';
+import {
+  Building2,
+  Circle,
+  GraduationCap,
+  Phone,
+  Image,
+  Minus,
+  QrCode,
+  Search,
+  Shield,
+  Square,
+  Type,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { IdCardBackgroundUploader } from '@/components/id-cards/id-card-background-uploader';
 import { backgroundForSide } from '@/components/id-cards/id-card-background-utils';
@@ -26,6 +40,26 @@ type Props = {
   onBackgroundUploaded: (result: BackgroundUploadResult) => void;
   onAddItem: (item: IdCardCatalogItem) => void;
 };
+
+const CATEGORY_ICON: Record<string, LucideIcon> = {
+  text: Type,
+  shapes: Square,
+  images: Image,
+  student: UserRound,
+  academic: GraduationCap,
+  contact: Phone,
+  parent: UserRound,
+  institution: Building2,
+  staff: UserRound,
+  system: Shield,
+};
+
+function iconForItem(item: IdCardCatalogItem): LucideIcon {
+  if (item.fieldKey === 'qr' || item.fieldKey === 'barcode') return QrCode;
+  if (item.shapeKind === 'circle') return Circle;
+  if (item.shapeKind === 'line' || item.shapeKind === 'divider') return Minus;
+  return CATEGORY_ICON[item.category] ?? Square;
+}
 
 function payloadForItem(item: IdCardCatalogItem): PaletteDragPayload {
   if (item.kind === 'shape') {
@@ -82,26 +116,32 @@ export function DesignerElementsPanel({
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               {group.label}
             </p>
-            <div className="space-y-1">
-              {group.items.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  draggable
-                  className="flex w-full cursor-grab items-center rounded-md border border-border px-2 py-1.5 text-left active:cursor-grabbing hover:bg-muted"
-                  onClick={() => onAddItem(item)}
-                  onDragStart={(e) => {
-                    const payload = payloadForItem(item);
-                    const json = serializePalettePayload(payload);
-                    e.dataTransfer.setData(PALETTE_ELEMENT_MIME, json);
-                    e.dataTransfer.setData(PALETTE_MIME, item.fieldKey ?? json);
-                    e.dataTransfer.setData('text/plain', item.fieldKey ?? json);
-                    e.dataTransfer.effectAllowed = 'copy';
-                  }}
-                >
-                  + {item.defaultLabel}
-                </button>
-              ))}
+            <div className="grid grid-cols-1 gap-1">
+              {group.items.map((item) => {
+                const Icon = iconForItem(item);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    draggable
+                    className="flex w-full cursor-grab items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left shadow-sm active:cursor-grabbing hover:border-blue-300 hover:bg-blue-50"
+                    onClick={() => onAddItem(item)}
+                    onDragStart={(e) => {
+                      const payload = payloadForItem(item);
+                      const json = serializePalettePayload(payload);
+                      e.dataTransfer.setData(PALETTE_ELEMENT_MIME, json);
+                      e.dataTransfer.setData(PALETTE_MIME, item.fieldKey ?? json);
+                      e.dataTransfer.setData('text/plain', item.fieldKey ?? json);
+                      e.dataTransfer.effectAllowed = 'copy';
+                    }}
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700">
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="truncate">{item.defaultLabel}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
