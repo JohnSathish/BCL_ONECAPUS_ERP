@@ -232,21 +232,13 @@ export default function StudentFeesScreen() {
       <StudentScreenShell title="Fees" subtitle="Fee Module">
         <View style={styles.centered}>
           <Text style={styles.lockEmoji}>🔒</Text>
-          <Text style={styles.lockTitle}>Fee Module</Text>
+          <Text style={styles.lockTitle}>
+            {account.statusMessage?.trim() || 'Fee Module Not Yet Enabled'}
+          </Text>
           <Text style={styles.lockBody}>
             {account.lockMessage ??
-              'The fee module has not been activated yet. Fee details will be available once the college officially publishes the fee demand.'}
+              'Fee details will be available once the college officially publishes the fee demand.'}
           </Text>
-          <View style={styles.lockZeros}>
-            <View style={styles.lockZeroCell}>
-              <Text style={styles.muted}>Due Amount</Text>
-              <Text style={styles.lockZeroValue}>{formatInr(0)}</Text>
-            </View>
-            <View style={styles.lockZeroCell}>
-              <Text style={styles.muted}>Demand Amount</Text>
-              <Text style={styles.lockZeroValue}>{formatInr(0)}</Text>
-            </View>
-          </View>
         </View>
       </StudentScreenShell>
     );
@@ -704,23 +696,6 @@ const styles = StyleSheet.create({
   lockEmoji: { fontSize: 36, marginBottom: 4 },
   lockTitle: { fontSize: 20, fontWeight: '700', color: '#0f172a', textAlign: 'center' },
   lockBody: { color: '#64748b', textAlign: 'center', lineHeight: 20, maxWidth: 320 },
-  lockZeros: {
-    marginTop: 16,
-    width: '100%',
-    maxWidth: 320,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  lockZeroCell: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    padding: 12,
-    backgroundColor: '#f8fafc',
-    gap: 4,
-  },
-  lockZeroValue: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
   muted: { color: '#666' },
   summaryRow: { flexDirection: 'row', gap: 10 },
   summaryCard: {

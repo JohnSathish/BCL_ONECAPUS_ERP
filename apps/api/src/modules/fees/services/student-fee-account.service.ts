@@ -13,6 +13,7 @@ import { FeeFinanceSettingsService } from './fee-finance-settings.service';
 import { FeeFineEngineService } from './fee-fine-engine.service';
 import { MonthlyFeeEngineService } from './monthly-fee-engine.service';
 import { StudentFeeSummaryService } from './student-fee-summary.service';
+import { FEE_MODULE_NOT_ENABLED_MESSAGE } from '../student-fee-portal-status';
 
 @Injectable()
 export class StudentFeeAccountService {
@@ -46,12 +47,25 @@ export class StudentFeeAccountService {
     }
     const settings = await this.financeSettings.get(tenantId);
     // Student portal only — admin fee desk still uses getAccount() for real balances.
-    if (settings.studentPortalFeesEnabled === false) {
+    const demandPublished =
+      settings.studentPortalFeesEnabled !== false &&
+      Boolean(
+        await this.db().studentFeeDemand.findFirst({
+          where: {
+            tenantId,
+            status: { in: ['PUBLISHED', 'LOCKED', 'PARTIALLY_PAID', 'PAID'] },
+          },
+          select: { id: true },
+        }),
+      );
+    if (settings.studentPortalFeesEnabled === false || !demandPublished) {
       return {
         studentId: student.id,
         moduleLocked: true,
+        moduleEnabled: false,
+        statusMessage: FEE_MODULE_NOT_ENABLED_MESSAGE,
         lockMessage:
-          'The fee module has not been activated yet. Fee details will be available once the college officially publishes the fee demand.',
+          'Fee details will be available once the college officially publishes the fee demand.',
         summary: {
           totalOutstanding: 0,
           totalPaid: 0,

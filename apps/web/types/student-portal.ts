@@ -66,6 +66,8 @@ export type StudentDashboardView = {
     status: 'PAID' | 'PENDING' | 'LOCKED';
     semesterLabel: string;
     moduleLocked?: boolean;
+    moduleEnabled?: boolean;
+    statusMessage?: string | null;
   };
   credits?: {
     earned: number;

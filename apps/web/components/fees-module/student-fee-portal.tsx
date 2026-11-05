@@ -354,21 +354,13 @@ export function StudentFeePortal() {
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-muted">
           <Lock className="h-7 w-7" />
         </div>
-        <h1 className="text-xl font-bold tracking-tight">Fee Module</h1>
+        <h1 className="text-xl font-bold tracking-tight">
+          {account.statusMessage?.trim() || 'Fee Module Not Yet Enabled'}
+        </h1>
         <p className="text-sm text-muted-foreground">
           {account.lockMessage ??
-            'The fee module has not been activated yet. Fee details will be available once the college officially publishes the fee demand.'}
+            'Fee details will be available once the college officially publishes the fee demand.'}
         </p>
-        <div className="grid grid-cols-2 gap-3 rounded-xl border bg-muted/30 p-4 text-sm">
-          <div>
-            <p className="text-xs text-muted-foreground">Due Amount</p>
-            <p className="font-semibold tabular-nums">₹0.00</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Demand Amount</p>
-            <p className="font-semibold tabular-nums">₹0.00</p>
-          </div>
-        </div>
       </div>
     );
   }

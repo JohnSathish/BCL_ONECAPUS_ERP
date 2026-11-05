@@ -16,6 +16,7 @@ import {
   type StudentDashboardWidgets,
 } from '@/services/student-dashboard';
 import { formatInr } from '@/utils/currency';
+import { resolveStudentFeeDisplay } from '@/utils/student-fee-display';
 
 export default function StudentHomeScreen() {
   const router = useRouter();
@@ -66,8 +67,9 @@ export default function StudentHomeScreen() {
   ]
     .filter(Boolean)
     .join(' · ');
-  const feeDue = home?.fees?.due ?? 0;
-  const feePaid = home?.fees?.paid ?? 0;
+  const feeDisplay = resolveStudentFeeDisplay(home?.fees);
+  const feeDue = feeDisplay.due;
+  const feePaid = feeDisplay.moduleEnabled ? (home?.fees?.paid ?? 0) : 0;
   const feeTotal = feePaid + feeDue;
   const attendancePercent = home?.attendance?.percentage ?? null;
   const attendanceLabel = attendancePercent != null ? `${Math.round(attendancePercent)}%` : '—';
@@ -76,7 +78,9 @@ export default function StudentHomeScreen() {
   const greeting = getGreeting();
   const feeProgressPercent =
     feeTotal > 0 ? Math.min(Math.round((feePaid / feeTotal) * 100), 100) : feeDue > 0 ? 8 : 100;
-  const feeStatus = home?.fees?.status ?? (feeDue > 0 ? 'PENDING' : 'PAID');
+  const feeStatus = feeDisplay.moduleEnabled
+    ? (home?.fees?.status ?? (feeDue > 0 ? 'PENDING' : 'PAID'))
+    : 'PAID';
   const accountStatus = statusCard(feeStatus);
   const timetableSlots = widgets?.timetable ?? [];
   const pendingAssignments = widgets?.lms?.pendingAssignments ?? 0;
@@ -177,9 +181,11 @@ export default function StudentHomeScreen() {
           />
           <KpiCard
             tint="#FEF9C3"
-            value={formatInr(feeDue)}
+            value={feeDisplay.amountLabel}
             label="Fees Due"
-            hint={feeDue > 0 ? 'Pending' : 'No Pending Fees'}
+            hint={feeDisplay.hint}
+            valueLines={feeDisplay.showAmount ? 1 : 3}
+            compactValue={!feeDisplay.showAmount}
             onPress={() => router.push('/(student)/(tabs)/fees' as never)}
           />
           <KpiCard
@@ -236,11 +242,19 @@ export default function StudentHomeScreen() {
           onPress={() => router.push('/(student)/(tabs)/fees' as never)}
         >
           <Text style={styles.sectionTitle}>💰 Outstanding Fees</Text>
-          <Text style={styles.feeValue}>{formatInr(feeDue)}</Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${feeProgressPercent}%` }]} />
-          </View>
-          <Text style={styles.actionText}>Pay now →</Text>
+          {feeDisplay.showAmount ? (
+            <>
+              <Text style={styles.feeValue}>{formatInr(feeDue)}</Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${feeProgressPercent}%` }]} />
+              </View>
+              <Text style={styles.actionText}>
+                {feeDue > 0 ? 'Pay now →' : `${feeDisplay.hint} →`}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.feeUnavailable}>{feeDisplay.amountLabel}</Text>
+          )}
         </Pressable>
 
         <View style={styles.statsGrid}>
@@ -436,6 +450,8 @@ function KpiCard({
   label,
   hint,
   valueColor,
+  valueLines = 1,
+  compactValue = false,
   onPress,
 }: {
   tint: string;
@@ -443,17 +459,27 @@ function KpiCard({
   label: string;
   hint: string;
   valueColor?: string;
+  valueLines?: number;
+  compactValue?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable style={[styles.kpiCard, { backgroundColor: tint }]} onPress={onPress}>
       <Text style={styles.kpiLabel}>{label}</Text>
-      <Text style={[styles.kpiValue, valueColor ? { color: valueColor } : null]} numberOfLines={1}>
+      <Text
+        style={[
+          compactValue ? styles.kpiValueCompact : styles.kpiValue,
+          valueColor ? { color: valueColor } : null,
+        ]}
+        numberOfLines={valueLines}
+      >
         {value}
       </Text>
-      <Text style={styles.kpiHint} numberOfLines={2}>
-        {hint}
-      </Text>
+      {hint ? (
+        <Text style={styles.kpiHint} numberOfLines={2}>
+          {hint}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -527,6 +553,12 @@ const styles = StyleSheet.create({
   kpiCard: { flex: 1, borderRadius: 16, padding: 10, minHeight: 96, gap: 2 },
   kpiLabel: { fontSize: 10, fontWeight: '800', color: '#6B7280', textTransform: 'uppercase' },
   kpiValue: { fontSize: 16, fontWeight: '800', color: studentTheme.text },
+  kpiValueCompact: {
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '800',
+    color: studentTheme.text,
+  },
   kpiHint: { fontSize: 11, fontWeight: '600', color: '#4B5563' },
   quickCard: {
     flexDirection: 'row',
@@ -562,6 +594,13 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '700', color: studentTheme.text },
   sectionHeading: { fontSize: 16, fontWeight: '800', color: studentTheme.text, marginTop: 4 },
   feeValue: { fontSize: 28, fontWeight: '700', color: '#854d0e', marginTop: 6 },
+  feeUnavailable: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#854d0e',
+    marginTop: 8,
+  },
   progressTrack: {
     height: 8,
     borderRadius: 999,

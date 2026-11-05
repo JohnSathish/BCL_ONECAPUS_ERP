@@ -8,6 +8,7 @@ import { UserNotificationsService } from '../../communication/services/user-noti
 import { BirthdayQueryService } from '../../communication/services/birthday-query.service';
 import { ExaminationsService } from '../../examinations/examinations.service';
 import { StudentFeeSummaryService } from '../../fees/services/student-fee-summary.service';
+import { studentFeePortalView } from '../../fees/student-fee-portal-status';
 import { LibraryQrService } from '../../library/services/library-qr.service';
 import { LmsDashboardService } from '../../lms/services/lms-dashboard.service';
 import { StudentAttendanceService } from '../../student-attendance/student-attendance.service';
@@ -171,6 +172,7 @@ export class StudentPortalService {
       examResults,
       libraryLoans,
       primaryShift,
+      feeModule,
     ] = await Promise.all([
       this.academicEngine
         .getMyRegistration(user.tid, user.sub)
@@ -207,6 +209,7 @@ export class StudentPortalService {
             select: { id: true, name: true, code: true },
           })
         : Promise.resolve(null),
+      this.resolveStudentFeeModule(user.tid),
     ]);
 
     const semesterSequence =
@@ -229,17 +232,14 @@ export class StudentPortalService {
       format,
     );
 
-    const feeDueRaw = feeSummaryRow.totalOutstanding;
-    const feePaidRaw = feeSummaryRow.totalPaid;
-    const feeSettings = await this.prisma.feeFinanceSettings
-      .findUnique({
-        where: { tenantId: user.tid },
-        select: { studentPortalFeesEnabled: true },
-      })
-      .catch(() => null);
-    const feesLocked = feeSettings?.studentPortalFeesEnabled === false;
-    const feeDue = feesLocked ? 0 : feeDueRaw;
-    const feePaid = feesLocked ? 0 : feePaidRaw;
+    const fees = studentFeePortalView({
+      portalEnabled: feeModule.portalEnabled,
+      demandPublished: feeModule.demandPublished,
+      outstanding: Number(feeSummaryRow.totalOutstanding ?? 0),
+      paid: Number(feeSummaryRow.totalPaid ?? 0),
+    });
+    const feeDue = fees.due;
+    const feePaid = fees.paid;
 
     const profileCompletion = this.profileCompletion({
       hasPhoto: Boolean(student.masterProfile?.photoPath),
@@ -307,8 +307,12 @@ export class StudentPortalService {
         {
           key: 'fees',
           title: 'Fee Status',
-          value: feeDue > 0 ? `Pending ₹${feeDue.toLocaleString()}` : 'PAID',
-          tone: feeDue > 0 ? 'warn' : 'good',
+          value: !fees.moduleEnabled
+            ? (fees.statusMessage ?? 'Fee Module Not Yet Enabled')
+            : feeDue > 0
+              ? `Pending ₹${feeDue.toLocaleString()}`
+              : (fees.statusMessage ?? 'No Pending Fees'),
+          tone: !fees.moduleEnabled ? 'neutral' : feeDue > 0 ? 'warn' : 'good',
           href: '/student/fees',
         },
         {
@@ -346,19 +350,7 @@ export class StudentPortalService {
       ],
       academicChips,
       unreadNotificationCount: unreadCount.count ?? 0,
-      fees: {
-        paid: feePaid,
-        due: feeDue,
-        status: feesLocked
-          ? ('LOCKED' as const)
-          : feeDue > 0
-            ? ('PENDING' as const)
-            : ('PAID' as const),
-        semesterLabel: feesLocked
-          ? 'Fee module not activated'
-          : 'Current semester',
-        moduleLocked: feesLocked,
-      },
+      fees,
       examinations: {
         hasResults: summaries.length > 0,
         hasAdmitCard: Boolean(examResults),
@@ -378,36 +370,48 @@ export class StudentPortalService {
 
   async getDashboardWidgetFees(user: JwtUser) {
     const student = await this.resolveStudent(user);
-    const feeSettings = await (
-      this.prisma as unknown as {
-        feeFinanceSettings: {
-          findUnique: (args: unknown) => Promise<{
-            studentPortalFeesEnabled: boolean;
-          } | null>;
-        };
-      }
-    ).feeFinanceSettings
+    const feeModule = await this.resolveStudentFeeModule(user.tid);
+    if (!feeModule.portalEnabled || !feeModule.demandPublished) {
+      return studentFeePortalView({
+        portalEnabled: feeModule.portalEnabled,
+        demandPublished: feeModule.demandPublished,
+        outstanding: 0,
+        paid: 0,
+      });
+    }
+    const summary = await this.feeSummary.get(user.tid, student.id);
+    return studentFeePortalView({
+      portalEnabled: true,
+      demandPublished: true,
+      outstanding: summary.totalOutstanding,
+      paid: summary.totalPaid,
+    });
+  }
+
+  /**
+   * Student portal fees are live only when the college has turned the module on
+   * and has published at least one student fee demand. A default-on flag with
+   * no demand is not a genuine zero balance.
+   */
+  private async resolveStudentFeeModule(tenantId: string) {
+    const feeSettings = await this.prisma.feeFinanceSettings
       .findUnique({
-        where: { tenantId: user.tid },
+        where: { tenantId },
         select: { studentPortalFeesEnabled: true },
       })
       .catch(() => null);
-    if (feeSettings?.studentPortalFeesEnabled === false) {
-      return {
-        paid: 0,
-        due: 0,
-        status: 'LOCKED',
-        semesterLabel: 'Fee module not activated',
-        moduleLocked: true,
-      };
+    const portalEnabled = feeSettings?.studentPortalFeesEnabled === true;
+    if (!portalEnabled) {
+      return { portalEnabled: false, demandPublished: false };
     }
-    const summary = await this.feeSummary.get(user.tid, student.id);
-    return {
-      paid: summary.totalPaid,
-      due: summary.totalOutstanding,
-      status: summary.totalOutstanding > 0 ? 'PENDING' : 'PAID',
-      semesterLabel: 'Current semester',
-    };
+    const publishedDemand = await this.prisma.studentFeeDemand.findFirst({
+      where: {
+        tenantId,
+        status: { in: ['PUBLISHED', 'LOCKED', 'PARTIALLY_PAID', 'PAID'] },
+      },
+      select: { id: true },
+    });
+    return { portalEnabled: true, demandPublished: Boolean(publishedDemand) };
   }
 
   async getDashboardWidgetTimetable(user: JwtUser) {

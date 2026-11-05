@@ -23,7 +23,15 @@ export type StudentHomeSnapshot = {
     shiftName?: string | null;
     photoUrl?: string | null;
   };
-  fees?: { due?: number; paid?: number; status?: string; semesterLabel?: string };
+  fees?: {
+    due?: number;
+    paid?: number;
+    status?: string;
+    semesterLabel?: string;
+    moduleLocked?: boolean;
+    moduleEnabled?: boolean;
+    statusMessage?: string | null;
+  };
   attendance?: { percentage?: number | null };
   academicChips?: {
     category: string;

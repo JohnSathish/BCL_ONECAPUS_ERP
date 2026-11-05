@@ -18,7 +18,7 @@ import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { DRAWER_MENU_SECTIONS, filterDrawerByFeatureFlags } from './drawer-menu';
 import { useStudentPortal } from './student-portal-context';
 import { studentTheme } from './theme';
-import { formatInr } from '@/utils/currency';
+import { resolveStudentFeeDisplay } from '@/utils/student-fee-display';
 import { useMobileConfig } from '@/hooks/useMobileConfig';
 
 export function StudentDrawer() {
@@ -74,7 +74,7 @@ export function StudentDrawer() {
     typeof attendancePct === 'number' && Number.isFinite(attendancePct)
       ? `${Math.round(attendancePct)}%`
       : '—';
-  const feeDue = home?.fees?.due ?? 0;
+  const feeDisplay = resolveStudentFeeDisplay(home?.fees);
 
   function navigate(href: string) {
     closeDrawer();
@@ -124,7 +124,12 @@ export function StudentDrawer() {
             </View>
             <View style={styles.statPill}>
               <Text style={styles.statLabel}>Outstanding</Text>
-              <Text style={styles.statValue}>{formatInr(feeDue)}</Text>
+              <Text
+                style={feeDisplay.showAmount ? styles.statValue : styles.statValueCompact}
+                numberOfLines={feeDisplay.showAmount ? 1 : 3}
+              >
+                {feeDisplay.amountLabel}
+              </Text>
             </View>
           </View>
 
@@ -253,6 +258,13 @@ const styles = StyleSheet.create({
   },
   statLabel: { fontSize: 10, color: studentTheme.textMuted, textTransform: 'uppercase' },
   statValue: { fontSize: 14, fontWeight: '700', color: studentTheme.text, marginTop: 2 },
+  statValueCompact: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    color: studentTheme.text,
+    marginTop: 2,
+  },
   searchBox: {
     marginHorizontal: 16,
     marginBottom: 8,

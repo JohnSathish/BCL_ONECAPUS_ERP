@@ -138,7 +138,13 @@ function StatCard({
       </div>
       {children}
       {stat.key !== 'attendance' ? (
-        <p className={cn('mt-1 text-2xl font-bold tracking-tight tabular-nums', theme.value)}>
+        <p
+          className={cn(
+            'mt-1 font-bold tracking-tight',
+            stat.value.length > 18 ? 'text-base leading-snug' : 'text-2xl tabular-nums',
+            theme.value,
+          )}
+        >
           {stat.value}
         </p>
       ) : null}
@@ -178,11 +184,23 @@ function buildStats(data: StudentDashboardView): StudentQuickStat[] {
     value: '—',
     href: '/student/attendance',
   };
+  const feesLive =
+    data.fees?.moduleEnabled !== false &&
+    data.fees?.status !== 'LOCKED' &&
+    !data.fees?.moduleLocked;
   const fees = byKey.fees ?? {
     key: 'fees',
     title: 'Fee Status',
-    value: data.fees?.status === 'PENDING' ? `Pending ₹${data.fees.due}` : 'PAID',
-    tone: data.fees?.status === 'PENDING' ? ('warn' as const) : ('good' as const),
+    value: !feesLive
+      ? data.fees?.statusMessage?.trim() || 'Fee Module Not Yet Enabled'
+      : data.fees?.status === 'PENDING'
+        ? `Pending ₹${data.fees.due}`
+        : data.fees?.statusMessage?.trim() || 'No Pending Fees',
+    tone: !feesLive
+      ? ('neutral' as const)
+      : data.fees?.status === 'PENDING'
+        ? ('warn' as const)
+        : ('good' as const),
     href: '/student/fees',
   };
   const cgpa =
@@ -271,11 +289,31 @@ export function StudentQuickStats({
     if (s.key === 'cgpa' && data.examinations?.cgpa != null && s.value === '—') {
       return { ...s, value: Number(data.examinations.cgpa).toFixed(2), subvalue: 'Cumulative GPA' };
     }
+    if (
+      s.key === 'fees' &&
+      (data.fees?.moduleEnabled === false ||
+        data.fees?.moduleLocked ||
+        data.fees?.status === 'LOCKED')
+    ) {
+      return {
+        ...s,
+        value: data.fees?.statusMessage?.trim() || 'Fee Module Not Yet Enabled',
+        subvalue: undefined,
+        tone: 'neutral' as const,
+      };
+    }
     if (s.key === 'fees' && data.fees?.status === 'PENDING') {
       return {
         ...s,
         value: `Pending ₹${Number(data.fees.due).toLocaleString('en-IN')}`,
         subvalue: data.fees.semesterLabel || 'Action needed',
+      };
+    }
+    if (s.key === 'fees' && data.fees?.moduleEnabled && data.fees.statusMessage) {
+      return {
+        ...s,
+        value: s.value === 'PAID' ? data.fees.statusMessage : s.value,
+        subvalue: data.fees.statusMessage,
       };
     }
     return s;

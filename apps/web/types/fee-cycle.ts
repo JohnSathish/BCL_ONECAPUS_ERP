@@ -138,6 +138,8 @@ export type ExternalFeePayment = {
 export type StudentFeeAccount = {
   studentId: string | null;
   moduleLocked?: boolean;
+  moduleEnabled?: boolean;
+  statusMessage?: string | null;
   lockMessage?: string;
   student?: {
     enrollmentNumber: string;

@@ -7,7 +7,7 @@ import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { useStudentPortal } from '@/components/student-portal/student-portal-context';
 import { studentTheme } from '@/components/student-portal/theme';
 import { logout } from '@/auth/logout';
-import { formatInr } from '@/utils/currency';
+import { resolveStudentFeeDisplay } from '@/utils/student-fee-display';
 
 const MENU = [
   {
@@ -84,7 +84,7 @@ export default function StudentProfileScreen() {
       ? `Semester ${home.profile.semesterSequence}`
       : 'Semester');
   const roll = home?.profile?.rollNumber ?? '—';
-  const feeDue = home?.fees?.due ?? 0;
+  const feeDisplay = resolveStudentFeeDisplay(home?.fees);
   const unread = home?.unreadNotificationCount ?? 0;
   const enrollment = enrollmentStatus(home?.profile?.status);
 
@@ -131,8 +131,13 @@ export default function StudentProfileScreen() {
             onPress={() => router.push('/(student)/(tabs)/fees' as never)}
           >
             <Text style={styles.kpiLabel}>Outstanding Fees</Text>
-            <Text style={styles.kpiValue}>{formatInr(feeDue)}</Text>
-            <Text style={styles.kpiHint}>{feeDue > 0 ? 'Pending fees' : 'No Pending Fees'}</Text>
+            <Text
+              style={feeDisplay.showAmount ? styles.kpiValue : styles.kpiValueCompact}
+              numberOfLines={feeDisplay.showAmount ? 1 : 3}
+            >
+              {feeDisplay.amountLabel}
+            </Text>
+            {feeDisplay.hint ? <Text style={styles.kpiHint}>{feeDisplay.hint}</Text> : null}
           </Pressable>
           <Pressable
             style={[styles.kpi, { backgroundColor: unread > 0 ? '#FEE2E2' : '#F3F4F6' }]}
@@ -251,6 +256,12 @@ const styles = StyleSheet.create({
   kpi: { flex: 1, borderRadius: 16, padding: 10, minHeight: 96, gap: 2 },
   kpiLabel: { fontSize: 10, fontWeight: '700', color: '#6B7280' },
   kpiValue: { fontSize: 14, fontWeight: '800', color: studentTheme.text },
+  kpiValueCompact: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '800',
+    color: studentTheme.text,
+  },
   kpiHint: { fontSize: 10, fontWeight: '600', color: '#4B5563' },
   menuRow: {
     flexDirection: 'row',

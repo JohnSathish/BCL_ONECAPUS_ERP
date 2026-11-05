@@ -51,6 +51,8 @@ export type PaymentHistoryRow = {
 export type StudentFeeAccount = {
   studentId: string;
   moduleLocked?: boolean;
+  moduleEnabled?: boolean;
+  statusMessage?: string | null;
   lockMessage?: string;
   summary: {
     totalDemand: number;

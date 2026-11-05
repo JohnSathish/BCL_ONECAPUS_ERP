@@ -23,27 +23,16 @@ export function FeeWidget({
     );
   }
 
-  if (fees?.moduleLocked || fees?.status === 'LOCKED') {
+  if (fees?.moduleEnabled === false || fees?.moduleLocked || fees?.status === 'LOCKED') {
     return (
       <GlassCard className="p-5">
         <div className="flex items-center gap-2">
           <Lock className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold tracking-tight">Fee Module</h3>
+          <h3 className="text-sm font-semibold tracking-tight">Fees Due</h3>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          The fee module has not been activated yet. Details will appear when the college publishes
-          fee demand.
+        <p className="mt-3 text-sm font-semibold text-foreground">
+          {fees?.statusMessage?.trim() || 'Fee Module Not Yet Enabled'}
         </p>
-        <div className="mt-4 space-y-2 rounded-xl border border-border/50 bg-background/40 p-4">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Due</span>
-            <span className="font-semibold">₹0</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Demand</span>
-            <span className="font-semibold">₹0</span>
-          </div>
-        </div>
       </GlassCard>
     );
   }

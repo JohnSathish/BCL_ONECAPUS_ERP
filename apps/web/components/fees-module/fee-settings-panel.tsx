@@ -92,8 +92,8 @@ export function FeeSettingsPanel() {
             Student Fee Module
           </CardTitle>
           <CardDescription>
-            When off, students see a locked Fee Module (Due ₹0) and cannot pay online. Admin fee
-            desk, structures, and configuration stay available.
+            When off, or before fee demand is published, students see “Fee Module Not Yet Enabled”
+            instead of a zero balance. Admin fee desk, structures, and configuration stay available.
           </CardDescription>
         </CardHeader>
         <CardContent>
