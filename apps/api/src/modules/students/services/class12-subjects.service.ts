@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { othersSubjectsForStream } from '../domain/class12-others-subjects';
 import {
   buildClass12SubjectCode,
   class12BoardLookupAliases,
@@ -8,11 +9,6 @@ import {
   normalizeClass12Stream,
   normalizeClass12SubjectKey,
 } from '../domain/class12-subjects.util';
-
-const OTHERS_LANGUAGE_SUBJECTS = [
-  { subjectName: 'English', sortOrder: 10 },
-  { subjectName: 'Hindi', sortOrder: 20 },
-] as const;
 
 export type Class12SubjectDto = {
   id: string;
@@ -38,7 +34,7 @@ export class Class12SubjectsService {
     }
 
     if (this.isOthersBoard(boardRaw)) {
-      await this.ensureOthersLanguageSubjects(tenantId, streamCode);
+      await this.ensureOthersStreamSubjects(tenantId, streamCode);
     }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);
@@ -76,7 +72,11 @@ export class Class12SubjectsService {
       },
     });
 
-    return rows.map((row) => ({
+    const listed = this.isOthersBoard(boardRaw)
+      ? this.preferBoardRows(rows, 'OTHERS')
+      : rows;
+
+    return listed.map((row) => ({
       id: row.id,
       subjectName: row.subjectName,
       sortOrder: row.sortOrder,
@@ -92,16 +92,15 @@ export class Class12SubjectsService {
   }
 
   /**
-   * Others has the arts/science/commerce papers, but English and Hindi were
-   * never stored on that board. Write them into the subject master so the
-   * dropdown and the save check use the same rows.
+   * Others subjects live on board OTHERS for that stream only. Commerce uses
+   * the Assam Higher Secondary papers. Arts and Science keep their own lists.
    */
-  private async ensureOthersLanguageSubjects(
+  private async ensureOthersStreamSubjects(
     tenantId: string,
     streamCode: string,
   ) {
     const stream = class12StreamLookupAliases(streamCode)[0] || streamCode;
-    for (const subject of OTHERS_LANGUAGE_SUBJECTS) {
+    for (const subject of othersSubjectsForStream(stream)) {
       const existing = await this.prisma.supportBoardSubject.findFirst({
         where: {
           tenantId,
@@ -110,15 +109,13 @@ export class Class12SubjectsService {
           category: { equals: stream, mode: 'insensitive' },
           subjectName: { equals: subject.subjectName, mode: 'insensitive' },
         },
-        select: { id: true, isActive: true },
+        select: { id: true },
       });
       if (existing) {
-        if (!existing.isActive) {
-          await this.prisma.supportBoardSubject.update({
-            where: { id: existing.id },
-            data: { isActive: true, sortOrder: subject.sortOrder },
-          });
-        }
+        await this.prisma.supportBoardSubject.update({
+          where: { id: existing.id },
+          data: { isActive: true, sortOrder: subject.sortOrder },
+        });
         continue;
       }
       const subjectCode = buildClass12SubjectCode(
@@ -147,6 +144,37 @@ export class Class12SubjectsService {
         },
       });
     }
+  }
+
+  /** One row per subject name. A board-specific row wins over a shared catalog row. */
+  private preferBoardRows<
+    T extends {
+      subjectName: string;
+      boardType: string | null;
+      sortOrder: number;
+    },
+  >(rows: T[], boardCode: string): T[] {
+    const ranked = [...rows].sort((left, right) => {
+      const leftSpecific =
+        String(left.boardType ?? '').toUpperCase() === boardCode ? 0 : 1;
+      const rightSpecific =
+        String(right.boardType ?? '').toUpperCase() === boardCode ? 0 : 1;
+      if (leftSpecific !== rightSpecific) return leftSpecific - rightSpecific;
+      return left.sortOrder - right.sortOrder;
+    });
+    const seen = new Set<string>();
+    const unique: T[] = [];
+    for (const row of ranked) {
+      const key = normalizeClass12SubjectKey(row.subjectName);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      unique.push(row);
+    }
+    return unique.sort(
+      (left, right) =>
+        left.sortOrder - right.sortOrder ||
+        left.subjectName.localeCompare(right.subjectName),
+    );
   }
 
   private async resolveBoardAliases(
@@ -226,7 +254,7 @@ export class Class12SubjectsService {
     }
 
     if (this.isOthersBoard(boardRaw)) {
-      await this.ensureOthersLanguageSubjects(tenantId, streamCode);
+      await this.ensureOthersStreamSubjects(tenantId, streamCode);
     }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);
