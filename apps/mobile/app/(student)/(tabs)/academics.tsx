@@ -20,7 +20,7 @@ import {
   TodayClassesEmptyCard,
   WeeklyTimetablePanel,
 } from '@/components/student-portal/weekly-timetable-panel';
-import { fetchStudentAcademics } from '@/services/academics';
+import { applyFyugpReadmission, fetchStudentAcademics } from '@/services/academics';
 import type { AcademicSubjectCard, StudentAcademicsPayload } from '@/types/academics';
 
 type AcademicsTab = 'subjects' | 'timetable' | 'results';
@@ -33,6 +33,7 @@ export default function StudentAcademicsScreen() {
   const [expandedJourney, setExpandedJourney] = useState<number | null>(null);
   const [tab, setTab] = useState<AcademicsTab>('subjects');
   const [semesterOpen, setSemesterOpen] = useState(false);
+  const [applyingReadmission, setApplyingReadmission] = useState(false);
   const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -396,6 +397,60 @@ export default function StudentAcademicsScreen() {
             );
           })}
         </View>
+
+        {data?.programmeCompletion ? (
+          <View style={styles.completionCard}>
+            <Text style={styles.completionTitle}>{data.programmeCompletion.title}</Text>
+            <Text style={styles.completionBody}>{data.programmeCompletion.message}</Text>
+          </View>
+        ) : null}
+
+        {data?.continuation ? (
+          <View style={styles.continuationCard}>
+            <Text style={styles.continuationTitle}>{data.continuation.title}</Text>
+            <Text style={styles.completionBody}>{data.continuation.message}</Text>
+            {data.continuation.status === 'PENDING' ? (
+              <Text style={styles.pendingNote}>
+                Your readmission application is with the college office. Semester 7 starts after
+                approval and a new College Roll Number.
+              </Text>
+            ) : null}
+            {data.continuation.canApply ? (
+              <Pressable
+                style={[styles.applyButton, applyingReadmission && { opacity: 0.6 }]}
+                disabled={applyingReadmission}
+                onPress={() => {
+                  Alert.alert(
+                    'Apply for readmission',
+                    'This asks Don Bosco College to continue you into Semesters 7 and 8 under a new College Roll Number. Semesters 1 to 6 stay on your current record.',
+                    [
+                      { text: 'Not now', style: 'cancel' },
+                      {
+                        text: 'Apply',
+                        onPress: () => {
+                          setApplyingReadmission(true);
+                          void applyFyugpReadmission()
+                            .then(() => load())
+                            .catch((error) =>
+                              Alert.alert(
+                                'Could not apply',
+                                error instanceof Error ? error.message : 'Please try again.',
+                              ),
+                            )
+                            .finally(() => setApplyingReadmission(false));
+                        },
+                      },
+                    ],
+                  );
+                }}
+              >
+                <Text style={styles.applyButtonText}>
+                  {applyingReadmission ? 'Submitting…' : 'Apply for Readmission'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         <SectionTitle>Downloads</SectionTitle>
         <View style={styles.downloadRow}>
@@ -864,6 +919,34 @@ const styles = StyleSheet.create({
   markRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
   markLabel: { fontSize: 14, color: studentTheme.text },
   markValue: { fontSize: 14, fontWeight: '700', color: studentTheme.primary },
+  completionCard: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    padding: 16,
+    gap: 6,
+  },
+  completionTitle: { fontSize: 16, fontWeight: '800', color: '#065F46' },
+  completionBody: { fontSize: 13, lineHeight: 19, color: studentTheme.text },
+  continuationCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: studentTheme.border,
+    padding: 16,
+    gap: 8,
+  },
+  continuationTitle: { fontSize: 16, fontWeight: '800', color: studentTheme.text },
+  pendingNote: { fontSize: 13, lineHeight: 18, color: '#1D4ED8' },
+  applyButton: {
+    marginTop: 4,
+    backgroundColor: studentTheme.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  applyButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   journeyCard: {
     backgroundColor: studentTheme.surface,
     borderRadius: 16,

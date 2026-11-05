@@ -46,6 +46,7 @@ import { StudentDepartmentBackfillService } from './services/student-department-
 import { StudentsController } from './students.controller';
 import { StudentPortalController } from './student-portal.controller';
 import { StudentsService } from './students.service';
+import { FyugpReadmissionService } from './services/fyugp-readmission.service';
 import { StudentPortalService } from './services/student-portal.service';
 import { StudentPortalCalendarService } from './services/student-portal-calendar.service';
 import { StudentPortalProfileService } from './services/student-portal-profile.service';
@@ -89,6 +90,7 @@ import { Class12SubjectsService } from './services/class12-subjects.service';
   providers: [
     StudentsService,
     StudentPortalService,
+    FyugpReadmissionService,
     StudentPortalCalendarService,
     StudentPortalProfileService,
     StudentProfileUpdatePolicyService,
@@ -124,6 +126,7 @@ import { Class12SubjectsService } from './services/class12-subjects.service';
   exports: [
     StudentsService,
     StudentProfileService,
+    FyugpReadmissionService,
     StudentSemesterResolverService,
     RollNumberService,
     RollShiftRangeService,

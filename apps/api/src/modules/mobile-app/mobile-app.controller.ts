@@ -31,6 +31,7 @@ import {
 import { MobileAnalyticsService } from './mobile-analytics.service';
 import { MobileAppSettingsService } from './mobile-app-settings.service';
 import { MobileDeviceService } from './mobile-device.service';
+import { FyugpReadmissionService } from '../students/services/fyugp-readmission.service';
 import { MobileHomeService } from './mobile-home.service';
 import { MobileSessionService } from './mobile-session.service';
 import type { MobileAppType } from './constants/dashboard-config';
@@ -44,6 +45,7 @@ export class MobileAppController {
     private readonly devices: MobileDeviceService,
     private readonly analytics: MobileAnalyticsService,
     private readonly home: MobileHomeService,
+    private readonly fyugpReadmission: FyugpReadmissionService,
     private readonly sessions: MobileSessionService,
     private readonly cls: ClsService,
     private readonly tenantResolution: TenantResolutionService,
@@ -199,6 +201,27 @@ export class MobileAppController {
   @RequirePermissions('student:portal:self')
   studentAcademics(@CurrentUser() user: JwtUser) {
     return this.home.studentAcademics(user);
+  }
+
+  @Post('student/fyugp-readmission')
+  @RequirePermissions('student:portal:self')
+  applyFyugpReadmission(@CurrentUser() user: JwtUser) {
+    return this.fyugpReadmission.apply(user);
+  }
+
+  @Post('students/:studentId/fyugp-readmission/approve')
+  @RequirePermissions('students:manage')
+  approveFyugpReadmission(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+    @Body() body: { newRollNumber?: string },
+  ) {
+    return this.fyugpReadmission.approve(
+      user.tid,
+      studentId,
+      user.sub,
+      body.newRollNumber ?? '',
+    );
   }
 
   @Get('staff/home')

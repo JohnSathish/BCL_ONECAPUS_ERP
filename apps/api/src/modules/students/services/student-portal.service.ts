@@ -13,7 +13,9 @@ import { LibraryQrService } from '../../library/services/library-qr.service';
 import { LmsDashboardService } from '../../lms/services/lms-dashboard.service';
 import { StudentAttendanceService } from '../../student-attendance/student-attendance.service';
 import { TimetableEngineService } from '../../timetable-engine/timetable-engine.service';
+import { buildFyugpStudentJourney } from '../domain/fyugp-journey';
 import { StudentsService } from '../students.service';
+import { FYUGP_SEM7_READMISSION } from './fyugp-readmission.service';
 import { StudentPortalCalendarService } from './student-portal-calendar.service';
 import { getZonedWeekday } from '../../../common/utils/time-greeting';
 
@@ -1386,38 +1388,55 @@ export class StudentPortalService {
     }[];
 
     const totalSemesters =
-      programVersion?.structureTemplate?.totalSemesters ?? 6;
+      programVersion?.structureTemplate?.totalSemesters ?? 8;
     const currentSem = semesterSequence ?? 1;
-    const completedSemesters = new Set(
-      allRegistrations
-        .filter((r) =>
-          ['submitted', 'approved', 'completed', 'confirmed'].includes(
-            String(r.status).toLowerCase(),
+    const [completedProgress, readmissionEvent] = await Promise.all([
+      this.prisma.studentSemesterProgress.findMany({
+        where: { tenantId: user.tid, studentId: student.id },
+        select: { semesterSequence: true, status: true },
+      }),
+      this.prisma.studentLifecycleEvent.findFirst({
+        where: {
+          tenantId: user.tid,
+          studentId: student.id,
+          eventType: FYUGP_SEM7_READMISSION,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { metadata: true },
+      }),
+    ]);
+    const readmissionRaw = String(
+      (readmissionEvent?.metadata as { status?: string } | null)?.status ?? '',
+    ).toUpperCase();
+    const readmissionStatus =
+      readmissionRaw === 'PENDING' ||
+      readmissionRaw === 'APPROVED' ||
+      readmissionRaw === 'DECLINED'
+        ? readmissionRaw
+        : 'NONE';
+    const fyugpJourney = buildFyugpStudentJourney({
+      totalSemesters,
+      currentSemester: currentSem,
+      readmissionStatus,
+      progressCompletedSequences: completedProgress
+        .filter((row) =>
+          ['completed', 'promoted', 'passed'].includes(
+            String(row.status).toLowerCase(),
           ),
         )
-        .map((r) => r.semester?.sequence)
-        .filter((n): n is number => n != null),
-    );
-
-    const journey = Array.from({ length: totalSemesters }, (_, i) => {
-      const sem = i + 1;
-      const reg = allRegistrations.find((r) => r.semester?.sequence === sem);
-      let status: 'completed' | 'current' | 'upcoming' = 'upcoming';
-      if (sem < currentSem || completedSemesters.has(sem)) status = 'completed';
-      else if (sem === currentSem) status = 'current';
-      return {
-        semesterSequence: sem,
-        label: `Semester ${sem}`,
-        status,
-        registrationStatus: reg?.status ?? null,
-        subjectCount: reg?.lines?.length ?? 0,
-        credits: (reg?.lines ?? []).reduce(
+        .map((row) => row.semesterSequence),
+      registrations: allRegistrations.map((registration) => ({
+        sequence: registration.semester?.sequence ?? null,
+        status: registration.status,
+        subjectCount: registration.lines?.length ?? 0,
+        credits: (registration.lines ?? []).reduce(
           (sum, line) =>
             sum + Number(line.credits ?? line.offering?.course?.credits ?? 0),
           0,
         ),
-      };
+      })),
     });
+    const journey = fyugpJourney.journey;
 
     return {
       header: {
@@ -1454,6 +1473,8 @@ export class StudentPortalService {
       weeklyTimetable,
       semesterProgress,
       journey,
+      programmeCompletion: fyugpJourney.programmeCompletion,
+      continuation: fyugpJourney.continuation,
       internalMarks: subjects
         .filter((s) => s.internalMarks)
         .map((s) => ({

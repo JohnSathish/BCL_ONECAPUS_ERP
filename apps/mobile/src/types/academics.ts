@@ -81,6 +81,16 @@ export type StudentAcademicsPayload = {
     subjectCount: number;
     credits: number;
   }[];
+  programmeCompletion?: {
+    title: string;
+    message: string;
+  } | null;
+  continuation?: {
+    title: string;
+    message: string;
+    canApply: boolean;
+    status: 'NONE' | 'PENDING' | 'APPROVED' | 'DECLINED';
+  } | null;
   internalMarks: {
     label: string;
     category: string;
