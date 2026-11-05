@@ -1,4 +1,5 @@
 import {
+  buildClass12SubjectCode,
   class12BoardLookupAliases,
   class12StreamLookupAliases,
   isExcelImportedStudent,
@@ -18,6 +19,15 @@ describe('class12 board/stream aliases', () => {
     );
     expect(class12BoardLookupAliases('MBOSE')).not.toContain('OTHERS');
     expect(class12BoardLookupAliases('CBSE')).not.toContain('OTHERS');
+  });
+
+  it('keeps the MBOSE Arts Computer Science code separate from Science', () => {
+    expect(buildClass12SubjectCode('MBOSE', 'ARTS', 'CS')).toBe(
+      'MBOSE_ARTS_CS',
+    );
+    expect(
+      buildClass12SubjectCode('MBOSE', 'SCIENCE', 'Computer Science'),
+    ).toBe('MBOSE_SCIENCE_COMPUTER_SCIENCE');
   });
 
   it('maps Commerce stream to COMMERCE plus COM', () => {

@@ -59,6 +59,7 @@ function parseCsv(content: string): Array<{
   streamCode: string;
   subjectName: string;
   sortOrder: number;
+  subjectCode?: string;
 }> {
   const lines = content
     .split(/\r?\n/)
@@ -76,18 +77,20 @@ function parseCsv(content: string): Array<{
     streamCode: string;
     subjectName: string;
     sortOrder: number;
+    subjectCode?: string;
   }> = [];
   for (const line of lines.slice(1)) {
     // Simple CSV split (no quoted commas in this template)
     const parts = line.split(',').map((p) => p.trim());
     if (parts.length < 3) continue;
-    const [boardCode, streamCode, subjectName, sortRaw] = parts;
+    const [boardCode, streamCode, subjectName, sortRaw, codeRaw] = parts;
     if (!boardCode || !subjectName) continue;
     rows.push({
       boardCode: normalizeBoard(boardCode),
       streamCode: normalizeStream(streamCode || 'GENERAL'),
       subjectName: subjectName.trim(),
       sortOrder: Number(sortRaw) || 0,
+      subjectCode: codeRaw?.trim() || undefined,
     });
   }
   return rows;
@@ -142,7 +145,7 @@ async function main() {
       const subjectCode = buildCode(
         row.boardCode,
         row.streamCode,
-        row.subjectName,
+        row.subjectCode || row.subjectName,
       );
       const existing = await prisma.supportBoardSubject.findFirst({
         where: {

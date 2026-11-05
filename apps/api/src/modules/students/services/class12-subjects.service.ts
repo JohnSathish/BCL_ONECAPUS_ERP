@@ -36,6 +36,9 @@ export class Class12SubjectsService {
     if (this.isOthersBoard(boardRaw)) {
       await this.ensureOthersStreamSubjects(tenantId, streamCode);
     }
+    if (this.isMboseArts(boardRaw, streamCode)) {
+      await this.ensureMboseArtsComputerScience(tenantId);
+    }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);
     const streamAliases = class12StreamLookupAliases(streamCode);
@@ -89,6 +92,56 @@ export class Class12SubjectsService {
     return class12BoardLookupAliases(boardRaw).some(
       (alias) => alias === 'OTHERS' || alias === 'OTHER',
     );
+  }
+
+  private isMboseArts(boardRaw: string, streamCode: string) {
+    return (
+      normalizeClass12Stream(streamCode) === 'ARTS' &&
+      class12BoardLookupAliases(boardRaw).some((alias) => alias === 'MBOSE')
+    );
+  }
+
+  /** Optional MBOSE Arts paper. Science and Commerce already have their own rows. */
+  private async ensureMboseArtsComputerScience(tenantId: string) {
+    const subjectName = 'Computer Science';
+    const subjectCode = buildClass12SubjectCode('MBOSE', 'ARTS', 'CS');
+    const existing = await this.prisma.supportBoardSubject.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        boardType: { equals: 'MBOSE', mode: 'insensitive' },
+        category: { equals: 'ARTS', mode: 'insensitive' },
+        subjectName: { equals: subjectName, mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      await this.prisma.supportBoardSubject.update({
+        where: { id: existing.id },
+        data: { isActive: true, sortOrder: 200, subjectCode },
+      });
+      return;
+    }
+    await this.prisma.supportBoardSubject.upsert({
+      where: { tenantId_subjectCode: { tenantId, subjectCode } },
+      create: {
+        tenantId,
+        subjectCode,
+        subjectName,
+        boardType: 'MBOSE',
+        category: 'ARTS',
+        sortOrder: 200,
+        isActive: true,
+      },
+      update: {
+        subjectName,
+        boardType: 'MBOSE',
+        category: 'ARTS',
+        sortOrder: 200,
+        isActive: true,
+        deletedAt: null,
+      },
+    });
   }
 
   /**
@@ -255,6 +308,9 @@ export class Class12SubjectsService {
 
     if (this.isOthersBoard(boardRaw)) {
       await this.ensureOthersStreamSubjects(tenantId, streamCode);
+    }
+    if (this.isMboseArts(boardRaw, streamCode)) {
+      await this.ensureMboseArtsComputerScience(tenantId);
     }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);
