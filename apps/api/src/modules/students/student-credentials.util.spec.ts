@@ -23,6 +23,21 @@ describe('student login email helpers', () => {
     );
   });
 
+  it('shows a saved personal email instead of the college login', () => {
+    expect(
+      resolveStudentContactEmail(
+        'student.personal@gmail.com',
+        'name@donboscocollege.ac.in',
+      ),
+    ).toBe('student.personal@gmail.com');
+  });
+
+  it('shows the college login when no personal email is saved', () => {
+    expect(resolveStudentContactEmail(null, 'name@donboscocollege.ac.in')).toBe(
+      'name@donboscocollege.ac.in',
+    );
+  });
+
   it('prefers personal profile email over temporary login', () => {
     expect(
       resolveStudentContactEmail(

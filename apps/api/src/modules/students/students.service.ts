@@ -351,6 +351,13 @@ export class StudentsService {
     this.logger.log(
       `Student directory list start tenant=${tenantId} page=${page} limit=${limit}`,
     );
+    await this.profileService
+      .syncTenantProfileWrites(tenantId)
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Profile write sync skipped: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+      });
 
     let where: Prisma.StudentWhereInput = {
       tenantId,

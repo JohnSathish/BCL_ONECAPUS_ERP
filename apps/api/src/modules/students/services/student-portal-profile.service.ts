@@ -17,10 +17,7 @@ import { StudentPortalService } from './student-portal.service';
 import { StudentProfileService } from './student-profile.service';
 import { offeringPaperTitle } from '../../academic-engine/domain/offering-paper-title';
 import { StudentProfileChangeRequestService } from './student-profile-change-request.service';
-import {
-  STUDENT_MARKSHEET_IMAGE_MIMES,
-  STUDENT_SELF_UPLOAD_DOCUMENT_TYPES,
-} from '../domain/profile-update-policy.defaults';
+import { STUDENT_SELF_UPLOAD_DOCUMENT_TYPES } from '../domain/profile-update-policy.defaults';
 
 const SNAPSHOT_LABELS: Record<string, string> = {
   MAJOR: 'Major',
@@ -503,20 +500,16 @@ export class StudentPortalProfileService {
         'Passport photo is uploaded by the college office. Students cannot upload it.',
       );
     }
+    if (normalized === 'CLASS_XII_MARKSHEET') {
+      throw new BadRequestException(
+        'Class XII marksheet upload is closed. Update your marks without uploading the marksheet.',
+      );
+    }
     if (!allowed.has(normalized)) {
       throw new BadRequestException(
         'Document type not allowed for student upload',
       );
     }
-    if (
-      normalized === 'CLASS_XII_MARKSHEET' &&
-      !STUDENT_MARKSHEET_IMAGE_MIMES.has(file.mimetype)
-    ) {
-      throw new BadRequestException(
-        'Class XII marksheet must be an image (JPEG, PNG, or WebP). PDF is not allowed.',
-      );
-    }
-
     const doc = await this.assets.uploadDocument(
       user.tid,
       student.id,

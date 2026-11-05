@@ -119,24 +119,61 @@ export class StudentProfileChangeRequestService {
     return this.prisma as unknown as Record<string, any>;
   }
 
-  /** Mobile blood group chips need lookup rows. Create the standard set once. */
+  /** Keep the standard blood groups available even if only some lookups exist. */
   private async ensureBloodGroups(tenantId: string) {
-    const existing = await this.prisma.masterLookup.count({
-      where: { tenantId, lookupType: 'BLOOD_GROUP', isActive: true },
-    });
-    if (existing > 0) return;
     const groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    const existing = await this.prisma.masterLookup.findMany({
+      where: { tenantId, lookupType: 'BLOOD_GROUP' },
+      select: { id: true, label: true, code: true, isActive: true },
+    });
+    const standard = new Set(groups.map((label) => label.toUpperCase()));
+    const inactiveIds = existing
+      .filter(
+        (row) =>
+          !row.isActive &&
+          standard.has(row.label.replace(/\s+/g, '').toUpperCase()),
+      )
+      .map((row) => row.id);
+    if (inactiveIds.length) {
+      await this.prisma.masterLookup.updateMany({
+        where: { id: { in: inactiveIds } },
+        data: { isActive: true },
+      });
+    }
+    const labels = new Set(
+      existing.map((row) => row.label.replace(/\s+/g, '').toUpperCase()),
+    );
+    const codes = new Set(existing.map((row) => row.code.toUpperCase()));
+    const missing = groups.filter((label) => !labels.has(label.toUpperCase()));
+    if (!missing.length) return;
     await this.prisma.masterLookup.createMany({
-      data: groups.map((label, index) => ({
-        tenantId,
-        lookupType: 'BLOOD_GROUP',
-        code: label.replace('+', '_POS').replace('-', '_NEG'),
-        label,
-        sortOrder: index + 1,
-        isActive: true,
-      })),
+      data: missing.map((label) => {
+        const preferred = label.replace('+', '_POS').replace('-', '_NEG');
+        const code = codes.has(preferred) ? `STD_${preferred}` : preferred;
+        codes.add(code);
+        return {
+          tenantId,
+          lookupType: 'BLOOD_GROUP',
+          code,
+          label,
+          sortOrder: groups.indexOf(label) + 1,
+          isActive: true,
+        };
+      }),
       skipDuplicates: true,
     });
+  }
+
+  /** Apply queued personal-email and other auto-approve writes before the ERP reads the profile. */
+  async syncStudentProfileWrites(tenantId: string, studentId: string) {
+    await this.ensureBloodGroups(tenantId);
+    await this.reconcilePendingItems(tenantId, studentId);
+  }
+
+  /** Same catch-up for the student directory, so pending personal emails show in the list. */
+  async syncTenantProfileWrites(tenantId: string) {
+    await this.ensureBloodGroups(tenantId);
+    await this.reconcilePendingItems(tenantId);
   }
 
   async getCompletion(tenantId: string, studentId: string) {
@@ -1188,7 +1225,9 @@ export class StudentProfileChangeRequestService {
       where: {
         tenantId,
         sectionKey: 'personal',
-        fieldKey: { in: ['nationalId', 'bloodGroupLookupId', 'gender'] },
+        fieldKey: {
+          in: ['nationalId', 'bloodGroupLookupId', 'gender', 'email'],
+        },
         approvalStatus: { in: ['AUTO_APPROVED', 'APPROVED'] },
         ...(studentId ? { request: { studentId } } : {}),
       },
@@ -1216,6 +1255,8 @@ export class StudentProfileChangeRequestService {
           nationalId: true,
           bloodGroupLookupId: true,
           gender: true,
+          email: true,
+          student: { select: { user: { select: { email: true } } } },
         },
       });
       const current =
@@ -1223,8 +1264,30 @@ export class StudentProfileChangeRequestService {
           ? profile?.nationalId
           : item.fieldKey === 'bloodGroupLookupId'
             ? profile?.bloodGroupLookupId
-            : profile?.gender;
-      if (current && String(current).trim()) continue;
+            : item.fieldKey === 'email'
+              ? profile?.email
+              : profile?.gender;
+      if (item.fieldKey === 'email') {
+        const next = String(parsed).trim().toLowerCase();
+        const stored = String(current ?? '')
+          .trim()
+          .toLowerCase();
+        const previous = String(parseValue(item.oldValue) ?? '')
+          .trim()
+          .toLowerCase();
+        const login = String(profile?.student?.user?.email ?? '')
+          .trim()
+          .toLowerCase();
+        if (!next || stored === next) continue;
+        const stillPrevious =
+          !stored ||
+          stored === previous ||
+          (login && stored === login) ||
+          isTemporaryStudentLoginEmail(stored);
+        if (!stillPrevious) continue;
+      } else if (current && String(current).trim()) {
+        continue;
+      }
 
       try {
         await this.applyItem(tenantId, ownerId, item, null);
@@ -1234,6 +1297,7 @@ export class StudentProfileChangeRequestService {
             nationalId: true,
             bloodGroupLookupId: true,
             gender: true,
+            email: true,
           },
         });
         const after =
@@ -1241,7 +1305,9 @@ export class StudentProfileChangeRequestService {
             ? saved?.nationalId
             : item.fieldKey === 'bloodGroupLookupId'
               ? saved?.bloodGroupLookupId
-              : saved?.gender;
+              : item.fieldKey === 'email'
+                ? saved?.email
+                : saved?.gender;
         if (after && String(after).trim()) continue;
         throw new Error('Profile field was not saved');
       } catch {
@@ -1370,11 +1436,38 @@ export class StudentProfileChangeRequestService {
               );
             }
           }
+          if (field === 'email' && next) {
+            next = next.toLowerCase();
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) {
+              throw new BadRequestException('Enter a valid email address');
+            }
+          }
           // A blank submission must not erase a value already on the profile.
           if (next) data[field] = next;
         }
         if (field === 'dateOfBirth' && value) {
-          data.dateOfBirth = new Date(String(value));
+          const raw = String(value).slice(0, 10);
+          const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+          const year = Number(match?.[1]);
+          const month = Number(match?.[2]);
+          const day = Number(match?.[3]);
+          const parsed = new Date(year, month - 1, day);
+          const today = new Date();
+          today.setHours(23, 59, 59, 999);
+          const realCalendarDate =
+            Boolean(match) &&
+            parsed.getFullYear() === year &&
+            parsed.getMonth() === month - 1 &&
+            parsed.getDate() === day;
+          if (
+            !realCalendarDate ||
+            year < 1900 ||
+            Number.isNaN(parsed.getTime()) ||
+            parsed > today
+          ) {
+            throw new BadRequestException('Enter a valid date of birth');
+          }
+          data.dateOfBirth = parsed;
         }
         if (Object.keys(data).length) {
           await this.prisma.studentProfile.update({
@@ -1664,6 +1757,9 @@ export class StudentProfileChangeRequestService {
 
     const currentLogin = student.user.email.trim().toLowerCase();
     if (currentLogin === normalized) return;
+    // Personal email stays on the student profile. Only a temporary login
+    // (students.local / student.*) may be replaced.
+    if (!isTemporaryStudentLoginEmail(currentLogin)) return;
 
     const taken = await this.prisma.user.findFirst({
       where: {

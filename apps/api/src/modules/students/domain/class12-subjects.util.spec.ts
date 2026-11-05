@@ -12,6 +12,14 @@ describe('class12 board/stream aliases', () => {
     );
   });
 
+  it('maps the Others board to OTHERS without changing MBOSE', () => {
+    expect(class12BoardLookupAliases('Others')).toEqual(
+      expect.arrayContaining(['OTHERS']),
+    );
+    expect(class12BoardLookupAliases('MBOSE')).not.toContain('OTHERS');
+    expect(class12BoardLookupAliases('CBSE')).not.toContain('OTHERS');
+  });
+
   it('maps Commerce stream to COMMERCE plus COM', () => {
     expect(normalizeClass12Stream('Commerce')).toBe('COMMERCE');
     expect(class12StreamLookupAliases('Commerce')).toEqual(

@@ -9,6 +9,7 @@ import { StudentSemesterResolverService } from './student-semester-resolver.serv
 import { StudentProfileSectionsService } from './student-profile-sections.service';
 import { StudentDirectoryEnrichmentService } from './student-directory-enrichment.service';
 import { StudentDisplaySettingsService } from '../../administration/services/student-display-settings.service';
+import { StudentProfileChangeRequestService } from './student-profile-change-request.service';
 import type { UpdateStudentProfileDto } from '../dto/students.dto';
 import { resolveStudentContactEmail } from '../student-credentials.util';
 import { offeringPaperTitle } from '../../academic-engine/domain/offering-paper-title';
@@ -59,9 +60,17 @@ export class StudentProfileService {
     private readonly sections: StudentProfileSectionsService,
     private readonly directoryEnrichment: StudentDirectoryEnrichmentService,
     private readonly displaySettings: StudentDisplaySettingsService,
+    private readonly changeRequests: StudentProfileChangeRequestService,
   ) {}
 
+  async syncTenantProfileWrites(tenantId: string) {
+    await this.changeRequests.syncTenantProfileWrites(tenantId);
+  }
+
   async getFullProfile(tenantId: string, studentId: string) {
+    await this.changeRequests
+      .syncStudentProfileWrites(tenantId, studentId)
+      .catch(() => undefined);
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId, deletedAt: null },
       include: profileInclude,

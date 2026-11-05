@@ -1,12 +1,18 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import {
+  buildClass12SubjectCode,
   class12BoardLookupAliases,
   class12StreamLookupAliases,
   normalizeClass12Board,
   normalizeClass12Stream,
   normalizeClass12SubjectKey,
 } from '../domain/class12-subjects.util';
+
+const OTHERS_LANGUAGE_SUBJECTS = [
+  { subjectName: 'English', sortOrder: 10 },
+  { subjectName: 'Hindi', sortOrder: 20 },
+] as const;
 
 export type Class12SubjectDto = {
   id: string;
@@ -29,6 +35,10 @@ export class Class12SubjectsService {
     const streamCode = normalizeClass12Stream(stream);
     if (!boardRaw || !streamCode) {
       return [];
+    }
+
+    if (this.isOthersBoard(boardRaw)) {
+      await this.ensureOthersLanguageSubjects(tenantId, streamCode);
     }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);
@@ -73,6 +83,70 @@ export class Class12SubjectsService {
       boardCode: String(row.boardType ?? boardRaw).toUpperCase(),
       streamCode: String(row.category ?? streamCode).toUpperCase(),
     }));
+  }
+
+  private isOthersBoard(boardRaw: string) {
+    return class12BoardLookupAliases(boardRaw).some(
+      (alias) => alias === 'OTHERS' || alias === 'OTHER',
+    );
+  }
+
+  /**
+   * Others has the arts/science/commerce papers, but English and Hindi were
+   * never stored on that board. Write them into the subject master so the
+   * dropdown and the save check use the same rows.
+   */
+  private async ensureOthersLanguageSubjects(
+    tenantId: string,
+    streamCode: string,
+  ) {
+    const stream = class12StreamLookupAliases(streamCode)[0] || streamCode;
+    for (const subject of OTHERS_LANGUAGE_SUBJECTS) {
+      const existing = await this.prisma.supportBoardSubject.findFirst({
+        where: {
+          tenantId,
+          deletedAt: null,
+          boardType: { equals: 'OTHERS', mode: 'insensitive' },
+          category: { equals: stream, mode: 'insensitive' },
+          subjectName: { equals: subject.subjectName, mode: 'insensitive' },
+        },
+        select: { id: true, isActive: true },
+      });
+      if (existing) {
+        if (!existing.isActive) {
+          await this.prisma.supportBoardSubject.update({
+            where: { id: existing.id },
+            data: { isActive: true, sortOrder: subject.sortOrder },
+          });
+        }
+        continue;
+      }
+      const subjectCode = buildClass12SubjectCode(
+        'OTHERS',
+        stream,
+        subject.subjectName,
+      );
+      await this.prisma.supportBoardSubject.upsert({
+        where: { tenantId_subjectCode: { tenantId, subjectCode } },
+        create: {
+          tenantId,
+          subjectCode,
+          subjectName: subject.subjectName,
+          boardType: 'OTHERS',
+          category: stream,
+          sortOrder: subject.sortOrder,
+          isActive: true,
+        },
+        update: {
+          subjectName: subject.subjectName,
+          boardType: 'OTHERS',
+          category: stream,
+          sortOrder: subject.sortOrder,
+          isActive: true,
+          deletedAt: null,
+        },
+      });
+    }
   }
 
   private async resolveBoardAliases(
@@ -149,6 +223,10 @@ export class Class12SubjectsService {
       throw new BadRequestException(
         'Select Board and Stream before saving Class XII subjects',
       );
+    }
+
+    if (this.isOthersBoard(boardRaw)) {
+      await this.ensureOthersLanguageSubjects(tenantId, streamCode);
     }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);

@@ -57,7 +57,10 @@ export class MasterDataService {
     ];
   }
 
-  list(tenantId: string, lookupType?: string, activeOnly = true) {
+  async list(tenantId: string, lookupType?: string, activeOnly = true) {
+    if (!lookupType || lookupType.toUpperCase() === 'BLOOD_GROUP') {
+      await this.ensureStandardBloodGroups(tenantId);
+    }
     return this.prisma.masterLookup.findMany({
       where: {
         tenantId,
@@ -125,6 +128,60 @@ export class MasterDataService {
     return { success: true };
   }
 
+  private async ensureStandardBloodGroups(tenantId: string) {
+    const groups = [
+      ['A_POS', 'A+', 1],
+      ['A_NEG', 'A-', 2],
+      ['B_POS', 'B+', 3],
+      ['B_NEG', 'B-', 4],
+      ['AB_POS', 'AB+', 5],
+      ['AB_NEG', 'AB-', 6],
+      ['O_POS', 'O+', 7],
+      ['O_NEG', 'O-', 8],
+    ] as const;
+    const existing = await this.prisma.masterLookup.findMany({
+      where: { tenantId, lookupType: 'BLOOD_GROUP' },
+      select: { id: true, label: true, code: true, isActive: true },
+    });
+    const standard = new Set(groups.map(([, label]) => label.toUpperCase()));
+    const inactiveIds = existing
+      .filter(
+        (row) =>
+          !row.isActive &&
+          standard.has(row.label.replace(/\s+/g, '').toUpperCase()),
+      )
+      .map((row) => row.id);
+    if (inactiveIds.length) {
+      await this.prisma.masterLookup.updateMany({
+        where: { id: { in: inactiveIds } },
+        data: { isActive: true },
+      });
+    }
+    const labels = new Set(
+      existing.map((row) => row.label.replace(/\s+/g, '').toUpperCase()),
+    );
+    const codes = new Set(existing.map((row) => row.code.toUpperCase()));
+    const missing = groups.filter(
+      ([, label]) => !labels.has(label.toUpperCase()),
+    );
+    if (!missing.length) return;
+    await this.prisma.masterLookup.createMany({
+      data: missing.map(([preferred, label, sortOrder]) => {
+        const code = codes.has(preferred) ? `STD_${preferred}` : preferred;
+        codes.add(code);
+        return {
+          tenantId,
+          lookupType: 'BLOOD_GROUP',
+          code,
+          label,
+          sortOrder,
+          isActive: true,
+        };
+      }),
+      skipDuplicates: true,
+    });
+  }
+
   async seedDefaults(tenantId: string) {
     const defaults: {
       lookupType: string;
@@ -151,9 +208,13 @@ export class MasterDataService {
       },
       { lookupType: 'RELIGION', code: 'OTHER', label: 'Other', sortOrder: 4 },
       { lookupType: 'BLOOD_GROUP', code: 'A_POS', label: 'A+', sortOrder: 1 },
-      { lookupType: 'BLOOD_GROUP', code: 'B_POS', label: 'B+', sortOrder: 2 },
-      { lookupType: 'BLOOD_GROUP', code: 'O_POS', label: 'O+', sortOrder: 3 },
-      { lookupType: 'BLOOD_GROUP', code: 'AB_POS', label: 'AB+', sortOrder: 4 },
+      { lookupType: 'BLOOD_GROUP', code: 'A_NEG', label: 'A-', sortOrder: 2 },
+      { lookupType: 'BLOOD_GROUP', code: 'B_POS', label: 'B+', sortOrder: 3 },
+      { lookupType: 'BLOOD_GROUP', code: 'B_NEG', label: 'B-', sortOrder: 4 },
+      { lookupType: 'BLOOD_GROUP', code: 'AB_POS', label: 'AB+', sortOrder: 5 },
+      { lookupType: 'BLOOD_GROUP', code: 'AB_NEG', label: 'AB-', sortOrder: 6 },
+      { lookupType: 'BLOOD_GROUP', code: 'O_POS', label: 'O+', sortOrder: 7 },
+      { lookupType: 'BLOOD_GROUP', code: 'O_NEG', label: 'O-', sortOrder: 8 },
       { lookupType: 'NATIONALITY', code: 'IN', label: 'Indian', sortOrder: 1 },
       {
         lookupType: 'ADMISSION_STATUS',

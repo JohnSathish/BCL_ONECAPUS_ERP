@@ -49,13 +49,21 @@ export class StudentProfileUpdatePolicyService {
         skipDuplicates: true,
       });
     }
-    // Gender, Aadhaar, and date of birth must apply immediately. Existing tenant
-    // rows keep the old "approval required" mode unless we correct them here.
+    // Personal fields students edit on the phone must land on the profile
+    // immediately. Older tenant rows still say "approval required".
     await this.db().studentProfileUpdatePolicy.updateMany({
       where: {
         tenantId,
         sectionKey: 'personal',
-        fieldKey: { in: ['gender', 'nationalId', 'dateOfBirth'] },
+        fieldKey: {
+          in: [
+            'gender',
+            'nationalId',
+            'dateOfBirth',
+            'bloodGroupLookupId',
+            'email',
+          ],
+        },
         OR: [
           {
             approvalMode: {
@@ -69,6 +77,25 @@ export class StudentProfileUpdatePolicyService {
       data: {
         approvalMode: 'AUTO_APPROVE',
         mandatory: true,
+        enabled: true,
+      },
+    });
+    await this.db().studentProfileUpdatePolicy.updateMany({
+      where: {
+        tenantId,
+        sectionKey: 'contact',
+        fieldKey: 'email',
+        OR: [
+          {
+            approvalMode: {
+              in: ['APPROVAL_REQUIRED', 'VERIFICATION_REQUIRED'],
+            },
+          },
+          { enabled: false },
+        ],
+      },
+      data: {
+        approvalMode: 'AUTO_APPROVE',
         enabled: true,
       },
     });

@@ -11,7 +11,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { StudentAvatar } from '@/components/student-portal/student-avatar';
 import { StudentScreenShell } from '@/components/student-portal/student-screen-shell';
 import { useStudentPortal } from '@/components/student-portal/student-portal-context';
@@ -21,7 +20,6 @@ import {
   fetchMyProfileBootstrap,
   normalizeClass12Stream,
   submitMyProfileChanges,
-  uploadMyDocument,
   upsertMyClassXii,
   type Class12SubjectOption,
   type ProfileBootstrap,
@@ -68,6 +66,16 @@ const CHECK_ICONS: Record<string, string> = {
   photo: '📷',
   marksheet: '📄',
 };
+
+const BLOOD_GROUP_ORDER = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+function sortBloodGroups<T extends { label: string }>(options: T[]): T[] {
+  return [...options].sort((left, right) => {
+    const leftIndex = BLOOD_GROUP_ORDER.indexOf(left.label.replace(/\s+/g, '').toUpperCase());
+    const rightIndex = BLOOD_GROUP_ORDER.indexOf(right.label.replace(/\s+/g, '').toUpperCase());
+    return (leftIndex < 0 ? 99 : leftIndex) - (rightIndex < 0 ? 99 : rightIndex);
+  });
+}
 
 function genderIcon(value: string) {
   if (value === 'MALE') return '♂';
@@ -149,7 +157,7 @@ export default function CompleteProfileScreen() {
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [savingBank, setSavingBank] = useState(false);
   const [savingClassXii, setSavingClassXii] = useState(false);
-  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [bloodPickerOpen, setBloodPickerOpen] = useState(false);
 
   async function refresh() {
     const data = await fetchMyProfileBootstrap();
@@ -342,6 +350,23 @@ export default function CompleteProfileScreen() {
       if (aadhaar && !AADHAAR_RE.test(aadhaar.replace(/\s/g, ''))) {
         throw new Error('Aadhaar must be exactly 12 digits');
       }
+      if (dateOfBirth) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth);
+        const year = Number(match?.[1]);
+        const month = Number(match?.[2]);
+        const day = Number(match?.[3]);
+        const parsed = new Date(year, month - 1, day);
+        const today = new Date();
+        const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const real =
+          Boolean(match) &&
+          parsed.getFullYear() === year &&
+          parsed.getMonth() === month - 1 &&
+          parsed.getDate() === day;
+        if (!real || year < 1900 || dateOfBirth > todayIso) {
+          throw new Error('Select a valid date of birth');
+        }
+      }
       if (!abcIdLocked) {
         if (abcId.trim() && abcId.trim().length < 8) {
           throw new Error('Enter a valid ABC ID');
@@ -351,23 +376,33 @@ export default function CompleteProfileScreen() {
       const changes: Array<{ sectionKey: string; fieldKey: string; newValue: string | null }> = [
         { sectionKey: 'personal', fieldKey: 'gender', newValue: genderValue || null },
         { sectionKey: 'personal', fieldKey: 'mobileNumber', newValue: mobile || null },
-        { sectionKey: 'personal', fieldKey: 'email', newValue: email || null },
-        {
+      ];
+      if (email.trim()) {
+        changes.push({
           sectionKey: 'personal',
-          fieldKey: 'nationalId',
-          newValue: aadhaar.replace(/\s/g, '') || null,
-        },
-        {
+          fieldKey: 'email',
+          newValue: email.trim().toLowerCase(),
+        });
+      }
+      changes.push({
+        sectionKey: 'personal',
+        fieldKey: 'nationalId',
+        newValue: aadhaar.replace(/\s/g, '') || null,
+      });
+      if (bloodGroupLookupId) {
+        changes.push({
           sectionKey: 'personal',
           fieldKey: 'bloodGroupLookupId',
-          newValue: bloodGroupLookupId || null,
-        },
-        {
+          newValue: bloodGroupLookupId,
+        });
+      }
+      if (dateOfBirth) {
+        changes.push({
           sectionKey: 'personal',
           fieldKey: 'dateOfBirth',
-          newValue: dateOfBirth || null,
-        },
-      ];
+          newValue: dateOfBirth,
+        });
+      }
       if (!abcIdLocked) {
         changes.push({
           sectionKey: 'personal',
@@ -520,41 +555,6 @@ export default function CompleteProfileScreen() {
     }
   }
 
-  async function pickAndUploadMarksheet() {
-    setUploadingDoc('CLASS_XII_MARKSHEET');
-    setMessage('');
-    try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        throw new Error('Photo library permission is required');
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.85,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      const ext = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const mime =
-        asset.mimeType ??
-        (ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg');
-      if (!mime.startsWith('image/')) {
-        throw new Error('Class XII marksheet must be an image (JPEG, PNG, or WebP)');
-      }
-      await uploadMyDocument('CLASS_XII_MARKSHEET', {
-        uri: asset.uri,
-        name: asset.fileName ?? `class-xii-marksheet.${ext === 'png' ? 'png' : 'jpg'}`,
-        mimeType: mime,
-      });
-      setMessage('Class XII marksheet uploaded for verification.');
-      await refresh();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Upload failed');
-    } finally {
-      setUploadingDoc(null);
-    }
-  }
-
   const awaitingFields = useMemo(() => {
     const keys = new Set<string>();
     for (const request of bootstrap?.changeRequests ?? []) {
@@ -569,9 +569,8 @@ export default function CompleteProfileScreen() {
 
   const completion = bootstrap?.completion;
   const student = bootstrap?.student;
-  const docs: Array<{ id: string; documentType: string; verificationStatus?: string }> =
-    bootstrap?.sections?.documents?.documents ?? [];
   const canEditProfile = bootstrap?.profileUpdate?.canEdit !== false;
+  const bloodOptions = sortBloodGroups(bootstrap?.lookups?.bloodGroup ?? []);
   const profileClosedMessage =
     bootstrap?.profileUpdate?.message ||
     'The profile update period has ended. Please contact the College Office if you need to make any changes.';
@@ -751,37 +750,24 @@ export default function CompleteProfileScreen() {
             borderColor={studentTheme.border}
           />
           <Text style={styles.label}>Blood Group *</Text>
-          <View style={styles.chipRow}>
-            {(bootstrap?.lookups?.bloodGroup ?? []).map((opt) => {
-              const active = bloodGroupLookupId === opt.id;
-              return (
-                <Pressable
-                  key={opt.id}
-                  style={[
-                    styles.chip,
-                    active && styles.chipActive,
-                    !canEditProfile && { opacity: 0.5 },
-                  ]}
-                  disabled={!canEditProfile}
-                  onPress={() => setBloodGroupLookupId(opt.id)}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {!(bootstrap?.lookups?.bloodGroup ?? []).length ? (
-            <Text style={styles.hint}>
-              Blood group options are not set up yet. Ask the office to add them under master data.
+          <Pressable
+            style={[styles.fieldRow, !canEditProfile && { opacity: 0.5 }]}
+            disabled={!canEditProfile}
+            onPress={() => setBloodPickerOpen(true)}
+          >
+            <Text style={styles.fieldIcon}>🩸</Text>
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 16,
+                color: bloodGroupLookupId ? studentTheme.text : '#94a3b8',
+              }}
+            >
+              {bloodOptions.find((opt) => opt.id === bloodGroupLookupId)?.label ||
+                'Select blood group'}
             </Text>
-          ) : (
-            <Text style={styles.hint}>
-              Saved with your profile. If it stays on Awaiting approval, the office approves it
-              under Pending Profile Updates.
-            </Text>
-          )}
+          </Pressable>
+          <Text style={styles.hint}>A+, A-, B+, B-, AB+, AB-, O+, or O-.</Text>
           <Text style={styles.label}>Aadhaar Number *</Text>
           <TextInput
             style={styles.input}
@@ -1209,33 +1195,40 @@ export default function CompleteProfileScreen() {
           </View>
         </Modal>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Documents</Text>
-          <Text style={styles.hint}>
-            Upload Class XII marksheet as an image. Passport photo is uploaded by the college
-            office.
-          </Text>
-          <Pressable
-            style={styles.button}
-            onPress={() => void pickAndUploadMarksheet()}
-            disabled={uploadingDoc === 'CLASS_XII_MARKSHEET' || !canEditProfile}
-          >
-            <Text style={styles.buttonText}>
-              {uploadingDoc === 'CLASS_XII_MARKSHEET'
-                ? 'Uploading…'
-                : 'Upload Class XII marksheet (image only)'}
-            </Text>
-          </Pressable>
-          {docs.length ? (
-            docs.map((doc) => (
-              <Text key={doc.id} style={styles.docRow}>
-                • {doc.documentType} — {doc.verificationStatus ?? 'PENDING'}
-              </Text>
-            ))
-          ) : (
-            <Text style={styles.hint}>No documents uploaded yet.</Text>
-          )}
-        </View>
+        <Modal
+          visible={bloodPickerOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setBloodPickerOpen(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.sectionTitle}>Blood group</Text>
+              <FlatList
+                data={bloodOptions}
+                keyExtractor={(item) => item.id}
+                style={{ maxHeight: 360 }}
+                ListEmptyComponent={
+                  <Text style={styles.hint}>Blood group options are not available yet.</Text>
+                }
+                renderItem={({ item }) => (
+                  <Pressable
+                    style={styles.pickerRow}
+                    onPress={() => {
+                      setBloodGroupLookupId(item.id);
+                      setBloodPickerOpen(false);
+                    }}
+                  >
+                    <Text style={{ color: studentTheme.text, fontSize: 16 }}>{item.label}</Text>
+                  </Pressable>
+                )}
+              />
+              <Pressable style={styles.secondaryButton} onPress={() => setBloodPickerOpen(false)}>
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
 
         {message ? (
           <Text style={styles.message} onLongPress={() => Alert.alert('Message', message)}>

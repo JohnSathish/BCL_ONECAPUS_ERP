@@ -375,12 +375,6 @@ export const PROFILE_COMPLETION_CHECKS: Array<{
     sectionKey: 'documents',
     fieldKey: 'PHOTO',
   },
-  {
-    key: 'marksheet',
-    label: 'Class XII Marksheet',
-    sectionKey: 'documents',
-    fieldKey: 'CLASS_XII_MARKSHEET',
-  },
 ];
 
 export const PORTAL_DOCUMENT_TYPES = [
@@ -402,7 +396,6 @@ export const PORTAL_DOCUMENT_TYPES = [
 export const STUDENT_SELF_UPLOAD_DOCUMENT_TYPES = [
   'AADHAAR',
   'PAN',
-  'CLASS_XII_MARKSHEET',
   'CLASS_XII_PASSING',
   'MIGRATION',
   'CHARACTER',

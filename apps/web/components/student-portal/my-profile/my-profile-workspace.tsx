@@ -1426,9 +1426,9 @@ function DocumentsForm({
 }) {
   const docs = bootstrap.sections.documents?.documents ?? [];
   const allowed = (bootstrap.sections.documents?.allowedTypes ?? []).filter(
-    (t) => !['PHOTO', 'PASSPORT_PHOTO'].includes(String(t).toUpperCase()),
+    (t) => !['PHOTO', 'PASSPORT_PHOTO', 'CLASS_XII_MARKSHEET'].includes(String(t).toUpperCase()),
   );
-  const [docType, setDocType] = useState(String(allowed[0] ?? 'CLASS_XII_MARKSHEET'));
+  const [docType, setDocType] = useState(String(allowed[0] ?? ''));
   const [file, setFile] = useState<File | null>(null);
   const marksheetOnlyImage = String(docType).toUpperCase() === 'CLASS_XII_MARKSHEET';
   const mut = useMutation({
@@ -1453,8 +1453,7 @@ function DocumentsForm({
   return (
     <SectionCard title="Documents" subtitle="Upload and track verification status">
       <p className="mb-3 text-xs text-muted-foreground">
-        Passport photo is uploaded by the college office. Class XII marksheet must be an image (not
-        PDF).
+        Passport photo is uploaded by the college office. Class XII marksheet upload is closed.
       </p>
       <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
         <SelectBox
@@ -1496,9 +1495,6 @@ function DocumentsForm({
             </span>
           </div>
         ))}
-        {!docs.length ? (
-          <p className="text-sm text-muted-foreground">No documents uploaded yet.</p>
-        ) : null}
       </div>
     </SectionCard>
   );
