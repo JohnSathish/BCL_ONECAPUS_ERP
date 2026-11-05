@@ -1010,16 +1010,18 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
             pending={saveMut.isPending}
             loading={!usingManualRoll && (shiftPreviewQ.isLoading || shiftPreviewQ.isFetching)}
             errorMessage={
-              usingManualRoll
-                ? manualRollReady
-                  ? null
-                  : 'Enter the roll number from Excel to continue.'
-                : shiftPreviewQ.isError
-                  ? apiErrorMessage(
-                      shiftPreviewQ.error,
-                      'Could not preview roll number. Switch to “Enter from Excel”.',
-                    )
-                  : null
+              saveMut.isError
+                ? apiErrorMessage(saveMut.error, 'Could not transfer this student.')
+                : usingManualRoll
+                  ? manualRollReady
+                    ? null
+                    : 'Enter the roll number from Excel to continue.'
+                  : shiftPreviewQ.isError
+                    ? apiErrorMessage(
+                        shiftPreviewQ.error,
+                        'Could not preview roll number. Switch to “Enter from Excel”.',
+                      )
+                    : null
             }
             onConfirm={() => saveMut.mutate()}
           />

@@ -42,7 +42,7 @@ export function ShiftTransferConfirmDialog({
         </DialogHeader>
         {loading && !preview && !errorMessage ? (
           <p className="text-sm text-muted-foreground">Loading preview…</p>
-        ) : errorMessage ? (
+        ) : errorMessage && !preview ? (
           <div className="space-y-2 text-sm">
             <p className="font-medium text-destructive">Could not prepare shift transfer</p>
             <p className="text-muted-foreground">{errorMessage}</p>
@@ -71,6 +71,9 @@ export function ShiftTransferConfirmDialog({
               This action will permanently assign a new roll number. The previous roll number will
               be preserved in the audit history. Major papers and other subjects stay the same.
             </p>
+            {errorMessage ? (
+              <p className="whitespace-pre-wrap text-sm text-destructive">{errorMessage}</p>
+            ) : null}
           </div>
         ) : isBulk ? (
           <p className="text-sm text-muted-foreground">
