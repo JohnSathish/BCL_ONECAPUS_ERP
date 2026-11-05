@@ -4,6 +4,7 @@
 .expo/
 node_modules/
 dist/
+dist/**
 web-build/
 *.jks
 *.p8
@@ -35,3 +36,8 @@ android.bak/**
 **/checksums.lock
 **/build/
 android/keystore.properties
+credentials.json
+credentials/**
+.env.*
+*.bak
+**/*.bak-*
