@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { class12BoardReportLabel } from '../../students/domain/class12-board-name';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { StudentDirectoryEnrichmentService } from '../../students/services/student-directory-enrichment.service';
@@ -234,6 +235,11 @@ export class StudentMasterAssemblerService {
       district: permanent?.district ?? present?.district ?? '',
       pincode: permanent?.pinCode ?? present?.pinCode ?? '',
       boardName: board?.boardName ?? '',
+      boardNameOther: board?.boardNameOther ?? '',
+      boardReportName: class12BoardReportLabel(
+        board?.boardName,
+        board?.boardNameOther,
+      ),
       boardYear: board?.examYear ?? '',
       boardPercentage: board?.percentage ? Number(board.percentage) : '',
       cuetRoll: student.cuetDetail?.cuetRollNumber ?? '',

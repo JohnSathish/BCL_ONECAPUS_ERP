@@ -1135,6 +1135,7 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
   const exam = bootstrap.sections.class_xii ?? null;
   const [form, setForm] = useState({
     boardName: String(exam?.boardName ?? ''),
+    boardNameOther: String(exam?.boardNameOther ?? ''),
     schoolName: String(exam?.schoolName ?? ''),
     boardRollNumber: String(exam?.boardRollNumber ?? ''),
     registrationNumber: String(exam?.registrationNumber ?? ''),
@@ -1182,6 +1183,12 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
   const mut = useMutation({
     mutationFn: () => {
       const named = subjects.filter((s) => s.subjectName.trim());
+      if (
+        ['OTHERS', 'OTHER'].includes(form.boardName.trim().toUpperCase()) &&
+        !form.boardNameOther.trim()
+      ) {
+        throw new Error('Enter the board name');
+      }
       if (named.length < 5) {
         throw new Error('Enter at least 5 Class XII subjects');
       }
@@ -1191,6 +1198,9 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
       }
       return upsertMyClassXii({
         boardName: form.boardName || null,
+        boardNameOther: ['OTHERS', 'OTHER'].includes(form.boardName.trim().toUpperCase())
+          ? form.boardNameOther.trim() || null
+          : undefined,
         schoolName: form.schoolName || null,
         boardRollNumber: form.boardRollNumber || null,
         registrationNumber: form.registrationNumber || null,
@@ -1280,12 +1290,17 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
       <div className="mt-6">
         <ClassXiiSubjectMarksEditor
           boardName={form.boardName}
+          boardNameOther={form.boardNameOther}
           stream={form.stream}
           subjectMarks={subjects}
           boardOptions={boardOptions}
           showBoardSelect
           onBoardChange={(boardName) => {
             setForm((p) => ({ ...p, boardName }));
+            onDirty();
+          }}
+          onBoardNameOtherChange={(boardNameOther) => {
+            setForm((p) => ({ ...p, boardNameOther }));
             onDirty();
           }}
           onStreamChange={(stream) => {

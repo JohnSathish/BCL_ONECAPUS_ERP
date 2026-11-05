@@ -100,6 +100,7 @@ export class BoardSubjectMarkDto {
 
 export class UpdateBoardExamSectionDto {
   @IsOptional() @IsString() boardName?: string;
+  @IsOptional() @IsString() boardNameOther?: string;
   @IsOptional() @IsString() schoolName?: string;
   @IsOptional() @IsString() boardRollNumber?: string;
   @IsOptional() @IsInt() examYear?: number;

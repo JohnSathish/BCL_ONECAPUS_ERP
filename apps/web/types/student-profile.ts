@@ -107,6 +107,7 @@ export type BoardSubjectMark = {
 export type StudentBoardExam = {
   id: string;
   boardName?: string | null;
+  boardNameOther?: string | null;
   schoolName?: string | null;
   boardRollNumber?: string | null;
   examYear?: number | null;

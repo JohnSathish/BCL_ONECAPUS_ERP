@@ -59,6 +59,11 @@ export class StudentReportsController {
     return this.customReports.listFieldRegistry(module ?? 'STUDENTS');
   }
 
+  @Get('class-xii-board-counts')
+  classXiiBoardCounts(@CurrentUser() user: JwtUser) {
+    return this.customReports.classXiiBoardCounts(user.tid);
+  }
+
   @Get('builtin-templates')
   builtinTemplates() {
     return this.customReports.listBuiltinTemplates();

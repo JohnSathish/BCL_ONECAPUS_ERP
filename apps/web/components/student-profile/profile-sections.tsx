@@ -1185,6 +1185,7 @@ export function BoardExamSection({
   const class12Optional = isExcelImportedStudent(profile);
   const [form, setForm] = useState({
     boardName: exam?.boardName ?? '',
+    boardNameOther: exam?.boardNameOther ?? '',
     schoolName: exam?.schoolName ?? '',
     boardRollNumber: exam?.boardRollNumber ?? '',
     examYear: exam?.examYear ?? undefined,
@@ -1252,6 +1253,7 @@ export function BoardExamSection({
       <div className="mt-4">
         <ClassXiiSubjectMarksEditor
           boardName={form.boardName}
+          boardNameOther={form.boardNameOther}
           stream={form.stream}
           subjectMarks={form.subjectMarks}
           boardOptions={
@@ -1265,6 +1267,7 @@ export function BoardExamSection({
           requireCatalog={!class12Optional}
           inputClassName={inputClass}
           onBoardChange={(boardName) => setForm((f) => ({ ...f, boardName }))}
+          onBoardNameOtherChange={(boardNameOther) => setForm((f) => ({ ...f, boardNameOther }))}
           onStreamChange={(stream) => setForm((f) => ({ ...f, stream }))}
           onSubjectMarksChange={(subjectMarks) =>
             setForm((f) => ({

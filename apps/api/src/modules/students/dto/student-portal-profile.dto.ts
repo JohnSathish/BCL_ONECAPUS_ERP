@@ -89,6 +89,10 @@ export class UpsertClassXiiDto {
 
   @IsOptional()
   @IsString()
+  boardNameOther?: string | null;
+
+  @IsOptional()
+  @IsString()
   schoolName?: string | null;
 
   @IsOptional()

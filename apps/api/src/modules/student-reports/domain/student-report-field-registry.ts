@@ -95,6 +95,8 @@ export const STUDENT_REPORT_FIELDS: StudentReportFieldDef[] = [
   { key: 'district', label: 'District', group: 'address' },
   { key: 'pincode', label: 'Pincode', group: 'address' },
   { key: 'boardName', label: 'Board Name', group: 'board' },
+  { key: 'boardNameOther', label: 'Other Board Name', group: 'board' },
+  { key: 'boardReportName', label: 'Board (actual name)', group: 'board' },
   { key: 'boardYear', label: 'Board Year', group: 'board' },
   { key: 'boardPercentage', label: 'Board Percentage', group: 'board' },
   { key: 'cuetRoll', label: 'CUET Roll', group: 'cuet' },

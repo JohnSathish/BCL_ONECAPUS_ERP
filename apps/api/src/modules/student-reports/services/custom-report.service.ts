@@ -23,6 +23,7 @@ import type {
   UpdateSavedReportDto,
 } from '../dto/custom-report.dto';
 import type { StudentReportFiltersDto } from '../dto/student-reports.dto';
+import { class12BoardReportLabel } from '../../students/domain/class12-board-name';
 import { StudentMasterAssemblerService } from './student-master-assembler.service';
 import { StudentSubjectReportService } from './student-subject-report.service';
 import { StudentTabularExportService } from './student-tabular-export.service';
@@ -56,6 +57,26 @@ export class CustomReportService {
 
   listBuiltinTemplates() {
     return BUILTIN_STUDENT_REPORTS;
+  }
+
+  async classXiiBoardCounts(tenantId: string) {
+    const rows = await this.prisma.studentBoardExam.findMany({
+      where: { tenantId, student: { deletedAt: null } },
+      select: { boardName: true, boardNameOther: true },
+    });
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      const label = class12BoardReportLabel(row.boardName, row.boardNameOther);
+      if (!label) continue;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([boardName, count]) => ({ boardName, count }))
+      .sort(
+        (left, right) =>
+          right.count - left.count ||
+          left.boardName.localeCompare(right.boardName),
+      );
   }
 
   async listSavedReports(

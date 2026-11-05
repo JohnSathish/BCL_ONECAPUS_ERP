@@ -2566,6 +2566,7 @@ model StudentBoardExam {
   tenantId            String   @map("tenant_id") @db.Uuid
   studentId           String   @map("student_id") @db.Uuid
   boardName           String?  @map("board_name")
+  boardNameOther      String?  @map("board_name_other")
   schoolName          String?  @map("school_name")
   boardRollNumber     String?  @map("board_roll_number")
   examYear            Int?     @map("exam_year")

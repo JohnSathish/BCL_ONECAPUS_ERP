@@ -7,6 +7,7 @@ export type BoardExamSubjectMarkForm = {
 
 export type BoardExamFormValues = {
   boardName: string;
+  boardNameOther?: string;
   schoolName: string;
   boardRollNumber: string;
   examYear?: number;
@@ -26,8 +27,11 @@ export function sanitizeBoardExamPayload<T extends BoardExamFormValues>(form: T)
   const subjectMarks = form.subjectMarks.filter(
     (mark) => !isPlaceholderBoardSubjectName(mark.subjectName),
   );
+  const others = ['OTHERS', 'OTHER'].includes(form.boardName.trim().toUpperCase());
+  const boardNameOther = form.boardNameOther?.trim();
   return {
     ...form,
+    boardNameOther: others && boardNameOther ? boardNameOther : undefined,
     subjectMarks: subjectMarks.length > 0 ? subjectMarks : undefined,
   };
 }

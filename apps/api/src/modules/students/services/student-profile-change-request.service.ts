@@ -18,6 +18,7 @@ import { isTemporaryStudentLoginEmail } from '../student-credentials.util';
 import { StudentProfileUpdatePolicyService } from './student-profile-update-policy.service';
 import { Class12SubjectsService } from './class12-subjects.service';
 import { StudentAbcService } from './student-abc.service';
+import { isOthersClass12Board } from '../domain/class12-board-name';
 import { isExcelImportedStudent } from '../domain/class12-subjects.util';
 
 function serializeValue(value: unknown): string | null {
@@ -667,6 +668,7 @@ export class StudentProfileChangeRequestService {
     studentId: string,
     input: {
       boardName?: string | null;
+      boardNameOther?: string | null;
       schoolName?: string | null;
       boardRollNumber?: string | null;
       registrationNumber?: string | null;
@@ -716,8 +718,16 @@ export class StudentProfileChangeRequestService {
       where: { tenantId: user.tid, studentId },
     });
 
+    const otherBoardName = String(input.boardNameOther ?? '').trim();
+    if (isOthersClass12Board(input.boardName) && !otherBoardName) {
+      throw new BadRequestException('Enter the board name');
+    }
+
     const payload = {
       boardName: input.boardName ?? undefined,
+      ...(isOthersClass12Board(input.boardName)
+        ? { boardNameOther: otherBoardName }
+        : {}),
       schoolName: input.schoolName ?? undefined,
       boardRollNumber: input.boardRollNumber ?? undefined,
       registrationNumber: input.registrationNumber ?? undefined,

@@ -27,6 +27,7 @@ import type {
   UpdateGuardiansSectionDto,
   VerifyDocumentDto,
 } from '../dto/profile-section.dto';
+import { isOthersClass12Board } from '../domain/class12-board-name';
 import { AcademicChangeHistoryService } from '../academic-change-history/academic-change-history.service';
 import type { AcademicChangeAuditContext } from '../academic-change-history/academic-change-history.types';
 import { Class12SubjectsService } from './class12-subjects.service';
@@ -1059,10 +1060,23 @@ export class StudentProfileSectionsService {
         percentage = new Prisma.Decimal(((obtained / max) * 100).toFixed(2));
     }
 
+    const nextBoard = dto.boardName ?? exam.boardName;
+    const otherBoardName = String(dto.boardNameOther ?? '').trim();
+    if (
+      dto.boardNameOther !== undefined &&
+      isOthersClass12Board(nextBoard) &&
+      !otherBoardName
+    ) {
+      throw new BadRequestException('Enter the board name');
+    }
+
     await this.prisma.studentBoardExam.update({
       where: { id: exam.id },
       data: {
         ...(dto.boardName !== undefined ? { boardName: dto.boardName } : {}),
+        ...(dto.boardNameOther !== undefined && isOthersClass12Board(nextBoard)
+          ? { boardNameOther: otherBoardName }
+          : {}),
         ...(dto.schoolName !== undefined ? { schoolName: dto.schoolName } : {}),
         ...(dto.boardRollNumber !== undefined
           ? { boardRollNumber: dto.boardRollNumber }

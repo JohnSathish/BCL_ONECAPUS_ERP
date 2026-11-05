@@ -21,6 +21,8 @@ export type ClassXiiSubjectMarkRow = {
 
 type Props = {
   boardName: string;
+  boardNameOther?: string;
+  onBoardNameOtherChange?: (name: string) => void;
   stream: string;
   subjectMarks: ClassXiiSubjectMarkRow[];
   onBoardChange?: (board: string) => void;
@@ -39,6 +41,11 @@ type Props = {
   className?: string;
   inputClassName?: string;
 };
+
+function isOthersBoard(board: string) {
+  const value = board.trim().toUpperCase();
+  return value === 'OTHERS' || value === 'OTHER';
+}
 
 function emptyRows(count: number): ClassXiiSubjectMarkRow[] {
   return Array.from({ length: count }, () => ({
@@ -149,6 +156,8 @@ function SubjectSearchSelect({
 
 export function ClassXiiSubjectMarksEditor({
   boardName,
+  boardNameOther = '',
+  onBoardNameOtherChange,
   stream,
   subjectMarks,
   onBoardChange,
@@ -242,6 +251,18 @@ export function ClassXiiSubjectMarksEditor({
                 </option>
               ))}
             </select>
+          </label>
+        ) : null}
+        {showBoardSelect && isOthersBoard(boardName) ? (
+          <label className="space-y-1 text-sm sm:col-span-2">
+            <span className="font-medium">Enter Board Name *</span>
+            <input
+              className={inputClassName}
+              disabled={disabled}
+              value={boardNameOther}
+              placeholder="e.g. Assam State School Education Board"
+              onChange={(e) => onBoardNameOtherChange?.(e.target.value)}
+            />
           </label>
         ) : null}
         <label className="space-y-1 text-sm">
