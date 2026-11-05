@@ -83,6 +83,34 @@ export class StudentProfileUpdatePolicyService {
     await this.db().studentProfileUpdatePolicy.updateMany({
       where: {
         tenantId,
+        sectionKey: 'category_reservation',
+        fieldKey: {
+          in: [
+            'categoryLookupId',
+            'religionLookupId',
+            'tribeLookupId',
+            'denominationLookupId',
+            'differentlyAbled',
+            'ews',
+          ],
+        },
+        OR: [
+          {
+            approvalMode: {
+              in: ['APPROVAL_REQUIRED', 'VERIFICATION_REQUIRED'],
+            },
+          },
+          { enabled: false },
+        ],
+      },
+      data: {
+        approvalMode: 'AUTO_APPROVE',
+        enabled: true,
+      },
+    });
+    await this.db().studentProfileUpdatePolicy.updateMany({
+      where: {
+        tenantId,
         sectionKey: 'contact',
         fieldKey: 'email',
         OR: [

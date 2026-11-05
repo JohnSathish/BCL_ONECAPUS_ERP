@@ -27,6 +27,7 @@ export const STUDENT_PORTAL_CHANGE_SECTIONS = [
   'emergency',
   'class_xii',
   'parent',
+  'category_reservation',
 ] as const;
 
 export type StudentPortalChangeSection =

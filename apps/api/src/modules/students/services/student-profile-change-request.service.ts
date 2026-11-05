@@ -71,6 +71,10 @@ const PROFILE_FIELD_LABELS: Record<string, string> = {
   panNumber: 'PAN',
   categoryLookupId: 'Category',
   religionLookupId: 'Religion',
+  tribeLookupId: 'Tribe',
+  denominationLookupId: 'Denomination',
+  differentlyAbled: 'Differently abled',
+  ews: 'Economically Weaker Section',
   nationalityLookupId: 'Nationality',
   maritalStatus: 'Marital status',
   whatsappNumber: 'WhatsApp number',
@@ -404,6 +408,19 @@ export class StudentProfileChangeRequestService {
     if (section === 'class_xii') {
       return { section, data: await this.getClassXii(tenantId, studentId) };
     }
+    if (section === 'category_reservation') {
+      return {
+        section,
+        data: {
+          categoryLookupId: profile.categoryLookupId,
+          religionLookupId: profile.religionLookupId,
+          tribeLookupId: profile.tribeLookupId,
+          denominationLookupId: profile.denominationLookupId,
+          differentlyAbled: profile.differentlyAbled ?? false,
+          ews: profile.ews ?? false,
+        },
+      };
+    }
     if (section === 'documents') {
       const documents = await this.prisma.studentDocument.findMany({
         where: { tenantId, studentId },
@@ -458,6 +475,7 @@ export class StudentProfileChangeRequestService {
       'emergency',
       'class_xii',
       'documents',
+      'category_reservation',
     ] as const;
 
     const [
@@ -491,6 +509,8 @@ export class StudentProfileChangeRequestService {
               'CATEGORY',
               'NATIONALITY',
               'GENDER',
+              'TRIBE',
+              'DENOMINATION',
             ],
           },
           isActive: true,
@@ -515,6 +535,35 @@ export class StudentProfileChangeRequestService {
       sections[row.key] = row.data;
     }
     this.overlayPendingValues(sections, changeRequests);
+
+    const reservation = sections.category_reservation as
+      | Record<string, unknown>
+      | undefined;
+    const selectedLookupIds = [
+      reservation?.categoryLookupId,
+      reservation?.religionLookupId,
+      reservation?.tribeLookupId,
+      reservation?.denominationLookupId,
+    ]
+      .map((value) => (typeof value === 'string' ? value : ''))
+      .filter((id) => UUID_RE.test(id));
+    const knownLookupIds = new Set(lookups.map((row) => row.id));
+    const missingLookupIds = selectedLookupIds.filter(
+      (id) => !knownLookupIds.has(id),
+    );
+    if (missingLookupIds.length) {
+      const extra = await this.prisma.masterLookup.findMany({
+        where: { tenantId, id: { in: missingLookupIds } },
+        select: {
+          id: true,
+          label: true,
+          code: true,
+          lookupType: true,
+          sortOrder: true,
+        },
+      });
+      lookups.push(...extra);
+    }
 
     const lookupsByType: Record<
       string,
@@ -560,6 +609,8 @@ export class StudentProfileChangeRequestService {
         bloodGroup: lookupsByType.BLOOD_GROUP ?? [],
         religion: lookupsByType.RELIGION ?? [],
         category: lookupsByType.CATEGORY ?? [],
+        tribe: lookupsByType.TRIBE ?? [],
+        denomination: lookupsByType.DENOMINATION ?? [],
         nationality: lookupsByType.NATIONALITY ?? [],
         gender: lookupsByType.GENDER ?? [],
       },
@@ -805,6 +856,18 @@ export class StudentProfileChangeRequestService {
       if (
         change.fieldKey === 'nationalId' &&
         (change.newValue == null || String(change.newValue).trim() === '')
+      ) {
+        continue;
+      }
+      if (
+        change.sectionKey === 'category_reservation' &&
+        [
+          'categoryLookupId',
+          'religionLookupId',
+          'tribeLookupId',
+          'denominationLookupId',
+        ].includes(change.fieldKey) &&
+        !coalesceText(change.newValue)
       ) {
         continue;
       }
@@ -1560,6 +1623,52 @@ export class StudentProfileChangeRequestService {
             ...guardianData,
           },
           update: guardianData,
+        });
+      }
+    } else if (section === 'category_reservation') {
+      const lookupTypes: Record<string, string> = {
+        categoryLookupId: 'CATEGORY',
+        religionLookupId: 'RELIGION',
+        tribeLookupId: 'TRIBE',
+        denominationLookupId: 'DENOMINATION',
+      };
+      const data: Record<string, unknown> = {};
+      if (lookupTypes[field]) {
+        const next = coalesceText(value);
+        if (next) {
+          if (!UUID_RE.test(next)) {
+            throw new BadRequestException('Select a valid option');
+          }
+          const lookup = await this.prisma.masterLookup.findFirst({
+            where: {
+              id: next,
+              tenantId,
+              lookupType: lookupTypes[field],
+            },
+            select: { id: true },
+          });
+          if (!lookup) {
+            throw new BadRequestException(
+              'Select an option from the college list',
+            );
+          }
+          data[field] = lookup.id;
+        }
+      }
+      if (field === 'differentlyAbled' || field === 'ews') {
+        if (
+          value === true ||
+          value === false ||
+          value === 'true' ||
+          value === 'false'
+        ) {
+          data[field] = value === true || value === 'true';
+        }
+      }
+      if (Object.keys(data).length) {
+        await this.prisma.studentProfile.update({
+          where: { studentId },
+          data: data as any,
         });
       }
     } else if (section === 'class_xii' && field === 'boardExam') {

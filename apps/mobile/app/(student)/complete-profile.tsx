@@ -158,6 +158,17 @@ export default function CompleteProfileScreen() {
   const [savingBank, setSavingBank] = useState(false);
   const [savingClassXii, setSavingClassXii] = useState(false);
   const [bloodPickerOpen, setBloodPickerOpen] = useState(false);
+  const [categoryLookupId, setCategoryLookupId] = useState('');
+  const [religionLookupId, setReligionLookupId] = useState('');
+  const [tribeLookupId, setTribeLookupId] = useState('');
+  const [denominationLookupId, setDenominationLookupId] = useState('');
+  const [differentlyAbled, setDifferentlyAbled] = useState(false);
+  const [ews, setEws] = useState(false);
+  const [savingReservation, setSavingReservation] = useState(false);
+  const [reservationPicker, setReservationPicker] = useState<
+    'category' | 'religion' | 'tribe' | 'denomination' | null
+  >(null);
+  const [reservationSearch, setReservationSearch] = useState('');
 
   async function refresh() {
     const data = await fetchMyProfileBootstrap();
@@ -177,6 +188,13 @@ export default function CompleteProfileScreen() {
     const existingAbc = String(personal.abcId ?? '').trim();
     setAbcId(existingAbc);
     setAbcIdLocked(Boolean(existingAbc));
+    const reservation = data.sections?.category_reservation ?? {};
+    setCategoryLookupId(String(reservation.categoryLookupId ?? ''));
+    setReligionLookupId(String(reservation.religionLookupId ?? ''));
+    setTribeLookupId(String(reservation.tribeLookupId ?? ''));
+    setDenominationLookupId(String(reservation.denominationLookupId ?? ''));
+    setDifferentlyAbled(Boolean(reservation.differentlyAbled));
+    setEws(Boolean(reservation.ews));
 
     const bankData = data.sections?.bank ?? {};
     setBank({
@@ -422,6 +440,60 @@ export default function CompleteProfileScreen() {
     }
   }
 
+  async function onSaveReservation() {
+    setSavingReservation(true);
+    setMessage('');
+    try {
+      const changes: Array<{
+        sectionKey: string;
+        fieldKey: string;
+        newValue: string | boolean;
+      }> = [
+        {
+          sectionKey: 'category_reservation',
+          fieldKey: 'differentlyAbled',
+          newValue: differentlyAbled,
+        },
+        { sectionKey: 'category_reservation', fieldKey: 'ews', newValue: ews },
+      ];
+      if (categoryLookupId) {
+        changes.push({
+          sectionKey: 'category_reservation',
+          fieldKey: 'categoryLookupId',
+          newValue: categoryLookupId,
+        });
+      }
+      if (religionLookupId) {
+        changes.push({
+          sectionKey: 'category_reservation',
+          fieldKey: 'religionLookupId',
+          newValue: religionLookupId,
+        });
+      }
+      if (tribeLookupId) {
+        changes.push({
+          sectionKey: 'category_reservation',
+          fieldKey: 'tribeLookupId',
+          newValue: tribeLookupId,
+        });
+      }
+      if (denominationLookupId) {
+        changes.push({
+          sectionKey: 'category_reservation',
+          fieldKey: 'denominationLookupId',
+          newValue: denominationLookupId,
+        });
+      }
+      await submitMyProfileChanges(changes);
+      setMessage('Category and reservation details saved.');
+      await refresh();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'Could not save category and reservation');
+    } finally {
+      setSavingReservation(false);
+    }
+  }
+
   async function onSaveBank() {
     setSavingBank(true);
     setMessage('');
@@ -571,6 +643,25 @@ export default function CompleteProfileScreen() {
   const student = bootstrap?.student;
   const canEditProfile = bootstrap?.profileUpdate?.canEdit !== false;
   const bloodOptions = sortBloodGroups(bootstrap?.lookups?.bloodGroup ?? []);
+  const reservationLists = {
+    category: bootstrap?.lookups?.category ?? [],
+    religion: bootstrap?.lookups?.religion ?? [],
+    tribe: bootstrap?.lookups?.tribe ?? [],
+    denomination: bootstrap?.lookups?.denomination ?? [],
+  };
+  const reservationValues = {
+    category: categoryLookupId,
+    religion: religionLookupId,
+    tribe: tribeLookupId,
+    denomination: denominationLookupId,
+  };
+  const reservationPickerOptions = (
+    reservationPicker ? reservationLists[reservationPicker] : []
+  ).filter(
+    (row) =>
+      !reservationSearch.trim() ||
+      row.label.toLowerCase().includes(reservationSearch.trim().toLowerCase()),
+  );
   const profileClosedMessage =
     bootstrap?.profileUpdate?.message ||
     'The profile update period has ended. Please contact the College Office if you need to make any changes.';
@@ -798,6 +889,76 @@ export default function CompleteProfileScreen() {
           >
             <Text style={styles.buttonText}>
               {savingPersonal ? 'Saving…' : 'Save personal details'}
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Category & Reservation</Text>
+          <Text style={styles.sectionHint}>
+            Category, religion, tribe, denomination, and reservation details
+          </Text>
+          {(
+            [
+              ['category', 'Category'],
+              ['religion', 'Religion'],
+              ['tribe', 'Tribe'],
+              ['denomination', 'Denomination'],
+            ] as const
+          ).map(([key, label]) => {
+            const selected = reservationLists[key].find((row) => row.id === reservationValues[key]);
+            return (
+              <View key={key}>
+                <Text style={styles.label}>{label}</Text>
+                <Pressable
+                  style={[styles.fieldRow, !canEditProfile && { opacity: 0.5 }]}
+                  disabled={!canEditProfile}
+                  onPress={() => {
+                    setReservationSearch('');
+                    setReservationPicker(key);
+                  }}
+                >
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: 16,
+                      color: selected ? studentTheme.text : '#94a3b8',
+                    }}
+                  >
+                    {selected?.label || `Select ${label.toLowerCase()}`}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          })}
+          {(
+            [
+              ['Differently Abled', differentlyAbled, setDifferentlyAbled],
+              ['Economically Weaker Section (EWS)', ews, setEws],
+            ] as const
+          ).map(([label, checked, setChecked]) => (
+            <Pressable
+              key={label}
+              style={[styles.checkRow, !canEditProfile && { opacity: 0.5 }]}
+              disabled={!canEditProfile}
+              onPress={() => setChecked(!checked)}
+            >
+              <View style={[styles.checkBox, checked && styles.checkBoxOn]}>
+                {checked ? <Text style={styles.checkTick}>✓</Text> : null}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.checkTitle}>{label}</Text>
+                <Text style={styles.hint}>{checked ? 'Yes' : 'No'}</Text>
+              </View>
+            </Pressable>
+          ))}
+          <Pressable
+            style={[styles.button, !canEditProfile && { opacity: 0.5 }]}
+            onPress={() => void onSaveReservation()}
+            disabled={savingReservation || !canEditProfile}
+          >
+            <Text style={styles.buttonText}>
+              {savingReservation ? 'Saving…' : 'Save category and reservation'}
             </Text>
           </Pressable>
         </View>
@@ -1196,6 +1357,73 @@ export default function CompleteProfileScreen() {
         </Modal>
 
         <Modal
+          visible={reservationPicker != null}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setReservationPicker(null)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.sectionTitle}>
+                {reservationPicker === 'category'
+                  ? 'Category'
+                  : reservationPicker === 'religion'
+                    ? 'Religion'
+                    : reservationPicker === 'tribe'
+                      ? 'Tribe'
+                      : 'Denomination'}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Search…"
+                placeholderTextColor="#94a3b8"
+                value={reservationSearch}
+                onChangeText={setReservationSearch}
+                autoFocus
+              />
+              <FlatList
+                data={reservationPickerOptions}
+                keyExtractor={(item) => item.id}
+                style={{ maxHeight: 360 }}
+                keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={
+                  <Text style={styles.hint}>No matching options are configured yet.</Text>
+                }
+                renderItem={({ item }) => {
+                  const selected =
+                    reservationPicker != null && reservationValues[reservationPicker] === item.id;
+                  return (
+                    <Pressable
+                      style={styles.pickerRow}
+                      onPress={() => {
+                        if (reservationPicker === 'category') setCategoryLookupId(item.id);
+                        if (reservationPicker === 'religion') setReligionLookupId(item.id);
+                        if (reservationPicker === 'tribe') setTribeLookupId(item.id);
+                        if (reservationPicker === 'denomination') setDenominationLookupId(item.id);
+                        setReservationPicker(null);
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: selected ? studentTheme.primary : studentTheme.text,
+                          fontSize: 16,
+                          fontWeight: selected ? '700' : '400',
+                        }}
+                      >
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                }}
+              />
+              <Pressable style={styles.secondaryButton} onPress={() => setReservationPicker(null)}>
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
           visible={bloodPickerOpen}
           transparent
           animationType="slide"
@@ -1420,4 +1648,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: studentTheme.border,
   },
+  checkRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: studentTheme.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+  },
+  checkBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#94a3b8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  checkBoxOn: {
+    borderColor: studentTheme.primary,
+    backgroundColor: studentTheme.primary,
+  },
+  checkTick: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  checkTitle: { fontSize: 14, fontWeight: '700', color: studentTheme.text },
 });

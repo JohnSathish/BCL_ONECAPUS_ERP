@@ -278,6 +278,42 @@ export const DEFAULT_PROFILE_UPDATE_POLICIES: ProfilePolicySeed[] = [
     approvalMode: 'VERIFICATION_REQUIRED',
     sortOrder: 120,
   },
+  {
+    sectionKey: 'category_reservation',
+    fieldKey: 'categoryLookupId',
+    approvalMode: 'AUTO_APPROVE',
+    sortOrder: 10,
+  },
+  {
+    sectionKey: 'category_reservation',
+    fieldKey: 'religionLookupId',
+    approvalMode: 'AUTO_APPROVE',
+    sortOrder: 20,
+  },
+  {
+    sectionKey: 'category_reservation',
+    fieldKey: 'tribeLookupId',
+    approvalMode: 'AUTO_APPROVE',
+    sortOrder: 30,
+  },
+  {
+    sectionKey: 'category_reservation',
+    fieldKey: 'denominationLookupId',
+    approvalMode: 'AUTO_APPROVE',
+    sortOrder: 40,
+  },
+  {
+    sectionKey: 'category_reservation',
+    fieldKey: 'differentlyAbled',
+    approvalMode: 'AUTO_APPROVE',
+    sortOrder: 50,
+  },
+  {
+    sectionKey: 'category_reservation',
+    fieldKey: 'ews',
+    approvalMode: 'AUTO_APPROVE',
+    sortOrder: 60,
+  },
 ];
 
 export const STUDENT_EDITABLE_SECTIONS = [
@@ -289,6 +325,7 @@ export const STUDENT_EDITABLE_SECTIONS = [
   'emergency',
   'class_xii',
   'documents',
+  'category_reservation',
 ] as const;
 
 /** Temporarily hide Bank from student UIs until the college needs it. */

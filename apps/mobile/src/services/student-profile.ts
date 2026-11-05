@@ -41,6 +41,10 @@ export type ProfileBootstrap = {
   lookups?: {
     gender?: Array<{ id?: string; code?: string | null; label: string }>;
     bloodGroup?: Array<{ id: string; code?: string | null; label: string }>;
+    category?: Array<{ id: string; code?: string | null; label: string }>;
+    religion?: Array<{ id: string; code?: string | null; label: string }>;
+    tribe?: Array<{ id: string; code?: string | null; label: string }>;
+    denomination?: Array<{ id: string; code?: string | null; label: string }>;
   };
   staticOptions?: {
     board?: string[];
