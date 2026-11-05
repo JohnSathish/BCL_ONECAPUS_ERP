@@ -412,6 +412,12 @@ export const PROFILE_COMPLETION_CHECKS: Array<{
     sectionKey: 'documents',
     fieldKey: 'PHOTO',
   },
+  {
+    key: 'categoryReservation',
+    label: 'Category & Reservation',
+    sectionKey: 'category_reservation',
+    fieldKey: 'categoryLookupId',
+  },
 ];
 
 export const PORTAL_DOCUMENT_TYPES = [

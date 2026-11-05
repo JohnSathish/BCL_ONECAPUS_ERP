@@ -273,6 +273,9 @@ export class StudentProfileChangeRequestService {
         case 'photo':
           filled = Boolean(profile?.photoPath) || docTypes.has('PHOTO');
           break;
+        case 'categoryReservation':
+          filled = Boolean(profile?.categoryLookupId);
+          break;
         case 'marksheet':
           filled =
             docTypes.has('CLASS_XII_MARKSHEET') ||

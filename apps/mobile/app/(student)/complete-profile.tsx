@@ -66,6 +66,7 @@ const CHECK_ICONS: Record<string, string> = {
   classXii: '🎓',
   photo: '📷',
   marksheet: '📄',
+  categoryReservation: '🏷️',
 };
 
 const BLOOD_GROUP_ORDER = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
