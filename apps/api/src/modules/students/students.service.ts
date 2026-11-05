@@ -48,6 +48,7 @@ import { LicenseEnforcementService } from '../licensing/services/license-enforce
 import { FeeCycleEngineService } from '../fees/services/fee-cycle-engine.service';
 import { createWorkbookWithSheets } from '../../common/import/excel.util';
 import { StudentAbcService } from './services/student-abc.service';
+import { isExactRollNumberQuery } from './domain/student-directory-search';
 import { AcademicChangeHistoryService } from './academic-change-history/academic-change-history.service';
 import { MoodleHookService } from '../moodle/moodle-hook.service';
 import type { AcademicChangeAuditContext } from './academic-change-history/academic-change-history.types';
@@ -492,12 +493,18 @@ export class StudentsService {
 
     if (query.search) {
       const searchTerm = query.search.trim();
+      const exactRoll = isExactRollNumberQuery(searchTerm);
+      const identifierMatch = exactRoll
+        ? { equals: searchTerm, mode: 'insensitive' as const }
+        : { contains: searchTerm, mode: 'insensitive' as const };
       const transferMatches = searchTerm
         ? await this.prisma.studentShiftTransfer.findMany({
             where: {
               tenantId,
               status: 'approved',
-              oldRollNumber: { contains: searchTerm, mode: 'insensitive' },
+              oldRollNumber: exactRoll
+                ? { equals: searchTerm, mode: 'insensitive' }
+                : { contains: searchTerm, mode: 'insensitive' },
             },
             select: { studentId: true },
             distinct: ['studentId'],
@@ -506,72 +513,64 @@ export class StudentsService {
         : [];
       const matchedStudentIds = transferMatches.map((t) => t.studentId);
 
+      const exactIdentifiers = [
+        { enrollmentNumber: identifierMatch },
+        { rollNumber: identifierMatch },
+        { applicationNumber: identifierMatch },
+        { admissionNumber: identifierMatch },
+        { universityRollNumber: identifierMatch },
+        ...(matchedStudentIds.length
+          ? [{ id: { in: matchedStudentIds } }]
+          : []),
+      ];
+
       where = {
         ...where,
-        OR: [
-          {
-            enrollmentNumber: {
-              contains: searchTerm,
-              mode: 'insensitive',
-            },
-          },
-          { rollNumber: { contains: searchTerm, mode: 'insensitive' } },
-          ...(matchedStudentIds.length
-            ? [{ id: { in: matchedStudentIds } }]
-            : []),
-          {
-            user: {
-              email: { contains: searchTerm, mode: 'insensitive' },
-            },
-          },
-          {
-            masterProfile: {
-              email: { contains: searchTerm, mode: 'insensitive' },
-            },
-          },
-          {
-            masterProfile: {
-              fullName: { contains: searchTerm, mode: 'insensitive' },
-            },
-          },
-          {
-            masterProfile: {
-              mobileNumber: { contains: searchTerm, mode: 'insensitive' },
-            },
-          },
-          {
-            masterProfile: {
-              nationalId: { contains: searchTerm, mode: 'insensitive' },
-            },
-          },
-          {
-            applicationNumber: {
-              contains: searchTerm,
-              mode: 'insensitive',
-            },
-          },
-          {
-            admissionNumber: {
-              contains: searchTerm,
-              mode: 'insensitive',
-            },
-          },
-          {
-            rfidNumber: { contains: searchTerm, mode: 'insensitive' },
-          },
-          {
-            abcAccount: {
-              abcId: { contains: searchTerm, mode: 'insensitive' },
-            },
-          },
-          {
-            programVersion: {
-              program: {
-                name: { contains: searchTerm, mode: 'insensitive' },
+        OR: exactRoll
+          ? exactIdentifiers
+          : [
+              ...exactIdentifiers,
+              {
+                user: {
+                  email: { contains: searchTerm, mode: 'insensitive' },
+                },
               },
-            },
-          },
-        ],
+              {
+                masterProfile: {
+                  email: { contains: searchTerm, mode: 'insensitive' },
+                },
+              },
+              {
+                masterProfile: {
+                  fullName: { contains: searchTerm, mode: 'insensitive' },
+                },
+              },
+              {
+                masterProfile: {
+                  mobileNumber: { contains: searchTerm, mode: 'insensitive' },
+                },
+              },
+              {
+                masterProfile: {
+                  nationalId: { contains: searchTerm, mode: 'insensitive' },
+                },
+              },
+              {
+                rfidNumber: { contains: searchTerm, mode: 'insensitive' },
+              },
+              {
+                abcAccount: {
+                  abcId: { contains: searchTerm, mode: 'insensitive' },
+                },
+              },
+              {
+                programVersion: {
+                  program: {
+                    name: { contains: searchTerm, mode: 'insensitive' },
+                  },
+                },
+              },
+            ],
       };
     }
 
