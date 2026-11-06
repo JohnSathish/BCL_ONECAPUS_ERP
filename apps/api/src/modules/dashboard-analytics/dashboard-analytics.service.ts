@@ -9,7 +9,6 @@ import {
   shiftWhere,
   sparklineFromMonthlyCounts,
   studentWhere,
-  trendFromSparkline,
   type DashboardFilters,
 } from './dashboard-scope.helper';
 import type {
@@ -22,11 +21,21 @@ import type {
 } from './dashboard-analytics.types';
 import { getDayPartGreeting } from '../../common/utils/time-greeting';
 
-const SEED_SPARK = {
-  attendance: [93, 92, 91, 92, 91, 90, 91],
-  fees: [62, 65, 68, 71, 74, 76, 78],
-  placement: [72, 74, 78, 80, 83, 85, 86],
-  hostel: [91, 92, 93, 93, 94, 94, 94],
+const ACTIVE_FEE_DEMANDS = [
+  'PUBLISHED',
+  'LOCKED',
+  'PARTIALLY_PAID',
+  'PAID',
+] as const;
+const FEE_HEAD_LABEL: Record<string, string> = {
+  GENERAL: 'Fee Demand',
+  ADMISSION_SESSION: 'Admission Fee',
+  MONTHLY: 'Monthly Fee',
+  EXAM_FEE: 'Examination Fee',
+  MISCELLANEOUS: 'Miscellaneous Fee',
+  SHORT_TERM_COURSE: 'Short-term Course',
+  TUITION: 'Tuition Fee',
+  LIBRARY: 'Library Fee',
 };
 
 @Injectable()
@@ -45,14 +54,34 @@ export class DashboardAnalyticsService {
     filters: DashboardFilters,
     user?: JwtUser,
   ): Promise<DashboardOverviewResponse> {
-    const buckets = monthBuckets(7);
-    const sw = studentWhere(tenantId, filters);
+    const buckets = monthBuckets(6);
+    const semesterNo = filters.semesterId
+      ? (
+          await this.prisma.semester.findFirst({
+            where: { id: filters.semesterId, tenantId, deletedAt: null },
+            select: { semesterNumber: true },
+          })
+        )?.semesterNumber
+      : undefined;
+    const sw = this.studentScope(tenantId, filters);
     const aw = applicationWhere(tenantId, filters);
     const rw = registrationWhere(tenantId, filters);
+    const since = new Date(buckets[0]?.start ?? new Date());
+    const studentRows = await this.prisma.student.findMany({
+      where: sw,
+      select: {
+        id: true,
+        createdAt: true,
+        department: { select: { name: true } },
+        programVersion: {
+          select: { program: { select: { name: true, code: true } } },
+        },
+      },
+    });
+    const studentIds = studentRows.map((row) => row.id);
+    const studentTotal = studentIds.length;
 
     const [
-      studentTotal,
-      studentRows,
       applicationTotal,
       applicationRows,
       pendingReview,
@@ -60,15 +89,13 @@ export class DashboardAnalyticsService {
       completedRegistrations,
       totalRegistrations,
       facultyCount,
-      feeDemands,
+      feeTotals,
+      feeHeads,
       feePayments,
+      attendanceRows,
+      placementRows,
+      recentDemands,
     ] = await Promise.all([
-      this.prisma.student.count({ where: sw }),
-      this.prisma.student.findMany({
-        where: sw,
-        select: { createdAt: true },
-        orderBy: { createdAt: 'asc' },
-      }),
       this.prisma.admissionApplication.count({ where: aw }),
       this.prisma.admissionApplication.findMany({
         where: aw,
@@ -95,35 +122,123 @@ export class DashboardAnalyticsService {
           user: { tenantId, deletedAt: null, isActive: true },
         },
       }),
-      this.db().studentFeeDemand.findMany({ where: { tenantId }, take: 5000 }),
-      this.db().paymentTransaction.findMany({
-        where: { tenantId, status: { in: ['SUCCESS', 'PAID'] } },
-        take: 5000,
+      this.prisma.studentFeeDemand.aggregate({
+        where: this.feeDemandWhere(tenantId, filters, studentIds),
+        _sum: { totalAmount: true, paidAmount: true, balanceAmount: true },
+      }),
+      this.prisma.studentFeeDemand.groupBy({
+        by: ['demandType'],
+        where: this.feeDemandWhere(tenantId, filters, studentIds),
+        _sum: { paidAmount: true },
+      }),
+      this.prisma.paymentTransaction.findMany({
+        where: {
+          tenantId,
+          status: { in: ['SUCCESS', 'PAID'] },
+          createdAt: { gte: since },
+          studentId: { in: studentIds },
+        },
+        select: {
+          amount: true,
+          paidAt: true,
+          createdAt: true,
+          transactionNo: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.studentAttendanceSummary.findMany({
+        where: {
+          tenantId,
+          totalSessions: { gt: 0 },
+          ...(semesterNo != null ? { semesterNo } : {}),
+          studentId: { in: studentIds },
+        },
+        select: {
+          studentId: true,
+          percentage: true,
+          totalSessions: true,
+        },
+      }),
+      this.prisma.placementApplication.groupBy({
+        by: ['status'],
+        where: { tenantId, studentId: { in: studentIds } },
+        _count: { _all: true },
+      }),
+      this.prisma.studentFeeDemand.findMany({
+        where: this.feeDemandWhere(tenantId, filters, studentIds),
+        select: {
+          demandNo: true,
+          publishedAt: true,
+          createdAt: true,
+          totalAmount: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
       }),
     ]);
 
     const studentSpark = sparklineFromMonthlyCounts(buckets, studentRows);
     const appSpark = sparklineFromMonthlyCounts(buckets, applicationRows);
-    const studentTrend = trendFromSparkline(studentSpark);
-    const appTrend = trendFromSparkline(appSpark);
-
-    const completionPct =
-      totalRegistrations > 0
-        ? Math.round((completedRegistrations / totalRegistrations) * 1000) / 10
-        : 0;
-    const feeDemanded = feeDemands.reduce(
-      (sum: number, demand: any) => sum + Number(demand.totalAmount ?? 0),
-      0,
+    const studentTrend = this.monthChange(studentSpark);
+    const appTrend = this.monthChange(appSpark);
+    const attendance = this.summariseAttendance(
+      attendanceRows,
+      new Map(
+        studentRows.map((row) => [
+          row.id,
+          row.department?.name ?? 'Unassigned',
+        ]),
+      ),
     );
-    const feeCollected = feePayments.reduce(
-      (sum: number, payment: any) => sum + Number(payment.amount ?? 0),
-      0,
-    );
+    const programmes = this.programmeSlices(studentRows);
+    const feeDemanded = Number(feeTotals._sum.totalAmount ?? 0);
+    const feeCollected = Number(feeTotals._sum.paidAmount ?? 0);
+    const feePending = Number(feeTotals._sum.balanceAmount ?? 0);
     const feeCollectionPct =
       feeDemanded > 0
         ? Math.round((feeCollected / feeDemanded) * 1000) / 10
         : 0;
-    const feeSpark = this.feeSparkline(feePayments);
+    const feeMonthly = buckets.map((month) => ({
+      label: month.label,
+      collected: this.sumByMonth(
+        feePayments,
+        this.monthKey(month.start),
+        'amount',
+      ),
+    }));
+    const feeTrend = this.monthChange(
+      feeMonthly.map((month) => month.collected),
+    );
+    const placement = this.summarisePlacement(placementRows);
+    const completionPct =
+      totalRegistrations > 0
+        ? Math.round((completedRegistrations / totalRegistrations) * 1000) / 10
+        : 0;
+    const pendingTotal = pendingReview + pendingRegistrations;
+    const byHead = this.feeHeadSlices(feeHeads, feeCollected);
+    const board = {
+      fee: {
+        demanded: feeDemanded,
+        collected: feeCollected,
+        pending: feePending,
+        rate: feeCollectionPct,
+        byHead,
+        monthly: feeMonthly,
+      },
+      studentsByProgramme: programmes,
+      attendance,
+      placement,
+      activities: this.financeActivities(recentDemands, feePayments),
+      insights: this.financeInsights({
+        attendance,
+        feeRate: feeCollectionPct,
+        feeCollected,
+        feePending,
+        pendingTotal,
+        studentTotal,
+        placement,
+      }),
+    };
 
     const kpis: DashboardKpiMetric[] = [
       {
@@ -131,7 +246,7 @@ export class DashboardAnalyticsService {
         label: 'Total Students',
         value: studentTotal,
         ...studentTrend,
-        context: 'enrolled learners',
+        context: 'Enrolled in this scope',
         sparkline: studentSpark,
         source: 'live',
       },
@@ -140,116 +255,86 @@ export class DashboardAnalyticsService {
         label: 'Applications',
         value: applicationTotal,
         ...appTrend,
-        context: 'admissions pipeline',
+        context: 'Admission pipeline',
         sparkline: appSpark,
         source: 'live',
       },
       {
         id: 'attendance',
         label: 'Attendance',
-        value: 91.4,
+        value: attendance.average ?? 0,
         suffix: '%',
-        changePct: -0.6,
-        trend: 'down',
-        context: 'institution average',
-        sparkline: SEED_SPARK.attendance,
-        source: 'seed',
+        changePct: 0,
+        trend: 'up',
+        context: attendance.markedStudents
+          ? `Marked for ${attendance.markedStudents} students`
+          : 'No attendance has been marked',
+        sparkline: [],
+        source: 'live',
       },
       {
         id: 'fees',
         label: 'Fee Collection',
         value: feeCollectionPct,
         suffix: '%',
-        changePct:
-          feeSpark.length > 1
-            ? feeSpark[feeSpark.length - 1] - feeSpark[feeSpark.length - 2]
-            : 0,
-        trend: trendFromSparkline(feeSpark).trend,
-        context: `${Math.round(feeCollected).toLocaleString('en-IN')} collected`,
-        sparkline: feeSpark.length ? feeSpark : SEED_SPARK.fees,
-        source: feeDemands.length || feePayments.length ? 'live' : 'seed',
+        ...feeTrend,
+        context: feeDemanded
+          ? `${this.formatInr(feeCollected)} collected of ${this.formatInr(feeDemanded)}`
+          : 'No published fee demands',
+        sparkline: feeMonthly.map((month) => month.collected),
+        source: 'live',
       },
       {
         id: 'placement',
         label: 'Placement Rate',
-        value: 86.5,
+        value: placement.rate ?? 0,
         suffix: '%',
-        changePct: 3.4,
+        changePct: 0,
         trend: 'up',
-        context: 'final year cohort',
-        sparkline: SEED_SPARK.placement,
-        source: 'seed',
+        context: placement.applicants
+          ? `${placement.offers} offers from ${placement.applicants} applications`
+          : 'No placement applications',
+        sparkline: [],
+        source: 'live',
       },
       {
         id: 'pending',
         label: 'Pending Approvals',
-        value: pendingReview + pendingRegistrations,
-        changePct: pendingReview > 0 ? -12 : 0,
-        trend: pendingReview > 0 ? 'down' : 'up',
-        context: 'requires action',
-        sparkline: [
-          pendingReview + 4,
-          pendingReview + 3,
-          pendingReview + 2,
-          pendingReview + 1,
-          pendingReview,
-          Math.max(0, pendingReview - 1),
-          pendingReview,
-        ],
+        value: pendingTotal,
+        changePct: 0,
+        trend: 'up',
+        context: 'Admissions and registrations',
+        sparkline: [],
         source: 'live',
       },
       {
         id: 'faculty',
         label: 'Active Faculty',
         value: facultyCount,
-        changePct: 1.8,
+        changePct: 0,
         trend: 'up',
-        context: 'on campus today',
-        sparkline: [
-          facultyCount - 2,
-          facultyCount - 2,
-          facultyCount - 1,
-          facultyCount - 1,
-          facultyCount,
-          facultyCount,
-          facultyCount,
-        ],
+        context: 'Faculty accounts that can sign in',
+        sparkline: [],
         source: 'live',
       },
       {
         id: 'completion',
-        label: 'Course Completion',
+        label: 'Registration',
         value: completionPct,
         suffix: '%',
-        changePct: 2.1,
+        changePct: 0,
         trend: 'up',
-        context: 'CBCS progress',
-        sparkline: [
-          Math.max(0, completionPct - 6),
-          Math.max(0, completionPct - 5),
-          Math.max(0, completionPct - 4),
-          Math.max(0, completionPct - 3),
-          Math.max(0, completionPct - 2),
-          Math.max(0, completionPct - 1),
-          completionPct,
-        ],
+        context: totalRegistrations
+          ? `${completedRegistrations} of ${totalRegistrations} registrations completed`
+          : 'No semester registrations in this scope',
+        sparkline: [],
         source: 'live',
-      },
-      {
-        id: 'hostel',
-        label: 'Hostel Occupancy',
-        value: 94.1,
-        suffix: '%',
-        changePct: 0.3,
-        trend: 'up',
-        context: 'all residences',
-        sparkline: SEED_SPARK.hostel,
-        source: 'seed',
       },
     ];
 
     return {
-      kpis: this.filterKpisForUser(kpis.slice(0, 8), user),
+      kpis: this.filterKpisForUser(kpis, user),
+      board,
       updatedAt: new Date().toISOString(),
     };
   }
@@ -1023,6 +1108,322 @@ export class DashboardAnalyticsService {
         "Show today's attendance summary",
       ],
     };
+  }
+
+  private studentScope(tenantId: string, filters: DashboardFilters) {
+    const scope = studentWhere(tenantId, filters);
+    if (filters.semesterId) {
+      return {
+        ...scope,
+        semesterRegistrations: {
+          some: { semesterId: filters.semesterId, archivedAt: null },
+        },
+      };
+    }
+    if (filters.academicYearId) {
+      return {
+        ...scope,
+        semesterRegistrations: {
+          some: {
+            archivedAt: null,
+            semester: {
+              academicYearId: filters.academicYearId,
+              deletedAt: null,
+            },
+          },
+        },
+      };
+    }
+    return scope;
+  }
+
+  private feeDemandWhere(
+    tenantId: string,
+    filters: DashboardFilters,
+    studentIds: string[],
+  ) {
+    return {
+      tenantId,
+      cancelledAt: null,
+      status: { in: [...ACTIVE_FEE_DEMANDS] },
+      studentId: { in: studentIds },
+      ...(filters.academicYearId
+        ? { academicYearId: filters.academicYearId }
+        : {}),
+      ...(filters.semesterId ? { semesterId: filters.semesterId } : {}),
+    };
+  }
+
+  private monthChange(series: number[]): {
+    changePct: number;
+    trend: 'up' | 'down';
+  } {
+    if (series.length < 2) return { changePct: 0, trend: 'up' };
+    const previous = series[series.length - 2] ?? 0;
+    const latest = series[series.length - 1] ?? 0;
+    if (previous <= 0)
+      return { changePct: 0, trend: latest >= previous ? 'up' : 'down' };
+    const changePct = Math.round(((latest - previous) / previous) * 1000) / 10;
+    return { changePct, trend: changePct >= 0 ? 'up' : 'down' };
+  }
+
+  private feeHeadLabel(value: string) {
+    return (
+      FEE_HEAD_LABEL[value] ??
+      value
+        .toLowerCase()
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase())
+    );
+  }
+
+  private feeHeadSlices(
+    rows: Array<{ demandType: string; _sum: { paidAmount: unknown } }>,
+    collected: number,
+  ) {
+    return rows
+      .map((row) => ({
+        label: this.feeHeadLabel(row.demandType),
+        value: Number(row._sum.paidAmount ?? 0),
+      }))
+      .filter((row) => row.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .map((row) => ({
+        ...row,
+        share:
+          collected > 0 ? Math.round((row.value / collected) * 1000) / 10 : 0,
+      }));
+  }
+
+  private programmeSlices(
+    rows: Array<{
+      programVersion: { program: { name: string; code: string } } | null;
+    }>,
+  ) {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      const label = row.programVersion?.program.name ?? 'Unassigned';
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    const ordered = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    const top = ordered.slice(0, 5);
+    const rest = ordered.slice(5).reduce((sum, [, count]) => sum + count, 0);
+    if (rest > 0) top.push(['Others', rest]);
+    const total = rows.length;
+    return top.map(([label, value]) => ({
+      label,
+      value,
+      share: total > 0 ? Math.round((value / total) * 1000) / 10 : 0,
+    }));
+  }
+
+  private summariseAttendance(
+    rows: Array<{
+      studentId: string;
+      percentage: unknown;
+      totalSessions: number;
+    }>,
+    departments: Map<string, string>,
+  ) {
+    const students = new Map<
+      string,
+      { weighted: number; sessions: number; department: string }
+    >();
+    for (const row of rows) {
+      const sessions = row.totalSessions;
+      if (sessions <= 0) continue;
+      const current = students.get(row.studentId) ?? {
+        weighted: 0,
+        sessions: 0,
+        department: departments.get(row.studentId) ?? 'Unassigned',
+      };
+      current.weighted += Number(row.percentage ?? 0) * sessions;
+      current.sessions += sessions;
+      students.set(row.studentId, current);
+    }
+    let weighted = 0;
+    let sessions = 0;
+    let below75 = 0;
+    const departments = new Map<
+      string,
+      { weighted: number; sessions: number; students: number }
+    >();
+    for (const student of students.values()) {
+      const average = student.sessions
+        ? student.weighted / student.sessions
+        : 0;
+      weighted += student.weighted;
+      sessions += student.sessions;
+      if (average < 75) below75 += 1;
+      const dept = departments.get(student.department) ?? {
+        weighted: 0,
+        sessions: 0,
+        students: 0,
+      };
+      dept.weighted += student.weighted;
+      dept.sessions += student.sessions;
+      dept.students += 1;
+      departments.set(student.department, dept);
+    }
+    return {
+      average: sessions ? Math.round((weighted / sessions) * 10) / 10 : null,
+      markedStudents: students.size,
+      below75,
+      byDepartment: [...departments.entries()]
+        .map(([label, dept]) => ({
+          label,
+          percentage: dept.sessions
+            ? Math.round((dept.weighted / dept.sessions) * 10) / 10
+            : null,
+          students: dept.students,
+        }))
+        .sort((a, b) => (b.percentage ?? 0) - (a.percentage ?? 0))
+        .slice(0, 6),
+    };
+  }
+
+  private summarisePlacement(
+    rows: Array<{ status: string; _count: { _all?: number } | number }>,
+  ) {
+    const countOf = (row: { _count: { _all?: number } | number }) =>
+      typeof row._count === 'number' ? row._count : (row._count._all ?? 0);
+    const applicants = rows.reduce((sum, row) => sum + countOf(row), 0);
+    const offers = rows
+      .filter((row) => /OFFER|SELECT|PLACE|JOIN|HIRE/i.test(row.status))
+      .reduce((sum, row) => sum + countOf(row), 0);
+    return {
+      offers,
+      applicants,
+      rate:
+        applicants > 0 ? Math.round((offers / applicants) * 1000) / 10 : null,
+    };
+  }
+
+  private financeActivities(
+    demands: Array<{
+      demandNo: string;
+      publishedAt: Date | null;
+      createdAt: Date;
+      totalAmount: unknown;
+    }>,
+    payments: Array<{
+      transactionNo: string;
+      amount: unknown;
+      paidAt: Date | null;
+      createdAt: Date;
+    }>,
+  ) {
+    const items = [
+      ...demands.map((demand) => ({
+        id: `demand-${demand.demandNo}`,
+        title: `Fee demand ${demand.demandNo} · ${this.formatInr(Number(demand.totalAmount ?? 0))}`,
+        at: (demand.publishedAt ?? demand.createdAt).toISOString(),
+        tone: 'info' as const,
+      })),
+      ...payments.slice(0, 5).map((payment) => ({
+        id: `pay-${payment.transactionNo}`,
+        title: `Fee collection ${payment.transactionNo} · ${this.formatInr(Number(payment.amount ?? 0))}`,
+        at: (payment.paidAt ?? payment.createdAt).toISOString(),
+        tone: 'success' as const,
+      })),
+    ];
+    return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6);
+  }
+
+  private financeInsights(input: {
+    attendance: {
+      average: number | null;
+      markedStudents: number;
+      below75: number;
+    };
+    feeRate: number;
+    feeCollected: number;
+    feePending: number;
+    pendingTotal: number;
+    studentTotal: number;
+    placement: { applicants: number; rate: number | null };
+  }) {
+    const insights: Array<{
+      id: string;
+      title: string;
+      detail: string;
+      level: 'critical' | 'high' | 'normal' | 'positive';
+    }> = [];
+    if (input.attendance.markedStudents > 0 && input.attendance.below75 > 0) {
+      const share = Math.round(
+        (input.attendance.below75 / input.attendance.markedStudents) * 100,
+      );
+      insights.push({
+        id: 'attendance-shortage',
+        title: 'Students below 75% attendance',
+        detail: `${input.attendance.below75} marked students are under 75% (${share}% of those with attendance).`,
+        level: share >= 25 ? 'critical' : 'high',
+      });
+    } else if (input.attendance.markedStudents === 0) {
+      insights.push({
+        id: 'attendance-empty',
+        title: 'Attendance is not marked yet',
+        detail: 'There is no attendance summary for the selected students.',
+        level: 'normal',
+      });
+    } else if ((input.attendance.average ?? 0) >= 85) {
+      insights.push({
+        id: 'attendance-healthy',
+        title: 'Attendance is healthy',
+        detail: `The marked average is ${input.attendance.average}%.`,
+        level: 'positive',
+      });
+    }
+    if (input.feePending > 0 && input.feeRate < 50) {
+      insights.push({
+        id: 'fee-low',
+        title: 'Fee collection is below half',
+        detail: `${this.formatInr(input.feeCollected)} is collected and ${this.formatInr(input.feePending)} is still due.`,
+        level: 'high',
+      });
+    } else if (input.feeRate >= 80 && input.feeCollected > 0) {
+      insights.push({
+        id: 'fee-healthy',
+        title: 'Fee collection is on track',
+        detail: `${input.feeRate}% of published demands are collected.`,
+        level: 'positive',
+      });
+    } else if (input.feeCollected === 0 && input.feePending === 0) {
+      insights.push({
+        id: 'fee-empty',
+        title: 'No published fee demands',
+        detail:
+          'Collection rate stays at 0% until a demand is published for this scope.',
+        level: 'normal',
+      });
+    }
+    if (input.pendingTotal > 0) {
+      insights.push({
+        id: 'pending',
+        title: 'Approvals are waiting',
+        detail: `${input.pendingTotal} admission or registration items still need a decision.`,
+        level: input.pendingTotal > 25 ? 'high' : 'normal',
+      });
+    }
+    if (input.placement.applicants === 0) {
+      insights.push({
+        id: 'placement-empty',
+        title: 'No placement applications',
+        detail:
+          'The placement rate is 0% because no applications are recorded for these students.',
+        level: 'normal',
+      });
+    }
+    if (input.studentTotal === 0) {
+      insights.push({
+        id: 'students-empty',
+        title: 'No students in this filter',
+        detail:
+          'Widen the academic year, semester, shift, or department to see enrolment.',
+        level: 'normal',
+      });
+    }
+    return insights;
   }
 
   private formatInr(amount: number) {

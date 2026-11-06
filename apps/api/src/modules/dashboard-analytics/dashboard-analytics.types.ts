@@ -12,8 +12,58 @@ export type DashboardKpiMetric = {
   source: DashboardDataSource;
 };
 
+export type FinanceBoardSlice = {
+  label: string;
+  value: number;
+  share: number;
+};
+
+export type FinanceInsight = {
+  id: string;
+  title: string;
+  detail: string;
+  level: 'critical' | 'high' | 'normal' | 'positive';
+};
+
+export type FinanceActivity = {
+  id: string;
+  title: string;
+  at: string;
+  tone: 'info' | 'success' | 'warning';
+};
+
+export type FinanceBoard = {
+  fee: {
+    demanded: number;
+    collected: number;
+    pending: number;
+    rate: number;
+    byHead: FinanceBoardSlice[];
+    monthly: Array<{ label: string; collected: number }>;
+  };
+  studentsByProgramme: FinanceBoardSlice[];
+  attendance: {
+    average: number | null;
+    markedStudents: number;
+    below75: number;
+    byDepartment: Array<{
+      label: string;
+      percentage: number | null;
+      students: number;
+    }>;
+  };
+  placement: {
+    offers: number;
+    applicants: number;
+    rate: number | null;
+  };
+  activities: FinanceActivity[];
+  insights: FinanceInsight[];
+};
+
 export type DashboardOverviewResponse = {
   kpis: DashboardKpiMetric[];
+  board: FinanceBoard;
   updatedAt: string;
 };
 
