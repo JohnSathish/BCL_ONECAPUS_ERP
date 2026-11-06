@@ -5,7 +5,7 @@ import { ProfileVerificationWorkspace } from '@/components/students-module/profi
 
 export default function ClassXiiVerificationPage() {
   return (
-    <DashboardShell role="admin" title="Class XII Verification">
+    <DashboardShell role="admin" title="Class XII Verification" pageHeader={false}>
       <ProfileVerificationWorkspace mode="class-xii" />
     </DashboardShell>
   );

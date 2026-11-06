@@ -5,7 +5,7 @@ import { ProfileVerificationWorkspace } from '@/components/students-module/profi
 
 export default function ProfileVerificationHubPage() {
   return (
-    <DashboardShell role="admin" title="Student Profile Verification">
+    <DashboardShell role="admin" title="Student Profile Verification" pageHeader={false}>
       <ProfileVerificationWorkspace mode="pending" />
     </DashboardShell>
   );

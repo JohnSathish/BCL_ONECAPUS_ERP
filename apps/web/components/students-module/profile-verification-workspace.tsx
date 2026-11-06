@@ -1,7 +1,20 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Download, ExternalLink, Loader2, Printer, X } from 'lucide-react';
+import {
+  Check,
+  CheckCircle2,
+  Clock,
+  Download,
+  ExternalLink,
+  Info,
+  Loader2,
+  Printer,
+  Search,
+  Users,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -31,6 +44,7 @@ import {
   type ProfileSoftGate,
   type ProfileUpdateWindowSettings,
 } from '@/services/student-profile-verification';
+import { fetchAcademicYears } from '@/services/organization';
 import { verifyStudentDocument } from '@/services/students';
 import { apiErrorMessage } from '@/utils/api-error';
 import { downloadBlob } from '@/utils/download-blob';
@@ -47,6 +61,7 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
   const qc = useQueryClient();
   const [message, setMessage] = useState('');
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [search, setSearch] = useState('');
 
   const pendingQ = useQuery({
     queryKey: ['profile-verification', 'pending'],
@@ -88,6 +103,11 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
     queryKey: ['profile-verification', 'update-window'],
     queryFn: fetchProfileUpdateWindow,
     enabled: mode === 'policy' || mode === 'pending',
+  });
+  const yearsQ = useQuery({
+    queryKey: ['organization', 'academic-years', 'profile-verification'],
+    queryFn: fetchAcademicYears,
+    enabled: mode === 'pending' || mode === 'class-xii',
   });
 
   const reviewMut = useMutation({
@@ -212,6 +232,23 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
   const requestRows =
     (mode === 'pending' ? pendingQ.data : mode === 'class-xii' ? classXiiQ.data : historyQ.data) ??
     [];
+  const queueMode = mode === 'pending' || mode === 'class-xii';
+  const activeYearName =
+    yearsQ.data?.find((year) => String(year.status ?? '').toUpperCase() === 'ACTIVE')?.name ??
+    yearsQ.data?.[0]?.name;
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return requestRows;
+    return requestRows.filter((row) => {
+      const name = row.student?.masterProfile?.fullName ?? '';
+      const roll = row.student?.rollNumber ?? row.student?.enrollmentNumber ?? '';
+      const fields = (row.items ?? [])
+        .map((item) => `${item.fieldLabel ?? ''} ${item.displayValue ?? ''} ${item.newValue ?? ''}`)
+        .join(' ');
+      return `${name} ${roll} ${fields}`.toLowerCase().includes(query);
+    });
+  }, [requestRows, search]);
+  const queueCounts = useMemo(() => countQueue(requestRows), [requestRows]);
 
   const selectedCount = useMemo(() => Object.values(selected).filter(Boolean).length, [selected]);
 
@@ -243,27 +280,33 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
 
   return (
     <div className="space-y-4 print:space-y-2">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">{title}</h1>
-          <p className="text-sm text-muted-foreground print:hidden">
-            {mode === 'pending'
-              ? 'Approve blood group and any other student update still waiting for a decision. Aadhaar is saved on the profile directly. Academic, fee, and exam fields stay locked.'
-              : 'Review student self-service updates. Academic, fee, and exam fields stay locked.'}
-          </p>
+      {queueMode ? (
+        <QueueHero
+          title={mode === 'class-xii' ? 'Class XII Verification' : 'Student Profile Verification'}
+          yearName={activeYearName}
+          counts={queueCounts}
+        />
+      ) : (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">{title}</h1>
+            <p className="text-sm text-muted-foreground print:hidden">
+              Review student self-service updates. Academic, fee, and exam fields stay locked.
+            </p>
+          </div>
+          {mode === 'completion' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="print:hidden"
+              onClick={() => window.print()}
+            >
+              <Printer className="mr-1 h-3 w-3" />
+              Print
+            </Button>
+          ) : null}
         </div>
-        {mode === 'completion' ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="print:hidden"
-            onClick={() => window.print()}
-          >
-            <Printer className="mr-1 h-3 w-3" />
-            Print
-          </Button>
-        ) : null}
-      </div>
+      )}
       {mode === 'completion' ? (
         <div className="flex flex-wrap gap-2 print:hidden">
           {(
@@ -311,14 +354,15 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
           <Button
             size="sm"
             variant="outline"
-            disabled={!requestRows.length}
+            className="border-slate-300 bg-white"
+            disabled={!filteredRows.length}
             onClick={() => {
               const next: Record<string, boolean> = {};
-              for (const row of requestRows) next[row.id] = true;
+              for (const row of filteredRows) next[row.id] = true;
               setSelected(next);
             }}
           >
-            Select all
+            Select All
           </Button>
           <Button
             size="sm"
@@ -328,41 +372,52 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
           >
             Clear
           </Button>
-          <span className="text-xs text-muted-foreground">{selectedCount} selected</span>
+          <span className="text-xs font-medium text-slate-500">{selectedCount} selected</span>
           <Button
             size="sm"
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
             disabled={!selectedCount || bulkMut.isPending}
             onClick={() => bulkMut.mutate('APPROVE')}
           >
-            Bulk approve
+            Bulk Approve
           </Button>
           <Button
             size="sm"
-            variant="outline"
+            className="bg-rose-600 text-white hover:bg-rose-700"
             disabled={!selectedCount || bulkMut.isPending}
             onClick={() => bulkMut.mutate('REJECT')}
           >
-            Bulk reject
+            Bulk Reject
           </Button>
           <Button
             size="sm"
-            variant="ghost"
+            className="bg-sky-600 text-white hover:bg-sky-700"
             disabled={!selectedCount || bulkMut.isPending}
             onClick={() => bulkMut.mutate('NEEDS_INFO')}
           >
-            Bulk needs info
+            Bulk Needs Info
           </Button>
+          <div className="relative ml-auto min-w-[220px] flex-1 sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by Name, Roll Number or Registration No."
+              className="h-9 bg-white pl-8"
+            />
+          </div>
         </div>
       )}
 
       {(mode === 'pending' || mode === 'class-xii' || mode === 'history') &&
         !activeQuery.isError && (
           <RequestTable
-            rows={requestRows}
+            rows={queueMode ? filteredRows : requestRows}
             loading={pendingQ.isLoading || classXiiQ.isLoading || historyQ.isLoading}
             showActions={mode !== 'history'}
             pendingOnly={mode !== 'history'}
             selectable={mode !== 'history'}
+            colorful={queueMode}
             selected={selected}
             onToggle={(id, on) => setSelected((prev) => ({ ...prev, [id]: on }))}
             onReview={(id, action) => reviewMut.mutate({ id, action })}
@@ -849,12 +904,121 @@ function SoftGatesPanel({
   );
 }
 
+function formatYearBadge(name: string) {
+  const trimmed = name.trim();
+  if (/^ay\b/i.test(trimmed)) return trimmed.replace(/^ay/i, 'AY');
+  return `AY ${trimmed.replace(/^academic year\s*/i, '')}`;
+}
+
+function countQueue(rows: ProfileChangeRequest[]) {
+  const counts = { total: rows.length, pending: 0, approved: 0, rejected: 0, needsInfo: 0 };
+  for (const row of rows) {
+    const status = String(row.status ?? '').toUpperCase();
+    if (status === 'APPROVED') counts.approved += 1;
+    else if (status === 'REJECTED') counts.rejected += 1;
+    else if (status === 'NEEDS_INFO') counts.needsInfo += 1;
+    else counts.pending += 1;
+  }
+  return counts;
+}
+
+function QueueHero({
+  title,
+  yearName,
+  counts,
+}: {
+  title: string;
+  yearName?: string;
+  counts: ReturnType<typeof countQueue>;
+}) {
+  const cards = [
+    {
+      label: 'Total Requests',
+      value: counts.total,
+      icon: Users,
+      wrap: 'bg-blue-50 text-blue-600',
+    },
+    {
+      label: 'Pending',
+      value: counts.pending,
+      icon: Clock,
+      wrap: 'bg-amber-50 text-amber-600',
+    },
+    {
+      label: 'Approved',
+      value: counts.approved,
+      icon: CheckCircle2,
+      wrap: 'bg-emerald-50 text-emerald-600',
+    },
+    {
+      label: 'Rejected',
+      value: counts.rejected,
+      icon: XCircle,
+      wrap: 'bg-rose-50 text-rose-600',
+    },
+    {
+      label: 'Needs Info',
+      value: counts.needsInfo,
+      icon: Info,
+      wrap: 'bg-sky-50 text-sky-600',
+    },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white">
+          <Users className="h-4 w-4" />
+        </span>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
+        {yearName ? (
+          <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-800">
+            {formatYearBadge(yearName)}
+          </span>
+        ) : null}
+        <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">
+          Odd Cycle
+        </span>
+        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+          ACTIVE
+        </span>
+      </div>
+      <div className="flex gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+        <p>
+          <span className="font-semibold">Pending Profile Updates. </span>
+          Approve blood group and any other student update still waiting for a decision. Aadhaar is
+          saved on the profile directly. Academic, fee, and exam fields stay locked.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {cards.map((card) => (
+          <div
+            key={card.label}
+            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+          >
+            <span
+              className={`flex h-11 w-11 items-center justify-center rounded-full ${card.wrap}`}
+            >
+              <card.icon className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-medium text-slate-500">{card.label}</p>
+              <p className="text-2xl font-semibold tabular-nums text-slate-900">{card.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RequestTable({
   rows,
   loading,
   showActions,
   pendingOnly,
   selectable,
+  colorful = false,
   selected,
   onToggle,
   onReview,
@@ -865,6 +1029,7 @@ function RequestTable({
   showActions: boolean;
   pendingOnly?: boolean;
   selectable: boolean;
+  colorful?: boolean;
   selected: Record<string, boolean>;
   onToggle: (id: string, on: boolean) => void;
   onReview: (id: string, action: 'APPROVE' | 'REJECT' | 'NEEDS_INFO') => void;
@@ -872,23 +1037,35 @@ function RequestTable({
 }) {
   const colSpan = (selectable ? 1 : 0) + 4 + (showActions ? 1 : 0);
   return (
-    <div className="overflow-auto rounded-2xl border border-border">
+    <div
+      className={
+        colorful
+          ? 'overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm'
+          : 'overflow-auto rounded-2xl border border-border'
+      }
+    >
       <table className="min-w-full text-sm">
-        <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+        <thead
+          className={
+            colorful
+              ? 'bg-blue-700 text-left text-[11px] font-semibold uppercase tracking-wide text-white'
+              : 'bg-muted/40 text-left text-xs uppercase text-muted-foreground'
+          }
+        >
           <tr>
-            {selectable ? <th className="px-3 py-2"> </th> : null}
-            <th className="px-3 py-2">Student</th>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Fields</th>
-            <th className="px-3 py-2">Submitted</th>
-            {showActions ? <th className="px-3 py-2">Actions</th> : null}
+            {selectable ? <th className="px-3 py-3"> </th> : null}
+            <th className="px-3 py-3">Student</th>
+            <th className="px-3 py-3">Status</th>
+            <th className="px-3 py-3">Fields (Update Details)</th>
+            <th className="px-3 py-3">Submitted</th>
+            {showActions ? <th className="px-3 py-3">Actions</th> : null}
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-t border-border align-top">
+            <tr key={row.id} className="border-t border-slate-200 align-top">
               {selectable ? (
-                <td className="px-3 py-2">
+                <td className="px-3 py-3">
                   <input
                     type="checkbox"
                     checked={Boolean(selected[row.id])}
@@ -896,17 +1073,19 @@ function RequestTable({
                   />
                 </td>
               ) : null}
-              <td className="px-3 py-2">
-                <p className="font-medium">{row.student?.masterProfile?.fullName ?? '—'}</p>
-                <p className="text-xs text-muted-foreground">
+              <td className="px-3 py-3">
+                <p className="font-semibold uppercase text-slate-900">
+                  {row.student?.masterProfile?.fullName ?? '—'}
+                </p>
+                <p className="text-xs font-medium text-slate-500">
                   {row.student?.rollNumber ?? row.student?.enrollmentNumber ?? '—'}
                 </p>
               </td>
-              <td className="px-3 py-2">
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{row.status}</span>
+              <td className="px-3 py-3">
+                <StatusPill status={row.status} />
               </td>
-              <td className="px-3 py-2 text-xs">
-                <div className="space-y-1">
+              <td className="px-3 py-3 text-xs">
+                <div className="max-w-xl space-y-2">
                   {(row.items ?? [])
                     .filter(
                       (item) =>
@@ -915,48 +1094,47 @@ function RequestTable({
                         item.approvalStatus === 'NEEDS_INFO',
                     )
                     .map((item) => (
-                      <p key={item.id}>
-                        <span className="font-medium">
+                      <div key={item.id} className="rounded-lg bg-slate-50 px-2.5 py-2">
+                        <p className="font-semibold text-blue-800">
                           {item.fieldLabel ?? `${item.sectionKey}.${item.fieldKey}`}
-                        </span>
-                        {': '}
-                        {item.displayValue ?? item.newValue ?? '—'}
-                        <span className="text-muted-foreground">
-                          {' '}
-                          ({item.approvalStatus.replaceAll('_', ' ')})
-                        </span>
-                      </p>
+                        </p>
+                        <FieldValue value={item.displayValue ?? item.newValue} />
+                      </div>
                     ))}
                 </div>
               </td>
-              <td className="px-3 py-2 text-xs">
-                {row.submittedAt ? new Date(row.submittedAt).toLocaleString() : '—'}
+              <td className="px-3 py-3 text-xs text-slate-600">
+                {row.submittedAt ? formatSubmitted(row.submittedAt) : '—'}
               </td>
               {showActions ? (
-                <td className="px-3 py-2">
-                  <div className="flex flex-wrap gap-1">
+                <td className="px-3 py-3">
+                  <div className="flex min-w-[7.5rem] flex-col gap-1.5">
                     <Button
                       size="sm"
+                      className="bg-emerald-600 text-white hover:bg-emerald-700"
                       disabled={reviewing}
                       onClick={() => onReview(row.id, 'APPROVE')}
                     >
+                      <Check className="mr-1 h-3 w-3" />
                       Approve
                     </Button>
                     <Button
                       size="sm"
-                      variant="outline"
+                      className="bg-rose-600 text-white hover:bg-rose-700"
                       disabled={reviewing}
                       onClick={() => onReview(row.id, 'REJECT')}
                     >
+                      <X className="mr-1 h-3 w-3" />
                       Reject
                     </Button>
                     <Button
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
+                      className="border-sky-500 text-sky-700 hover:bg-sky-50"
                       disabled={reviewing}
                       onClick={() => onReview(row.id, 'NEEDS_INFO')}
                     >
-                      Needs info
+                      Needs Info
                     </Button>
                   </div>
                 </td>
@@ -974,6 +1152,92 @@ function RequestTable({
       </table>
     </div>
   );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const key = String(status ?? '').toUpperCase();
+  const tone =
+    key === 'APPROVED'
+      ? 'bg-emerald-100 text-emerald-800'
+      : key === 'REJECTED'
+        ? 'bg-rose-100 text-rose-800'
+        : key === 'NEEDS_INFO'
+          ? 'bg-sky-100 text-sky-800'
+          : 'bg-amber-100 text-amber-800';
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone}`}>
+      {key.replaceAll('_', ' ') || 'PENDING'}
+    </span>
+  );
+}
+
+function formatSubmitted(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function FieldValue({ value }: { value?: string | null }) {
+  const parsed = parseJsonRecord(value);
+  const subjects = Array.isArray(parsed?.subjects) ? parsed.subjects : null;
+  if (!parsed || !subjects) {
+    return <p className="mt-1 break-words text-slate-700">{value || '—'}</p>;
+  }
+  const meta = [parsed.boardName, parsed.stream, parsed.examYear, parsed.schoolName]
+    .filter((part) => part != null && String(part).trim())
+    .join(' · ');
+  return (
+    <div className="mt-1 space-y-1.5">
+      {meta ? <p className="text-slate-600">{meta}</p> : null}
+      <ul className="grid gap-1 sm:grid-cols-2">
+        {subjects.map((subject, index) => {
+          const name = String(subject.subjectName ?? subject.name ?? `Subject ${index + 1}`);
+          const got = subject.marksObtained ?? '—';
+          const max = subject.maxMarks ?? '—';
+          return (
+            <li
+              key={`${name}-${index}`}
+              className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1 text-slate-800"
+            >
+              <span className="font-medium">{name}</span>
+              <span className="tabular-nums text-slate-500">
+                {String(got)}/{String(max)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function parseJsonRecord(value?: string | null) {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    return parsed as {
+      boardName?: string;
+      stream?: string;
+      examYear?: string | number;
+      schoolName?: string;
+      subjects?: Array<{
+        subjectName?: string;
+        name?: string;
+        marksObtained?: string | number | null;
+        maxMarks?: string | number | null;
+      }>;
+    };
+  } catch {
+    return null;
+  }
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {

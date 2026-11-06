@@ -5,7 +5,7 @@ import { ProfileVerificationWorkspace } from '@/components/students-module/profi
 
 export default function PendingProfileUpdatesPage() {
   return (
-    <DashboardShell role="admin" title="Pending Profile Updates">
+    <DashboardShell role="admin" title="Pending Profile Updates" pageHeader={false}>
       <ProfileVerificationWorkspace mode="pending" />
     </DashboardShell>
   );
