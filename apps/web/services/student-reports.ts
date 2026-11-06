@@ -459,7 +459,11 @@ export async function previewBuiltinReport(
   columns?: string[],
 ): Promise<TabularReportPreview> {
   const { data } = await api.get(`/v1/student-reports/${builtinPath(key)}/preview`, {
-    params: { ...cleanParams(filters), ...(columns?.length ? { columns } : {}) },
+    params: {
+      ...cleanParams(filters),
+      ...(key === 'student-master' ? { limit: 25 } : {}),
+      ...(columns?.length ? { columns } : {}),
+    },
   });
   return data;
 }
@@ -477,6 +481,7 @@ export async function exportBuiltinReport(
       ...(columns?.length ? { columns } : {}),
     },
     responseType: 'blob',
+    timeout: key === 'student-master' ? 120_000 : undefined,
   });
   downloadBlob(response.data, `${key}.${format === 'xlsx' ? 'xlsx' : 'csv'}`);
 }

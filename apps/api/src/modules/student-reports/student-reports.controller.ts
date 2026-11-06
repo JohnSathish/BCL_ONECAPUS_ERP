@@ -166,6 +166,7 @@ export class StudentReportsController {
       filters,
       user,
       columns,
+      limit ?? 25,
     );
   }
 

@@ -42,6 +42,7 @@ const MASTER_INCLUDE = {
 } satisfies Prisma.StudentInclude;
 
 const ROW_LIMIT = 10_000;
+const PREVIEW_ROW_LIMIT = 25;
 
 @Injectable()
 export class StudentMasterAssemblerService {
@@ -56,15 +57,22 @@ export class StudentMasterAssemblerService {
     filters: StudentReportFiltersDto,
     user?: JwtUser,
     columns?: string[],
+    options?: { take?: number },
   ) {
-    const where = this.query.buildWhere(tenantId, filters, user);
+    const requestedKeys = this.normalizeColumnKeys(columns);
+    const where = await this.applyOperationalWhere(
+      tenantId,
+      this.query.buildWhere(tenantId, filters, user),
+      filters,
+    );
+    const take = Math.min(ROW_LIMIT, Math.max(1, options?.take ?? ROW_LIMIT));
     const [total, students, lookupMaps] = await Promise.all([
       this.prisma.student.count({ where }),
       this.prisma.student.findMany({
         where,
         include: MASTER_INCLUDE,
         orderBy: [{ rollNumber: 'asc' }, { enrollmentNumber: 'asc' }],
-        take: ROW_LIMIT,
+        take,
       }),
       this.loadLookupMaps(tenantId),
     ]);
@@ -72,31 +80,14 @@ export class StudentMasterAssemblerService {
     const operational = await this.directoryEnrichment.loadForStudents(
       tenantId,
       students.map((s) => s.id),
+      this.enrichmentParts(requestedKeys, filters),
     );
 
-    let filteredStudents = students;
-    if (filters.feeStatus || filters.residenceType) {
-      filteredStudents = students.filter((student) => {
-        const op = operational.get(student.id);
-        if (filters.feeStatus && op?.feeStatus !== filters.feeStatus) {
-          return false;
-        }
-        if (
-          filters.residenceType &&
-          op?.residenceType !== filters.residenceType
-        ) {
-          return false;
-        }
-        return true;
-      });
-    }
-
-    const rows = filteredStudents.map((student) =>
+    const rows = students.map((student) =>
       this.mapStudent(student, lookupMaps, operational.get(student.id)),
     );
 
     const sorted = this.sortRows(rows, filters);
-    const requestedKeys = this.normalizeColumnKeys(columns);
     const keys = requestedKeys?.length
       ? requestedKeys
       : Object.keys(rows[0] ?? this.emptyRow());
@@ -118,6 +109,129 @@ export class StudentMasterAssemblerService {
       columns: resolveFieldLabels(keys),
       rows: projected,
     };
+  }
+
+  /** Preview must not pull the full student graph. Export keeps the 10,000 cap. */
+  static previewTake(limit?: number) {
+    const requested = Number(limit);
+    if (!Number.isFinite(requested) || requested <= 0) return PREVIEW_ROW_LIMIT;
+    return Math.min(PREVIEW_ROW_LIMIT, Math.floor(requested));
+  }
+
+  private enrichmentParts(
+    columns: string[] | null,
+    filters: StudentReportFiltersDto,
+  ) {
+    const wants = (key: string) => !columns?.length || columns.includes(key);
+    return {
+      fee:
+        wants('feeStatus') ||
+        wants('feeDueAmount') ||
+        Boolean(filters.feeStatus),
+      attendance: wants('attendancePercent'),
+      residence:
+        wants('residenceType') ||
+        wants('hostelBlock') ||
+        wants('hostelRoom') ||
+        Boolean(filters.residenceType),
+    };
+  }
+
+  private async applyOperationalWhere(
+    tenantId: string,
+    where: Prisma.StudentWhereInput,
+    filters: StudentReportFiltersDto,
+  ): Promise<Prisma.StudentWhereInput> {
+    let next = where;
+    if (filters.residenceType) {
+      const current = next.academicProfile;
+      const plain =
+        current &&
+        typeof current === 'object' &&
+        !Array.isArray(current) &&
+        !('is' in current) &&
+        !('isNot' in current)
+          ? (current as Prisma.StudentAcademicProfileWhereInput)
+          : {};
+      next = {
+        ...next,
+        academicProfile: { ...plain, residenceType: filters.residenceType },
+      };
+    }
+    if (filters.feeStatus) {
+      next = this.intersectStudentIds(
+        next,
+        await this.studentIdsForFeeStatus(tenantId, filters.feeStatus),
+      );
+    }
+    return next;
+  }
+
+  private intersectStudentIds(
+    where: Prisma.StudentWhereInput,
+    ids: string[],
+  ): Prisma.StudentWhereInput {
+    const current = where.id;
+    if (
+      current &&
+      typeof current === 'object' &&
+      'in' in current &&
+      Array.isArray(current.in)
+    ) {
+      const allow = new Set(ids);
+      return {
+        ...where,
+        id: { in: current.in.filter((id) => allow.has(String(id))) },
+      };
+    }
+    return { ...where, id: { in: ids } };
+  }
+
+  private async studentIdsForFeeStatus(
+    tenantId: string,
+    status: string,
+  ): Promise<string[]> {
+    if (status === 'CLEAR') {
+      const due = await this.prisma.studentFeeSummary.findMany({
+        where: { tenantId, totalOutstanding: { gt: 0 } },
+        select: { studentId: true },
+      });
+      const dueIds = due.map((row) => row.studentId);
+      const students = await this.prisma.student.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+          ...(dueIds.length ? { id: { notIn: dueIds } } : {}),
+        },
+        select: { id: true },
+      });
+      return students.map((row) => row.id);
+    }
+
+    const where: Prisma.StudentFeeSummaryWhereInput =
+      status === 'OVERDUE'
+        ? { tenantId, feeStatus: 'OVERDUE', totalOutstanding: { gt: 0 } }
+        : status === 'PARTIAL'
+          ? {
+              tenantId,
+              totalOutstanding: { gt: 0 },
+              activeDemandCount: { gt: 1 },
+              NOT: { feeStatus: 'OVERDUE' },
+            }
+          : status === 'DUE'
+            ? {
+                tenantId,
+                feeStatus: 'DUE',
+                totalOutstanding: { gt: 0 },
+                activeDemandCount: { lte: 1 },
+              }
+            : { tenantId, feeStatus: status, totalOutstanding: { gt: 0 } };
+
+    const rows = await this.prisma.studentFeeSummary.findMany({
+      where,
+      select: { studentId: true },
+    });
+    return rows.map((row) => row.studentId);
   }
 
   private async loadLookupMaps(tenantId: string) {

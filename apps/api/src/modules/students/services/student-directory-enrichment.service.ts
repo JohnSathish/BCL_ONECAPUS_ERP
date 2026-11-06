@@ -74,6 +74,7 @@ export class StudentDirectoryEnrichmentService {
   async loadForStudents(
     tenantId: string,
     studentIds: string[],
+    parts?: { fee?: boolean; attendance?: boolean; residence?: boolean },
   ): Promise<Map<string, DirectoryOperationalSnapshot>> {
     const map = new Map<string, DirectoryOperationalSnapshot>();
     if (!studentIds.length) return map;
@@ -82,19 +83,29 @@ export class StudentDirectoryEnrichmentService {
       map.set(id, this.emptySnapshot());
     }
 
+    const loadFee = parts ? parts.fee === true : true;
+    const loadAttendance = parts ? parts.attendance === true : true;
+    const loadResidence = parts ? parts.residence === true : true;
+
     const [feeMap, attendanceMap, residenceRows] = await Promise.all([
-      this.safeLoad(
-        () => this.loadFeeSnapshots(tenantId, studentIds),
-        new Map(),
-      ),
-      this.safeLoad(
-        () => this.loadAttendanceSnapshots(tenantId, studentIds),
-        new Map(),
-      ),
-      this.safeLoad(
-        () => this.loadResidenceRows(tenantId, studentIds),
-        [] as ResidenceRow[],
-      ),
+      loadFee
+        ? this.safeLoad(
+            () => this.loadFeeSnapshots(tenantId, studentIds),
+            new Map(),
+          )
+        : Promise.resolve(new Map<string, DirectoryFeeSnapshot>()),
+      loadAttendance
+        ? this.safeLoad(
+            () => this.loadAttendanceSnapshots(tenantId, studentIds),
+            new Map(),
+          )
+        : Promise.resolve(new Map<string, DirectoryAttendanceSnapshot>()),
+      loadResidence
+        ? this.safeLoad(
+            () => this.loadResidenceRows(tenantId, studentIds),
+            [] as ResidenceRow[],
+          )
+        : Promise.resolve([] as ResidenceRow[]),
     ]);
 
     for (const [studentId, fee] of feeMap) {

@@ -182,8 +182,9 @@ export class CustomReportService {
     filters: StudentReportFiltersDto,
     user?: JwtUser,
     columns?: string[],
+    limit?: number,
   ) {
-    return this.runBuiltin(tenantId, key, filters, user, columns);
+    return this.runBuiltin(tenantId, key, filters, user, columns, limit);
   }
 
   async exportBuiltin(
@@ -369,6 +370,7 @@ export class CustomReportService {
     filters: StudentReportFiltersDto,
     user?: JwtUser,
     columns?: string[],
+    previewLimit?: number,
   ) {
     const resolvedFilters = await this.applyOperationalFilters(
       tenantId,
@@ -381,6 +383,9 @@ export class CustomReportService {
         resolvedFilters,
         user,
         columns?.length ? columns : template?.defaultColumns,
+        previewLimit != null
+          ? { take: StudentMasterAssemblerService.previewTake(previewLimit) }
+          : undefined,
       );
     }
     if (key === 'subject-summary') {
