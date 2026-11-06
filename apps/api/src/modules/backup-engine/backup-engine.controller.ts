@@ -5,6 +5,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Header,
   Param,
   Post,
   Put,
@@ -154,6 +155,19 @@ export class BackupEngineController {
     return this.orchestrator.getRun(id);
   }
 
+  @Get('runs/:id/bundle-progress')
+  @RequireAnyPermission('backup:download', 'backup:manage')
+  @Header('Cache-Control', 'no-store')
+  bundleProgress(@Param('id') id: string) {
+    return this.orchestrator.bundleProgressSnapshot(id);
+  }
+
+  @Post('runs/:id/bundle-cancel')
+  @RequireAnyPermission('backup:download', 'backup:manage')
+  cancelBundle(@Param('id') id: string) {
+    return this.orchestrator.cancelBundlePack(id);
+  }
+
   @Get('runs/:id/bundle')
   @RequireAnyPermission('backup:download', 'backup:manage')
   @RequireStepUp()
@@ -162,7 +176,7 @@ export class BackupEngineController {
     @Param('id') id: string,
     @Req() req: Request,
   ): Promise<StreamableFile> {
-    const file = await this.orchestrator.downloadBundle(id);
+    const file = await this.orchestrator.downloadBundle(id, req);
     const ip = extractClientIp(req);
     await this.audit.log({
       action: 'DOWNLOAD',

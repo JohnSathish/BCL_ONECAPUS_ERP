@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { mkdir, rm, stat, writeFile } from 'fs/promises';
 import { basename, join } from 'path';
-import { materializeBackupPayload } from '../backup-zip.util';
+import {
+  BackupPackCancelledError,
+  materializeBackupPayload,
+} from '../backup-zip.util';
 import { PrismaService } from '../../../database/prisma.service';
 import { BackupDatabaseService } from './backup-database.service';
 import { BackupFilesService } from './backup-files.service';
@@ -196,12 +199,37 @@ export class BackupRunExecutorService {
     }
   }
 
-  /** Build a WinRAR-compatible ZIP of the run. Does not delete the original artifacts. */
-  async packRunArchive(runId: string) {
+  /**
+   * Build a WinRAR-compatible ZIP of the run.
+   * Does not change the run status and does not delete the original dump files.
+   * A cancelled pack removes only the unfinished ZIP and decrypted temp copies.
+   */
+  async packRunArchive(
+    runId: string,
+    hooks?: {
+      isCancelled?: () => boolean;
+      onProgress?: (event: {
+        phase: 'preparing' | 'compressing' | 'finalising';
+        bytesProcessed: number;
+        bytesTotal: number | null;
+      }) => void;
+    },
+  ) {
     const existing = await this.prisma.backupArtifact.findFirst({
       where: { runId, kind: 'ARCHIVE' },
     });
     if (existing) return existing;
+
+    const throwIfCancelled = () => {
+      if (hooks?.isCancelled?.()) throw new BackupPackCancelledError();
+    };
+
+    throwIfCancelled();
+    hooks?.onProgress?.({
+      phase: 'preparing',
+      bytesProcessed: 0,
+      bytesTotal: null,
+    });
 
     const run = await this.prisma.backupRun.findUnique({
       where: { id: runId },
@@ -224,9 +252,11 @@ export class BackupRunExecutorService {
     const entries = [
       { name: 'backup-manifest.json', sourcePath: manifestPath },
     ];
-    let zip: { sizeBytes: bigint };
+    let archiveCommitted = false;
     try {
+      throwIfCancelled();
       for (const artifact of artifacts) {
+        throwIfCancelled();
         const plainPath = join(plainDir, basename(artifact.localPath));
         const source = await materializeBackupPayload(
           artifact.localPath,
@@ -237,23 +267,72 @@ export class BackupRunExecutorService {
           sourcePath: source,
         });
       }
-      zip = await this.files.writeVerifiedZip(zipPath, entries);
+      throwIfCancelled();
+      const zip = await this.files.writeVerifiedZip(zipPath, entries, {
+        isCancelled: hooks?.isCancelled,
+        onProgress: (event) => {
+          if (event.phase === 'reading') {
+            hooks?.onProgress?.({
+              phase: 'preparing',
+              bytesProcessed: event.bytesProcessed,
+              bytesTotal: event.bytesTotal,
+            });
+            return;
+          }
+          if (event.phase === 'writing') {
+            hooks?.onProgress?.({
+              phase: 'compressing',
+              bytesProcessed: event.bytesProcessed,
+              bytesTotal: event.bytesTotal,
+            });
+            return;
+          }
+          hooks?.onProgress?.({
+            phase: 'finalising',
+            bytesProcessed: 0,
+            bytesTotal: null,
+          });
+        },
+      });
+      throwIfCancelled();
+      hooks?.onProgress?.({
+        phase: 'finalising',
+        bytesProcessed: 0,
+        bytesTotal: null,
+      });
+      const checksum = await this.files.sha256File(zipPath, {
+        isCancelled: hooks?.isCancelled,
+        onProgress: (bytesProcessed, bytesTotal) => {
+          hooks?.onProgress?.({
+            phase: 'finalising',
+            bytesProcessed,
+            bytesTotal,
+          });
+        },
+      });
+      throwIfCancelled();
+      const created = await this.prisma.backupArtifact.create({
+        data: {
+          runId,
+          kind: 'ARCHIVE',
+          localPath: zipPath,
+          sizeBytes: zip.sizeBytes,
+          checksumSha256: checksum,
+          verifiedAt: new Date(),
+        },
+      });
+      archiveCommitted = true;
+      return created;
+    } catch (err) {
+      if (!archiveCommitted) {
+        await rm(zipPath, { force: true }).catch(() => undefined);
+      }
+      throw err;
     } finally {
       await rm(plainDir, { recursive: true, force: true }).catch(
         () => undefined,
       );
     }
-    const checksum = await this.files.sha256File(zipPath);
-    return this.prisma.backupArtifact.create({
-      data: {
-        runId,
-        kind: 'ARCHIVE',
-        localPath: zipPath,
-        sizeBytes: zip.sizeBytes,
-        checksumSha256: checksum,
-        verifiedAt: new Date(),
-      },
-    });
   }
 
   private async buildManifest(

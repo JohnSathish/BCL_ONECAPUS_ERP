@@ -3,8 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import {
   assertZipArchive,
+  BackupPackCancelledError,
   writeStoreZip,
   type ZipEntry,
+  type ZipWriteProgress,
 } from '../backup-zip.util';
 import { createReadStream, createWriteStream } from 'fs';
 import { mkdir, readdir, stat, writeFile } from 'fs/promises';
@@ -67,17 +69,46 @@ export class BackupFilesService {
     return join(this.backupRoot(), runId);
   }
 
-  async writeVerifiedZip(outputPath: string, entries: ZipEntry[]) {
+  async writeVerifiedZip(
+    outputPath: string,
+    entries: ZipEntry[],
+    options?: {
+      onProgress?: (progress: ZipWriteProgress) => void;
+      isCancelled?: () => boolean;
+    },
+  ) {
     await mkdir(dirname(outputPath), { recursive: true });
-    await writeStoreZip(outputPath, entries);
+    await writeStoreZip(outputPath, entries, options);
     const info = await assertZipArchive(outputPath);
     if (info.size <= 0) throw new Error('ZIP archive is empty');
     return { sizeBytes: BigInt(info.size) };
   }
 
-  async sha256File(filePath: string): Promise<string> {
+  async sha256File(
+    filePath: string,
+    hooks?: {
+      onProgress?: (bytesProcessed: number, bytesTotal: number) => void;
+      isCancelled?: () => boolean;
+    },
+  ): Promise<string> {
     const hash = createHash('sha256');
-    await pipeline(createReadStream(filePath), hash);
+    if (!hooks?.onProgress && !hooks?.isCancelled) {
+      await pipeline(createReadStream(filePath), hash);
+      return hash.digest('hex');
+    }
+    const total = (await stat(filePath)).size;
+    let processed = 0;
+    const stream = createReadStream(filePath);
+    for await (const chunk of stream) {
+      if (hooks.isCancelled?.()) {
+        stream.destroy();
+        throw new BackupPackCancelledError();
+      }
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      hash.update(buf);
+      processed += buf.length;
+      hooks.onProgress?.(processed, total);
+    }
     return hash.digest('hex');
   }
 

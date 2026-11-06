@@ -40,11 +40,10 @@ import {
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { useRequireAuth } from '@/hooks/use-auth';
-import { useStepUpAction } from '@/hooks/use-step-up-action';
+import { useBackupDownload } from '@/hooks/use-backup-download';
 import { useInstitutionBranding } from '@/hooks/use-institution-branding';
 import { usePermissions } from '@/hooks/use-permissions';
 import {
-  downloadBackupBundle,
   fetchBackupDashboard,
   formatBytes,
   updateBackupRetention,
@@ -110,11 +109,7 @@ export function BackupDashboardPage() {
   const { branding } = useInstitutionBranding();
   const qc = useQueryClient();
   const [manualOpen, setManualOpen] = useState(false);
-  const { withStepUp, stepUpDialog } = useStepUpAction({
-    description:
-      'Re-enter your password. A backup ZIP is about 1 GB and can take several minutes. Leave this window open.',
-    pendingLabel: 'Downloading…',
-  });
+  const { startDownload, downloadDialog } = useBackupDownload();
   const canDownload = canAny('backup:download', 'backup:manage');
   const canManage = canAny('backup:manage');
 
@@ -149,7 +144,7 @@ export function BackupDashboardPage() {
   const downloadLatest = () => {
     if (!latest?.artifacts?.length) return;
     const filename = buildBackupDownloadName(institutionSlug, latest.completedAt, 'zip');
-    withStepUp((token) => downloadBackupBundle(latest.id, filename, token));
+    startDownload(latest.id, filename);
   };
 
   const cloudStatusLine = () => {
@@ -598,7 +593,7 @@ export function BackupDashboardPage() {
           onOpenChange={setManualOpen}
           cloudSync={d?.cloudSync ?? []}
         />
-        {stepUpDialog}
+        {downloadDialog}
       </AdminShell>
     </DashboardShell>
   );

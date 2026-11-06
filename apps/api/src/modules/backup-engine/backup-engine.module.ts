@@ -4,6 +4,7 @@ import { AdministrationModule } from '../administration/administration.module';
 import { BackupEngineController } from './backup-engine.controller';
 import { BackupQueueProcessor } from './processors/backup-run.processor';
 import { BackupAuditService } from './services/backup-audit.service';
+import { BackupBundleProgressService } from './services/backup-bundle-progress.service';
 import { BackupCloudSyncService } from './services/backup-cloud-sync.service';
 import { BackupCryptoService } from './services/backup-crypto.service';
 import { BackupDatabaseService } from './services/backup-database.service';
@@ -32,6 +33,7 @@ const backupQueueProcessors = API_RUNS_BACKUP_JOBS
   controllers: [BackupEngineController],
   providers: [
     BackupAuditService,
+    BackupBundleProgressService,
     BackupCryptoService,
     BackupDatabaseService,
     BackupFilesService,

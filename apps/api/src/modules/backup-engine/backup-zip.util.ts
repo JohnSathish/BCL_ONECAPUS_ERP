@@ -16,10 +16,29 @@ const CRC_TABLE = (() => {
   return table;
 })();
 
+export class BackupPackCancelledError extends Error {
+  constructor() {
+    super('Backup download cancelled');
+    this.name = 'BackupPackCancelledError';
+  }
+}
+
 export type ZipEntry = {
   /** Path inside the archive. Forward slashes, no leading slash. */
   name: string;
   sourcePath: string;
+};
+
+export type ZipWriteProgress = {
+  /** reading = scan for the ZIP checksum, writing = bytes copied into the archive. */
+  phase: 'reading' | 'writing' | 'directory';
+  bytesProcessed: number;
+  bytesTotal: number;
+};
+
+type ZipWriteOptions = {
+  onProgress?: (progress: ZipWriteProgress) => void;
+  isCancelled?: () => boolean;
 };
 
 type WrittenEntry = {
@@ -30,14 +49,50 @@ type WrittenEntry = {
 };
 
 /** Stream a standard store-method ZIP that WinRAR and 7-Zip can open. */
-export async function writeStoreZip(outputPath: string, entries: ZipEntry[]) {
+export async function writeStoreZip(
+  outputPath: string,
+  entries: ZipEntry[],
+  options?: ZipWriteOptions,
+) {
+  const throwIfCancelled = () => {
+    if (options?.isCancelled?.()) throw new BackupPackCancelledError();
+  };
+  throwIfCancelled();
+  const sizes: number[] = [];
+  for (const entry of entries) {
+    throwIfCancelled();
+    sizes.push((await stat(entry.sourcePath)).size);
+  }
+  const sourceTotal = sizes.reduce((sum, size) => sum + size, 0);
+  const crcs: Array<{ crc: number; size: number }> = [];
+  let read = 0;
+  for (const entry of entries) {
+    throwIfCancelled();
+    crcs.push(
+      await crc32File(entry.sourcePath, {
+        isCancelled: options?.isCancelled,
+        onBytes: (delta) => {
+          read += delta;
+          options?.onProgress?.({
+            phase: 'reading',
+            bytesProcessed: read,
+            bytesTotal: sourceTotal,
+          });
+        },
+      }),
+    );
+  }
+
   const handle = await open(outputPath, 'w');
   const written: WrittenEntry[] = [];
   let offset = 0;
+  let copied = 0;
   try {
-    for (const entry of entries) {
+    for (let index = 0; index < entries.length; index++) {
+      throwIfCancelled();
+      const entry = entries[index];
       const name = sanitizeZipName(entry.name);
-      const { crc, size } = await crc32File(entry.sourcePath);
+      const { crc, size } = crcs[index];
       const localOffset = offset;
       const header = localHeader(name, crc, size);
       await handle.write(header, 0, header.length, localOffset);
@@ -45,10 +100,27 @@ export async function writeStoreZip(outputPath: string, entries: ZipEntry[]) {
         handle,
         entry.sourcePath,
         localOffset + header.length,
+        {
+          isCancelled: options?.isCancelled,
+          onBytes: (delta) => {
+            copied += delta;
+            options?.onProgress?.({
+              phase: 'writing',
+              bytesProcessed: copied,
+              bytesTotal: sourceTotal,
+            });
+          },
+        },
       );
       written.push({ name, crc, size, offset: localOffset });
     }
 
+    throwIfCancelled();
+    options?.onProgress?.({
+      phase: 'directory',
+      bytesProcessed: sourceTotal,
+      bytesTotal: sourceTotal,
+    });
     const cdOffset = offset;
     for (const entry of written) {
       const cd = centralHeader(entry);
@@ -100,13 +172,19 @@ async function copyFile(
   handle: Awaited<ReturnType<typeof open>>,
   sourcePath: string,
   position: number,
+  hooks?: { onBytes?: (delta: number) => void; isCancelled?: () => boolean },
 ) {
   let pos = position;
   const stream = createReadStream(sourcePath);
   for await (const chunk of stream) {
+    if (hooks?.isCancelled?.()) {
+      stream.destroy();
+      throw new BackupPackCancelledError();
+    }
     const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     await handle.write(buf, 0, buf.length, pos);
     pos += buf.length;
+    hooks?.onBytes?.(buf.length);
   }
   return pos;
 }
@@ -118,18 +196,25 @@ function sanitizeZipName(name: string) {
   return cleaned;
 }
 
-async function crc32File(filePath: string) {
+async function crc32File(
+  filePath: string,
+  hooks?: { onBytes?: (delta: number) => void; isCancelled?: () => boolean },
+) {
   let crc = 0xffffffff;
   let size = 0;
-  await pipeline(createReadStream(filePath), async function* (source) {
-    for await (const chunk of source) {
-      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      size += buf.length;
-      for (let i = 0; i < buf.length; i++) {
-        crc = CRC_TABLE[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
-      }
+  const stream = createReadStream(filePath);
+  for await (const chunk of stream) {
+    if (hooks?.isCancelled?.()) {
+      stream.destroy();
+      throw new BackupPackCancelledError();
     }
-  });
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buf.length;
+    for (let i = 0; i < buf.length; i++) {
+      crc = CRC_TABLE[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
+    }
+    hooks?.onBytes?.(buf.length);
+  }
   return { crc: (crc ^ 0xffffffff) >>> 0, size };
 }
 

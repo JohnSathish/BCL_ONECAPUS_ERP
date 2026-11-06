@@ -202,28 +202,188 @@ export async function triggerTenantExport(tenantId: string) {
   return data;
 }
 
-export async function downloadBackupBundle(runId: string, filename: string, stepUpToken?: string) {
-  const response = await api.get(`/v1/admin/backups/runs/${runId}/bundle`, {
-    responseType: 'blob',
-    timeout: 0,
-    params: stepUpToken ? { stepUpToken } : undefined,
-    headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
-  });
-  const blob = response.data as Blob;
-  const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
-  const isZip =
-    header[0] === 0x50 && header[1] === 0x4b && header[2] === 0x03 && header[3] === 0x04;
-  if (!isZip) {
-    throw new Error('The server did not return a ZIP archive. The file was not saved.');
+export type BackupDownloadStage =
+  | 'preparing'
+  | 'compressing'
+  | 'finalising'
+  | 'downloading'
+  | 'verifying'
+  | 'done';
+
+export type BackupDownloadProgress = {
+  stage: BackupDownloadStage;
+  /** Null when this stage has no measured total. Never invented. */
+  percent: number | null;
+  bytesProcessed: number | null;
+  bytesTotal: number | null;
+  bytesPerSecond: number | null;
+  etaSeconds: number | null;
+  skippedStages: BackupDownloadStage[];
+};
+
+type BundleProgressSnapshot = {
+  phase: 'idle' | 'preparing' | 'compressing' | 'finalising' | 'ready' | 'failed' | 'cancelled';
+  bytesProcessed: number;
+  bytesTotal: number | null;
+  error?: string | null;
+};
+
+export class BackupDownloadCancelled extends Error {
+  constructor() {
+    super('Download cancelled');
+    this.name = 'BackupDownloadCancelled';
   }
-  const expected = Number(response.headers['content-length'] ?? 0);
-  if (expected > 0 && blob.size !== expected) {
-    throw new Error(
-      'The download was interrupted before the ZIP finished. The file was not saved.',
-    );
+}
+
+const PACK_STAGES: BackupDownloadStage[] = ['preparing', 'compressing', 'finalising'];
+
+export async function fetchBackupBundleProgress(runId: string) {
+  const { data } = await api.get(`/v1/admin/backups/runs/${runId}/bundle-progress`);
+  return data as BundleProgressSnapshot;
+}
+
+export async function cancelBackupBundle(runId: string) {
+  const { data } = await api.post(`/v1/admin/backups/runs/${runId}/bundle-cancel`);
+  return data as { cancelled: boolean };
+}
+
+function measuredPercent(processed: number, total: number | null) {
+  if (total == null || total <= 0 || processed < 0) return null;
+  return Math.min(100, Math.floor((processed / total) * 100));
+}
+
+export async function downloadBackupBundle(
+  runId: string,
+  filename: string,
+  stepUpToken?: string,
+  options?: {
+    signal?: AbortSignal;
+    onProgress?: (progress: BackupDownloadProgress) => void;
+    onRequest?: () => void;
+  },
+) {
+  const samples: Array<{ stage: BackupDownloadStage; at: number; bytes: number }> = [];
+  let downloadStarted = false;
+  let sawPackStage = false;
+  let polling = false;
+  const skippedStages = (stage: BackupDownloadStage): BackupDownloadStage[] => {
+    if (sawPackStage) return [];
+    if (stage === 'downloading' || stage === 'verifying' || stage === 'done') return PACK_STAGES;
+    return [];
+  };
+
+  const rateFor = (stage: BackupDownloadStage, bytes: number, total: number | null) => {
+    const now = Date.now();
+    const previous = samples[samples.length - 1];
+    if (!previous || previous.stage !== stage) {
+      samples.length = 0;
+      samples.push({ stage, at: now, bytes });
+      return { bytesPerSecond: null as number | null, etaSeconds: null as number | null };
+    }
+    samples.push({ stage, at: now, bytes });
+    const recent = samples.filter((sample) => now - sample.at <= 4000);
+    const first = recent[0] ?? samples[0];
+    const elapsed = (now - first.at) / 1000;
+    const delta = bytes - first.bytes;
+    if (elapsed < 0.4 || delta <= 0) {
+      return { bytesPerSecond: null, etaSeconds: null };
+    }
+    const bytesPerSecond = delta / elapsed;
+    const etaSeconds = total != null && total >= bytes ? (total - bytes) / bytesPerSecond : null;
+    return { bytesPerSecond, etaSeconds };
+  };
+
+  const emit = (
+    stage: BackupDownloadStage,
+    bytesProcessed: number | null,
+    bytesTotal: number | null,
+  ) => {
+    const rate =
+      bytesProcessed == null
+        ? { bytesPerSecond: null, etaSeconds: null }
+        : rateFor(stage, bytesProcessed, bytesTotal);
+    options?.onProgress?.({
+      stage,
+      percent: bytesProcessed == null ? null : measuredPercent(bytesProcessed, bytesTotal),
+      bytesProcessed,
+      bytesTotal,
+      bytesPerSecond: rate.bytesPerSecond,
+      etaSeconds: rate.etaSeconds,
+      skippedStages: skippedStages(stage),
+    });
+  };
+
+  emit('preparing', null, null);
+
+  const poll = async () => {
+    if (polling || downloadStarted || options?.signal?.aborted) return;
+    polling = true;
+    try {
+      const snap = await fetchBackupBundleProgress(runId);
+      if (downloadStarted || options?.signal?.aborted) return;
+      if (
+        snap.phase === 'preparing' ||
+        snap.phase === 'compressing' ||
+        snap.phase === 'finalising'
+      ) {
+        sawPackStage = true;
+        const total = snap.bytesTotal != null && snap.bytesTotal > 0 ? snap.bytesTotal : null;
+        emit(snap.phase, total == null ? null : snap.bytesProcessed, total);
+        return;
+      }
+      if (snap.phase === 'ready') {
+        emit('downloading', null, null);
+      }
+    } catch {
+      // The bundle request reports the failure. A missed poll is not a percentage.
+    } finally {
+      polling = false;
+    }
+  };
+
+  const pollTimer = setInterval(() => {
+    void poll();
+  }, 500);
+  void poll();
+
+  try {
+    options?.onRequest?.();
+    const response = await api.get(`/v1/admin/backups/runs/${runId}/bundle`, {
+      responseType: 'blob',
+      timeout: 0,
+      signal: options?.signal,
+      params: stepUpToken ? { stepUpToken } : undefined,
+      headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+      onDownloadProgress: (event) => {
+        downloadStarted = true;
+        const total = event.total && event.total > 0 ? event.total : null;
+        emit('downloading', event.loaded, total);
+      },
+    });
+    downloadStarted = true;
+    const blob = response.data as Blob;
+    const expected = Number(response.headers['content-length'] ?? 0);
+    emit('verifying', null, expected > 0 ? expected : null);
+    const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+    const isZip =
+      header[0] === 0x50 && header[1] === 0x4b && header[2] === 0x03 && header[3] === 0x04;
+    if (!isZip) {
+      throw new Error('The server did not return a ZIP archive. The file was not saved.');
+    }
+    if (expected > 0 && blob.size !== expected) {
+      throw new Error(
+        'The download was interrupted before the ZIP finished. The file was not saved.',
+      );
+    }
+    emit('done', blob.size, blob.size);
+    const { downloadBlob } = await import('@/utils/download-blob');
+    downloadBlob(blob, filename.endsWith('.zip') ? filename : `${filename}.zip`);
+  } catch (error) {
+    if (options?.signal?.aborted) throw new BackupDownloadCancelled();
+    throw error;
+  } finally {
+    clearInterval(pollTimer);
   }
-  const { downloadBlob } = await import('@/utils/download-blob');
-  downloadBlob(blob, filename.endsWith('.zip') ? filename : `${filename}.zip`);
 }
 
 export async function downloadBackupArtifact(

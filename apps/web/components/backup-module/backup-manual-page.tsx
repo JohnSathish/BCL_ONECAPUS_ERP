@@ -8,12 +8,12 @@ import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useRequireAuth } from '@/hooks/use-auth';
+import { useBackupDownload } from '@/hooks/use-backup-download';
 import { useStepUpAction } from '@/hooks/use-step-up-action';
 import {
   fetchBackupRun,
   triggerBackupRun,
   downloadBackupArtifact,
-  downloadBackupBundle,
   formatBytes,
 } from '@/services/backup';
 
@@ -35,6 +35,7 @@ export function BackupManualPage() {
   const { withStepUp, stepUpDialog } = useStepUpAction({
     description: 'Re-enter your password to download backup files.',
   });
+  const { startDownload, downloadDialog } = useBackupDownload();
   const [type, setType] = useState('DATABASE_DOCUMENTS');
   const [runId, setRunId] = useState<string | null>(null);
 
@@ -64,6 +65,7 @@ export function BackupManualPage() {
   return (
     <DashboardShell role="admin" title="Manual Backup">
       {stepUpDialog}
+      {downloadDialog}
       <AdminShell>
         <AdminPageHeader title="Manual Backup" subtitle="Run an on-demand instance backup" />
         <AdminGlassCard className="max-w-xl space-y-4 p-6">
@@ -117,11 +119,7 @@ export function BackupManualPage() {
                 <Button
                   size="sm"
                   className="mb-3"
-                  onClick={() =>
-                    withStepUp((token) =>
-                      downloadBackupBundle(run.id, `${run.type.toLowerCase()}-backup.zip`, token),
-                    )
-                  }
+                  onClick={() => startDownload(run.id, `${run.type.toLowerCase()}-backup.zip`)}
                 >
                   Download ZIP
                 </Button>

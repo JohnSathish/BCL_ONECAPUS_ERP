@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { useBackupDownload } from '@/hooks/use-backup-download';
 import { useStepUpAction } from '@/hooks/use-step-up-action';
 import {
   deleteBackupRun,
-  downloadBackupBundle,
   formatBytes,
   verifyBackupRun,
   type BackupRunRow,
@@ -42,11 +42,7 @@ export function BackupRepositoryTable({
   compact = false,
 }: Props) {
   const qc = useQueryClient();
-  const { withStepUp, stepUpDialog } = useStepUpAction({
-    description:
-      'Re-enter your password. A backup ZIP is about 1 GB and can take several minutes. Leave this window open.',
-    pendingLabel: 'Downloading…',
-  });
+  const { startDownload, downloadDialog } = useBackupDownload();
   const { withStepUp: withDeleteStepUp, stepUpDialog: deleteStepUpDialog } = useStepUpAction({
     title: 'Delete this backup',
     description:
@@ -60,7 +56,7 @@ export function BackupRepositoryTable({
 
   const downloadRun = (run: BackupRunRow) => {
     const filename = buildBackupDownloadName(institutionSlug, run.completedAt, 'zip');
-    withStepUp((token) => downloadBackupBundle(run.id, filename, token));
+    startDownload(run.id, filename);
   };
 
   const deleteRun = (run: BackupRunRow) => {
@@ -80,7 +76,7 @@ export function BackupRepositoryTable({
 
   return (
     <>
-      {stepUpDialog}
+      {downloadDialog}
       {deleteStepUpDialog}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">

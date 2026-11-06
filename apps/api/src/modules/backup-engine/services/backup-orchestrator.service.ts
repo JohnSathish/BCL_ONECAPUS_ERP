@@ -7,6 +7,7 @@ import {
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { basename } from 'path';
+import type { Request } from 'express';
 import { PrismaService } from '../../../database/prisma.service';
 import { QueueService } from '../../../shared/queue/queue.service';
 import { BackupAuditService } from './backup-audit.service';
@@ -17,7 +18,8 @@ import { BackupFilesService } from './backup-files.service';
 import { SystemMaintenanceService } from './system-maintenance.service';
 import { BackupHealthService } from './backup-health.service';
 import { BackupRunExecutorService } from './backup-run-executor.service';
-import { assertZipArchive } from '../backup-zip.util';
+import { assertZipArchive, BackupPackCancelledError } from '../backup-zip.util';
+import { BackupBundleProgressService } from './backup-bundle-progress.service';
 import {
   buildRunLogText,
   diagnoseRun,
@@ -102,6 +104,7 @@ export class BackupOrchestratorService {
     private readonly maintenance: SystemMaintenanceService,
     private readonly health: BackupHealthService,
     private readonly executor: BackupRunExecutorService,
+    private readonly bundleProgress: BackupBundleProgressService,
   ) {}
 
   async getDashboard() {
@@ -499,7 +502,15 @@ export class BackupOrchestratorService {
     });
   }
 
-  async downloadBundle(runId: string) {
+  bundleProgressSnapshot(runId: string) {
+    return this.bundleProgress.snapshot(runId);
+  }
+
+  cancelBundlePack(runId: string) {
+    return this.bundleProgress.cancel(runId);
+  }
+
+  async downloadBundle(runId: string, req?: Request) {
     const run = await this.prisma.backupRun.findUnique({
       where: { id: runId },
     });
@@ -510,13 +521,64 @@ export class BackupOrchestratorService {
     let archive = await this.prisma.backupArtifact.findFirst({
       where: { runId, kind: 'ARCHIVE' },
     });
-    if (!archive) archive = await this.executor.packRunArchive(runId);
+    if (!archive) {
+      const job = this.bundleProgress.begin(runId);
+      const stopWatching = this.watchClientDisconnect(req, job);
+      try {
+        archive = await this.bundleProgress.once(runId, () =>
+          this.executor.packRunArchive(runId, {
+            isCancelled: () => job.cancelled,
+            onProgress: (event) => this.bundleProgress.apply(job, event),
+          }),
+        );
+        if (job.cancelled) throw new BackupPackCancelledError();
+      } catch (err) {
+        if (err instanceof BackupPackCancelledError || job.cancelled) {
+          this.bundleProgress.mark(job, {
+            phase: 'cancelled',
+            bytesProcessed: job.bytesProcessed,
+            bytesTotal: job.bytesTotal,
+          });
+          throw new BadRequestException('Download cancelled');
+        }
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'The backup ZIP could not be created';
+        this.bundleProgress.mark(job, {
+          phase: 'failed',
+          bytesProcessed: job.bytesProcessed,
+          bytesTotal: job.bytesTotal,
+          error: message,
+        });
+        throw err;
+      } finally {
+        stopWatching();
+      }
+    }
     const info = await assertZipArchive(archive.localPath);
+    this.bundleProgress.noteReady(runId, info.size);
     return new StreamableFile(createReadStream(archive.localPath), {
       type: 'application/zip',
       disposition: 'attachment; filename="college-backup.zip"',
       length: info.size,
     });
+  }
+
+  private watchClientDisconnect(
+    req: Request | undefined,
+    job: { cancelled: boolean },
+  ) {
+    if (!req) return () => undefined;
+    let armed = true;
+    const onClose = () => {
+      if (armed && (req.destroyed || req.aborted)) job.cancelled = true;
+    };
+    req.on('close', onClose);
+    return () => {
+      armed = false;
+      req.removeListener('close', onClose);
+    };
   }
 
   async verifyRun(runId: string, actorId?: string) {
