@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Lora, Plus_Jakarta_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import { SchoolSiteHeader } from '@/components/school-web/school-site-chrome';
 import { SchoolSiteFooter } from '@/components/school-web/school-site-footer';
 import { SchoolJsonLd } from '@/components/school-web/school-json-ld';
@@ -10,17 +10,29 @@ import { parseLaunchPopup } from '@/lib/school-web/launch-popup';
 import { extras, fetchSchoolWebBundle, schoolWebRequestHost } from '@/lib/school-web/public';
 import { schoolGraphFromSite, schoolPublicOrigin, seoBag } from '@/lib/school-web/seo';
 
-const slsSans = Plus_Jakarta_Sans({
-  subsets: ['latin', 'latin-ext'],
-  weight: ['400', '500', '600', '700'],
+/** Bundled faces. next/font/google fetches Google at build time and fails in Docker. */
+const slsSans = localFont({
+  src: [
+    { path: './fonts/plus-jakarta-sans-latin-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/plus-jakarta-sans-latin-500-normal.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/plus-jakarta-sans-latin-600-normal.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/plus-jakarta-sans-latin-700-normal.woff2', weight: '700', style: 'normal' },
+  ],
   variable: '--font-sls-sans',
   display: 'swap',
 });
 
-const slsSerif = Lora({
-  subsets: ['latin', 'latin-ext'],
-  weight: ['400', '500', '600', '700'],
-  style: ['normal', 'italic'],
+const slsSerif = localFont({
+  src: [
+    { path: './fonts/lora-latin-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/lora-latin-400-italic.woff2', weight: '400', style: 'italic' },
+    { path: './fonts/lora-latin-500-normal.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/lora-latin-500-italic.woff2', weight: '500', style: 'italic' },
+    { path: './fonts/lora-latin-600-normal.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/lora-latin-600-italic.woff2', weight: '600', style: 'italic' },
+    { path: './fonts/lora-latin-700-normal.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/lora-latin-700-italic.woff2', weight: '700', style: 'italic' },
+  ],
   variable: '--font-sls-serif',
   display: 'swap',
 });

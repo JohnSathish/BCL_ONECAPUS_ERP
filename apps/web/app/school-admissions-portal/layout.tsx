@@ -1,18 +1,22 @@
 import type { Metadata } from 'next';
-import { Great_Vibes, Libre_Baskerville } from 'next/font/google';
+import localFont from 'next/font/local';
 import { SchoolAdmissionsPortalGuard } from '@/components/school-admissions-portal/school-admissions-portal-guard';
 
 const SCHOOL_PORTAL_LOGO_SRC = '/school-admissions/tps-logo.png';
 
-const tpsScript = Great_Vibes({
+/** Bundled faces. next/font/google fetches Google at build time and fails in Docker. */
+const tpsScript = localFont({
+  src: './fonts/great-vibes-latin-400-normal.woff2',
   weight: '400',
-  subsets: ['latin'],
+  style: 'normal',
   variable: '--font-tps-script',
 });
 
-const tpsSerif = Libre_Baskerville({
-  weight: ['400', '700'],
-  subsets: ['latin'],
+const tpsSerif = localFont({
+  src: [
+    { path: './fonts/libre-baskerville-latin-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/libre-baskerville-latin-700-normal.woff2', weight: '700', style: 'normal' },
+  ],
   variable: '--font-tps-serif',
 });
 
