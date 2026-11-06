@@ -11,6 +11,7 @@ export type ReportStudentRef = {
   rollNumber: string;
   fullName: string;
   admissionYearId: string | null;
+  currentSemester?: number | null;
 };
 
 export type RelatedSheet = {
@@ -20,6 +21,7 @@ export type RelatedSheet = {
 };
 
 const SHEET_CAP = 20_000;
+const ELECTIVE_KEYS = ['mdc', 'aec', 'sec', 'vac', 'vtc'] as const;
 const LINK = [
   { key: 'rollNumber', label: 'Roll Number' },
   { key: 'fullName', label: 'Student Name' },
@@ -36,6 +38,7 @@ export class StudentReportRelatedService {
     tenantId: string,
     students: ReportStudentRef[],
     columns: string[] | null,
+    options?: { semester?: number | null },
   ): Promise<{
     patches: Map<string, Record<string, unknown>>;
     sheets: RelatedSheet[];
@@ -159,6 +162,60 @@ export class StudentReportRelatedService {
           ],
           rows: sheetRows.slice(0, SHEET_CAP),
         });
+      });
+    }
+
+    if (ELECTIVE_KEYS.some((key) => needs(key))) {
+      await this.safe(async () => {
+        const lines = await this.loadElectiveLines(tenantId, ids);
+        const byStudent = new Map<string, typeof lines>();
+        for (const line of lines) {
+          const studentId = line.registration.studentId;
+          const list = byStudent.get(studentId) ?? [];
+          list.push(line);
+          byStudent.set(studentId, list);
+        }
+        const filteredSemester =
+          options?.semester && options.semester > 0 ? options.semester : null;
+        for (const student of students) {
+          const semester = filteredSemester ?? student.currentSemester ?? null;
+          const buckets: Record<(typeof ELECTIVE_KEYS)[number], string[]> = {
+            mdc: [],
+            aec: [],
+            sec: [],
+            vac: [],
+            vtc: [],
+          };
+          for (const line of byStudent.get(student.studentId) ?? []) {
+            if (
+              semester != null &&
+              line.registration.semesterSequence !== semester
+            ) {
+              continue;
+            }
+            if (semester == null) continue;
+            const key = line.category.trim().toUpperCase().toLowerCase();
+            if (
+              !ELECTIVE_KEYS.includes(key as (typeof ELECTIVE_KEYS)[number])
+            ) {
+              continue;
+            }
+            const title =
+              line.offering.titleOverride?.trim() ||
+              line.offering.course.title?.trim() ||
+              '';
+            if (!title) continue;
+            const bucket = buckets[key as (typeof ELECTIVE_KEYS)[number]];
+            if (!bucket.includes(title)) bucket.push(title);
+          }
+          set(student.studentId, {
+            mdc: buckets.mdc.join('; '),
+            aec: buckets.aec.join('; '),
+            sec: buckets.sec.join('; '),
+            vac: buckets.vac.join('; '),
+            vtc: buckets.vtc.join('; '),
+          });
+        }
       });
     }
 
@@ -521,6 +578,38 @@ export class StudentReportRelatedService {
     }
 
     return { patches, sheets };
+  }
+
+  private async loadElectiveLines(tenantId: string, studentIds: string[]) {
+    const lines: Array<{
+      category: string;
+      registration: { studentId: string; semesterSequence: number };
+      offering: {
+        titleOverride: string | null;
+        course: { title: string };
+      };
+    }> = [];
+    for (let offset = 0; offset < studentIds.length; offset += 2000) {
+      const slice = studentIds.slice(offset, offset + 2000);
+      const rows = await this.prisma.semesterRegistrationLine.findMany({
+        where: {
+          tenantId,
+          registration: { studentId: { in: slice }, archivedAt: null },
+        },
+        select: {
+          category: true,
+          registration: { select: { studentId: true, semesterSequence: true } },
+          offering: {
+            select: {
+              titleOverride: true,
+              course: { select: { title: true } },
+            },
+          },
+        },
+      });
+      lines.push(...rows);
+    }
+    return lines;
   }
 
   private async loadBoardExams(tenantId: string, studentIds: string[]) {

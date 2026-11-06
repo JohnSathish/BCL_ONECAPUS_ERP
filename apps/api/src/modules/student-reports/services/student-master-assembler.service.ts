@@ -132,8 +132,14 @@ export class StudentMasterAssemblerService {
         rollNumber: student.rollNumber ?? student.enrollmentNumber,
         fullName: student.masterProfile?.fullName ?? '',
         admissionYearId: student.academicProfile?.admissionYearId ?? null,
+        currentSemester:
+          student.academicStanding?.currentSemesterSequence ?? null,
       })),
       requestedKeys,
+      {
+        semester:
+          filters.semester && filters.semester > 0 ? filters.semester : null,
+      },
     );
     for (const row of rows) {
       Object.assign(row, related.patches.get(String(row.studentId)) ?? {});

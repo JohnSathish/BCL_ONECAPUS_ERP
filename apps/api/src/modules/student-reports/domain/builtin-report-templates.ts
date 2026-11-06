@@ -1,5 +1,3 @@
-import { STUDENT_REPORT_FIELDS } from './student-report-field-registry';
-
 export type BuiltinReportKey =
   | 'student-master'
   | 'subject-summary'
@@ -16,16 +14,25 @@ export type BuiltinReportTemplate = {
 const MASTER_DEFAULT_KEYS = [
   'rollNumber',
   'fullName',
+  'gender',
+  'category',
+  'mobileNumber',
+  'email',
   'programme',
   'department',
   'shift',
   'batch',
   'currentSemester',
-  'gender',
-  'category',
-  'mobileNumber',
-  'email',
   'feeStatus',
+  'mdc',
+  'aec',
+  'sec',
+  'vac',
+  'vtc',
+  'fatherName',
+  'motherName',
+  'permanentAddress',
+  'schoolName',
 ];
 
 export const BUILTIN_STUDENT_REPORTS: BuiltinReportTemplate[] = [
@@ -35,9 +42,7 @@ export const BUILTIN_STUDENT_REPORTS: BuiltinReportTemplate[] = [
     description:
       'Wide student profile export with programme, demographic, contact, and operational fields.',
     module: 'STUDENTS',
-    defaultColumns: STUDENT_REPORT_FIELDS.filter((f) =>
-      MASTER_DEFAULT_KEYS.includes(f.key),
-    ).map((f) => f.key),
+    defaultColumns: MASTER_DEFAULT_KEYS,
   },
   {
     key: 'subject-summary',

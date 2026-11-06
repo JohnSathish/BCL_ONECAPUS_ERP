@@ -214,7 +214,7 @@ export const STUDENT_REPORT_FIELDS: StudentReportFieldDef[] = [
   field('boardName', 'Board Name', 'board'),
   field('boardNameOther', 'Other Board Name', 'board'),
   field('boardReportName', 'Actual Board Name', 'board'),
-  field('schoolName', 'School Name', 'board'),
+  field('schoolName', 'Last School Studied', 'board'),
   field('boardRollNumber', 'Board Roll Number', 'board'),
   field('boardRegistrationNumber', 'Board Registration Number', 'board'),
   field('boardYear', 'Examination Year', 'board'),
@@ -231,6 +231,12 @@ export const STUDENT_REPORT_FIELDS: StudentReportFieldDef[] = [
     description:
       'Excel export creates one numeric column per Class XII subject found in the selected students. A blank cell means that student has no mark for that subject. The Class XII Marks sheet still lists each subject on its own row.',
   }),
+
+  field('mdc', 'MDC', 'subjects'),
+  field('aec', 'AEC', 'subjects'),
+  field('sec', 'SEC', 'subjects'),
+  field('vac', 'VAC', 'subjects'),
+  field('vtc', 'VTC', 'subjects'),
 
   field('registeredSubjects', 'Registered Subjects', 'subjects', {
     detailSheet: 'Subject Registration',
