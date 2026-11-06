@@ -35,6 +35,7 @@ model Tenant {
   studentDisplaySettings        StudentDisplaySettings?
   rollPrefixConfigs             RollPrefixConfig[]
   rollShiftRangeConfigs         RollShiftRangeConfig[]
+  rollDepartmentShiftRanges     RollDepartmentShiftRange[]
   staffEmployeeCodeSettings     StaffEmployeeCodeSettings?
   staffEmployeeCodeTypePrefixes StaffEmployeeCodeTypePrefix[]
   securitySettings              TenantSecuritySettings?
@@ -1015,6 +1016,31 @@ model RollShiftRangeConfig {
   @@schema("platform")
 }
 
+model RollDepartmentShiftRange {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  institutionId String   @map("institution_id") @db.Uuid
+  departmentId  String   @map("department_id") @db.Uuid
+  shiftId       String   @map("shift_id") @db.Uuid
+  admissionYear Int      @map("admission_year")
+  sequenceStart Int      @map("sequence_start")
+  sequenceEnd   Int      @map("sequence_end")
+  nextSequence  Int      @map("next_sequence")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  department  Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  shift       Shift       @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, departmentId, shiftId, admissionYear])
+  @@index([tenantId, admissionYear])
+  @@map("roll_department_shift_ranges")
+  @@schema("platform")
+}
+
 model StaffEmployeeCodeSettings {
   tenantId             String   @id @map("tenant_id") @db.Uuid
   orgPrefix            String   @default("DBC") @map("org_prefix")
@@ -1646,6 +1672,7 @@ model Institution {
 
   rollNumberSequences        RollNumberSequence[]
   rollShiftRangeConfigs      RollShiftRangeConfig[]
+  rollDepartmentShiftRanges  RollDepartmentShiftRange[]
   staffEmployeeCodeSequences StaffEmployeeCodeSequence[]
 
   @@index([tenantId])
@@ -1725,6 +1752,7 @@ model Shift {
   lmsWorkspaces              LmsWorkspace[]
   teachingSubjectGroups      TeachingSubjectGroup[]
   rollShiftRangeConfigs      RollShiftRangeConfig[]
+  rollDepartmentShiftRanges  RollDepartmentShiftRange[]
   rollNumberVacancies        RollNumberVacancy[]
   shiftProgrammeConfigs      ShiftProgrammeConfig[]
   shiftDepartmentConfigs     ShiftDepartmentConfig[]
@@ -1773,6 +1801,7 @@ model Department {
   departmentActivities DepartmentActivity[]
   websiteProfile   WebsiteDepartmentProfile?
   erpUserAccounts  ErpUserAccount[]
+  rollDepartmentShiftRanges RollDepartmentShiftRange[]
 
   @@index([tenantId])
   @@index([institutionId])

@@ -199,6 +199,53 @@ export async function fetchRollNumberSequences(): Promise<RollNumberSequenceRow[
   return data;
 }
 
+export type DepartmentRollBand = {
+  start: number;
+  end: number;
+  next: number;
+};
+
+export type DepartmentRollRangeRow = {
+  departmentId: string;
+  departmentName: string;
+  prefix: string;
+  admissionYear: number;
+  dayShiftId: string | null;
+  morningShiftId: string | null;
+  dayStudents: number;
+  morningStudents: number;
+  day: DepartmentRollBand;
+  morning: DepartmentRollBand;
+  nextDayRoll: string;
+  nextMorningRoll: string;
+  note: string | null;
+};
+
+export async function fetchDepartmentRollRanges(admissionYear?: number) {
+  const { data } = await api.get<{ admissionYear: number; rows: DepartmentRollRangeRow[] }>(
+    '/v1/settings/roll-number-config/department-ranges',
+    { params: { admissionYear } },
+  );
+  return data;
+}
+
+export async function saveDepartmentRollRanges(input: {
+  admissionYear: number;
+  ranges: Array<{
+    departmentId: string;
+    shiftId: string;
+    sequenceStart: number;
+    sequenceEnd: number;
+    nextSequence: number;
+  }>;
+}) {
+  const { data } = await api.patch<{ admissionYear: number; rows: DepartmentRollRangeRow[] }>(
+    '/v1/settings/roll-number-config/department-ranges',
+    input,
+  );
+  return data;
+}
+
 export async function fetchRollNumberDepartmentMappings(): Promise<RollNumberDepartmentMapping[]> {
   const { data } = await api.get<RollNumberDepartmentMapping[]>(
     '/v1/settings/roll-number-config/departments',

@@ -287,7 +287,34 @@ export class RollNumberService {
       });
 
       let sequence: number;
-      if (input.departmentId) {
+      if (input.departmentId && input.shiftId) {
+        sequence = await this.rollShiftRange.nextDepartmentShiftSequence(
+          tenantId,
+          {
+            departmentId: input.departmentId,
+            shiftId: input.shiftId,
+            prefix: ctx.prefix,
+            admissionYear: ctx.admissionYear,
+          },
+          tx,
+        );
+        if (existing) {
+          await tx.rollNumberSequence.update({
+            where: { id: existing.id },
+            data: { nextSequence: sequence + 1 },
+          });
+        } else {
+          await tx.rollNumberSequence.create({
+            data: {
+              tenantId,
+              institutionId: ctx.institutionId,
+              prefix: ctx.prefix,
+              admissionYear: ctx.admissionYear,
+              nextSequence: sequence + 1,
+            },
+          });
+        }
+      } else if (input.departmentId) {
         const highest = await this.highestRollSequence(
           tx,
           tenantId,
@@ -799,26 +826,32 @@ export class RollNumberService {
               simulated = dryRunCounters.get(counterKey) ?? baseSeq;
               dryRunCounters.set(counterKey, simulated + 1);
             }
+          } else if (student.departmentId && shiftId) {
+            const counterKey = `dept:${student.departmentId}:${shiftId}:${ctx.admissionYear}`;
+            if (!dryRunCounters.has(counterKey)) {
+              const next =
+                await this.rollShiftRange.nextDepartmentShiftSequence(
+                  tenantId,
+                  {
+                    departmentId: student.departmentId,
+                    shiftId,
+                    prefix: ctx.prefix,
+                    admissionYear: ctx.admissionYear,
+                  },
+                );
+              dryRunCounters.set(counterKey, next);
+            }
+            simulated = dryRunCounters.get(counterKey) ?? 1;
+            dryRunCounters.set(counterKey, simulated + 1);
           } else {
             const counterKey = `${ctx.institutionId}:${ctx.prefix}:${ctx.admissionYear}`;
-            const stored = await this.readNextSequence(
+            const baseSeq = await this.readNextSequence(
               this.prisma,
               tenantId,
               ctx.institutionId,
               ctx.prefix,
               ctx.admissionYear,
             );
-            const baseSeq = student.departmentId
-              ? Math.max(
-                  stored,
-                  (await this.highestRollSequence(
-                    this.prisma,
-                    tenantId,
-                    ctx.prefix,
-                    ctx.admissionYear,
-                  )) + 1,
-                )
-              : stored;
             simulated = dryRunCounters.get(counterKey) ?? baseSeq;
             dryRunCounters.set(counterKey, simulated + 1);
           }

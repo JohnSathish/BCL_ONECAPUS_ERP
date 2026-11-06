@@ -25,6 +25,36 @@ export class RollPrefixConfigItemDto {
   isActive?: boolean;
 }
 
+export class DepartmentShiftRangeItemDto {
+  @IsUUID()
+  departmentId!: string;
+
+  @IsUUID()
+  shiftId!: string;
+
+  @IsInt()
+  @Min(1)
+  sequenceStart!: number;
+
+  @IsInt()
+  @Min(1)
+  sequenceEnd!: number;
+
+  @IsInt()
+  @Min(1)
+  nextSequence!: number;
+}
+
+export class UpdateDepartmentRollRangesDto {
+  @IsInt()
+  admissionYear!: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DepartmentShiftRangeItemDto)
+  ranges!: DepartmentShiftRangeItemDto[];
+}
+
 export class UpdateRollNumberConfigDto {
   @IsOptional()
   @IsInt()

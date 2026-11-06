@@ -8,7 +8,10 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import {
   DEPARTMENT_ROLL_SEQUENCE_LENGTH,
+  nextFreeInBand,
   prefixForDepartment,
+  shiftBandFor,
+  suggestDepartmentShiftBands,
 } from '../domain/department-roll-prefix';
 import { pickEquivalentOfferingSection } from '../domain/shift-section-match';
 import type { RollNumberPreview } from './roll-number.service';
@@ -82,6 +85,7 @@ type TransferStudentContext = {
   rollSettings: { sequenceLength: number; separator: string };
   /** Set when the roll stays inside the major department, for example EC26-01. */
   departmentPrefix: string | null;
+  departmentId: string | null;
 };
 
 const ALLOCATE_MAX_RETRIES = 20;
@@ -128,35 +132,92 @@ export class RollShiftRangeService {
     return `${prefix}${yearSuffix}${settings.separator}${padded}`;
   }
 
-  /** Next number in one department. EC26-01, EC26-02, then one past the highest roll. */
-  private async nextDepartmentSequence(
+  /** Next Day or Morning number inside one department, skipping numbers already used. */
+  async nextDepartmentShiftSequence(
     tenantId: string,
-    prefix: string,
-    admissionYear: number,
+    input: {
+      departmentId?: string | null;
+      shiftId: string;
+      shiftCode?: string | null;
+      shiftName?: string | null;
+      prefix: string;
+      admissionYear: number;
+    },
     db: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    const yearSuffix = String(admissionYear).slice(-2);
+    const yearSuffix = String(input.admissionYear).slice(-2);
     const rolls = await db.student.findMany({
       where: {
         tenantId,
         deletedAt: null,
-        rollNumber: { startsWith: `${prefix}${yearSuffix}-` },
+        rollNumber: { startsWith: `${input.prefix}${yearSuffix}-` },
       },
-      select: { rollNumber: true },
+      select: {
+        rollNumber: true,
+        primaryShift: { select: { code: true, name: true } },
+      },
     });
-    let highest = 0;
+    const used: number[] = [];
+    let dayHighest = 0;
+    let morningHighest = 0;
     for (const row of rolls) {
       const parsed = this.parseRollNumber(row.rollNumber ?? '');
       if (
-        parsed &&
-        parsed.prefix === prefix &&
-        parsed.admissionYear === admissionYear &&
-        parsed.sequence > highest
+        !parsed ||
+        parsed.prefix !== input.prefix ||
+        parsed.admissionYear !== input.admissionYear
       ) {
-        highest = parsed.sequence;
+        continue;
+      }
+      used.push(parsed.sequence);
+      const band = shiftBandFor(row.primaryShift?.code, row.primaryShift?.name);
+      if (band === 'morning')
+        morningHighest = Math.max(morningHighest, parsed.sequence);
+      else dayHighest = Math.max(dayHighest, parsed.sequence);
+    }
+
+    let shiftCode = input.shiftCode;
+    let shiftName = input.shiftName;
+    if (!shiftCode || !shiftName) {
+      const shift = await db.shift.findFirst({
+        where: { id: input.shiftId },
+        select: { code: true, name: true },
+      });
+      shiftCode = shiftCode ?? shift?.code;
+      shiftName = shiftName ?? shift?.name;
+    }
+    const bandName = shiftBandFor(shiftCode, shiftName) ?? 'day';
+    const suggestion = suggestDepartmentShiftBands(dayHighest, morningHighest);
+    let start = suggestion[bandName].start;
+    let end = suggestion[bandName].end;
+    if (input.departmentId) {
+      const saved = await db.rollDepartmentShiftRange.findUnique({
+        where: {
+          tenantId_departmentId_shiftId_admissionYear: {
+            tenantId,
+            departmentId: input.departmentId,
+            shiftId: input.shiftId,
+            admissionYear: input.admissionYear,
+          },
+        },
+        select: { sequenceStart: true, sequenceEnd: true, isActive: true },
+      });
+      if (saved?.isActive) {
+        start = saved.sequenceStart;
+        end = saved.sequenceEnd;
       }
     }
-    return highest + 1;
+    const highestInBand = used.reduce(
+      (max, seq) => (seq >= start && seq <= end && seq > max ? seq : max),
+      0,
+    );
+    const next = nextFreeInBand(start, end, used, highestInBand);
+    if (next == null) {
+      throw new BadRequestException(
+        `${input.prefix} ${bandName === 'morning' ? 'Morning' : 'Day'} Shift is full (${String(start).padStart(2, '0')}–${String(end).padStart(2, '0')}). Raise the end number in Administration → Roll Number.`,
+      );
+    }
+    return next;
   }
 
   async hasActiveShiftRanges(
@@ -657,6 +718,7 @@ export class RollShiftRangeService {
       yearSuffix: String(admissionYear).slice(-2),
       rollSettings,
       departmentPrefix,
+      departmentId: student.department?.id ?? null,
     };
   }
 
@@ -677,11 +739,14 @@ export class RollShiftRangeService {
     if (!toShift) throw new NotFoundException('Target shift not found');
 
     if (ctx.departmentPrefix) {
-      const next = await this.nextDepartmentSequence(
-        tenantId,
-        ctx.departmentPrefix,
-        ctx.admissionYear,
-      );
+      const next = await this.nextDepartmentShiftSequence(tenantId, {
+        departmentId: ctx.departmentId,
+        shiftId: input.toShiftId,
+        shiftCode: toShift.code,
+        shiftName: toShift.name,
+        prefix: ctx.departmentPrefix,
+        admissionYear: ctx.admissionYear,
+      });
       return {
         studentId: input.studentId,
         currentShift: ctx.student.primaryShift!,
@@ -1638,10 +1703,16 @@ export class RollShiftRangeService {
             rollNumber: this.formatRollNumber(
               departmentPrefix,
               yearSuffix,
-              await this.nextDepartmentSequence(
+              await this.nextDepartmentShiftSequence(
                 tenantId,
-                departmentPrefix,
-                admissionYear,
+                {
+                  departmentId: student.department?.id,
+                  shiftId: input.toShiftId,
+                  shiftCode: toShift.code,
+                  shiftName: toShift.name,
+                  prefix: departmentPrefix,
+                  admissionYear,
+                },
                 tx,
               ),
               {

@@ -13,12 +13,11 @@ import { Label } from '@/components/ui/label';
 import { useRequireAuth } from '@/hooks/use-auth';
 import {
   fetchRollNumberConfig,
-  fetchRollNumberDepartmentMappings,
   fetchRollNumberSequences,
   resetRollNumberConfig,
   updateRollNumberConfig,
 } from '@/services/roll-number';
-import { RollNumberShiftConfigSection } from '@/components/administration-module/roll-number-shift-config';
+import { DepartmentRollRangeSettings } from '@/components/administration-module/department-roll-ranges';
 
 function formatPreviewSamples(
   prefix: string,
@@ -47,11 +46,6 @@ export function RollNumberSettingsPage() {
     queryKey: ['admin', 'roll-number-sequences'],
     queryFn: fetchRollNumberSequences,
   });
-  const departmentsQ = useQuery({
-    queryKey: ['admin', 'roll-number-departments'],
-    queryFn: fetchRollNumberDepartmentMappings,
-  });
-
   const [sequenceLength, setSequenceLength] = useState(3);
   const [separator, setSeparator] = useState('-');
   const [autoGenerateOnAdmit, setAutoGenerateOnAdmit] = useState(true);
@@ -197,58 +191,7 @@ export function RollNumberSettingsPage() {
             </div>
           </AdminGlassCard>
 
-          <RollNumberShiftConfigSection />
-
-          <AdminGlassCard className="p-4">
-            <h2 className="text-sm font-semibold">Department Mapping</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Each department starts at 01. The next roll is one number after the highest roll
-              already used in that department for{' '}
-              {departmentsQ.data?.[0]?.admissionYear ?? 'this year'}. Leave the Morning and Day
-              shift ranges empty.
-            </p>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
-                <thead>
-                  <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
-                    <th className="pb-2 pr-3 font-medium">Department</th>
-                    <th className="pb-2 pr-3 font-medium">Prefix</th>
-                    <th className="pb-2 pr-3 font-medium">Start</th>
-                    <th className="pb-2 pr-3 font-medium">Students</th>
-                    <th className="pb-2 pr-3 font-medium">Last no.</th>
-                    <th className="pb-2 font-medium">Next roll</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(departmentsQ.data ?? []).map((row) => (
-                    <tr key={row.departmentId} className="border-b border-border/40">
-                      <td className="py-2 pr-3">{row.departmentName}</td>
-                      <td className="py-2 pr-3 font-mono text-xs">{row.prefix || '—'}</td>
-                      <td className="py-2 pr-3 font-mono text-xs">
-                        {row.sequenceStart != null
-                          ? String(row.sequenceStart).padStart(2, '0')
-                          : '—'}
-                      </td>
-                      <td className="py-2 pr-3">{row.studentCount ?? 0}</td>
-                      <td className="py-2 pr-3 font-mono text-xs">
-                        {row.lastSequence ? String(row.lastSequence).padStart(2, '0') : '—'}
-                      </td>
-                      <td className="py-2 font-mono text-xs text-primary">
-                        {row.nextRollNumber ?? '—'}
-                      </td>
-                    </tr>
-                  ))}
-                  {!departmentsQ.data?.length && (
-                    <tr>
-                      <td colSpan={6} className="py-4 text-center text-xs text-muted-foreground">
-                        No departments configured
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </AdminGlassCard>
+          <DepartmentRollRangeSettings />
 
           <AdminGlassCard className="p-4">
             <h2 className="text-sm font-semibold">Sequence Management</h2>

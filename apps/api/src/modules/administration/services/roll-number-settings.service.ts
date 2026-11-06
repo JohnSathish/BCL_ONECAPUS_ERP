@@ -1,6 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
-import { prefixForDepartment } from '../../students/domain/department-roll-prefix';
+import {
+  prefixForDepartment,
+  shiftBandFor,
+  suggestDepartmentShiftBands,
+} from '../../students/domain/department-roll-prefix';
 import { AdminAuditHelper } from '../admin-audit.helper';
 import type { UpdateRollNumberConfigDto } from '../dto/roll-number-settings.dto';
 
@@ -196,6 +200,201 @@ export class RollNumberSettingsService {
         admissionYear,
       };
     });
+  }
+
+  async getDepartmentRollRanges(
+    tenantId: string,
+    admissionYear = new Date().getFullYear(),
+  ) {
+    const yearSuffix = String(admissionYear).slice(-2);
+    const [departments, shifts, rolls, saved] = await Promise.all([
+      this.prisma.department.findMany({
+        where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+        select: { id: true, name: true, code: true, institutionId: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.shift.findMany({
+        where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+        select: { id: true, code: true, name: true, institutionId: true },
+      }),
+      this.prisma.student.findMany({
+        where: { tenantId, deletedAt: null, rollNumber: { not: null } },
+        select: {
+          departmentId: true,
+          rollNumber: true,
+          primaryShift: { select: { code: true, name: true } },
+        },
+      }),
+      this.prisma.rollDepartmentShiftRange.findMany({
+        where: { tenantId, admissionYear, isActive: true },
+      }),
+    ]);
+
+    const rows = [];
+    for (const department of departments) {
+      const prefix = prefixForDepartment(department.name, department.code);
+      if (!prefix) continue;
+      const pattern = new RegExp(`^${prefix}${yearSuffix}-(\\d+)$`, 'i');
+      let dayHighest = 0;
+      let morningHighest = 0;
+      let dayStudents = 0;
+      let morningStudents = 0;
+      for (const roll of rolls) {
+        if (roll.departmentId !== department.id || !roll.rollNumber) continue;
+        const match = roll.rollNumber.trim().match(pattern);
+        if (!match) continue;
+        const sequence = Number(match[1]);
+        const band = shiftBandFor(
+          roll.primaryShift?.code,
+          roll.primaryShift?.name,
+        );
+        if (band === 'morning') {
+          morningStudents += 1;
+          morningHighest = Math.max(morningHighest, sequence);
+        } else {
+          dayStudents += 1;
+          dayHighest = Math.max(dayHighest, sequence);
+        }
+      }
+      const suggested = suggestDepartmentShiftBands(dayHighest, morningHighest);
+      const dayShift = shifts.find(
+        (shift) =>
+          shift.institutionId === department.institutionId &&
+          shiftBandFor(shift.code, shift.name) === 'day',
+      );
+      const morningShift = shifts.find(
+        (shift) =>
+          shift.institutionId === department.institutionId &&
+          shiftBandFor(shift.code, shift.name) === 'morning',
+      );
+      const daySaved = saved.find(
+        (row) =>
+          row.departmentId === department.id && row.shiftId === dayShift?.id,
+      );
+      const morningSaved = saved.find(
+        (row) =>
+          row.departmentId === department.id &&
+          row.shiftId === morningShift?.id,
+      );
+      const day = daySaved
+        ? {
+            start: daySaved.sequenceStart,
+            end: daySaved.sequenceEnd,
+            next: Math.max(daySaved.nextSequence, suggested.day.next),
+          }
+        : suggested.day;
+      const morning = morningSaved
+        ? {
+            start: morningSaved.sequenceStart,
+            end: morningSaved.sequenceEnd,
+            next: Math.max(morningSaved.nextSequence, suggested.morning.next),
+          }
+        : suggested.morning;
+      const sample = (sequence: number) =>
+        `${prefix}${yearSuffix}-${String(sequence).padStart(2, '0')}`;
+      rows.push({
+        departmentId: department.id,
+        departmentName: department.name,
+        prefix,
+        admissionYear,
+        dayShiftId: dayShift?.id ?? null,
+        morningShiftId: morningShift?.id ?? null,
+        dayStudents,
+        morningStudents,
+        day,
+        morning,
+        nextDayRoll: sample(day.next),
+        nextMorningRoll: sample(morning.next),
+        note: suggested.note,
+      });
+    }
+    return { admissionYear, rows };
+  }
+
+  async saveDepartmentRollRanges(
+    tenantId: string,
+    input: {
+      admissionYear: number;
+      ranges: Array<{
+        departmentId: string;
+        shiftId: string;
+        sequenceStart: number;
+        sequenceEnd: number;
+        nextSequence: number;
+      }>;
+    },
+    actorId?: string,
+  ) {
+    const byDepartment = new Map<string, typeof input.ranges>();
+    for (const range of input.ranges) {
+      if (range.sequenceEnd < range.sequenceStart) {
+        throw new BadRequestException(
+          'The end number has to be at least the start number.',
+        );
+      }
+      const list = byDepartment.get(range.departmentId) ?? [];
+      list.push(range);
+      byDepartment.set(range.departmentId, list);
+    }
+    for (const ranges of byDepartment.values()) {
+      if (ranges.length < 2) continue;
+      const ordered = [...ranges].sort(
+        (a, b) => a.sequenceStart - b.sequenceStart,
+      );
+      if (ordered[0].sequenceEnd >= ordered[1].sequenceStart) {
+        throw new BadRequestException(
+          'Day Shift and Morning Shift numbers overlap. Morning Shift must start after Day Shift ends.',
+        );
+      }
+    }
+
+    for (const range of input.ranges) {
+      const department = await this.prisma.department.findFirst({
+        where: { id: range.departmentId, tenantId, deletedAt: null },
+        select: { institutionId: true },
+      });
+      if (!department) continue;
+      await this.prisma.rollDepartmentShiftRange.upsert({
+        where: {
+          tenantId_departmentId_shiftId_admissionYear: {
+            tenantId,
+            departmentId: range.departmentId,
+            shiftId: range.shiftId,
+            admissionYear: input.admissionYear,
+          },
+        },
+        create: {
+          tenantId,
+          institutionId: department.institutionId,
+          departmentId: range.departmentId,
+          shiftId: range.shiftId,
+          admissionYear: input.admissionYear,
+          sequenceStart: range.sequenceStart,
+          sequenceEnd: range.sequenceEnd,
+          nextSequence: range.nextSequence,
+        },
+        update: {
+          sequenceStart: range.sequenceStart,
+          sequenceEnd: range.sequenceEnd,
+          nextSequence: range.nextSequence,
+          isActive: true,
+        },
+      });
+    }
+
+    await this.audit.log({
+      tenantId,
+      userId: actorId,
+      module: 'roll-number-settings',
+      action: 'UPDATE_DEPARTMENT_RANGES',
+      entityType: 'RollDepartmentShiftRange',
+      entityId: tenantId,
+      metadata: {
+        admissionYear: input.admissionYear,
+        count: input.ranges.length,
+      },
+    });
+    return this.getDepartmentRollRanges(tenantId, input.admissionYear);
   }
 
   async getSequenceOverview(tenantId: string) {

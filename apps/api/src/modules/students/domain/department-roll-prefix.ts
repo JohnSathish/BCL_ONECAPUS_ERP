@@ -56,3 +56,61 @@ export function prefixForDepartment(
 export function prefixForStreamCode(code?: string | null): string | null {
   return prefixForDepartment(null, (code ?? '').replace(/_/g, ' '));
 }
+
+export type ShiftBandName = 'day' | 'morning';
+
+export type RollBand = {
+  start: number;
+  end: number;
+  next: number;
+};
+
+/** Day Shift is 01–100. Morning Shift is 101 and above. A full Day series pushes Morning up. */
+export function suggestDepartmentShiftBands(
+  dayHighest: number,
+  morningHighest: number,
+): { day: RollBand; morning: RollBand; note: string | null } {
+  const dayStart = 1;
+  const dayEnd = dayHighest > 100 ? Math.max(150, dayHighest) : 100;
+  const dayNext = dayHighest > 0 ? dayHighest + 1 : dayStart;
+  let morningStart = 101;
+  let morningEnd = Math.max(200, morningHighest);
+  let note: string | null = null;
+  if (dayEnd >= morningStart) {
+    morningStart = dayEnd + 1;
+    morningEnd = Math.max(morningStart + 99, morningHighest);
+    note = `Day Shift already uses numbers through ${String(dayHighest).padStart(2, '0')}, so Morning Shift starts at ${String(morningStart).padStart(2, '0')}.`;
+  }
+  const morningNext =
+    morningHighest >= morningStart ? morningHighest + 1 : morningStart;
+  return {
+    day: { start: dayStart, end: dayEnd, next: dayNext },
+    morning: { start: morningStart, end: morningEnd, next: morningNext },
+    note,
+  };
+}
+
+export function shiftBandFor(
+  code?: string | null,
+  name?: string | null,
+): ShiftBandName | null {
+  const text = `${code ?? ''} ${name ?? ''}`.toUpperCase();
+  if (text.includes('MORNING')) return 'morning';
+  if (text.includes('DAY')) return 'day';
+  return null;
+}
+
+/** Next free number inside one shift band. Skips numbers already used in the department. */
+export function nextFreeInBand(
+  start: number,
+  end: number,
+  used: Iterable<number>,
+  highestInBand: number,
+): number | null {
+  const taken = new Set(used);
+  let candidate = highestInBand >= start ? highestInBand + 1 : start;
+  if (candidate < start) candidate = start;
+  while (candidate <= end && taken.has(candidate)) candidate += 1;
+  if (candidate < start || candidate > end) return null;
+  return candidate;
+}
