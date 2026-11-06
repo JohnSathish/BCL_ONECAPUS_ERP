@@ -86,9 +86,11 @@ import { ProfileCompletionMonitorService } from './services/profile-completion-m
     StudentProfileVerificationController,
     StudentPhotoBulkController,
     StudentBulkUpdateController,
+    // Static /students/... paths must be registered before StudentsController.
+    // Otherwise GET students/:id captures them and Prisma rejects the non-UUID id.
+    ProfileCompletionMonitorController,
     StudentsController,
     Class12SubjectsController,
-    ProfileCompletionMonitorController,
   ],
   providers: [
     StudentsService,
