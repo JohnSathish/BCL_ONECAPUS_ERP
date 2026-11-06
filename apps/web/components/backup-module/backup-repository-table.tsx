@@ -43,20 +43,31 @@ export function BackupRepositoryTable({
 }: Props) {
   const qc = useQueryClient();
   const { withStepUp, stepUpDialog } = useStepUpAction({
-    description: 'Re-enter your password to download this backup file.',
+    description:
+      'Re-enter your password. A backup ZIP is about 1 GB and can take several minutes. Leave this window open.',
+    pendingLabel: 'Downloading…',
+  });
+  const { withStepUp: withDeleteStepUp, stepUpDialog: deleteStepUpDialog } = useStepUpAction({
+    title: 'Delete this backup',
+    description:
+      'Re-enter your password to delete this backup from the server. This frees disk space and cannot be undone.',
+    pendingLabel: 'Deleting…',
   });
   const verifyM = useMutation({
     mutationFn: verifyBackupRun,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['backups'] }),
-  });
-  const deleteM = useMutation({
-    mutationFn: deleteBackupRun,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['backups'] }),
   });
 
   const downloadRun = (run: BackupRunRow) => {
     const filename = buildBackupDownloadName(institutionSlug, run.completedAt, 'zip');
     withStepUp((token) => downloadBackupBundle(run.id, filename, token));
+  };
+
+  const deleteRun = (run: BackupRunRow) => {
+    withDeleteStepUp(async (token) => {
+      await deleteBackupRun(run.id, token);
+      await qc.invalidateQueries({ queryKey: ['backups'] });
+    });
   };
 
   if (!runs.length) {
@@ -70,6 +81,7 @@ export function BackupRepositoryTable({
   return (
     <>
       {stepUpDialog}
+      {deleteStepUpDialog}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -130,6 +142,16 @@ export function BackupRepositoryTable({
                         Download ZIP
                       </Button>
                     ) : null}
+                    {canManage ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-rose-600"
+                        onClick={() => deleteRun(run)}
+                      >
+                        Delete
+                      </Button>
+                    ) : null}
                     {canManage && !compact ? (
                       <>
                         <Button
@@ -144,14 +166,6 @@ export function BackupRepositoryTable({
                           <Link href={`/admin/administration/backups/restore?runId=${run.id}`}>
                             Restore
                           </Link>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive"
-                          onClick={() => deleteM.mutate(run.id)}
-                        >
-                          Delete
                         </Button>
                       </>
                     ) : null}

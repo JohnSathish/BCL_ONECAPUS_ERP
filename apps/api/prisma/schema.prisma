@@ -890,7 +890,8 @@ model BackupCloudTarget {
 model BackupRetentionPolicy {
   id                 String   @id @default("singleton")
   keepCount          Int?     @map("keep_count")
-  keepDays           Int      @default(30) @map("keep_days")
+  keepDays           Int      @default(2) @map("keep_days")
+  keepHours          Int?     @map("keep_hours")
   autoCleanupEnabled Boolean  @default(true) @map("auto_cleanup_enabled")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")

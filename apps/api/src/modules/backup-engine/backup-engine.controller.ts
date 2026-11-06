@@ -221,6 +221,7 @@ export class BackupEngineController {
 
   @Delete('runs/:id')
   @RequirePermissions('backup:manage')
+  @RequireStepUp()
   deleteRun(@CurrentUser() user: JwtUser, @Param('id') id: string) {
     return this.orchestrator.deleteRun(id, user.sub);
   }

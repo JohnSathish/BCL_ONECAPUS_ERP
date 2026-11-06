@@ -553,6 +553,7 @@ export class BackupOrchestratorService {
   updateRetentionPolicy(input: {
     keepCount?: number;
     keepDays?: number;
+    keepHours?: number;
     autoCleanupEnabled?: boolean;
   }) {
     return this.retention.updatePolicy(input);

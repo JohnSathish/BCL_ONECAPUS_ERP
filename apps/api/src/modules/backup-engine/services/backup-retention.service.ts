@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { rm, stat } from 'fs/promises';
+import { rm } from 'fs/promises';
 import { PrismaService } from '../../../database/prisma.service';
 import { BackupCloudSyncService } from './backup-cloud-sync.service';
 
@@ -15,7 +15,12 @@ export class BackupRetentionService {
   async getPolicy() {
     return this.prisma.backupRetentionPolicy.upsert({
       where: { id: 'singleton' },
-      create: { id: 'singleton', keepDays: 30, autoCleanupEnabled: true },
+      create: {
+        id: 'singleton',
+        keepDays: 2,
+        keepHours: 48,
+        autoCleanupEnabled: true,
+      },
       update: {},
     });
   }
@@ -23,13 +28,15 @@ export class BackupRetentionService {
   async updatePolicy(input: {
     keepCount?: number;
     keepDays?: number;
+    keepHours?: number;
     autoCleanupEnabled?: boolean;
   }) {
     return this.prisma.backupRetentionPolicy.upsert({
       where: { id: 'singleton' },
       create: {
         id: 'singleton',
-        keepDays: input.keepDays ?? 30,
+        keepDays: input.keepDays ?? 2,
+        keepHours: input.keepHours ?? 48,
         keepCount: input.keepCount,
         autoCleanupEnabled: input.autoCleanupEnabled ?? true,
       },
@@ -51,17 +58,37 @@ export class BackupRetentionService {
       include: { artifacts: true },
     });
 
+    const newestId = successRuns[0]?.id;
     const toDelete: typeof successRuns = [];
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - policy.keepDays);
+    if (policy.keepHours && policy.keepHours > 0) {
+      cutoff.setTime(Date.now() - policy.keepHours * 60 * 60 * 1000);
+    } else {
+      cutoff.setDate(cutoff.getDate() - policy.keepDays);
+    }
 
     if (policy.keepCount) {
-      toDelete.push(...successRuns.slice(policy.keepCount));
+      for (const run of successRuns.slice(policy.keepCount)) {
+        if (run.id !== newestId) toDelete.push(run);
+      }
     }
     for (const run of successRuns) {
+      if (run.id === newestId) continue;
       if (run.completedAt && run.completedAt < cutoff) {
         if (!toDelete.find((r) => r.id === run.id)) toDelete.push(run);
       }
+    }
+
+    const failedRuns = await this.prisma.backupRun.findMany({
+      where: {
+        status: 'FAILED',
+        scope: 'INSTANCE',
+        completedAt: { lt: cutoff },
+      },
+      include: { artifacts: true },
+    });
+    for (const run of failedRuns) {
+      if (!toDelete.find((r) => r.id === run.id)) toDelete.push(run);
     }
 
     let deleted = 0;

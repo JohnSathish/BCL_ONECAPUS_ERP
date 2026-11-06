@@ -47,6 +47,7 @@ import {
   downloadBackupBundle,
   fetchBackupDashboard,
   formatBytes,
+  updateBackupRetention,
   restoreBackup,
   type BackupRunRow,
 } from '@/services/backup';
@@ -110,7 +111,9 @@ export function BackupDashboardPage() {
   const qc = useQueryClient();
   const [manualOpen, setManualOpen] = useState(false);
   const { withStepUp, stepUpDialog } = useStepUpAction({
-    description: 'Re-enter your password to download this backup file.',
+    description:
+      'Re-enter your password. A backup ZIP is about 1 GB and can take several minutes. Leave this window open.',
+    pendingLabel: 'Downloading…',
   });
   const canDownload = canAny('backup:download', 'backup:manage');
   const canManage = canAny('backup:manage');
@@ -127,6 +130,11 @@ export function BackupDashboardPage() {
   const recentRuns = d?.recentRuns ?? [];
   const institutionSlug =
     branding?.displayName?.split(',')[0]?.trim() ?? branding?.displayName ?? 'Institution';
+
+  const retentionM = useMutation({
+    mutationFn: updateBackupRetention,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['backups'] }),
+  });
 
   const restoreM = useMutation({
     mutationFn: (mode: string) =>
@@ -396,6 +404,36 @@ export function BackupDashboardPage() {
         </div>
 
         <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-slate-800">Automatic cleanup</p>
+              <p className="text-xs text-slate-500">
+                Backups older than this are deleted every hour. The newest copy is always kept.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {[24, 48].map((hours) => {
+                const active = (d?.retention?.keepHours ?? 48) === hours;
+                return (
+                  <Button
+                    key={hours}
+                    size="sm"
+                    variant={active ? 'default' : 'outline'}
+                    disabled={!canManage || retentionM.isPending}
+                    onClick={() =>
+                      retentionM.mutate({
+                        keepHours: hours,
+                        keepDays: hours / 24,
+                        autoCleanupEnabled: true,
+                      })
+                    }
+                  >
+                    {hours} hours
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2 font-medium">
               <FolderArchive className="h-4 w-4" />

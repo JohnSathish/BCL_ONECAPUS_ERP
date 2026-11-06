@@ -55,6 +55,7 @@ export type BackupDashboard = {
   } | null;
   retention?: {
     keepDays: number;
+    keepHours?: number | null;
     autoCleanupEnabled: boolean;
   } | null;
   recentRuns?: BackupRunRow[];
@@ -178,8 +179,11 @@ export async function verifyBackupRun(id: string) {
   return data;
 }
 
-export async function deleteBackupRun(id: string) {
-  const { data } = await api.delete(`/v1/admin/backups/runs/${id}`);
+export async function deleteBackupRun(id: string, stepUpToken?: string) {
+  const { data } = await api.delete(`/v1/admin/backups/runs/${id}`, {
+    params: stepUpToken ? { stepUpToken } : undefined,
+    headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+  });
   return data;
 }
 
@@ -201,6 +205,7 @@ export async function triggerTenantExport(tenantId: string) {
 export async function downloadBackupBundle(runId: string, filename: string, stepUpToken?: string) {
   const response = await api.get(`/v1/admin/backups/runs/${runId}/bundle`, {
     responseType: 'blob',
+    timeout: 0,
     params: stepUpToken ? { stepUpToken } : undefined,
     headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
   });
@@ -229,6 +234,7 @@ export async function downloadBackupArtifact(
 ) {
   const { data } = await api.get(`/v1/admin/backups/runs/${runId}/download/${artifactId}`, {
     responseType: 'blob',
+    timeout: 0,
     params: stepUpToken ? { stepUpToken } : undefined,
     headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
   });

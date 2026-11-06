@@ -19,6 +19,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   title?: string;
   description?: string;
+  pendingLabel?: string;
   onVerified: (stepUpToken: string) => void | Promise<void>;
 };
 
@@ -27,6 +28,7 @@ export function StepUpDialog({
   onOpenChange,
   title = 'Confirm your identity',
   description = 'Re-enter your password to download backup files.',
+  pendingLabel = 'Please wait…',
   onVerified,
 }: Props) {
   const [password, setPassword] = useState('');
@@ -89,7 +91,7 @@ export function StepUpDialog({
             Cancel
           </Button>
           <Button onClick={() => void submit()} disabled={pending}>
-            {pending ? 'Verifying…' : 'Continue'}
+            {pending ? pendingLabel : 'Continue'}
           </Button>
         </DialogFooter>
       </DialogContent>

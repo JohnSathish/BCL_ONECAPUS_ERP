@@ -54,6 +54,14 @@ export class BackupSchedulerService implements OnModuleInit {
       this.logger.warn(`Backup schedule bootstrap skipped: ${String(err)}`);
     }
 
+    setTimeout(() => {
+      this.retention
+        .cleanupExpired()
+        .catch((err) =>
+          this.logger.warn(`Backup retention skipped: ${String(err)}`),
+        );
+    }, 60_000);
+
     if (process.env.PROCESS_BACKGROUND_JOBS === 'worker') {
       setTimeout(() => {
         this.orchestrator
@@ -99,6 +107,12 @@ export class BackupSchedulerService implements OnModuleInit {
 
   @Cron('0 30 3 * * *')
   async nightlyRetention() {
+    await this.retention.cleanupExpired();
+  }
+
+  /** Remove backups older than the 24 or 48 hour window. */
+  @Cron('0 20 * * * *')
+  async hourlyRetention() {
     await this.retention.cleanupExpired();
   }
 }

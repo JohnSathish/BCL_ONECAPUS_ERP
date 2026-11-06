@@ -3,7 +3,11 @@
 import { useCallback, useState } from 'react';
 import { StepUpDialog } from '@/components/auth/step-up-dialog';
 
-export function useStepUpAction(options?: { title?: string; description?: string }) {
+export function useStepUpAction(options?: {
+  title?: string;
+  description?: string;
+  pendingLabel?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [action, setAction] = useState<((stepUpToken: string) => void | Promise<void>) | null>(
     null,
@@ -20,6 +24,7 @@ export function useStepUpAction(options?: { title?: string; description?: string
       onOpenChange={setOpen}
       title={options?.title}
       description={options?.description}
+      pendingLabel={options?.pendingLabel}
       onVerified={async (token) => {
         if (action) await action(token);
         setAction(null);

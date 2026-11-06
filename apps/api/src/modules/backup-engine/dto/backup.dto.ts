@@ -50,6 +50,14 @@ export class UpdateRetentionPolicyDto {
   @Min(1)
   keepDays?: number;
 
+  @ApiPropertyOptional({
+    description: 'Delete backups older than this many hours. 24 or 48.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  keepHours?: number;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
