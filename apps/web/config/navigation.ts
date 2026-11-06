@@ -352,6 +352,12 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['students:import', 'students:manage'],
           },
           {
+            label: 'Profile Completion Monitor',
+            href: '/admin/students/profile-completion',
+            permissions: ['students:profile-verify', 'students:read', 'students:manage'],
+            activePattern: '^/admin/students/profile-completion(?:/.*)?$',
+          },
+          {
             label: 'Student Profile Verification',
             href: '/admin/students/profile-verification',
             permissions: [

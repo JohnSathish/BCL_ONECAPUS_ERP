@@ -57,6 +57,8 @@ import { StudentProfileChangeRequestService } from './services/student-profile-c
 import { StudentProfileVerificationController } from './student-profile-verification.controller';
 import { Class12SubjectsController } from './controllers/class12-subjects.controller';
 import { Class12SubjectsService } from './services/class12-subjects.service';
+import { ProfileCompletionMonitorController } from './profile-completion-monitor.controller';
+import { ProfileCompletionMonitorService } from './services/profile-completion-monitor.service';
 
 @Module({
   imports: [
@@ -86,6 +88,7 @@ import { Class12SubjectsService } from './services/class12-subjects.service';
     StudentBulkUpdateController,
     StudentsController,
     Class12SubjectsController,
+    ProfileCompletionMonitorController,
   ],
   providers: [
     StudentsService,
@@ -96,6 +99,7 @@ import { Class12SubjectsService } from './services/class12-subjects.service';
     StudentProfileUpdatePolicyService,
     StudentProfileChangeRequestService,
     Class12SubjectsService,
+    ProfileCompletionMonitorService,
     StudentLeaveService,
     StudentProfileService,
     StudentDirectoryEnrichmentService,

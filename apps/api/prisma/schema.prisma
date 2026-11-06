@@ -2561,6 +2561,59 @@ model StudentGuardian {
   @@schema("academic")
 }
 
+/// Which profile fields the completion monitor treats as mandatory.
+model ProfileCompletionSetting {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @unique @map("tenant_id") @db.Uuid
+  requiredKeys           Json     @map("required_keys")
+  reminderIntervalHours  Int      @default(24) @map("reminder_interval_hours")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("profile_completion_settings")
+  @@schema("academic")
+}
+
+model ProfileReminderBatch {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  channel          String
+  audience         String
+  messageTemplate  String   @map("message_template")
+  recipientCount   Int      @default(0) @map("recipient_count")
+  successCount     Int      @default(0) @map("success_count")
+  failedCount      Int      @default(0) @map("failed_count")
+  skippedCount     Int      @default(0) @map("skipped_count")
+  sentById         String?  @map("sent_by_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  deliveries ProfileReminderDelivery[]
+
+  @@index([tenantId, createdAt])
+  @@map("profile_reminder_batches")
+  @@schema("academic")
+}
+
+model ProfileReminderDelivery {
+  id          String   @id @default(uuid()) @db.Uuid
+  batchId     String   @map("batch_id") @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  studentId   String   @map("student_id") @db.Uuid
+  channel     String
+  destination String?
+  status      String
+  provider    String?
+  providerRef String?  @map("provider_ref")
+  error       String?
+  sentAt      DateTime @default(now()) @map("sent_at")
+
+  batch ProfileReminderBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId, channel, sentAt])
+  @@index([batchId])
+  @@map("profile_reminder_deliveries")
+  @@schema("academic")
+}
+
 model StudentBoardExam {
   id                  String   @id @default(uuid()) @db.Uuid
   tenantId            String   @map("tenant_id") @db.Uuid
