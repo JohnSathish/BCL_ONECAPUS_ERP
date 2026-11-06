@@ -10,6 +10,7 @@ import { StudentReportsService } from './services/student-reports.service';
 import { StudentSubjectReportService } from './services/student-subject-report.service';
 import { StudentSubjectStrengthReportService } from './services/student-subject-strength-report.service';
 import { StudentDepartmentStrengthReportService } from './services/student-department-strength-report.service';
+import { StudentReportRelatedService } from './services/student-report-related.service';
 import { StudentTabularExportService } from './services/student-tabular-export.service';
 
 @Module({
@@ -20,6 +21,7 @@ import { StudentTabularExportService } from './services/student-tabular-export.s
     StudentReportsService,
     StudentReportsExportService,
     StudentMasterAssemblerService,
+    StudentReportRelatedService,
     StudentSubjectReportService,
     StudentSubjectStrengthReportService,
     StudentDepartmentStrengthReportService,

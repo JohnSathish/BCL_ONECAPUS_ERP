@@ -53,6 +53,10 @@ export class StudentReportFiltersDto {
 
   @IsOptional()
   @IsString()
+  admissionType?: string;
+
+  @IsOptional()
+  @IsString()
   studentStatus?: string;
 
   @IsOptional()

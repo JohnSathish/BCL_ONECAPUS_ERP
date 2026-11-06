@@ -55,8 +55,14 @@ export class StudentReportsController {
   ) {}
 
   @Get('field-registry')
-  fieldRegistry(@Query('module') module?: string) {
-    return this.customReports.listFieldRegistry(module ?? 'STUDENTS');
+  fieldRegistry(
+    @CurrentUser() user: JwtUser,
+    @Query('module') module?: string,
+  ) {
+    return this.customReports.listFieldRegistry(
+      module ?? 'STUDENTS',
+      user.permissions,
+    );
   }
 
   @Get('class-xii-board-counts')

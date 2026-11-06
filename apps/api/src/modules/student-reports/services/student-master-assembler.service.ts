@@ -1,15 +1,37 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { class12BoardReportLabel } from '../../students/domain/class12-board-name';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
 import { StudentDirectoryEnrichmentService } from '../../students/services/student-directory-enrichment.service';
-import { resolveFieldLabels } from '../domain/student-report-field-registry';
+import {
+  canViewSensitiveReportFields,
+  resolveFieldLabels,
+  SENSITIVE_REPORT_FIELDS,
+} from '../domain/student-report-field-registry';
+import {
+  completionPercent,
+  isFilled,
+  isValidEmail,
+  isValidMobile,
+} from '../../students/domain/profile-completion-monitor.logic';
 import type { StudentReportFiltersDto } from '../dto/student-reports.dto';
+import { StudentReportRelatedService } from './student-report-related.service';
 import { StudentReportsQueryService } from './student-reports-query.service';
 
 const MASTER_INCLUDE = {
-  user: { select: { email: true } },
+  user: { select: { email: true, isActive: true, lastLoginAt: true } },
+  createdBy: { select: { email: true, displayName: true } },
+  lastModifiedBy: { select: { email: true, displayName: true } },
+  admissionApplication: {
+    select: {
+      firstName: true,
+      lastName: true,
+      status: true,
+      submittedAt: true,
+      documentVerificationStatus: true,
+    },
+  },
   masterProfile: true,
   programVersion: {
     include: { program: { select: { code: true, name: true } } },
@@ -19,13 +41,21 @@ const MASTER_INCLUDE = {
   academicProfile: {
     include: {
       stream: { select: { name: true } },
+      preferredShift: { select: { name: true } },
       admissionBatch: {
         include: { entrySession: { select: { name: true } } },
       },
     },
   },
   academicStanding: true,
-  abcAccount: { select: { abcId: true, abcVerified: true } },
+  abcAccount: {
+    select: {
+      abcId: true,
+      abcVerified: true,
+      verificationStatus: true,
+      status: true,
+    },
+  },
   addresses: true,
   guardians: true,
   boardExams: { orderBy: { examYear: 'desc' as const }, take: 1 },
@@ -50,6 +80,7 @@ export class StudentMasterAssemblerService {
     private readonly prisma: PrismaService,
     private readonly query: StudentReportsQueryService,
     private readonly directoryEnrichment: StudentDirectoryEnrichmentService,
+    private readonly related: StudentReportRelatedService,
   ) {}
 
   async assemble(
@@ -59,7 +90,15 @@ export class StudentMasterAssemblerService {
     columns?: string[],
     options?: { take?: number },
   ) {
-    const requestedKeys = this.normalizeColumnKeys(columns);
+    const requestedKeys = this.allowedColumns(
+      this.normalizeColumnKeys(columns),
+      user,
+    );
+    if (columns?.length && requestedKeys && requestedKeys.length === 0) {
+      throw new ForbiddenException(
+        'You do not have access to the selected fields.',
+      );
+    }
     const where = await this.applyOperationalWhere(
       tenantId,
       this.query.buildWhere(tenantId, filters, user),
@@ -86,11 +125,27 @@ export class StudentMasterAssemblerService {
     const rows = students.map((student) =>
       this.mapStudent(student, lookupMaps, operational.get(student.id)),
     );
+    const related = await this.related.attach(
+      tenantId,
+      students.map((student) => ({
+        studentId: student.id,
+        rollNumber: student.rollNumber ?? student.enrollmentNumber,
+        fullName: student.masterProfile?.fullName ?? '',
+        admissionYearId: student.academicProfile?.admissionYearId ?? null,
+      })),
+      requestedKeys,
+    );
+    for (const row of rows) {
+      Object.assign(row, related.patches.get(String(row.studentId)) ?? {});
+    }
 
     const sorted = this.sortRows(rows, filters);
-    const keys = requestedKeys?.length
-      ? requestedKeys
-      : Object.keys(rows[0] ?? this.emptyRow());
+    const allowSensitive = canViewSensitiveReportFields(user?.permissions);
+    const keys =
+      requestedKeys ??
+      Object.keys(rows[0] ?? this.emptyRow()).filter(
+        (key) => allowSensitive || !SENSITIVE_REPORT_FIELDS.has(key),
+      );
 
     // Project to selected columns with stable string values for the UI/export.
     const projected = sorted.map((row) => {
@@ -108,6 +163,7 @@ export class StudentMasterAssemblerService {
       rowCount: projected.length,
       columns: resolveFieldLabels(keys),
       rows: projected,
+      relatedSheets: related.sheets,
     };
   }
 
@@ -128,7 +184,10 @@ export class StudentMasterAssemblerService {
         wants('feeStatus') ||
         wants('feeDueAmount') ||
         Boolean(filters.feeStatus),
-      attendance: wants('attendancePercent'),
+      attendance:
+        wants('attendancePercent') ||
+        wants('attendanceStatus') ||
+        wants('attendanceWorkingDays'),
       residence:
         wants('residenceType') ||
         wants('hostelBlock') ||
@@ -242,6 +301,7 @@ export class StudentMasterAssemblerService {
       'CATEGORY',
       'TRIBE',
       'DENOMINATION',
+      'NATIONALITY',
     ] as const;
     const entries = await Promise.all(
       types.map(
@@ -282,6 +342,10 @@ export class StudentMasterAssemblerService {
     ]);
     const father = student.guardians.find((g) => g.guardianType === 'FATHER');
     const mother = student.guardians.find((g) => g.guardianType === 'MOTHER');
+    const nameParts = this.splitName(
+      profile?.fullName,
+      student.admissionApplication,
+    );
     const board = student.boardExams[0];
     const age = profile?.dateOfBirth ? this.calcAge(profile.dateOfBirth) : null;
     const majorChoice = student.programChoices?.find(
@@ -368,6 +432,7 @@ export class StudentMasterAssemblerService {
       hostelBlock: operational?.hostelBlock ?? '',
       hostelRoom: operational?.hostelRoom ?? '',
       attendancePercent: operational?.attendancePercent ?? '',
+      attendanceStatus: operational?.attendanceEligibility ?? '',
       majorDepartment:
         student.majorMinorTrack?.majorSubject?.department?.name ??
         student.majorMinorTrack?.majorSubject?.name ??
@@ -379,7 +444,165 @@ export class StudentMasterAssemblerService {
         student.majorMinorTrack?.minorSubject?.name ??
         this.humanizeSlug(minorChoice?.subjectSlug) ??
         '',
+      studentId: student.id,
+      formNumber: student.formNumber ?? '',
+      libraryCardNumber: student.libraryCardNumber ?? '',
+      firstName: nameParts.first,
+      middleName: nameParts.middle,
+      lastName: nameParts.last,
+      nationality: this.lookup(
+        lookups,
+        'NATIONALITY',
+        profile?.nationalityLookupId,
+      ),
+      panNumber: profile?.panNumber ?? '',
+      alternateMobile: profile?.alternateMobile ?? '',
+      whatsappNumber: profile?.whatsappNumber ?? '',
+      emergencyContactName: profile?.emergencyContactName ?? '',
+      emergencyContactRelation: profile?.emergencyContactRelation ?? '',
+      emergencyContactMobile: profile?.emergencyContactMobile ?? '',
+      fatherMobile: father?.contactNumber ?? '',
+      fatherOccupation: father?.occupation ?? '',
+      motherMobile: mother?.contactNumber ?? '',
+      motherOccupation: mother?.occupation ?? '',
+      presentVillage: present?.city ?? '',
+      permanentVillage: permanent?.city ?? '',
+      presentDistrict: present?.district ?? '',
+      presentState: present?.state ?? '',
+      presentPincode: present?.pinCode ?? '',
+      admissionSource: student.admissionSource ?? '',
+      admissionCategory: profile?.admissionCategory ?? '',
+      applicationStatus: student.admissionApplication?.status ?? '',
+      applicationSubmittedAt: this.formatDateOnly(
+        student.admissionApplication?.submittedAt,
+      ),
+      previousCollegeName: student.academicProfile?.previousCollegeName ?? '',
+      applicationDocumentStatus:
+        student.admissionApplication?.documentVerificationStatus ?? '',
+      majorSubject:
+        student.majorMinorTrack?.majorSubject?.name ??
+        this.humanizeSlug(majorChoice?.subjectSlug) ??
+        '',
+      minorSubject:
+        student.majorMinorTrack?.minorSubject?.name ??
+        this.humanizeSlug(minorChoice?.subjectSlug) ??
+        '',
+      preferredShift: student.academicProfile?.preferredShift?.name ?? '',
+      nccEnrolled: student.academicProfile?.nccEnrolled ?? false,
+      programmeStatus: student.academicStanding?.programmeStatus ?? '',
+      profileCompletionPercent: this.profilePercent(student),
+      schoolName: board?.schoolName ?? '',
+      boardRollNumber: board?.boardRollNumber ?? '',
+      boardRegistrationNumber: board?.registrationNumber ?? '',
+      boardStream: board?.stream ?? '',
+      boardTotalMarks: board?.totalMarks ?? '',
+      boardMaximumMarks: board?.maximumMarks ?? '',
+      boardGrade: board?.grade ?? '',
+      boardDivision: board?.division ?? '',
+      boardVerificationStatus: board?.verificationStatus ?? '',
+      cuetApplied: student.cuetDetail?.cuetApplied ?? false,
+      cuetSubjects: this.jsonList(student.cuetDetail?.cuetSubjects),
+      abcVerificationStatus: student.abcAccount?.verificationStatus ?? '',
+      abcStatus: student.abcAccount?.status ?? '',
+      photoAvailable: isFilled(profile?.photoPath),
+      appAccountStatus: student.user.isActive ? 'ACTIVE' : 'INACTIVE',
+      lastLoginAt: this.formatDateOnly(student.user.lastLoginAt),
+      profileUpdatedAt: this.formatDateOnly(profile?.updatedAt),
+      accountCreatedAt: this.formatDateOnly(student.createdAt),
+      accountUpdatedAt: this.formatDateOnly(student.updatedAt),
+      createdBy:
+        student.createdBy?.displayName || student.createdBy?.email || '',
+      updatedBy:
+        student.lastModifiedBy?.displayName ||
+        student.lastModifiedBy?.email ||
+        '',
+      bankName: profile?.bankName ?? '',
+      accountHolderName: profile?.accountHolderName ?? '',
+      accountNumber: profile?.accountNumber ?? '',
+      ifsc: profile?.ifsc ?? '',
+      branchName: profile?.branchName ?? '',
     };
+  }
+
+  private allowedColumns(columns: string[] | null, user?: JwtUser) {
+    if (!columns?.length) return columns;
+    if (canViewSensitiveReportFields(user?.permissions)) return columns;
+    return columns.filter((key) => !SENSITIVE_REPORT_FIELDS.has(key));
+  }
+
+  private lookup(
+    lookups: Record<string, Map<string, string>>,
+    type: string,
+    id?: string | null,
+  ) {
+    if (!id) return '';
+    return lookups[type]?.get(id) ?? '';
+  }
+
+  private splitName(
+    fullName?: string | null,
+    application?: {
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null,
+  ) {
+    const parts = String(fullName ?? '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (parts.length >= 2) {
+      return {
+        first: parts[0],
+        middle: parts.slice(1, -1).join(' '),
+        last: parts[parts.length - 1],
+      };
+    }
+    return {
+      first: parts[0] || application?.firstName || '',
+      middle: '',
+      last: application?.lastName || '',
+    };
+  }
+
+  private jsonList(value: unknown) {
+    if (Array.isArray(value))
+      return value
+        .map((item) => String(item))
+        .filter(Boolean)
+        .join(', ');
+    if (value && typeof value === 'object') return JSON.stringify(value);
+    return value == null ? '' : String(value);
+  }
+
+  private profilePercent(
+    student: Prisma.StudentGetPayload<{ include: typeof MASTER_INCLUDE }>,
+  ) {
+    const profile = student.masterProfile;
+    const filledAddress = (types: string[]) =>
+      (student.addresses ?? []).some(
+        (address) =>
+          types.includes(String(address.addressType ?? '').toUpperCase()) &&
+          [address.line1, address.city, address.district, address.pinCode].some(
+            (part) => isFilled(part),
+          ),
+      );
+    const guardian = (type: string) =>
+      isFilled(
+        student.guardians.find((row) => row.guardianType === type)?.fullName,
+      );
+    const checks = [
+      isFilled(profile?.gender),
+      isFilled(profile?.dateOfBirth),
+      isFilled(profile?.bloodGroupLookupId),
+      isValidMobile(profile?.mobileNumber),
+      isValidEmail(profile?.email) || isValidEmail(student.user.email),
+      filledAddress(['PERMANENT', 'HOME']),
+      filledAddress(['CURRENT', 'TURA', 'PRESENT']),
+      guardian('FATHER'),
+      guardian('MOTHER'),
+      isFilled(profile?.photoPath),
+    ];
+    return completionPercent(checks.filter((ok) => !ok).length, checks.length);
   }
 
   private emptyRow(): Record<string, unknown> {

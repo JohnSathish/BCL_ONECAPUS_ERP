@@ -1,6 +1,9 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
+
 import type { StudentReportFilters } from '@/services/student-reports';
+import { fetchMasterLookups } from '@/services/students';
 
 export type StudentReportFilterState = {
   programVersionId: string;
@@ -14,6 +17,9 @@ export type StudentReportFilterState = {
   gender: string;
   feeStatus: string;
   residenceType: string;
+  bloodGroupLookupId: string;
+  categoryLookupId: string;
+  admissionType: string;
 };
 
 export const emptyReportFilters: StudentReportFilterState = {
@@ -28,6 +34,9 @@ export const emptyReportFilters: StudentReportFilterState = {
   gender: '',
   feeStatus: '',
   residenceType: '',
+  bloodGroupLookupId: '',
+  categoryLookupId: '',
+  admissionType: '',
 };
 
 export function toApiFilters(state: StudentReportFilterState): StudentReportFilters {
@@ -43,6 +52,9 @@ export function toApiFilters(state: StudentReportFilterState): StudentReportFilt
     gender: opt(state.gender),
     feeStatus: opt(state.feeStatus),
     residenceType: opt(state.residenceType),
+    bloodGroupLookupId: opt(state.bloodGroupLookupId),
+    categoryLookupId: opt(state.categoryLookupId),
+    admissionType: opt(state.admissionType),
     semester: state.semester ? Number(state.semester) : undefined,
   };
 }
@@ -73,6 +85,17 @@ export function StudentReportFiltersBar({
   extended = false,
   hideShiftFilter = false,
 }: Props) {
+  const bloodGroups = useQuery({
+    queryKey: ['master-lookups', 'BLOOD_GROUP', 'reports'],
+    queryFn: () => fetchMasterLookups('BLOOD_GROUP'),
+    enabled: extended,
+  });
+  const categories = useQuery({
+    queryKey: ['master-lookups', 'CATEGORY', 'reports'],
+    queryFn: () => fetchMasterLookups('CATEGORY'),
+    enabled: extended,
+  });
+
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-card/80 p-3 print:hidden">
       <select
@@ -204,6 +227,36 @@ export function StudentReportFiltersBar({
             <option value="HOSTELLER">Hosteller</option>
             <option value="DAY_SCHOLAR">Day Scholar</option>
           </select>
+          <select
+            className={filterSelectClass}
+            value={filters.bloodGroupLookupId}
+            onChange={(e) => onChange({ bloodGroupLookupId: e.target.value })}
+          >
+            <option value="">All blood groups</option>
+            {(bloodGroups.data ?? []).map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.label || row.code}
+              </option>
+            ))}
+          </select>
+          <select
+            className={filterSelectClass}
+            value={filters.categoryLookupId}
+            onChange={(e) => onChange({ categoryLookupId: e.target.value })}
+          >
+            <option value="">All categories</option>
+            {(categories.data ?? []).map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.label || row.code}
+              </option>
+            ))}
+          </select>
+          <input
+            className={filterSelectClass}
+            placeholder="Admission type"
+            value={filters.admissionType}
+            onChange={(e) => onChange({ admissionType: e.target.value })}
+          />
         </>
       ) : null}
     </div>

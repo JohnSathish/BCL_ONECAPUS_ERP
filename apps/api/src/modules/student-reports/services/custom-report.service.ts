@@ -11,9 +11,13 @@ import {
   BUILTIN_STUDENT_REPORTS,
   type BuiltinReportKey,
 } from '../domain/builtin-report-templates';
+import { CUSTOM_REPORT_PRESETS } from '../domain/custom-report-presets';
 import {
-  STUDENT_REPORT_FIELDS,
+  STUDENT_REPORT_FIELD_GROUPS,
+  STUDENT_REPORT_GROUP_ORDER,
+  detailSheetsForColumns,
   resolveFieldLabels,
+  visibleReportFields,
 } from '../domain/student-report-field-registry';
 import type {
   CreateSavedReportDto,
@@ -37,21 +41,25 @@ export class CustomReportService {
     private readonly tabularExport: StudentTabularExportService,
   ) {}
 
-  listFieldRegistry(module = 'STUDENTS') {
+  listFieldRegistry(module = 'STUDENTS', permissions?: string[]) {
     if (module !== 'STUDENTS') {
       throw new BadRequestException(`Unsupported report module: ${module}`);
     }
+    const fields = visibleReportFields(permissions);
     return {
       module,
-      groups: STUDENT_REPORT_FIELDS.reduce(
+      groupLabels: STUDENT_REPORT_FIELD_GROUPS,
+      groupOrder: STUDENT_REPORT_GROUP_ORDER,
+      groups: fields.reduce(
         (acc, field) => {
           if (!acc[field.group]) acc[field.group] = [];
           acc[field.group].push(field);
           return acc;
         },
-        {} as Record<string, typeof STUDENT_REPORT_FIELDS>,
+        {} as Record<string, typeof fields>,
       ),
-      fields: STUDENT_REPORT_FIELDS,
+      fields,
+      total: fields.length,
     };
   }
 
@@ -214,6 +222,8 @@ export class CustomReportService {
         tenantId,
         generatedBy: user?.email ?? user?.sub,
         filters: dto,
+        extraSheets:
+          'relatedSheets' in result ? result.relatedSheets : undefined,
       },
       dto.format ?? 'xlsx',
     );
@@ -230,7 +240,15 @@ export class CustomReportService {
     if (!columns.length) {
       throw new BadRequestException('At least one column is required');
     }
-    return this.masterAssembler.assemble(tenantId, filters, user, columns);
+    return this.masterAssembler.assemble(
+      tenantId,
+      filters,
+      user,
+      columns,
+      dto.limit != null
+        ? { take: StudentMasterAssemblerService.previewTake(dto.limit) }
+        : undefined,
+    );
   }
 
   async exportCustom(
@@ -252,9 +270,26 @@ export class CustomReportService {
         tenantId,
         generatedBy: user?.email ?? user?.sub,
         filters: dto,
+        extraSheets: result.relatedSheets,
       },
       dto.format ?? 'xlsx',
     );
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId: user?.sub,
+        module: 'student-reports',
+        action: 'CUSTOM_REPORT_EXPORT',
+        entityType: 'custom_student_report',
+        metadata: {
+          name: dto.name ?? 'Custom Student Report',
+          columns: dto.columns ?? [],
+          detailSheets: detailSheetsForColumns(dto.columns ?? []),
+          total: result.total,
+          format: dto.format ?? 'xlsx',
+        },
+      },
+    });
     return { ...exportResult, meta: result };
   }
 
@@ -300,6 +335,8 @@ export class CustomReportService {
         tenantId,
         generatedBy: user?.email ?? user?.sub,
         filters: overrides,
+        extraSheets:
+          'relatedSheets' in result ? result.relatedSheets : undefined,
       },
       format,
     );
@@ -516,6 +553,29 @@ export class CustomReportService {
           isSystemTemplate: true,
           filters: {},
           columns: template.defaultColumns,
+        },
+      });
+    }
+    for (const preset of CUSTOM_REPORT_PRESETS) {
+      const existing = await this.prisma.savedReport.findFirst({
+        where: {
+          tenantId,
+          builtinKey: preset.key,
+          isSystemTemplate: true,
+          deletedAt: null,
+        },
+      });
+      if (existing) continue;
+      await this.prisma.savedReport.create({
+        data: {
+          tenantId,
+          name: preset.name,
+          module: 'STUDENTS',
+          reportKind: 'CUSTOM',
+          builtinKey: preset.key,
+          isSystemTemplate: true,
+          filters: {},
+          columns: preset.columns,
         },
       });
     }

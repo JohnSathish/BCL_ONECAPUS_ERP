@@ -41,12 +41,17 @@ export type ReportFieldDef = {
   label: string;
   group: string;
   description?: string;
+  sensitive?: boolean;
+  detailSheet?: string;
 };
 
 export type FieldRegistry = {
   module: string;
+  groupLabels: Record<string, string>;
+  groupOrder: string[];
   groups: Record<string, ReportFieldDef[]>;
   fields: ReportFieldDef[];
+  total: number;
 };
 
 export type BuiltinReportTemplate = {
@@ -380,6 +385,49 @@ export async function createSavedReport(payload: {
 export async function toggleSavedReportFavorite(id: string): Promise<{ favorited: boolean }> {
   const { data } = await api.post(`/v1/student-reports/saved/${id}/favorite`);
   return data;
+}
+
+export async function updateSavedReport(
+  id: string,
+  payload: { name?: string; columns?: string[]; filters?: Record<string, unknown> },
+): Promise<SavedReport> {
+  const { data } = await api.patch(`/v1/student-reports/saved/${id}`, payload);
+  return data;
+}
+
+export async function previewCustomReport(payload: {
+  columns: string[];
+  name?: string;
+  limit?: number;
+  filters?: StudentReportFilters;
+}): Promise<TabularReportPreview> {
+  const { data } = await api.post('/v1/student-reports/custom/preview', {
+    columns: payload.columns,
+    name: payload.name,
+    limit: payload.limit ?? 10,
+    ...payload.filters,
+  });
+  return data;
+}
+
+export async function exportCustomReport(payload: {
+  columns: string[];
+  name?: string;
+  format?: 'xlsx' | 'csv';
+  filters?: StudentReportFilters;
+}): Promise<void> {
+  const response = await api.post(
+    '/v1/student-reports/custom/export',
+    {
+      columns: payload.columns,
+      name: payload.name,
+      format: payload.format ?? 'xlsx',
+      ...payload.filters,
+    },
+    { responseType: 'blob', timeout: 120_000 },
+  );
+  const ext = payload.format === 'csv' ? 'csv' : 'xlsx';
+  downloadBlob(response.data, `${slugFilename(payload.name || 'custom-student-report')}.${ext}`);
 }
 
 export async function deleteSavedReport(id: string): Promise<{ ok: boolean }> {

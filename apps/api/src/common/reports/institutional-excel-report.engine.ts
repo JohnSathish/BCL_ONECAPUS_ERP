@@ -106,6 +106,32 @@ const WRAP_KEYS = new Set([
   'fullname',
 ]);
 
+const TEXT_KEYS = new Set([
+  'rollnumber',
+  'enrollmentnumber',
+  'universityrollnumber',
+  'universityregistrationnumber',
+  'admissionnumber',
+  'applicationnumber',
+  'rfidnumber',
+  'mobilenumber',
+  'alternatemobile',
+  'whatsappnumber',
+  'fathermobile',
+  'mothermobile',
+  'guardianmobile',
+  'emergencycontactmobile',
+  'pincode',
+  'presentpincode',
+  'boardrollnumber',
+  'accountnumber',
+  'nationalid',
+  'librarycardnumber',
+  'cuetroll',
+  'abcid',
+  'formnumber',
+]);
+
 function normalizeKey(key: string) {
   return key.replace(/[^a-z0-9]/gi, '').toLowerCase();
 }
@@ -377,6 +403,11 @@ export async function buildInstitutionalExcelReport(
         };
         cell.border = thinBorder();
         cell.font = { size: 10 };
+        if (TEXT_KEYS.has(normalizeKey(key))) {
+          const text = cellText(rowData[key]);
+          cell.numFmt = '@';
+          cell.value = text === '' || text == null ? '' : String(text);
+        }
 
         const highlight = INSTITUTIONAL_EXCEL_THEME.highlight[key];
         if (highlight) {

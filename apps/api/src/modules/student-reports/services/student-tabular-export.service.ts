@@ -18,6 +18,11 @@ export type TabularExportInput = {
   filters?: StudentReportFiltersDto;
   reportTitle?: string;
   reportIcon?: string;
+  extraSheets?: Array<{
+    name: string;
+    columns: TabularColumn[];
+    rows: Record<string, unknown>[];
+  }>;
 };
 
 @Injectable()
@@ -60,6 +65,11 @@ export class StudentTabularExportService {
           columns: input.columns,
           rows: input.rows,
         },
+        ...(input.extraSheets ?? []).map((sheet) => ({
+          name: sheet.name.slice(0, 31),
+          columns: sheet.columns,
+          rows: sheet.rows,
+        })),
         {
           name: 'Summary',
           columns: [

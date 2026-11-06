@@ -70,6 +70,8 @@ export class StudentReportsQueryService {
     const profileFilter: Prisma.StudentProfileWhereInput = {};
     if (filters.admissionStatus)
       profileFilter.admissionStatus = filters.admissionStatus;
+    if (filters.admissionType)
+      profileFilter.admissionType = filters.admissionType;
     if (filters.studentStatus)
       profileFilter.studentStatus = filters.studentStatus;
     if (filters.gender) profileFilter.gender = filters.gender;

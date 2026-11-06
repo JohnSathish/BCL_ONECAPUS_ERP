@@ -3,10 +3,12 @@ import {
   ArrayMinSize,
   IsArray,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  Min,
 } from 'class-validator';
 import { StudentReportFiltersDto } from './student-reports.dto';
 
@@ -82,6 +84,12 @@ export class ExecuteCustomReportDto extends TabularReportExportDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
 }
 
 export class RunSavedReportDto extends StudentReportFiltersDto {
