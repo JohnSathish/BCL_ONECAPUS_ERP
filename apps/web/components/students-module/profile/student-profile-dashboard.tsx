@@ -176,12 +176,7 @@ function ProfileTabPanel({
             </div>
           </div>
 
-          <SectionCard
-            title="Registered subjects"
-            description="Semester-wise subject registrations"
-          >
-            <StudentSubjectsTab profile={profile} />
-          </SectionCard>
+          <StudentSubjectsTab profile={profile} />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <StudentRollShiftHistoryCard studentId={profile.id} />

@@ -1171,11 +1171,7 @@ function CurrentSemesterRegistrationCard({
 }
 
 export function FyugpRegistrationSection({ profile }: { profile: StudentProfile }) {
-  return (
-    <SectionCard title="Registered subjects" description="All semester subject registrations">
-      <StudentSubjectsTab profile={profile} />
-    </SectionCard>
-  );
+  return <StudentSubjectsTab profile={profile} />;
 }
 
 export function BoardExamSection({
