@@ -154,6 +154,9 @@ export class StudentMasterAssemblerService {
         const value = row[key];
         next[key] = value == null ? '' : value;
       }
+      if (keys.includes('class12SubjectList')) {
+        next.class12MarksBySubject = row.class12MarksBySubject ?? {};
+      }
       return next;
     });
 

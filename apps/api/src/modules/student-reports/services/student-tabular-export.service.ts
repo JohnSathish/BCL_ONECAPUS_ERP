@@ -4,6 +4,7 @@ import {
   type InstitutionalReportMeta,
 } from '../../../common/reports/institutional-excel-report.engine';
 import { PrismaService } from '../../../database/prisma.service';
+import { expandClass12SubjectColumns } from '../domain/class12-report-columns';
 import { resolveFieldLabels } from '../domain/student-report-field-registry';
 import type { StudentReportFiltersDto } from '../dto/student-reports.dto';
 
@@ -35,11 +36,14 @@ export class StudentTabularExportService {
   ): Promise<{ buffer: Buffer; contentType: string; filename: string }> {
     const reportTitle =
       input.reportTitle?.trim() || input.sheetName || 'Student Report';
+    const expanded = expandClass12SubjectColumns(input.columns, input.rows);
+    const columns = expanded.columns;
+    const rows = expanded.rows;
 
     if (format === 'csv') {
-      const headers = input.columns.map((c) => c.label);
-      const dataRows = input.rows.map((row) =>
-        input.columns.map((col) => this.cellValue(row[col.key])),
+      const headers = columns.map((c) => c.label);
+      const dataRows = rows.map((row) =>
+        columns.map((col) => this.cellValue(row[col.key])),
       );
       const lines = [
         headers.map((h) => this.csvEscape(h)).join(','),
@@ -55,15 +59,15 @@ export class StudentTabularExportService {
       };
     }
 
-    const meta = await this.buildMeta(input, reportTitle);
+    const meta = await this.buildMeta({ ...input, rows }, reportTitle);
     return buildInstitutionalExcelReport({
       meta,
       filenameBase: reportTitle,
       sheets: [
         {
           name: 'Student Register',
-          columns: input.columns,
-          rows: input.rows,
+          columns,
+          rows,
         },
         ...(input.extraSheets ?? []).map((sheet) => ({
           name: sheet.name.slice(0, 31),

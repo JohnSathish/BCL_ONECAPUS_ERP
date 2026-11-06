@@ -228,7 +228,8 @@ export const STUDENT_REPORT_FIELDS: StudentReportFieldDef[] = [
 
   field('class12SubjectList', 'Class XII Subjects and Marks', 'class12', {
     detailSheet: 'Class XII Marks',
-    description: sheetNote,
+    description:
+      'Excel export creates one numeric column per Class XII subject found in the selected students. A blank cell means that student has no mark for that subject. The Class XII Marks sheet still lists each subject on its own row.',
   }),
 
   field('registeredSubjects', 'Registered Subjects', 'subjects', {

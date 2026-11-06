@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import {
+  CLASS12_MARKS_ROW_KEY,
+  class12SubjectDisplayName,
+  class12SubjectMatchKey,
+  type Class12MarksBySubject,
+} from '../domain/class12-report-columns';
 export type ReportStudentRef = {
   studentId: string;
   rollNumber: string;
@@ -107,37 +113,41 @@ export class StudentReportRelatedService {
 
     if (needs('class12SubjectList')) {
       await this.safe(async () => {
-        const marks = await this.prisma.studentBoardSubjectMark.findMany({
-          where: { tenantId, boardExam: { studentId: { in: ids } } },
-          select: {
-            subjectName: true,
-            marksObtained: true,
-            maxMarks: true,
-            grade: true,
-            boardExam: { select: { studentId: true } },
-          },
-          take: SHEET_CAP,
-        });
-        const grouped = new Map<string, string[]>();
-        const sheetRows: Record<string, unknown>[] = [];
-        for (const mark of marks) {
-          const student = byId.get(mark.boardExam.studentId);
-          const label = `${mark.subjectName}${mark.marksObtained != null ? ` ${mark.marksObtained}` : ''}`;
-          const list = grouped.get(mark.boardExam.studentId) ?? [];
-          list.push(label);
-          grouped.set(mark.boardExam.studentId, list);
-          sheetRows.push({
-            rollNumber: student?.rollNumber ?? '',
-            fullName: student?.fullName ?? '',
-            studentId: mark.boardExam.studentId,
-            subjectName: mark.subjectName,
-            marksObtained: mark.marksObtained ?? '',
-            maxMarks: mark.maxMarks ?? '',
-            grade: mark.grade ?? '',
-          });
+        const exams = await this.loadBoardExams(tenantId, ids);
+        const latest = new Map<string, (typeof exams)[number]>();
+        for (const exam of exams) {
+          const current = latest.get(exam.studentId);
+          if (!current || this.preferBoardExam(exam, current) > 0) {
+            latest.set(exam.studentId, exam);
+          }
         }
-        for (const [studentId, list] of grouped)
-          set(studentId, { class12SubjectList: list.join(', ') });
+        const sheetRows: Record<string, unknown>[] = [];
+        for (const [studentId, exam] of latest) {
+          const student = byId.get(studentId);
+          const marks = this.class12Marks(exam.subjectMarks);
+          const preview = Object.values(marks)
+            .sort((left, right) => left.sortOrder - right.sortOrder)
+            .map((entry) =>
+              entry.marks == null
+                ? entry.display
+                : `${entry.display} ${entry.marks}`,
+            );
+          set(studentId, {
+            class12SubjectList: preview.join(', '),
+            [CLASS12_MARKS_ROW_KEY]: marks,
+          });
+          for (const mark of exam.subjectMarks) {
+            sheetRows.push({
+              rollNumber: student?.rollNumber ?? '',
+              fullName: student?.fullName ?? '',
+              studentId,
+              subjectName: class12SubjectDisplayName(mark.subjectName),
+              marksObtained: this.numericMark(mark.marksObtained) ?? '',
+              maxMarks: this.numericMark(mark.maxMarks) ?? '',
+              grade: mark.grade ?? '',
+            });
+          }
+        }
         sheets.push({
           name: 'Class XII Marks',
           columns: [
@@ -147,7 +157,7 @@ export class StudentReportRelatedService {
             { key: 'maxMarks', label: 'Maximum Marks' },
             { key: 'grade', label: 'Grade' },
           ],
-          rows: sheetRows,
+          rows: sheetRows.slice(0, SHEET_CAP),
         });
       });
     }
@@ -511,6 +521,96 @@ export class StudentReportRelatedService {
     }
 
     return { patches, sheets };
+  }
+
+  private async loadBoardExams(tenantId: string, studentIds: string[]) {
+    const exams: Array<{
+      studentId: string;
+      examYear: number | null;
+      createdAt: Date;
+      subjectMarks: Array<{
+        subjectName: string;
+        marksObtained: number | null;
+        maxMarks: number | null;
+        grade: string | null;
+        sortOrder: number;
+      }>;
+    }> = [];
+    for (let offset = 0; offset < studentIds.length; offset += 2000) {
+      const slice = studentIds.slice(offset, offset + 2000);
+      const rows = await this.prisma.studentBoardExam.findMany({
+        where: { tenantId, studentId: { in: slice } },
+        select: {
+          studentId: true,
+          examYear: true,
+          createdAt: true,
+          subjectMarks: {
+            orderBy: { sortOrder: 'asc' },
+            select: {
+              subjectName: true,
+              marksObtained: true,
+              maxMarks: true,
+              grade: true,
+              sortOrder: true,
+            },
+          },
+        },
+      });
+      exams.push(...rows);
+    }
+    return exams;
+  }
+
+  /** Prefer an exam that has subject marks, then the later examination year. */
+  private preferBoardExam(
+    candidate: {
+      examYear: number | null;
+      createdAt: Date;
+      subjectMarks: unknown[];
+    },
+    current: {
+      examYear: number | null;
+      createdAt: Date;
+      subjectMarks: unknown[];
+    },
+  ) {
+    const candidateMarks = candidate.subjectMarks.length > 0 ? 1 : 0;
+    const currentMarks = current.subjectMarks.length > 0 ? 1 : 0;
+    if (candidateMarks !== currentMarks) return candidateMarks - currentMarks;
+    const candidateYear = candidate.examYear ?? -1;
+    const currentYear = current.examYear ?? -1;
+    if (candidateYear !== currentYear) return candidateYear - currentYear;
+    return candidate.createdAt.getTime() - current.createdAt.getTime();
+  }
+
+  private class12Marks(
+    marks: Array<{
+      subjectName: string;
+      marksObtained: number | null;
+      sortOrder: number;
+    }>,
+  ): Class12MarksBySubject {
+    const bySubject: Class12MarksBySubject = {};
+    for (const mark of marks) {
+      const display = class12SubjectDisplayName(mark.subjectName);
+      const key = class12SubjectMatchKey(display);
+      if (!key) continue;
+      const numeric = this.numericMark(mark.marksObtained);
+      const existing = bySubject[key];
+      if (!existing) {
+        bySubject[key] = { display, marks: numeric, sortOrder: mark.sortOrder };
+      } else if (existing.marks == null && numeric != null) {
+        existing.marks = numeric;
+      }
+    }
+    return bySubject;
+  }
+
+  private numericMark(value: unknown): number | null {
+    if (value == null || value === '') return null;
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
   }
 
   private async safe(work: () => Promise<void>) {
