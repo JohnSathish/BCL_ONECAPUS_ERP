@@ -756,7 +756,8 @@ export function AdminSubjectRegistrationPage() {
                         Track locked
                       </span>
                       <p className="mt-0.5 text-muted-foreground">
-                        Major/Minor track locked after Semester 1 promotion.
+                        The student track was locked after Semester 1 promotion. Admin can still
+                        correct Major, Minor, and the semester subjects.
                         {context.data?.majorMinorTrack?.majorSubject
                           ? ` Major: ${context.data.majorMinorTrack.majorSubject.name}.`
                           : ''}
@@ -771,18 +772,12 @@ export function AdminSubjectRegistrationPage() {
                       VTC continuing track: {context.data.vtcTrack.trackGroupCode}
                     </p>
                   ) : null}
-                  {context.data?.canChangeMajorMinor !== false ? (
-                    <Link
-                      href={`/admin/students/${selectedStudentId}/academic`}
-                      className="text-xs text-primary underline"
-                    >
-                      Edit major/minor & stream
-                    </Link>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Major/minor path editing disabled (track locked).
-                    </p>
-                  )}
+                  <Link
+                    href={`/admin/students/${selectedStudentId}/academic`}
+                    className="text-xs text-primary underline"
+                  >
+                    Edit major/minor & stream
+                  </Link>
 
                   {semesterSequence >= 8 ? (
                     <HonoursTrackSelector

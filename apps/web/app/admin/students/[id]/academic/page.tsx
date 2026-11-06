@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
@@ -30,7 +30,8 @@ import {
   upsertStudentAcademicProfile,
 } from '@/services/academic-engine';
 import { fetchAcademicYears } from '@/services/organization';
-import { fetchStudent, fetchStudentProfile } from '@/services/students';
+import { fetchStudent } from '@/services/students';
+import { apiErrorMessage } from '@/utils/api-error';
 
 export default function StudentAcademicPage() {
   const session = useRequireAuth();
@@ -49,12 +50,6 @@ export default function StudentAcademicPage() {
   const student = useQuery({
     queryKey: ['students', studentId],
     queryFn: () => fetchStudent(studentId),
-    enabled: Boolean(session) && Boolean(studentId),
-  });
-
-  const fullProfile = useQuery({
-    queryKey: ['students', studentId, 'profile'],
-    queryFn: () => fetchStudentProfile(studentId),
     enabled: Boolean(session) && Boolean(studentId),
   });
 
@@ -80,13 +75,6 @@ export default function StudentAcademicPage() {
     semesterSequence,
     enabled: Boolean(programVersionId && majorSubjectSlug),
   });
-
-  const choicesLocked = useMemo(() => {
-    const regs = fullProfile.data?.registrations as
-      | { semesterSequence?: number; status?: string }[]
-      | undefined;
-    return regs?.some((r) => r.semesterSequence === 1 && r.status === 'completed') ?? false;
-  }, [fullProfile.data?.registrations]);
 
   const streams = useQuery({
     queryKey: ['academic-engine', 'streams'],
@@ -229,8 +217,7 @@ export default function StudentAcademicPage() {
                 label="Major subject"
                 value={majorSubjectId}
                 options={majors.data ?? []}
-                readOnly={choicesLocked}
-                disabled={!programVersionId || majors.isLoading || choicesLocked}
+                disabled={!programVersionId || majors.isLoading}
                 placeholder="Select major subject"
                 onChange={(id, subject) => {
                   setMajorSubjectId(id);
@@ -243,10 +230,7 @@ export default function StudentAcademicPage() {
                 label="Minor subject"
                 value={minorSubjectId}
                 options={minors.data ?? []}
-                readOnly={choicesLocked}
-                disabled={
-                  !programVersionId || !majorSubjectSlug || minors.isLoading || choicesLocked
-                }
+                disabled={!programVersionId || !majorSubjectSlug || minors.isLoading}
                 placeholder="Select minor subject"
                 onChange={(id, subject) => {
                   setMinorSubjectId(id);
@@ -255,20 +239,25 @@ export default function StudentAcademicPage() {
               />
             </FormGrid>
 
-            {choicesLocked ? (
-              <p className="text-xs text-muted-foreground">
-                Major and minor are locked because Semester 1 registration is completed.
-              </p>
-            ) : null}
+            <p className="text-xs text-muted-foreground">
+              Admins can correct Major and Minor after registration. To also replace the registered
+              Major, Minor, MDC, AEC, SEC, or VAC papers, use Change subjects / shift on the student
+              profile.
+            </p>
 
             <Button
               size="sm"
               variant="outline"
-              disabled={saveChoicesMut.isPending || choicesLocked || !majorSubjectSlug}
+              disabled={saveChoicesMut.isPending || !majorSubjectSlug}
               onClick={() => saveChoicesMut.mutate()}
             >
               {saveChoicesMut.isPending ? 'Saving…' : 'Save major / minor choices'}
             </Button>
+            {saveChoicesMut.isError ? (
+              <p className="text-xs text-destructive">
+                {apiErrorMessage(saveChoicesMut.error, 'Could not save major / minor')}
+              </p>
+            ) : null}
           </CompactCardBody>
         </CompactCard>
       </div>

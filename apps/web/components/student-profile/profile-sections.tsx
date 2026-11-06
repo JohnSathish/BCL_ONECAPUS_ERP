@@ -951,6 +951,10 @@ export function AcademicSection({
           <input className={inputClass} disabled value={profile.entrySession ?? '—'} />
         </Field>
       </FieldGrid>
+      <p className="text-xs text-muted-foreground">
+        To correct a wrong Major, Minor, MDC, AEC, SEC, or VAC, open Change subjects / shift below.
+        Admins can save those changes after registration is completed.
+      </p>
       {showAdvanced ? (
         <div className="mt-3 rounded-md border border-border p-3">
           <p className="text-xs font-medium uppercase text-muted-foreground">

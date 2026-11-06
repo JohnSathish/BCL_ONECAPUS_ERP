@@ -312,7 +312,8 @@ export class AcademicEngineService {
     dto: CreateProgramChoiceDto,
   ) {
     await this.assertStudent(tenantId, studentId);
-    await this.majorMinorTrack.assertCanChangeMajorMinor(tenantId, studentId);
+    // This route is office-only (academic-engine:manage). Staff may correct a
+    // wrong major or minor after registration or after the Semester 1 lock.
     await this.prisma.studentProgramChoice.updateMany({
       where: {
         studentId,
