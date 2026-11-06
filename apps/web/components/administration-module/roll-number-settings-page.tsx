@@ -92,14 +92,17 @@ export function RollNumberSettingsPage() {
     });
   };
 
-  const previewPrefix =
-    Object.values(prefixDraft).find((p) => p.trim()) ??
-    configQ.data?.prefixes.find((p) => p.prefix)?.prefix ??
-    'BA';
-
   const formatSamples = useMemo(
-    () => formatPreviewSamples(previewPrefix, previewYear, sequenceLength, separator),
-    [previewPrefix, previewYear, sequenceLength, separator],
+    () => [
+      ...formatPreviewSamples('EC', previewYear, 2, separator, 1, 1),
+      ...formatPreviewSamples('EC', previewYear, 2, separator, 101, 1),
+      ...formatPreviewSamples('ED', previewYear, 2, separator, 1, 1),
+    ],
+    [previewYear, separator],
+  );
+
+  const sequenceRows = (sequencesQ.data ?? []).filter(
+    (row) => !(row.admissionYear >= 2026 && ['BA', 'BS', 'BC'].includes(row.prefix)),
   );
 
   return (
@@ -154,8 +157,8 @@ export function RollNumberSettingsPage() {
           <AdminGlassCard className="p-4">
             <h2 className="text-sm font-semibold">Programme Mapping</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Stream prefixes apply only when a department has no prefix of its own. Arts
-              departments use EC, ED, EN, and the other prefixes in Department Mapping below.
+              BA, BS, and BC are the older programme prefixes. From 2026, Arts departments use their
+              own prefixes, such as EC, ED, and EN.
             </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[420px] text-sm">
@@ -196,8 +199,8 @@ export function RollNumberSettingsPage() {
           <AdminGlassCard className="p-4">
             <h2 className="text-sm font-semibold">Sequence Management</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Current counters per prefix and admission year. Sync from Generation if rolls were
-              assigned outside the system.
+              Counters for older programme prefixes such as BA24. The 2026 BA counter is hidden
+              because new students use the department prefixes above.
             </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[640px] text-xs">
@@ -212,7 +215,7 @@ export function RollNumberSettingsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(sequencesQ.data ?? []).map((row) => (
+                  {sequenceRows.map((row) => (
                     <tr
                       key={`${row.prefix}-${row.admissionYear}`}
                       className="border-b border-border/40"
@@ -225,10 +228,11 @@ export function RollNumberSettingsPage() {
                       <td className="py-2">{row.totalGenerated}</td>
                     </tr>
                   ))}
-                  {!sequencesQ.data?.length && (
+                  {!sequenceRows.length && (
                     <tr>
                       <td colSpan={6} className="py-4 text-center text-muted-foreground">
-                        No sequences yet — counters are created on first generation
+                        2026 does not use BA. Economics is EC26-01 for Day Shift and EC26-101 for
+                        Morning Shift. The next number for each department is in the table above.
                       </td>
                     </tr>
                   )}
@@ -263,6 +267,9 @@ export function RollNumberSettingsPage() {
                   </span>
                 ))}
               </div>
+              <p className="w-full text-xs text-muted-foreground">
+                Economics Day Shift, Economics Morning Shift, and Education Day Shift.
+              </p>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button size="sm" onClick={handleSave} disabled={saveMut.isPending}>
