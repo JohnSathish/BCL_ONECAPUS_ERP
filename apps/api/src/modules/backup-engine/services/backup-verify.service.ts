@@ -3,6 +3,7 @@ import { stat } from 'fs/promises';
 import { PrismaService } from '../../../database/prisma.service';
 import { BackupDatabaseService } from './backup-database.service';
 import { BackupFilesService } from './backup-files.service';
+import { assertZipArchive } from '../backup-zip.util';
 
 @Injectable()
 export class BackupVerifyService {
@@ -26,6 +27,9 @@ export class BackupVerifyService {
           : true;
         if (artifact.kind === 'DATABASE' && ok) {
           await this.db.listDumpContents(artifact.localPath).catch(() => null);
+        }
+        if (artifact.kind === 'ARCHIVE' && ok) {
+          await assertZipArchive(artifact.localPath);
         }
         await this.prisma.backupArtifact.update({
           where: { id: artifact.id },

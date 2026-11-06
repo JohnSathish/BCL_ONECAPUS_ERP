@@ -6,17 +6,12 @@ import { Button } from '@/components/ui/button';
 import { useStepUpAction } from '@/hooks/use-step-up-action';
 import {
   deleteBackupRun,
-  downloadBackupArtifact,
+  downloadBackupBundle,
   formatBytes,
   verifyBackupRun,
   type BackupRunRow,
 } from '@/services/backup';
-import {
-  backupRunLocation,
-  backupRunTypeLabel,
-  buildBackupDownloadName,
-  formatShortBackupDate,
-} from './backup-utils';
+import { backupRunTypeLabel, buildBackupDownloadName, formatShortBackupDate } from './backup-utils';
 
 type Props = {
   runs: BackupRunRow[];
@@ -25,6 +20,19 @@ type Props = {
   canManage: boolean;
   compact?: boolean;
 };
+
+export function archiveChecksum(run: BackupRunRow) {
+  return (
+    run.artifacts?.find((a) => a.kind === 'ARCHIVE')?.checksumSha256 ??
+    run.artifacts?.find((a) => a.checksumSha256)?.checksumSha256 ??
+    null
+  );
+}
+
+function shortChecksum(value: string | null) {
+  if (!value) return '—';
+  return `${value.slice(0, 12)}…`;
+}
 
 export function BackupRepositoryTable({
   runs,
@@ -47,11 +55,8 @@ export function BackupRepositoryTable({
   });
 
   const downloadRun = (run: BackupRunRow) => {
-    const artifact = run.artifacts?.[0];
-    if (!artifact) return;
-    const ext = artifact.kind === 'DATABASE' ? 'sql.zst' : 'tar.zst';
-    const filename = buildBackupDownloadName(institutionSlug, run.completedAt, ext);
-    withStepUp((token) => downloadBackupArtifact(run.id, artifact.id, filename, token));
+    const filename = buildBackupDownloadName(institutionSlug, run.completedAt, 'zip');
+    withStepUp((token) => downloadBackupBundle(run.id, filename, token));
   };
 
   if (!runs.length) {
@@ -72,7 +77,8 @@ export function BackupRepositoryTable({
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Type</th>
               <th className="px-4 py-3">Size</th>
-              <th className="px-4 py-3">Location</th>
+              <th className="px-4 py-3">Checksum</th>
+              <th className="px-4 py-3">Integrity</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Action</th>
             </tr>
@@ -85,10 +91,32 @@ export function BackupRepositoryTable({
                 </td>
                 <td className="px-4 py-3">{backupRunTypeLabel(run.type)}</td>
                 <td className="px-4 py-3 tabular-nums">{formatBytes(run.sizeBytes)}</td>
-                <td className="px-4 py-3">{backupRunLocation(run)}</td>
+                <td className="px-4 py-3 font-mono text-xs" title={archiveChecksum(run) ?? ''}>
+                  {shortChecksum(archiveChecksum(run))}
+                </td>
                 <td className="px-4 py-3">
-                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                    ✓ {run.status === 'SUCCESS' ? 'Success' : run.status}
+                  {run.artifacts?.some((a) => a.kind === 'ARCHIVE' && a.verifiedAt)
+                    ? 'ZIP verified'
+                    : run.artifacts?.some((a) => a.kind === 'ARCHIVE')
+                      ? 'ZIP packed'
+                      : 'Not a ZIP yet'}
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={
+                      run.status === 'SUCCESS'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : run.status === 'FAILED'
+                          ? 'text-destructive'
+                          : 'text-muted-foreground'
+                    }
+                    title={run.errorMessage ?? ''}
+                  >
+                    {run.status === 'SUCCESS'
+                      ? 'Successful'
+                      : run.status === 'FAILED'
+                        ? 'Failed'
+                        : run.status}
                   </span>
                 </td>
                 <td className="px-4 py-3">

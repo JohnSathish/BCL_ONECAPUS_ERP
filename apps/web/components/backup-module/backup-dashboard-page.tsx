@@ -46,7 +46,7 @@ import { useStepUpAction } from '@/hooks/use-step-up-action';
 import { useInstitutionBranding } from '@/hooks/use-institution-branding';
 import { usePermissions } from '@/hooks/use-permissions';
 import {
-  downloadBackupArtifact,
+  downloadBackupBundle,
   fetchBackupDashboard,
   formatBytes,
   restoreBackup,
@@ -131,9 +131,8 @@ export function BackupDashboardPage() {
 
   const downloadLatest = () => {
     if (!latest?.artifacts?.length) return;
-    const artifact = latest.artifacts[0];
     const filename = buildBackupDownloadName(institutionSlug, latest.completedAt, 'zip');
-    withStepUp((token) => downloadBackupArtifact(latest.id, artifact.id, filename, token));
+    withStepUp((token) => downloadBackupBundle(latest.id, filename, token));
   };
 
   const cloudStatusLine = () => {

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { mkdir, stat } from 'fs/promises';
-import { join } from 'path';
+import { mkdir, rm, stat, writeFile } from 'fs/promises';
+import { basename, join } from 'path';
+import { materializeBackupPayload } from '../backup-zip.util';
 import { PrismaService } from '../../../database/prisma.service';
 import { BackupDatabaseService } from './backup-database.service';
 import { BackupFilesService } from './backup-files.service';
@@ -149,6 +150,13 @@ export class BackupRunExecutorService {
         }
       }
 
+      await this.updateProgress(runId, 'PACKING_ZIP');
+      await this.packRunArchive(runId);
+      const archive = await this.prisma.backupArtifact.findFirst({
+        where: { runId, kind: 'ARCHIVE' },
+      });
+      if (archive) totalSize += archive.sizeBytes;
+
       await this.updateProgress(runId, 'UPLOADING_CLOUD');
       await this.cloud.syncRun(runId);
 
@@ -186,6 +194,134 @@ export class BackupRunExecutorService {
       }
       throw err;
     }
+  }
+
+  /** Build a WinRAR-compatible ZIP of the run. Does not delete the original artifacts. */
+  async packRunArchive(runId: string) {
+    const existing = await this.prisma.backupArtifact.findFirst({
+      where: { runId, kind: 'ARCHIVE' },
+    });
+    if (existing) return existing;
+
+    const run = await this.prisma.backupRun.findUnique({
+      where: { id: runId },
+    });
+    if (!run) throw new Error(`Run ${runId} not found`);
+    const artifacts = await this.prisma.backupArtifact.findMany({
+      where: { runId },
+    });
+    if (!artifacts.length) throw new Error('Backup has no files to archive');
+
+    const runDir = this.files.runDir(runId);
+    await mkdir(runDir, { recursive: true });
+    const manifestPath = join(runDir, 'backup-manifest.json');
+    const manifest = await this.buildManifest(run, artifacts);
+    await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+    const zipPath = join(runDir, 'college-backup.zip');
+    const plainDir = join(runDir, 'plain');
+    await mkdir(plainDir, { recursive: true });
+    const entries = [
+      { name: 'backup-manifest.json', sourcePath: manifestPath },
+    ];
+    let zip: { sizeBytes: bigint };
+    try {
+      for (const artifact of artifacts) {
+        const plainPath = join(plainDir, basename(artifact.localPath));
+        const source = await materializeBackupPayload(
+          artifact.localPath,
+          plainPath,
+        );
+        entries.push({
+          name: basename(artifact.localPath),
+          sourcePath: source,
+        });
+      }
+      zip = await this.files.writeVerifiedZip(zipPath, entries);
+    } finally {
+      await rm(plainDir, { recursive: true, force: true }).catch(
+        () => undefined,
+      );
+    }
+    const checksum = await this.files.sha256File(zipPath);
+    return this.prisma.backupArtifact.create({
+      data: {
+        runId,
+        kind: 'ARCHIVE',
+        localPath: zipPath,
+        sizeBytes: zip.sizeBytes,
+        checksumSha256: checksum,
+        verifiedAt: new Date(),
+      },
+    });
+  }
+
+  private async buildManifest(
+    run: {
+      id: string;
+      type: string;
+      startedAt: Date | null;
+      tenantId: string | null;
+    },
+    artifacts: Array<{
+      kind: string;
+      localPath: string;
+      sizeBytes: bigint;
+      checksumSha256: string | null;
+    }>,
+  ) {
+    const identity = publicDatabaseIdentity(this.db.databaseUrl());
+    const tenant = run.tenantId
+      ? await this.prisma.tenant.findUnique({
+          where: { id: run.tenantId },
+          select: { name: true },
+        })
+      : await this.prisma.tenant.findFirst({
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'asc' },
+          select: { name: true },
+        });
+    const academicYear = await this.prisma.academicYear
+      .findFirst({
+        where: {
+          deletedAt: null,
+          OR: [{ status: 'ACTIVE' }, { isPrimarySession: true }],
+        },
+        orderBy: { startDate: 'desc' },
+        select: { name: true },
+      })
+      .catch(() => null);
+    const database = artifacts.find((a) => a.kind === 'DATABASE');
+    const files = artifacts.find((a) => a.kind === 'FILES');
+    return {
+      backupId: run.id,
+      collegeName: tenant?.name ?? 'Don Bosco College, Tura',
+      createdAt: (run.startedAt ?? new Date()).toISOString(),
+      backupType: run.type,
+      academicYear: academicYear?.name ?? null,
+      environment: process.env.NODE_ENV ?? 'production',
+      database: {
+        host: identity.host,
+        name: identity.database,
+        dumpedAt: (run.startedAt ?? new Date()).toISOString(),
+        filename: database ? basename(database.localPath) : null,
+        sizeBytes: database ? database.sizeBytes.toString() : '0',
+        sha256: database?.checksumSha256 ?? null,
+        format: 'pg_dump custom (-Fc)',
+      },
+      uploadedFiles: {
+        filename: files ? basename(files.localPath) : null,
+        sizeBytes: files ? files.sizeBytes.toString() : '0',
+        sha256: files?.checksumSha256 ?? null,
+      },
+      components: artifacts.map((artifact) => ({
+        kind: artifact.kind,
+        filename: basename(artifact.localPath),
+        sizeBytes: artifact.sizeBytes.toString(),
+        sha256: artifact.checksumSha256,
+      })),
+      zipVersion: 1,
+    };
   }
 
   async executeRestore(input: {
@@ -233,5 +369,18 @@ export class BackupRunExecutorService {
       await this.maintenance.deactivate();
       throw err;
     }
+  }
+}
+
+function publicDatabaseIdentity(url: string) {
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname || 'configured',
+      database:
+        decodeURIComponent(parsed.pathname.replace(/^\//, '')) || 'configured',
+    };
+  } catch {
+    return { host: 'configured', database: 'configured' };
   }
 }

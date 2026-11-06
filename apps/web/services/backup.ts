@@ -198,6 +198,28 @@ export async function triggerTenantExport(tenantId: string) {
   return data;
 }
 
+export async function downloadBackupBundle(runId: string, filename: string, stepUpToken?: string) {
+  const response = await api.get(`/v1/admin/backups/runs/${runId}/bundle`, {
+    responseType: 'blob',
+    headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+  });
+  const blob = response.data as Blob;
+  const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+  const isZip =
+    header[0] === 0x50 && header[1] === 0x4b && header[2] === 0x03 && header[3] === 0x04;
+  if (!isZip) {
+    throw new Error('The server did not return a ZIP archive. The file was not saved.');
+  }
+  const expected = Number(response.headers['content-length'] ?? 0);
+  if (expected > 0 && blob.size !== expected) {
+    throw new Error(
+      'The download was interrupted before the ZIP finished. The file was not saved.',
+    );
+  }
+  const { downloadBlob } = await import('@/utils/download-blob');
+  downloadBlob(blob, filename.endsWith('.zip') ? filename : `${filename}.zip`);
+}
+
 export async function downloadBackupArtifact(
   runId: string,
   artifactId: string,

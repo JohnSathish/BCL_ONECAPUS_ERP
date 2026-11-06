@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
+import {
+  assertZipArchive,
+  writeStoreZip,
+  type ZipEntry,
+} from '../backup-zip.util';
 import { createReadStream, createWriteStream } from 'fs';
 import { mkdir, readdir, stat, writeFile } from 'fs/promises';
 import { basename, dirname, join } from 'path';
@@ -60,6 +65,14 @@ export class BackupFilesService {
 
   runDir(runId: string) {
     return join(this.backupRoot(), runId);
+  }
+
+  async writeVerifiedZip(outputPath: string, entries: ZipEntry[]) {
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeStoreZip(outputPath, entries);
+    const info = await assertZipArchive(outputPath);
+    if (info.size <= 0) throw new Error('ZIP archive is empty');
+    return { sizeBytes: BigInt(info.size) };
   }
 
   async sha256File(filePath: string): Promise<string> {

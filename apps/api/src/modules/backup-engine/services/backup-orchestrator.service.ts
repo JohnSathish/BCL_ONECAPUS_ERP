@@ -16,6 +16,8 @@ import { BackupVerifyService } from './backup-verify.service';
 import { BackupFilesService } from './backup-files.service';
 import { SystemMaintenanceService } from './system-maintenance.service';
 import { BackupHealthService } from './backup-health.service';
+import { BackupRunExecutorService } from './backup-run-executor.service';
+import { assertZipArchive } from '../backup-zip.util';
 import {
   buildRunLogText,
   diagnoseRun,
@@ -99,6 +101,7 @@ export class BackupOrchestratorService {
     private readonly files: BackupFilesService,
     private readonly maintenance: SystemMaintenanceService,
     private readonly health: BackupHealthService,
+    private readonly executor: BackupRunExecutorService,
   ) {}
 
   async getDashboard() {
@@ -493,6 +496,26 @@ export class BackupOrchestratorService {
     return new StreamableFile(stream, {
       type: 'application/octet-stream',
       disposition: `attachment; filename="${basename(artifact.localPath)}"`,
+    });
+  }
+
+  async downloadBundle(runId: string) {
+    const run = await this.prisma.backupRun.findUnique({
+      where: { id: runId },
+    });
+    if (!run) throw new NotFoundException('Backup run not found');
+    if (run.status !== 'SUCCESS' && run.status !== 'FAILED') {
+      throw new BadRequestException('This backup is still running');
+    }
+    let archive = await this.prisma.backupArtifact.findFirst({
+      where: { runId, kind: 'ARCHIVE' },
+    });
+    if (!archive) archive = await this.executor.packRunArchive(runId);
+    const info = await assertZipArchive(archive.localPath);
+    return new StreamableFile(createReadStream(archive.localPath), {
+      type: 'application/zip',
+      disposition: 'attachment; filename="college-backup.zip"',
+      length: info.size,
     });
   }
 

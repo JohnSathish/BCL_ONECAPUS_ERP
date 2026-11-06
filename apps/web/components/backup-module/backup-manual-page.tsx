@@ -13,6 +13,7 @@ import {
   fetchBackupRun,
   triggerBackupRun,
   downloadBackupArtifact,
+  downloadBackupBundle,
   formatBytes,
 } from '@/services/backup';
 
@@ -113,6 +114,17 @@ export function BackupManualPage() {
             {run.status === 'SUCCESS' && run.artifacts?.length ? (
               <div className="mt-4 border-t pt-4">
                 <p className="mb-2 text-sm font-medium">Download local backup files</p>
+                <Button
+                  size="sm"
+                  className="mb-3"
+                  onClick={() =>
+                    withStepUp((token) =>
+                      downloadBackupBundle(run.id, `${run.type.toLowerCase()}-backup.zip`, token),
+                    )
+                  }
+                >
+                  Download ZIP
+                </Button>
                 <div className="flex flex-wrap gap-2">
                   {run.artifacts.map((a: { id: string; kind: string; sizeBytes: string }) => (
                     <Button

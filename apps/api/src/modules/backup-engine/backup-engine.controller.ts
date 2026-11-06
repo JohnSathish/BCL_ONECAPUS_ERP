@@ -154,6 +154,35 @@ export class BackupEngineController {
     return this.orchestrator.getRun(id);
   }
 
+  @Get('runs/:id/bundle')
+  @RequireAnyPermission('backup:download', 'backup:manage')
+  @RequireStepUp()
+  async downloadBundle(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ): Promise<StreamableFile> {
+    const file = await this.orchestrator.downloadBundle(id);
+    const ip = extractClientIp(req);
+    await this.audit.log({
+      action: 'DOWNLOAD',
+      actorId: user.sub,
+      ipAddress: ip,
+      runId: id,
+      metadata: { bundle: true },
+    });
+    await this.adminAudit.log({
+      tenantId: user.tid,
+      userId: user.sub,
+      module: 'backup',
+      action: 'backup.download',
+      entityType: 'backup_run',
+      entityId: id,
+      metadata: { runId: id, bundle: true, ipAddress: ip },
+    });
+    return file;
+  }
+
   @Get('runs/:id/download/:artifactId')
   @RequireAnyPermission('backup:download', 'backup:manage')
   @RequireStepUp()
