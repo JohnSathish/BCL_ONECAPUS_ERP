@@ -1708,8 +1708,6 @@ export class RollShiftRangeService {
                 {
                   departmentId: student.department?.id,
                   shiftId: input.toShiftId,
-                  shiftCode: toShift.code,
-                  shiftName: toShift.name,
                   prefix: departmentPrefix,
                   admissionYear,
                 },
