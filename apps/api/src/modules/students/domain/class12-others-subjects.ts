@@ -11,6 +11,7 @@ export const OTHERS_ARTS_SUBJECTS = [
   { subjectName: 'History', sortOrder: 60 },
   { subjectName: 'Political Science', sortOrder: 70 },
   { subjectName: 'Sociology', sortOrder: 80 },
+  { subjectName: 'Logic and Philosophy', sortOrder: 90 },
 ] as const;
 
 export const OTHERS_SCIENCE_SUBJECTS = [

@@ -36,6 +36,7 @@ describe('Others Class XII subjects', () => {
         'History',
         'Political Science',
         'Sociology',
+        'Logic and Philosophy',
       ]),
     );
     expect(arts).not.toContain('Accountancy');
