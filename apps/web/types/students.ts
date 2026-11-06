@@ -100,6 +100,7 @@ export type StudentFeeSummary = {
   demands: {
     id: string;
     demandNo: string;
+    demandType?: string | null;
     status: string;
     balanceAmount: number;
     totalAmount: number;

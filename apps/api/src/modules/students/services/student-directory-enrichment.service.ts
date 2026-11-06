@@ -234,6 +234,7 @@ export class StudentDirectoryEnrichmentService {
           select: {
             id: true,
             demandNo: true,
+            demandType: true,
             status: true,
             balanceAmount: true,
             totalAmount: true,
@@ -252,6 +253,7 @@ export class StudentDirectoryEnrichmentService {
       demands: demands.map((d: Record<string, unknown>) => ({
         id: d.id,
         demandNo: d.demandNo,
+        demandType: d.demandType,
         status: d.status,
         balanceAmount: Number(d.balanceAmount ?? 0),
         totalAmount: Number(d.totalAmount ?? 0),
