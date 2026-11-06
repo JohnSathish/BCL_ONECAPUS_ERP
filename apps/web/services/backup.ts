@@ -201,6 +201,7 @@ export async function triggerTenantExport(tenantId: string) {
 export async function downloadBackupBundle(runId: string, filename: string, stepUpToken?: string) {
   const response = await api.get(`/v1/admin/backups/runs/${runId}/bundle`, {
     responseType: 'blob',
+    params: stepUpToken ? { stepUpToken } : undefined,
     headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
   });
   const blob = response.data as Blob;
@@ -228,6 +229,7 @@ export async function downloadBackupArtifact(
 ) {
   const { data } = await api.get(`/v1/admin/backups/runs/${runId}/download/${artifactId}`, {
     responseType: 'blob',
+    params: stepUpToken ? { stepUpToken } : undefined,
     headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
   });
   const { downloadBlob } = await import('@/utils/download-blob');

@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
-import { CacheService } from '../../shared/cache/cache.service';
 import { MfaService } from './mfa/mfa.service';
 
 const STEP_UP_TTL_SECONDS = 300;
@@ -18,7 +17,6 @@ type StepUpClaims = {
 export class StepUpService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: CacheService,
     private readonly mfa: MfaService,
     private readonly config: ConfigService,
   ) {}
@@ -41,28 +39,12 @@ export class StepUpService {
     if (!verified) throw new UnauthorizedException('Verification failed');
 
     const token = this.sign(userId);
-    await this.cache.set(
-      this.cacheKey(userId, token),
-      { used: false },
-      STEP_UP_TTL_SECONDS,
-    );
     return { stepUpToken: token, expiresInSeconds: STEP_UP_TTL_SECONDS };
   }
 
   async verify(userId: string, token: string): Promise<boolean> {
     const claims = this.read(token);
-    if (!claims || claims.sub !== userId || claims.exp < Date.now())
-      return false;
-
-    const key = this.cacheKey(userId, token);
-    const row = await this.cache.get<{ used: boolean }>(key);
-    if (row?.used) return false;
-    await this.cache.set(key, { used: true }, STEP_UP_TTL_SECONDS);
-    return true;
-  }
-
-  private cacheKey(userId: string, token: string) {
-    return `stepup:${userId}:${token}`;
+    return Boolean(claims && claims.sub === userId && claims.exp >= Date.now());
   }
 
   private sign(userId: string) {

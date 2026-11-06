@@ -30,7 +30,7 @@ export class StepUpGuard implements CanActivate {
     const user = req.user;
     if (!user) throw new ForbiddenException('Authentication required');
 
-    const token = String(req.headers['x-step-up-token'] ?? '');
+    const token = stepUpTokenFrom(req);
     const ok = await this.stepUp.verify(user.sub, token);
     if (!ok) {
       throw new ForbiddenException(
@@ -39,4 +39,15 @@ export class StepUpGuard implements CanActivate {
     }
     return true;
   }
+}
+
+function stepUpTokenFrom(req: Request): string {
+  const header = req.headers['x-step-up-token'];
+  if (typeof header === 'string' && header.trim()) return header.trim();
+  const query = req.query?.stepUpToken;
+  if (typeof query === 'string' && query.trim()) return query.trim();
+  if (Array.isArray(query) && typeof query[0] === 'string' && query[0].trim()) {
+    return query[0].trim();
+  }
+  return '';
 }
