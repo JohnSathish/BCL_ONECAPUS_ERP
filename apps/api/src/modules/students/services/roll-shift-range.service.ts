@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import {
+  DEPARTMENT_ROLL_SEQUENCE_LENGTH,
+  prefixForDepartment,
+} from '../domain/department-roll-prefix';
 import { pickEquivalentOfferingSection } from '../domain/shift-section-match';
 import type { RollNumberPreview } from './roll-number.service';
 
@@ -76,6 +80,8 @@ type TransferStudentContext = {
   prefix: string;
   yearSuffix: string;
   rollSettings: { sequenceLength: number; separator: string };
+  /** Set when the roll stays inside the major department, for example EC26-01. */
+  departmentPrefix: string | null;
 };
 
 const ALLOCATE_MAX_RETRIES = 20;
@@ -120,6 +126,37 @@ export class RollShiftRangeService {
   ): string {
     const padded = String(sequence).padStart(settings.sequenceLength, '0');
     return `${prefix}${yearSuffix}${settings.separator}${padded}`;
+  }
+
+  /** Next number in one department. EC26-01, EC26-02, then one past the highest roll. */
+  private async nextDepartmentSequence(
+    tenantId: string,
+    prefix: string,
+    admissionYear: number,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const yearSuffix = String(admissionYear).slice(-2);
+    const rolls = await db.student.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        rollNumber: { startsWith: `${prefix}${yearSuffix}-` },
+      },
+      select: { rollNumber: true },
+    });
+    let highest = 0;
+    for (const row of rolls) {
+      const parsed = this.parseRollNumber(row.rollNumber ?? '');
+      if (
+        parsed &&
+        parsed.prefix === prefix &&
+        parsed.admissionYear === admissionYear &&
+        parsed.sequence > highest
+      ) {
+        highest = parsed.sequence;
+      }
+    }
+    return highest + 1;
   }
 
   async hasActiveShiftRanges(
@@ -502,6 +539,7 @@ export class RollShiftRangeService {
         where: { id: studentId, tenantId, deletedAt: null },
         include: {
           primaryShift: { select: { id: true, code: true, name: true } },
+          department: { select: { id: true, name: true, code: true } },
           academicProfile: {
             include: {
               stream: true,
@@ -550,14 +588,16 @@ export class RollShiftRangeService {
     }
 
     const admissionYear = profile.admissionBatch!.admissionYear;
-    const shiftRangesActive = await this.hasActiveShiftRanges(
-      tenantId,
-      institutionId,
-      admissionYear,
+    const departmentPrefix = prefixForDepartment(
+      student.department?.name,
+      student.department?.code,
     );
+    const shiftRangesActive = departmentPrefix
+      ? true
+      : await this.hasActiveShiftRanges(tenantId, institutionId, admissionYear);
     if (!shiftRangesActive) {
       throw new BadRequestException(
-        'Shift roll number ranges are not configured for this admission year. Configure ranges in Administration → Roll Number → Shift Ranges before transferring.',
+        'This department has no roll prefix, and shift ranges are not configured for this admission year. Set the department prefix before transferring.',
       );
     }
 
@@ -565,30 +605,36 @@ export class RollShiftRangeService {
       where: { tenantId },
     });
     const rollSettings = {
-      sequenceLength: settings?.sequenceLength ?? 3,
+      sequenceLength: departmentPrefix
+        ? DEPARTMENT_ROLL_SEQUENCE_LENGTH
+        : (settings?.sequenceLength ?? 3),
       separator: settings?.separator ?? '-',
     };
 
-    const prefixConfig = await this.prisma.rollPrefixConfig.findFirst({
-      where: { tenantId, streamId: profile.streamId, isActive: true },
-    });
+    const prefixConfig = departmentPrefix
+      ? { prefix: departmentPrefix }
+      : await this.prisma.rollPrefixConfig.findFirst({
+          where: { tenantId, streamId: profile.streamId, isActive: true },
+        });
     if (!prefixConfig?.prefix) {
       throw new BadRequestException(
         'Roll prefix not configured for student stream',
       );
     }
 
-    const targetConfig = await this.findShiftConfig(
-      this.prisma,
-      tenantId,
-      institutionId,
-      toShiftId,
-      admissionYear,
-    );
-    if (!targetConfig) {
-      throw new BadRequestException(
-        'Target shift has no roll number range configured for this admission year',
+    if (!departmentPrefix) {
+      const targetConfig = await this.findShiftConfig(
+        this.prisma,
+        tenantId,
+        institutionId,
+        toShiftId,
+        admissionYear,
       );
+      if (!targetConfig) {
+        throw new BadRequestException(
+          'Target shift has no roll number range configured for this admission year',
+        );
+      }
     }
 
     return {
@@ -610,6 +656,7 @@ export class RollShiftRangeService {
       prefix: prefixConfig.prefix,
       yearSuffix: String(admissionYear).slice(-2),
       rollSettings,
+      departmentPrefix,
     };
   }
 
@@ -628,6 +675,28 @@ export class RollShiftRangeService {
       select: { id: true, code: true, name: true },
     });
     if (!toShift) throw new NotFoundException('Target shift not found');
+
+    if (ctx.departmentPrefix) {
+      const next = await this.nextDepartmentSequence(
+        tenantId,
+        ctx.departmentPrefix,
+        ctx.admissionYear,
+      );
+      return {
+        studentId: input.studentId,
+        currentShift: ctx.student.primaryShift!,
+        targetShift: toShift,
+        currentRollNumber: ctx.student.rollNumber,
+        previewRollNumber: this.formatRollNumber(
+          ctx.departmentPrefix,
+          ctx.yearSuffix,
+          next,
+          ctx.rollSettings,
+        ),
+        admissionYear: ctx.admissionYear,
+        prefix: ctx.departmentPrefix,
+      };
+    }
 
     const config = await this.findShiftConfig(
       this.prisma,
@@ -1327,6 +1396,7 @@ export class RollShiftRangeService {
     const student = await this.prisma.student.findFirst({
       where: { id: input.studentId, tenantId, deletedAt: null },
       include: {
+        department: { select: { id: true, name: true, code: true } },
         academicProfile: {
           include: {
             admissionBatch: { include: { entrySession: true } },
@@ -1507,20 +1577,24 @@ export class RollShiftRangeService {
       });
     }
 
-    const shiftRangesActive = await this.hasActiveShiftRanges(
-      tenantId,
-      institutionId,
-      admissionYear,
+    const departmentPrefix = prefixForDepartment(
+      student.department?.name,
+      student.department?.code,
     );
+    const shiftRangesActive = departmentPrefix
+      ? true
+      : await this.hasActiveShiftRanges(tenantId, institutionId, admissionYear);
     if (!shiftRangesActive) {
       throw new BadRequestException(
         'Shift roll number ranges are not configured for this admission year. Enter the roll number from Excel instead.',
       );
     }
 
-    const prefixConfig = await this.prisma.rollPrefixConfig.findFirst({
-      where: { tenantId, streamId: profile.streamId!, isActive: true },
-    });
+    const prefixConfig = departmentPrefix
+      ? { prefix: departmentPrefix }
+      : await this.prisma.rollPrefixConfig.findFirst({
+          where: { tenantId, streamId: profile.streamId!, isActive: true },
+        });
     if (!prefixConfig?.prefix) {
       throw new BadRequestException(
         'Roll prefix not configured for student stream',
@@ -1559,16 +1633,33 @@ export class RollShiftRangeService {
         });
       }
 
-      const allocated = await this.allocateInShiftRange(tx, tenantId, {
-        institutionId,
-        shiftId: input.toShiftId,
-        admissionYear,
-        prefix: prefixConfig.prefix,
-        yearSuffix,
-        streamCode: profile.stream!.code,
-        settings: rollSettings,
-        excludeStudentId: input.studentId,
-      });
+      const allocated = departmentPrefix
+        ? {
+            rollNumber: this.formatRollNumber(
+              departmentPrefix,
+              yearSuffix,
+              await this.nextDepartmentSequence(
+                tenantId,
+                departmentPrefix,
+                admissionYear,
+                tx,
+              ),
+              {
+                sequenceLength: DEPARTMENT_ROLL_SEQUENCE_LENGTH,
+                separator: rollSettings.separator,
+              },
+            ),
+          }
+        : await this.allocateInShiftRange(tx, tenantId, {
+            institutionId,
+            shiftId: input.toShiftId,
+            admissionYear,
+            prefix: prefixConfig.prefix,
+            yearSuffix,
+            streamCode: profile.stream!.code,
+            settings: rollSettings,
+            excludeStudentId: input.studentId,
+          });
 
       if (!allocated) {
         throw new BadRequestException(

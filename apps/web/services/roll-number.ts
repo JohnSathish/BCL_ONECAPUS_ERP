@@ -171,6 +171,12 @@ export type RollNumberDepartmentMapping = {
   departmentId: string;
   departmentName: string;
   departmentCode: string;
+  prefix?: string;
+  sequenceStart?: number | null;
+  studentCount?: number;
+  lastSequence?: number;
+  nextRollNumber?: string | null;
+  admissionYear?: number;
 };
 
 export type RollNumberGenerationBatch = {

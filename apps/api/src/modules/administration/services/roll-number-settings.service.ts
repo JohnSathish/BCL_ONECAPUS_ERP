@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
+import { prefixForDepartment } from '../../students/domain/department-roll-prefix';
 import { AdminAuditHelper } from '../admin-audit.helper';
 import type { UpdateRollNumberConfigDto } from '../dto/roll-number-settings.dto';
 
@@ -152,16 +153,49 @@ export class RollNumberSettingsService {
   }
 
   async getDepartmentMappings(tenantId: string) {
-    const departments = await this.prisma.department.findMany({
-      where: { tenantId, deletedAt: null, status: 'ACTIVE' },
-      select: { id: true, name: true, code: true },
-      orderBy: { name: 'asc' },
+    const admissionYear = new Date().getFullYear();
+    const yearSuffix = String(admissionYear).slice(-2);
+    const [departments, rolls] = await Promise.all([
+      this.prisma.department.findMany({
+        where: { tenantId, deletedAt: null, status: 'ACTIVE' },
+        select: { id: true, name: true, code: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.student.findMany({
+        where: { tenantId, deletedAt: null, rollNumber: { not: null } },
+        select: { departmentId: true, rollNumber: true },
+      }),
+    ]);
+    return departments.map((d) => {
+      const prefix = prefixForDepartment(d.name, d.code);
+      let studentCount = 0;
+      let lastSequence = 0;
+      if (prefix) {
+        const pattern = new RegExp(`^${prefix}${yearSuffix}-(\\d+)$`, 'i');
+        for (const row of rolls) {
+          if (row.departmentId !== d.id || !row.rollNumber) continue;
+          const match = row.rollNumber.trim().match(pattern);
+          if (!match) continue;
+          studentCount += 1;
+          lastSequence = Math.max(lastSequence, Number(match[1]));
+        }
+      }
+      const nextSequence = lastSequence > 0 ? lastSequence + 1 : 1;
+      const nextRollNumber = prefix
+        ? `${prefix}${yearSuffix}-${String(nextSequence).padStart(2, '0')}`
+        : null;
+      return {
+        departmentId: d.id,
+        departmentName: d.name,
+        departmentCode: d.code ?? '',
+        prefix: prefix ?? '',
+        sequenceStart: prefix ? 1 : null,
+        studentCount,
+        lastSequence,
+        nextRollNumber,
+        admissionYear,
+      };
     });
-    return departments.map((d) => ({
-      departmentId: d.id,
-      departmentName: d.name,
-      departmentCode: d.code ?? '',
-    }));
   }
 
   async getSequenceOverview(tenantId: string) {

@@ -5,6 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import {
+  DEPARTMENT_ROLL_SEQUENCE_LENGTH,
+  prefixForDepartment,
+} from '../domain/department-roll-prefix';
 import { PrismaService } from '../../../database/prisma.service';
 import {
   evaluateRollEligibility,
@@ -135,19 +139,85 @@ export class RollNumberService {
     return row?.nextSequence ?? 1;
   }
 
+  private async withDepartmentPrefix(
+    tenantId: string,
+    ctx: RollNumberContext,
+    departmentId?: string,
+  ) {
+    const settings = await this.getSettings(tenantId);
+    if (!departmentId) return settings;
+    const department = await this.prisma.department.findFirst({
+      where: { id: departmentId, tenantId, deletedAt: null },
+      select: { name: true, code: true },
+    });
+    const prefix = prefixForDepartment(department?.name, department?.code);
+    if (!prefix) return settings;
+    ctx.prefix = prefix;
+    return { ...settings, sequenceLength: DEPARTMENT_ROLL_SEQUENCE_LENGTH };
+  }
+
+  private async highestRollSequence(
+    db: Prisma.TransactionClient | PrismaService,
+    tenantId: string,
+    prefix: string,
+    admissionYear: number,
+  ) {
+    const yearSuffix = String(admissionYear).slice(-2);
+    const rolls = await db.student.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        rollNumber: { startsWith: `${prefix}${yearSuffix}-` },
+      },
+      select: { rollNumber: true },
+    });
+    let highest = 0;
+    for (const row of rolls) {
+      const parsed = this.rollShiftRange.parseRollNumber(row.rollNumber ?? '');
+      if (
+        parsed &&
+        parsed.prefix === prefix &&
+        parsed.admissionYear === admissionYear &&
+        parsed.sequence > highest
+      ) {
+        highest = parsed.sequence;
+      }
+    }
+    return highest;
+  }
+
   async previewNextRollNumber(
     tenantId: string,
-    input: { streamId: string; admissionBatchId: string },
+    input: {
+      streamId: string;
+      admissionBatchId: string;
+      departmentId?: string;
+    },
   ): Promise<RollNumberPreview> {
     const ctx = await this.resolveContext(tenantId, input);
-    const settings = await this.getSettings(tenantId);
-    const sequence = await this.readNextSequence(
+    const settings = await this.withDepartmentPrefix(
+      tenantId,
+      ctx,
+      input.departmentId,
+    );
+    const storedSequence = await this.readNextSequence(
       this.prisma,
       tenantId,
       ctx.institutionId,
       ctx.prefix,
       ctx.admissionYear,
     );
+    const sequence = input.departmentId
+      ? Math.max(
+          storedSequence,
+          (await this.highestRollSequence(
+            this.prisma,
+            tenantId,
+            ctx.prefix,
+            ctx.admissionYear,
+          )) + 1,
+        )
+      : storedSequence;
     const rollNumber = this.formatRollNumber(
       ctx.prefix,
       ctx.yearSuffix,
@@ -166,13 +236,22 @@ export class RollNumberService {
 
   async allocateNextRollNumber(
     tenantId: string,
-    input: { streamId: string; admissionBatchId: string; shiftId?: string },
+    input: {
+      streamId: string;
+      admissionBatchId: string;
+      shiftId?: string;
+      departmentId?: string;
+    },
   ): Promise<RollNumberPreview> {
     const ctx = await this.resolveContext(tenantId, input);
-    const settings = await this.getSettings(tenantId);
+    const settings = await this.withDepartmentPrefix(
+      tenantId,
+      ctx,
+      input.departmentId,
+    );
 
     return this.prisma.$transaction(async (tx) => {
-      if (input.shiftId) {
+      if (input.shiftId && !input.departmentId) {
         const shiftAllocated = await this.rollShiftRange.allocateInShiftRange(
           tx,
           tenantId,
@@ -208,7 +287,39 @@ export class RollNumberService {
       });
 
       let sequence: number;
-      if (existing) {
+      if (input.departmentId) {
+        const highest = await this.highestRollSequence(
+          tx,
+          tenantId,
+          ctx.prefix,
+          ctx.admissionYear,
+        );
+        if (!existing || existing.nextSequence <= highest) {
+          sequence = highest + 1;
+          if (existing) {
+            await tx.rollNumberSequence.update({
+              where: { id: existing.id },
+              data: { nextSequence: sequence + 1 },
+            });
+          } else {
+            await tx.rollNumberSequence.create({
+              data: {
+                tenantId,
+                institutionId: ctx.institutionId,
+                prefix: ctx.prefix,
+                admissionYear: ctx.admissionYear,
+                nextSequence: sequence + 1,
+              },
+            });
+          }
+        } else {
+          sequence = existing.nextSequence;
+          await tx.rollNumberSequence.update({
+            where: { id: existing.id },
+            data: { nextSequence: sequence + 1 },
+          });
+        }
+      } else if (existing) {
         sequence = existing.nextSequence;
         await tx.rollNumberSequence.update({
           where: { id: existing.id },
@@ -642,12 +753,17 @@ export class RollNumberService {
             streamId: profile.streamId,
             admissionBatchId: profile.admissionBatchId,
           });
+          const rowSettings = await this.withDepartmentPrefix(
+            tenantId,
+            ctx,
+            student.departmentId ?? undefined,
+          );
           const institutionId =
             profile.admissionBatch?.entrySession?.institutionId;
           const shiftId = student.primaryShiftId ?? undefined;
           let simulated: number;
 
-          if (shiftId && institutionId) {
+          if (shiftId && institutionId && !student.departmentId) {
             const shiftRangesActive =
               await this.rollShiftRange.hasActiveShiftRanges(
                 tenantId,
@@ -685,13 +801,24 @@ export class RollNumberService {
             }
           } else {
             const counterKey = `${ctx.institutionId}:${ctx.prefix}:${ctx.admissionYear}`;
-            const baseSeq = await this.readNextSequence(
+            const stored = await this.readNextSequence(
               this.prisma,
               tenantId,
               ctx.institutionId,
               ctx.prefix,
               ctx.admissionYear,
             );
+            const baseSeq = student.departmentId
+              ? Math.max(
+                  stored,
+                  (await this.highestRollSequence(
+                    this.prisma,
+                    tenantId,
+                    ctx.prefix,
+                    ctx.admissionYear,
+                  )) + 1,
+                )
+              : stored;
             simulated = dryRunCounters.get(counterKey) ?? baseSeq;
             dryRunCounters.set(counterKey, simulated + 1);
           }
@@ -700,7 +827,7 @@ export class RollNumberService {
             ctx.prefix,
             ctx.yearSuffix,
             simulated,
-            settings,
+            rowSettings,
           );
         } catch (err) {
           generationStatus = 'BLOCKED';
@@ -817,6 +944,7 @@ export class RollNumberService {
             streamId: profile.streamId,
             admissionBatchId: profile.admissionBatchId,
             shiftId: student?.primaryShiftId ?? undefined,
+            departmentId: student?.departmentId ?? undefined,
           });
           await this.assignRollNumber(
             tenantId,

@@ -11,6 +11,7 @@ import { Prisma } from '@prisma/client';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { DataScopeService } from '../../common/permissions/data-scope.service';
 import { ShiftScopeService } from '../../common/services/shift-scope.service';
+import { prefixForDepartment } from './domain/department-roll-prefix';
 import { PrismaService } from '../../database/prisma.service';
 import { AcademicEngineService } from '../academic-engine/academic-engine.service';
 import { OrganizationService } from '../organization/organization.service';
@@ -1560,6 +1561,7 @@ export class StudentsService {
       preview?: boolean;
       studentId?: string;
       shiftId?: string;
+      departmentId?: string;
     },
     actorId?: string,
   ) {
@@ -1576,10 +1578,20 @@ export class StudentsService {
       shiftId = student?.primaryShiftId ?? undefined;
     }
 
+    let departmentId = input.departmentId;
+    if (!departmentId && input.studentId) {
+      const enrolled = await this.prisma.student.findFirst({
+        where: { id: input.studentId, tenantId, deletedAt: null },
+        select: { departmentId: true },
+      });
+      departmentId = enrolled?.departmentId ?? undefined;
+    }
+
     const allocated = await this.rollNumbers.allocateNextRollNumber(tenantId, {
       streamId: input.streamId,
       admissionBatchId: input.admissionBatchId,
       shiftId,
+      departmentId,
     });
     if (input.studentId) {
       const ctx = await this.rollNumbers.resolveContext(tenantId, input);
@@ -1662,6 +1674,7 @@ export class StudentsService {
         admissionBatchId: student.academicProfile.admissionBatchId,
         preview: false,
         studentId,
+        departmentId: student.departmentId ?? undefined,
       },
       actorId,
     );
@@ -1710,13 +1723,14 @@ export class StudentsService {
 
     const studentShift = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId, deletedAt: null },
-      select: { primaryShiftId: true },
+      select: { primaryShiftId: true, departmentId: true },
     });
 
     const allocated = await this.rollNumbers.allocateNextRollNumber(tenantId, {
       streamId: input.streamId,
       admissionBatchId: input.admissionBatchId,
       shiftId: studentShift?.primaryShiftId ?? undefined,
+      departmentId: studentShift?.departmentId ?? undefined,
     });
 
     await this.rollNumbers.assignRollNumber(
@@ -2241,6 +2255,7 @@ export class StudentsService {
     const student = await this.prisma.student.findFirst({
       where: { id: transfer.studentId, tenantId, deletedAt: null },
       include: {
+        department: { select: { name: true, code: true } },
         academicProfile: {
           include: { admissionBatch: { include: { entrySession: true } } },
         },
@@ -2262,8 +2277,13 @@ export class StudentsService {
       }),
     ]);
 
-    const shiftRangesActive =
-      institutionId && admissionYear
+    const departmentPrefix = prefixForDepartment(
+      student?.department?.name,
+      student?.department?.code,
+    );
+    const shiftRangesActive = departmentPrefix
+      ? true
+      : institutionId && admissionYear
         ? await this.rollShiftRange.hasActiveShiftRanges(
             tenantId,
             institutionId,

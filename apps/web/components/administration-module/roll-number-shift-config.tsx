@@ -146,9 +146,9 @@ export function RollNumberShiftConfigSection() {
       <AdminGlassCard className="p-4">
         <h2 className="text-sm font-semibold">Shift Configuration</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Configure roll number numeric ranges per shift (e.g. Day 1–499, Morning 500–999, Evening
-          1000–1499). When configured, generation and shift transfers use these ranges
-          automatically.
+          Don Bosco roll numbers do not use one shared range for Morning and Day. Each department
+          has its own prefix and starts at 01, such as EC26-01 or ED26-01. Leave these shift ranges
+          empty unless a programme still uses one prefix for every department.
         </p>
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <div className="space-y-1.5">

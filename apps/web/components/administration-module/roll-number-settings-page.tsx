@@ -120,8 +120,8 @@ export function RollNumberSettingsPage() {
           <AdminGlassCard className="p-4">
             <h2 className="text-sm font-semibold">Roll Number Format Configuration</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Pattern: Programme Prefix + Admission Year (2 digits) + Separator + Sequence (e.g.
-              BA26-001, BC26-001).
+              Each major department has its own prefix. Economics is EC26-01, Education is ED26-01,
+              and English is EN26-01. Numbers start at 01 inside that department.
             </p>
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
@@ -160,7 +160,8 @@ export function RollNumberSettingsPage() {
           <AdminGlassCard className="p-4">
             <h2 className="text-sm font-semibold">Programme Mapping</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Map each academic stream (programme) to its roll number prefix.
+              Stream prefixes apply only when a department has no prefix of its own. Arts
+              departments use EC, ED, EN, and the other prefixes in Department Mapping below.
             </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[420px] text-sm">
@@ -201,26 +202,45 @@ export function RollNumberSettingsPage() {
           <AdminGlassCard className="p-4">
             <h2 className="text-sm font-semibold">Department Mapping</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Reference mapping of departments to codes (managed in Organization setup).
+              Each department starts at 01. The next roll is one number after the highest roll
+              already used in that department for{' '}
+              {departmentsQ.data?.[0]?.admissionYear ?? 'this year'}. Leave the Morning and Day
+              shift ranges empty.
             </p>
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[360px] text-sm">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
                     <th className="pb-2 pr-3 font-medium">Department</th>
-                    <th className="pb-2 font-medium">Code</th>
+                    <th className="pb-2 pr-3 font-medium">Prefix</th>
+                    <th className="pb-2 pr-3 font-medium">Start</th>
+                    <th className="pb-2 pr-3 font-medium">Students</th>
+                    <th className="pb-2 pr-3 font-medium">Last no.</th>
+                    <th className="pb-2 font-medium">Next roll</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(departmentsQ.data ?? []).map((row) => (
                     <tr key={row.departmentId} className="border-b border-border/40">
                       <td className="py-2 pr-3">{row.departmentName}</td>
-                      <td className="py-2 font-mono text-xs">{row.departmentCode || '—'}</td>
+                      <td className="py-2 pr-3 font-mono text-xs">{row.prefix || '—'}</td>
+                      <td className="py-2 pr-3 font-mono text-xs">
+                        {row.sequenceStart != null
+                          ? String(row.sequenceStart).padStart(2, '0')
+                          : '—'}
+                      </td>
+                      <td className="py-2 pr-3">{row.studentCount ?? 0}</td>
+                      <td className="py-2 pr-3 font-mono text-xs">
+                        {row.lastSequence ? String(row.lastSequence).padStart(2, '0') : '—'}
+                      </td>
+                      <td className="py-2 font-mono text-xs text-primary">
+                        {row.nextRollNumber ?? '—'}
+                      </td>
                     </tr>
                   ))}
                   {!departmentsQ.data?.length && (
                     <tr>
-                      <td colSpan={2} className="py-4 text-center text-xs text-muted-foreground">
+                      <td colSpan={6} className="py-4 text-center text-xs text-muted-foreground">
                         No departments configured
                       </td>
                     </tr>
