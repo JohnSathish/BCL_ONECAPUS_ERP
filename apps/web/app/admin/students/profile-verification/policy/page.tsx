@@ -5,7 +5,7 @@ import { ProfileVerificationWorkspace } from '@/components/students-module/profi
 
 export default function ProfileUpdatePolicyPage() {
   return (
-    <DashboardShell role="admin" title="Profile Update Policy">
+    <DashboardShell role="admin" title="Profile Update Policy" pageHeader={false}>
       <ProfileVerificationWorkspace mode="policy" />
     </DashboardShell>
   );

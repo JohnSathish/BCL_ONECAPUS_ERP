@@ -18,9 +18,9 @@ import {
 import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
+import { ProfileUpdatePolicyBoard } from '@/components/students-module/profile-update-policy-board';
 import { resolveUploadAssetUrl } from '@/lib/branding-asset';
 import {
   bulkReviewProfileRequests,
@@ -277,6 +277,42 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
             : mode === 'history'
               ? 'Unable to load profile update history'
               : 'Unable to load profile update policy';
+
+  if (mode === 'policy') {
+    return (
+      <div className="space-y-4">
+        {activeQuery.isError ? (
+          <QueryErrorPanel
+            title={modeErrorTitle}
+            error={activeQuery.error}
+            onRetry={() => void activeQuery.refetch()}
+            isRetrying={activeQuery.isFetching}
+          />
+        ) : (
+          <ProfileUpdatePolicyBoard
+            windowSettings={updateWindowQ.data}
+            windowLoading={updateWindowQ.isLoading}
+            windowSaving={updateWindowMut.isPending || reopenAllMut.isPending}
+            onSaveWindow={(payload) => updateWindowMut.mutate(payload)}
+            onReopenAll={(payload) => reopenAllMut.mutate(payload)}
+            gates={softGatesQ.data}
+            gatesLoading={softGatesQ.isLoading}
+            gatesSaving={softGatesMut.isPending}
+            onSaveGates={(payload) => softGatesMut.mutate(payload)}
+            policies={policyQ.data ?? []}
+            policiesLoading={policyQ.isLoading}
+            policySaving={policyMut.isPending}
+            onChangeApproval={(row, approvalMode) =>
+              policyMut.mutate([
+                { sectionKey: row.sectionKey, fieldKey: row.fieldKey, approvalMode },
+              ])
+            }
+            message={message}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 print:space-y-2">
@@ -544,363 +580,7 @@ export function ProfileVerificationWorkspace({ mode }: { mode: Mode }) {
           </div>
         </div>
       )}
-
-      {mode === 'policy' && !activeQuery.isError && (
-        <div className="space-y-4">
-          <UpdateWindowPanel
-            window={updateWindowQ.data}
-            loading={updateWindowQ.isLoading}
-            saving={updateWindowMut.isPending || reopenAllMut.isPending}
-            onSave={(payload) => updateWindowMut.mutate(payload)}
-            onReopenAll={(payload) => reopenAllMut.mutate(payload)}
-          />
-          <SoftGatesPanel
-            gates={softGatesQ.data}
-            loading={softGatesQ.isLoading}
-            saving={softGatesMut.isPending}
-            onSave={(payload) => softGatesMut.mutate(payload)}
-          />
-          <div className="overflow-auto rounded-2xl border border-border">
-            <table className="min-w-full text-sm">
-              <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Section</th>
-                  <th className="px-3 py-2">Field</th>
-                  <th className="px-3 py-2">Mode</th>
-                  <th className="px-3 py-2">Mandatory</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(policyQ.data ?? []).map((row) => (
-                  <tr key={row.id} className="border-t border-border">
-                    <td className="px-3 py-2">{row.sectionKey}</td>
-                    <td className="px-3 py-2 font-mono text-xs">{row.fieldKey}</td>
-                    <td className="px-3 py-2">
-                      <select
-                        className="h-8 rounded border bg-background px-2 text-xs"
-                        value={row.approvalMode}
-                        onChange={(e) =>
-                          policyMut.mutate([
-                            {
-                              sectionKey: row.sectionKey,
-                              fieldKey: row.fieldKey,
-                              approvalMode: e.target.value,
-                            },
-                          ])
-                        }
-                      >
-                        <option value="AUTO_APPROVE">Auto Approve</option>
-                        <option value="APPROVAL_REQUIRED">Approval Required</option>
-                        <option value="VERIFICATION_REQUIRED">Verification Required</option>
-                        <option value="READ_ONLY">Read Only</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">{row.mandatory ? 'Yes' : 'No'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {policyMut.isPending ? (
-              <p className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> Saving…
-              </p>
-            ) : null}
-          </div>
-        </div>
-      )}
     </div>
-  );
-}
-
-function UpdateWindowPanel({
-  window,
-  loading,
-  saving,
-  onSave,
-  onReopenAll,
-}: {
-  window?: ProfileUpdateWindowSettings;
-  loading: boolean;
-  saving: boolean;
-  onSave: (payload: Partial<ProfileUpdateWindowSettings>) => void;
-  onReopenAll: (payload: { startsAt?: string | null; endsAt: string }) => void;
-}) {
-  const [draft, setDraft] = useState<Partial<ProfileUpdateWindowSettings> | null>(null);
-  const [reopenEndsAt, setReopenEndsAt] = useState('');
-  const [rollNumber, setRollNumber] = useState('');
-  const [studentUntil, setStudentUntil] = useState('');
-  const [studentMsg, setStudentMsg] = useState('');
-  const value = draft ??
-    window ?? {
-      enabled: false,
-      startsAt: '',
-      endsAt: '',
-      closedMessage:
-        'The profile update period has ended. Please contact the College Office if you need to make any changes.',
-      bankSectionVisible: false,
-    };
-
-  return (
-    <>
-      {loading && !window ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading update window…
-        </p>
-      ) : null}
-      {!(loading && !window) ? (
-        <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
-          <div>
-            <h2 className="text-sm font-semibold">Profile update window</h2>
-            <p className="text-xs text-muted-foreground">
-              When enabled, students may edit their profile only between the start and end dates.
-              Outside the window the profile is read-only unless you reopen for a student or for
-              all.
-            </p>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={Boolean(value.enabled)}
-              onChange={(e) => setDraft({ ...value, enabled: e.target.checked })}
-            />
-            Enable date window (gate student edits)
-          </label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <p className="text-xs font-medium">Start date</p>
-              <DateInput
-                value={value.startsAt ?? ''}
-                onChange={(v) => setDraft({ ...value, startsAt: v || null })}
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-medium">End date</p>
-              <DateInput
-                value={value.endsAt ?? ''}
-                onChange={(v) => setDraft({ ...value, endsAt: v || null })}
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs font-medium">Closed message</p>
-            <Input
-              value={value.closedMessage ?? ''}
-              onChange={(e) => setDraft({ ...value, closedMessage: e.target.value })}
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={Boolean(value.bankSectionVisible)}
-              onChange={(e) => setDraft({ ...value, bankSectionVisible: e.target.checked })}
-            />
-            Show Bank Account Details to students (currently hidden by default)
-          </label>
-          <Button
-            size="sm"
-            disabled={saving}
-            onClick={() =>
-              onSave({
-                enabled: Boolean(value.enabled),
-                startsAt: value.startsAt || null,
-                endsAt: value.endsAt || null,
-                closedMessage: value.closedMessage,
-                bankSectionVisible: Boolean(value.bankSectionVisible),
-              })
-            }
-          >
-            {saving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-            Save update window
-          </Button>
-
-          <div className="border-t pt-3 space-y-2">
-            <p className="text-xs font-semibold uppercase text-muted-foreground">
-              Reopen for all students
-            </p>
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="space-y-1">
-                <p className="text-xs">New end date</p>
-                <DateInput value={reopenEndsAt} onChange={setReopenEndsAt} />
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!reopenEndsAt || saving}
-                onClick={() => onReopenAll({ endsAt: reopenEndsAt })}
-              >
-                Reopen all
-              </Button>
-            </div>
-          </div>
-
-          <div className="border-t pt-3 space-y-2">
-            <p className="text-xs font-semibold uppercase text-muted-foreground">
-              Reopen for one student
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Enter the student&apos;s roll number (e.g. BA25-016). Enrollment number also works.
-            </p>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <Input
-                placeholder="Roll number (e.g. BA25-016)"
-                value={rollNumber}
-                onChange={(e) => setRollNumber(e.target.value)}
-              />
-              <DateInput value={studentUntil} onChange={setStudentUntil} />
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!rollNumber.trim() || !studentUntil}
-                onClick={async () => {
-                  try {
-                    const res = await reopenStudentProfileUpdate(rollNumber.trim(), {
-                      reopenUntil: studentUntil,
-                    });
-                    const name = (res as any)?.student?.name;
-                    const roll = (res as any)?.student?.rollNumber ?? rollNumber.trim();
-                    setStudentMsg(
-                      name
-                        ? `Reopened until ${studentUntil} for ${name} (${roll})`
-                        : `Reopened until ${studentUntil} for ${roll}`,
-                    );
-                  } catch (e) {
-                    setStudentMsg(apiErrorMessage(e, 'Reopen failed'));
-                  }
-                }}
-              >
-                Reopen student
-              </Button>
-            </div>
-            {rollNumber.trim() ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={async () => {
-                  try {
-                    await revokeStudentProfileUpdate(rollNumber.trim());
-                    setStudentMsg(`Reopen revoked for ${rollNumber.trim()}`);
-                  } catch (e) {
-                    setStudentMsg(apiErrorMessage(e, 'Revoke failed'));
-                  }
-                }}
-              >
-                Revoke reopen
-              </Button>
-            ) : null}
-            {studentMsg ? <p className="text-xs text-muted-foreground">{studentMsg}</p> : null}
-          </div>
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-function SoftGatesPanel({
-  gates,
-  loading,
-  saving,
-  onSave,
-}: {
-  gates?: ProfileSoftGate;
-  loading: boolean;
-  saving: boolean;
-  onSave: (payload: Partial<ProfileSoftGate>) => void;
-}) {
-  const [draft, setDraft] = useState<Partial<ProfileSoftGate> | null>(null);
-  const value = draft ??
-    gates ?? {
-      enabled: false,
-      minCompletionPercent: 80,
-      remindOnLogin: true,
-      softBlockRegistration: false,
-      softBlockCertificates: false,
-    };
-
-  return (
-    <>
-      {loading && !gates ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading soft gates…
-        </p>
-      ) : null}
-      {!(loading && !gates) ? (
-        <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
-          <div>
-            <h2 className="text-sm font-semibold">Soft service gates</h2>
-            <p className="text-xs text-muted-foreground">
-              Remind students on incomplete profiles. Optional soft blocks apply only to student
-              self-service registration and certificate requests.
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={Boolean(value.enabled)}
-                onChange={(e) => setDraft({ ...value, enabled: e.target.checked })}
-              />
-              Enable soft gates
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={value.remindOnLogin !== false}
-                onChange={(e) => setDraft({ ...value, remindOnLogin: e.target.checked })}
-              />
-              Remind on login / profile home
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={Boolean(value.softBlockRegistration)}
-                onChange={(e) => setDraft({ ...value, softBlockRegistration: e.target.checked })}
-              />
-              Soft-block semester registration submit
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={Boolean(value.softBlockCertificates)}
-                onChange={(e) => setDraft({ ...value, softBlockCertificates: e.target.checked })}
-              />
-              Soft-block certificate requests
-            </label>
-            <label className="text-sm sm:col-span-2">
-              Minimum completion %
-              <input
-                type="number"
-                min={0}
-                max={100}
-                className="mt-1 h-9 w-28 rounded border bg-background px-2"
-                value={Number(value.minCompletionPercent ?? 80)}
-                onChange={(e) =>
-                  setDraft({
-                    ...value,
-                    minCompletionPercent: Number(e.target.value || 0),
-                  })
-                }
-              />
-            </label>
-          </div>
-          <Button
-            size="sm"
-            disabled={saving}
-            onClick={() =>
-              onSave({
-                enabled: Boolean(value.enabled),
-                minCompletionPercent: Number(value.minCompletionPercent ?? 80),
-                remindOnLogin: value.remindOnLogin !== false,
-                softBlockRegistration: Boolean(value.softBlockRegistration),
-                softBlockCertificates: Boolean(value.softBlockCertificates),
-              })
-            }
-          >
-            {saving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-            Save soft gates
-          </Button>
-        </div>
-      ) : null}
-    </>
   );
 }
 
