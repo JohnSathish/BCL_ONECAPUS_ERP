@@ -1223,7 +1223,7 @@ export class DashboardAnalyticsService {
       percentage: unknown;
       totalSessions: number;
     }>,
-    departments: Map<string, string>,
+    departmentByStudent: Map<string, string>,
   ) {
     const students = new Map<
       string,
@@ -1235,7 +1235,7 @@ export class DashboardAnalyticsService {
       const current = students.get(row.studentId) ?? {
         weighted: 0,
         sessions: 0,
-        department: departments.get(row.studentId) ?? 'Unassigned',
+        department: departmentByStudent.get(row.studentId) ?? 'Unassigned',
       };
       current.weighted += Number(row.percentage ?? 0) * sessions;
       current.sessions += sessions;
