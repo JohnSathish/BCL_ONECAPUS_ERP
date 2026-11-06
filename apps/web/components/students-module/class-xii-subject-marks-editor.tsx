@@ -40,6 +40,7 @@ type Props = {
   requireCatalog?: boolean;
   className?: string;
   inputClassName?: string;
+  appearance?: 'stack' | 'table';
 };
 
 function isOthersBoard(board: string) {
@@ -170,6 +171,7 @@ export function ClassXiiSubjectMarksEditor({
   requireCatalog = true,
   className,
   inputClassName = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm',
+  appearance = 'stack',
 }: Props) {
   const streamCode = normalizeClass12Stream(stream);
   const canFetch = Boolean(boardName?.trim() && streamCode);
@@ -288,8 +290,8 @@ export function ClassXiiSubjectMarksEditor({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium">
-            {requireCatalog ? `Subject marks (min ${minSubjects})` : 'Subject marks (optional)'}
+          <p className="text-sm font-semibold text-slate-800">
+            {requireCatalog ? `Subject marks (min ${minSubjects})` : 'Subject Marks (Optional)'}
           </p>
           {subjectsQuery.isFetching ? (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -316,64 +318,146 @@ export function ClassXiiSubjectMarksEditor({
           </p>
         ) : null}
 
-        {subjectMarks.map((row, idx) => (
-          <div
-            key={idx}
-            className="grid grid-cols-1 gap-2 rounded-lg border border-border/70 p-2 sm:grid-cols-[minmax(0,1.6fr)_0.8fr_0.8fr_auto]"
-          >
-            <SubjectSearchSelect
-              value={row.subjectName}
-              options={options}
-              disabledOptions={selectedNames}
-              disabled={disabled || (requireCatalog && (!canFetch || options.length === 0))}
-              loading={subjectsQuery.isFetching}
-              allowFreeText={allowFreeText}
-              onChange={(name) => updateRow(idx, { subjectName: name })}
-              inputClassName={inputClassName}
-            />
-            <input
-              className={inputClassName}
-              type="number"
-              placeholder="Obtained"
-              disabled={disabled}
-              value={row.marksObtained ?? ''}
-              onChange={(e) =>
-                updateRow(idx, {
-                  marksObtained: e.target.value === '' ? undefined : Number(e.target.value),
-                })
-              }
-            />
-            <input
-              className={inputClassName}
-              type="number"
-              placeholder="Max"
-              disabled={disabled}
-              value={row.maxMarks ?? ''}
-              onChange={(e) =>
-                updateRow(idx, {
-                  maxMarks: e.target.value === '' ? undefined : Number(e.target.value),
-                })
-              }
-            />
-            <button
-              type="button"
-              className="inline-flex h-10 items-center justify-center rounded-md border border-border px-2 text-destructive disabled:opacity-40"
-              disabled={disabled || subjectMarks.length <= minSubjects}
-              onClick={() => removeRow(idx)}
-              title="Remove subject"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+        {appearance === 'table' ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-left text-slate-500">
+                  <th className="px-3 py-2 font-medium">#</th>
+                  <th className="px-3 py-2 font-medium">Subject</th>
+                  <th className="px-3 py-2 font-medium">Marks Obtained</th>
+                  <th className="px-3 py-2 font-medium">Maximum Marks</th>
+                  <th className="px-3 py-2 font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subjectMarks.map((row, idx) => (
+                  <tr key={idx} className="border-b border-slate-100 last:border-0">
+                    <td className="px-3 py-2 text-slate-500">{idx + 1}</td>
+                    <td className="px-3 py-2">
+                      <SubjectSearchSelect
+                        value={row.subjectName}
+                        options={options}
+                        disabledOptions={selectedNames}
+                        disabled={
+                          disabled || (requireCatalog && (!canFetch || options.length === 0))
+                        }
+                        loading={subjectsQuery.isFetching}
+                        allowFreeText={allowFreeText}
+                        onChange={(name) => updateRow(idx, { subjectName: name })}
+                        inputClassName={inputClassName}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className={inputClassName}
+                        type="number"
+                        placeholder="Marks"
+                        disabled={disabled}
+                        value={row.marksObtained ?? ''}
+                        onChange={(e) =>
+                          updateRow(idx, {
+                            marksObtained:
+                              e.target.value === '' ? undefined : Number(e.target.value),
+                          })
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className={inputClassName}
+                        type="number"
+                        placeholder="Max"
+                        disabled={disabled}
+                        value={row.maxMarks ?? ''}
+                        onChange={(e) =>
+                          updateRow(idx, {
+                            maxMarks: e.target.value === '' ? undefined : Number(e.target.value),
+                          })
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-100 text-rose-500 disabled:opacity-40"
+                        disabled={disabled || subjectMarks.length <= minSubjects}
+                        onClick={() => removeRow(idx)}
+                        title="Remove subject"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
+        ) : (
+          subjectMarks.map((row, idx) => (
+            <div
+              key={idx}
+              className="grid grid-cols-1 gap-2 rounded-lg border border-border/70 p-2 sm:grid-cols-[minmax(0,1.6fr)_0.8fr_0.8fr_auto]"
+            >
+              <SubjectSearchSelect
+                value={row.subjectName}
+                options={options}
+                disabledOptions={selectedNames}
+                disabled={disabled || (requireCatalog && (!canFetch || options.length === 0))}
+                loading={subjectsQuery.isFetching}
+                allowFreeText={allowFreeText}
+                onChange={(name) => updateRow(idx, { subjectName: name })}
+                inputClassName={inputClassName}
+              />
+              <input
+                className={inputClassName}
+                type="number"
+                placeholder="Obtained"
+                disabled={disabled}
+                value={row.marksObtained ?? ''}
+                onChange={(e) =>
+                  updateRow(idx, {
+                    marksObtained: e.target.value === '' ? undefined : Number(e.target.value),
+                  })
+                }
+              />
+              <input
+                className={inputClassName}
+                type="number"
+                placeholder="Max"
+                disabled={disabled}
+                value={row.maxMarks ?? ''}
+                onChange={(e) =>
+                  updateRow(idx, {
+                    maxMarks: e.target.value === '' ? undefined : Number(e.target.value),
+                  })
+                }
+              />
+              <button
+                type="button"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-border px-2 text-destructive disabled:opacity-40"
+                disabled={disabled || subjectMarks.length <= minSubjects}
+                onClick={() => removeRow(idx)}
+                title="Remove subject"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))
+        )}
 
         <button
           type="button"
           disabled={disabled || (requireCatalog && !canFetch)}
           onClick={addRow}
-          className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
+          className={cn(
+            'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium disabled:opacity-50',
+            appearance === 'table'
+              ? 'rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50'
+              : 'rounded-md border border-dashed border-border text-foreground hover:bg-muted',
+          )}
         >
-          <Plus className="h-4 w-4" /> Add subject
+          <Plus className="h-4 w-4" /> Add Subject
         </button>
       </div>
     </div>

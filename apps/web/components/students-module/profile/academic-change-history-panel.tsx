@@ -1,20 +1,24 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  ClipboardList,
   Download,
   Filter,
+  GraduationCap,
   History,
+  Plus,
   Printer,
   User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SectionCard } from '@/components/student-profile/student-profile-shell';
+import { createStudentRemark } from '@/services/students';
+import { apiErrorMessage } from '@/utils/api-error';
 import {
   downloadAcademicChangeHistoryCsv,
   exportAcademicChangeHistoryCsv,
@@ -171,6 +175,23 @@ export function AcademicChangeHistoryPanel({
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [noteMessage, setNoteMessage] = useState('');
+  const noteM = useMutation({
+    mutationFn: () =>
+      createStudentRemark(studentId, {
+        remarkType: 'ACADEMIC',
+        body: note.trim(),
+        visibility: 'STAFF',
+      }),
+    onSuccess: () => {
+      setNote('');
+      setNoteOpen(false);
+      setNoteMessage('Note saved.');
+    },
+    onError: (error) => setNoteMessage(apiErrorMessage(error, 'Could not save the note')),
+  });
 
   const limit = compact && !showFull ? 10 : showFull ? 20 : 10;
 
@@ -213,188 +234,248 @@ export function AcademicChangeHistoryPanel({
     window.print();
   };
 
+  const recordCount = meta?.total ?? items.length;
+
   if (collapsed) {
     return (
       <div className={cn(sticky && 'sticky top-3', className)}>
-        <SectionCard
-          title="Academic Change History"
-          description="Audit trail of programme, shift, and subject changes"
-        >
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={() => setCollapsed(false)}
-          >
-            <History className="mr-1.5 h-3.5 w-3.5" />
-            Show history
-          </Button>
-        </SectionCard>
+        <HistoryShell onShow={() => setCollapsed(false)} />
       </div>
     );
   }
 
   return (
     <div className={cn(sticky && 'sticky top-3 print:static', className)}>
-      <SectionCard
-        title="Academic Change History"
-        description="Chronological audit trail — newest first"
-      >
-        <div className="flex justify-end -mt-1 mb-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setCollapsed(true)}
-          >
-            Collapse
-          </Button>
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex items-start gap-3 bg-gradient-to-r from-violet-600 to-purple-500 px-5 py-4 text-white">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20">
+            <History className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-lg font-semibold">Academic Change History</h2>
+            <p className="text-sm text-white/85">
+              Chronological audit trail of programme, shift, and subject changes.
+            </p>
+          </div>
         </div>
-        {showFull ? (
-          <div className="mb-3 flex flex-wrap items-end gap-2 rounded-md border border-border/60 bg-muted/20 p-2">
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium uppercase text-muted-foreground">
-                Change type
-              </label>
-              <select
-                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                value={changeType}
-                onChange={(e) => {
-                  setChangeType(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">All types</option>
-                {changeTypeOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium uppercase text-muted-foreground">
-                From
-              </label>
-              <Input
-                type="date"
-                className="h-8 text-xs"
-                value={from}
-                onChange={(e) => {
-                  setFrom(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium uppercase text-muted-foreground">To</label>
-              <Input
-                type="date"
-                className="h-8 text-xs"
-                value={to}
-                onChange={(e) => {
-                  setTo(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={handleExport}
-              >
-                <Download className="mr-1 h-3.5 w-3.5" />
-                Export Excel
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={handlePrint}
-              >
-                <Printer className="mr-1 h-3.5 w-3.5" />
-                Print
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        {historyQ.isLoading ? (
-          <p className="text-xs text-muted-foreground">Loading history…</p>
-        ) : items.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            No academic changes recorded yet. Changes appear here when programme, shift, or subjects
-            are saved.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {items.map((entry) => (
-              <HistoryEntryCard
-                key={entry.id}
-                entry={entry}
-                expanded={expandedId === entry.id}
-                onToggle={() =>
-                  setExpandedId((current) => (current === entry.id ? null : entry.id))
-                }
-              />
-            ))}
-          </div>
-        )}
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
-          {!showFull && (meta?.total ?? 0) > 10 ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => {
-                setShowFull(true);
-                setPage(1);
-              }}
-            >
-              <Filter className="mr-1 h-3 w-3" />
-              View full history
-            </Button>
-          ) : showFull && meta && meta.totalPages > 1 ? (
-            <div className="flex items-center gap-2 text-xs">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
-              </Button>
-              <span className="text-muted-foreground">
-                Page {meta.page} of {meta.totalPages}
+        <div className="space-y-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <ClipboardList className="h-4 w-4 text-violet-600" />
+              Change Records
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                {recordCount} {recordCount === 1 ? 'Record' : 'Records'}
               </span>
+            </div>
+            <div className="flex gap-2">
               <Button
                 type="button"
-                variant="outline"
                 size="sm"
-                className="h-7"
-                disabled={page >= meta.totalPages}
-                onClick={() => setPage((p) => p + 1)}
+                variant="outline"
+                onClick={() => setNoteOpen((open) => !open)}
               >
-                Next
+                <Plus className="mr-1 h-3.5 w-3.5" /> Add Note
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setCollapsed(true)}
+              >
+                Collapse
+              </Button>
+            </div>
+          </div>
+          {noteOpen ? (
+            <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/50 p-3">
+              <textarea
+                className="min-h-20 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                placeholder="Write a staff note about this student's academic record"
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+              />
+              <Button
+                type="button"
+                size="sm"
+                disabled={!note.trim() || noteM.isPending}
+                onClick={() => noteM.mutate()}
+              >
+                {noteM.isPending ? 'Saving…' : 'Save note'}
+              </Button>
+            </div>
+          ) : null}
+          {noteMessage ? <p className="text-xs text-slate-500">{noteMessage}</p> : null}
+          {showFull ? (
+            <div className="mb-3 flex flex-wrap items-end gap-2 rounded-md border border-border/60 bg-muted/20 p-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-medium uppercase text-muted-foreground">
+                  Change type
+                </label>
+                <select
+                  className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                  value={changeType}
+                  onChange={(e) => {
+                    setChangeType(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="">All types</option>
+                  {changeTypeOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-medium uppercase text-muted-foreground">
+                  From
+                </label>
+                <Input
+                  type="date"
+                  className="h-8 text-xs"
+                  value={from}
+                  onChange={(e) => {
+                    setFrom(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-medium uppercase text-muted-foreground">
+                  To
+                </label>
+                <Input
+                  type="date"
+                  className="h-8 text-xs"
+                  value={to}
+                  onChange={(e) => {
+                    setTo(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={handleExport}
+                >
+                  <Download className="mr-1 h-3.5 w-3.5" />
+                  Export Excel
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={handlePrint}
+                >
+                  <Printer className="mr-1 h-3.5 w-3.5" />
+                  Print
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {historyQ.isLoading ? (
+            <p className="text-xs text-muted-foreground">Loading history…</p>
+          ) : items.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-violet-50 text-violet-500">
+                <GraduationCap className="h-7 w-7" />
+              </span>
+              <p className="mt-3 font-semibold text-slate-800">No academic changes recorded yet.</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Changes will appear here when programme, shift, or subjects are updated.
+              </p>
             </div>
           ) : (
-            <span className="text-[11px] text-muted-foreground">
-              {meta?.total ?? 0} record{(meta?.total ?? 0) === 1 ? '' : 's'}
-            </span>
+            <div className="space-y-2">
+              {items.map((entry) => (
+                <HistoryEntryCard
+                  key={entry.id}
+                  entry={entry}
+                  expanded={expandedId === entry.id}
+                  onToggle={() =>
+                    setExpandedId((current) => (current === entry.id ? null : entry.id))
+                  }
+                />
+              ))}
+            </div>
           )}
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
+            {!showFull && (meta?.total ?? 0) > 10 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => {
+                  setShowFull(true);
+                  setPage(1);
+                }}
+              >
+                <Filter className="mr-1 h-3 w-3" />
+                View full history
+              </Button>
+            ) : showFull && meta && meta.totalPages > 1 ? (
+              <div className="flex items-center gap-2 text-xs">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <span className="text-muted-foreground">
+                  Page {meta.page} of {meta.totalPages}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7"
+                  disabled={page >= meta.totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            ) : (
+              <span className="text-[11px] text-muted-foreground">
+                {meta?.total ?? 0} record{(meta?.total ?? 0) === 1 ? '' : 's'}
+              </span>
+            )}
+          </div>
         </div>
-      </SectionCard>
+      </section>
     </div>
+  );
+}
+
+function HistoryShell({ onShow }: { onShow: () => void }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="bg-gradient-to-r from-violet-600 to-purple-500 px-5 py-4 text-white">
+        <h2 className="text-lg font-semibold">Academic Change History</h2>
+        <p className="text-sm text-white/85">
+          Chronological audit trail of programme, shift, and subject changes.
+        </p>
+      </div>
+      <div className="p-4">
+        <Button type="button" variant="outline" size="sm" className="w-full" onClick={onShow}>
+          <History className="mr-1.5 h-3.5 w-3.5" />
+          Show history
+        </Button>
+      </div>
+    </section>
   );
 }

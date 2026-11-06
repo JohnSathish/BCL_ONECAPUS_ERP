@@ -39,7 +39,16 @@ import { isExcelImportedStudent } from '@/lib/student-admission-source';
 import { formatCourseDisplayTitle } from '@/utils/format-course-title';
 import { resolveUploadAssetUrl } from '@/lib/branding-asset';
 import { GENDER_OPTIONS, normalizeGenderCode } from '@/lib/students/gender';
-import { ExternalLink } from 'lucide-react';
+import {
+  Award,
+  CalendarDays,
+  ExternalLink,
+  GraduationCap,
+  Home,
+  Info,
+  Layers,
+  SunMedium,
+} from 'lucide-react';
 const STUDENT_STATUSES = ['STUDYING', 'ALUMNI', 'LEAVING', 'DETAINED', 'DROPPED'] as const;
 const MARITAL_OPTIONS = [
   { value: 'SINGLE', label: 'Single' },
@@ -852,6 +861,67 @@ export function GuardiansSection({
   );
 }
 
+function ProfileToneCard({
+  tone,
+  icon: Icon,
+  title,
+  description,
+  footer,
+  children,
+}: {
+  tone: 'blue' | 'violet';
+  icon: typeof GraduationCap;
+  title: string;
+  description: string;
+  footer?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div
+        className={cn(
+          'flex items-start gap-3 px-5 py-4 text-white',
+          tone === 'blue'
+            ? 'bg-gradient-to-r from-blue-600 to-indigo-500'
+            : 'bg-gradient-to-r from-violet-600 to-purple-500',
+        )}
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20">
+          <Icon className="h-5 w-5" />
+        </span>
+        <div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <p className="text-sm text-white/85">{description}</p>
+        </div>
+      </div>
+      <div className="space-y-4 p-4 sm:p-5">{children}</div>
+      {footer ? (
+        <div className="border-t border-slate-100 px-5 py-2 text-xs text-slate-500">{footer}</div>
+      ) : null}
+    </section>
+  );
+}
+
+function SummaryTile({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof GraduationCap;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <Icon className="h-4 w-4 shrink-0 text-blue-600" />
+      <div className="min-w-0">
+        <p className="text-[11px] text-slate-500">{label}</p>
+        <p className="truncate text-sm font-semibold text-slate-800">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 export function AcademicSection({
   profile,
   canEdit = false,
@@ -932,11 +1002,19 @@ export function AcademicSection({
   const isHosteller = residenceForm.residenceType === 'HOSTELLER';
 
   return (
-    <SectionCard
+    <ProfileToneCard
+      tone="blue"
+      icon={GraduationCap}
       title="Academic Information"
-      description="Derived from programme choices and current semester registration"
+      description="Programme details, subject choices, and current semester registration."
       footer={residenceSaving || advancedSaving ? 'Saving…' : residenceMessage || advancedMessage}
     >
+      <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+        <SummaryTile icon={GraduationCap} label="Programme" value={profile.programme || '—'} />
+        <SummaryTile icon={CalendarDays} label="Batch" value={profile.batch || '—'} />
+        <SummaryTile icon={Layers} label="Semester" value={`Sem ${profile.semester || 1}`} />
+        <SummaryTile icon={SunMedium} label="Shift" value={profile.shift || '—'} />
+      </div>
       <FieldGrid>
         <Field label="Major Subject">
           <input className={inputClass} disabled value={major ?? '—'} />
@@ -947,14 +1025,17 @@ export function AcademicSection({
         <Field label="Stream">
           <input className={inputClass} disabled value={profile.stream ?? '—'} />
         </Field>
-        <Field label="Session">
+        <Field label="Session / Academic Year">
           <input className={inputClass} disabled value={profile.entrySession ?? '—'} />
         </Field>
       </FieldGrid>
-      <p className="text-xs text-muted-foreground">
-        To correct a wrong Major, Minor, MDC, AEC, SEC, or VAC, open Change subjects / shift below.
-        Admins can save those changes after registration is completed.
-      </p>
+      <div className="flex gap-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <p>
+          To correct a wrong Major, Minor, MDC, AEC, SEC, or VAC, open Change Subjects / Shift.
+          Admins can save those changes after registration is completed.
+        </p>
+      </div>
       {showAdvanced ? (
         <div className="mt-3 rounded-md border border-border p-3">
           <p className="text-xs font-medium uppercase text-muted-foreground">
@@ -1015,8 +1096,10 @@ export function AcademicSection({
           </p>
         </div>
       ) : null}
-      <div className="rounded-md border border-border p-3">
-        <p className="text-xs font-medium uppercase text-muted-foreground">Residence / Hostel</p>
+      <div className="rounded-xl border border-slate-200 p-3">
+        <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <Home className="h-4 w-4 text-blue-600" /> Residence / Hostel
+        </p>
         <FieldGrid>
           <Field label="Residence type">
             <select
@@ -1045,7 +1128,7 @@ export function AcademicSection({
               placeholder={isHosteller ? 'Block / wing' : '—'}
             />
           </Field>
-          <Field label="Room">
+          <Field label="Room Number">
             <input
               className={inputClass}
               disabled={!canEdit || !isHosteller}
@@ -1064,7 +1147,7 @@ export function AcademicSection({
         Edit academic profile
       </Link>
       <SubjectChangeEditor profile={profile} />
-    </SectionCard>
+    </ProfileToneCard>
   );
 }
 
@@ -1086,6 +1169,11 @@ function departmentFromCourseCode(code?: string | null) {
     COM: 'Commerce',
     BCOM: 'Commerce',
     ACC: 'Commerce',
+    BOT: 'Botany',
+    CHE: 'Chemistry',
+    MAT: 'Mathematics',
+    PHY: 'Physics',
+    ZOO: 'Zoology',
   };
   return prefix ? map[prefix] : undefined;
 }
@@ -1107,67 +1195,113 @@ function CurrentSemesterRegistrationCard({
   );
   const majorDepartment = major ?? departmentFromCourseCode(majorPapers[0]?.courseCode) ?? '—';
 
-  const groups = ['MDC', 'AEC', 'SEC', 'VAC', 'VTC', 'MINOR', 'INTERNSHIP'] as const;
-  const byCategory = (category: string) =>
-    enrollments.filter((row) => String(row.category ?? '').toUpperCase() === category);
+  const categoryOrder = ['MAJOR', 'MDC', 'AEC', 'SEC', 'VAC', 'MINOR', 'VTC', 'INTERNSHIP'];
+  const rows = [...enrollments].sort((left, right) => {
+    const leftIndex = categoryOrder.indexOf(String(left.category ?? '').toUpperCase());
+    const rightIndex = categoryOrder.indexOf(String(right.category ?? '').toUpperCase());
+    return (leftIndex < 0 ? 99 : leftIndex) - (rightIndex < 0 ? 99 : rightIndex);
+  });
+  const totalCredits = rows.reduce((sum, row) => sum + (row.credits ?? 0), 0);
 
   return (
-    <div className="rounded-lg border border-border bg-muted/10 p-4">
-      <p className="text-sm font-medium">Current Semester Registration</p>
-      <p className="text-xs text-muted-foreground">Semester {currentSemester}</p>
-
-      <div className="mt-3 space-y-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Major Department
-          </p>
-          <p className="text-sm font-medium">{majorDepartment}</p>
-        </div>
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Major Papers
-          </p>
-          <ul className="mt-1 space-y-1 text-sm">
-            {majorPapers.length ? (
-              majorPapers.map((paper) => (
-                <li key={`${paper.courseCode}-${paper.registrationId}`}>
-                  •{' '}
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {paper.courseCode}
-                  </span>
-                  {' — '}
-                  {formatCourseDisplayTitle(paper.courseTitle)}
-                </li>
-              ))
-            ) : (
-              <li className="text-muted-foreground">—</li>
-            )}
-          </ul>
-        </div>
-        {groups.map((category) => {
-          const rows = byCategory(category);
-          if (!rows.length) return null;
-          return (
-            <div key={category}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {category}
-              </p>
-              <ul className="mt-1 space-y-1 text-sm">
-                {rows.map((paper) => (
-                  <li key={`${category}-${paper.courseCode}-${paper.registrationId}`}>
-                    • {formatCourseDisplayTitle(paper.courseTitle)}
-                    <span className="ml-1 font-mono text-xs text-muted-foreground">
-                      ({paper.courseCode})
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
+    <div className="overflow-hidden rounded-xl border border-slate-200">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+        <p className="text-sm font-semibold text-slate-800">Current Semester Registration</p>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+          Semester {currentSemester}
+        </span>
       </div>
+      <div className="grid gap-2 border-b border-slate-100 px-4 py-3 sm:grid-cols-3">
+        <div className="rounded-xl bg-emerald-50 px-3 py-2">
+          <p className="text-[11px] text-emerald-700">Major Department</p>
+          <p className="font-semibold text-slate-800">{majorDepartment}</p>
+        </div>
+        <div className="rounded-xl bg-violet-50 px-3 py-2">
+          <p className="text-[11px] text-violet-700">Registered Subjects</p>
+          <p className="font-semibold text-slate-800">{rows.length}</p>
+        </div>
+        <div className="rounded-xl bg-sky-50 px-3 py-2">
+          <p className="text-[11px] text-sky-700">Total Credits</p>
+          <p className="font-semibold text-slate-800">{totalCredits}</p>
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <p className="px-4 py-6 text-center text-sm text-slate-500">
+          No subjects registered for this semester.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-slate-500">
+                <th className="px-4 py-2 font-medium">#</th>
+                <th className="px-4 py-2 font-medium">Subject Code</th>
+                <th className="px-4 py-2 font-medium">Subject Title</th>
+                <th className="px-4 py-2 font-medium">NEP Category</th>
+                <th className="px-4 py-2 font-medium">Credits</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => {
+                const category = String(row.category ?? '').toUpperCase() || '—';
+                return (
+                  <tr
+                    key={`${row.courseCode}-${row.registrationId}`}
+                    className="border-b border-slate-100 last:border-0"
+                  >
+                    <td className="px-4 py-2 text-slate-500">{index + 1}</td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-xs font-semibold',
+                          categoryPill(category),
+                        )}
+                      >
+                        {row.courseCode}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 font-medium text-slate-800">
+                      {formatCourseDisplayTitle(row.courseTitle)}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-xs font-semibold',
+                          categoryPill(category),
+                        )}
+                      >
+                        {categoryLabel(category)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-slate-700">{row.credits ?? '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
+}
+
+function categoryPill(category: string) {
+  const map: Record<string, string> = {
+    MAJOR: 'bg-sky-100 text-sky-700',
+    MINOR: 'bg-cyan-100 text-cyan-700',
+    MDC: 'bg-amber-100 text-amber-700',
+    AEC: 'bg-emerald-100 text-emerald-700',
+    SEC: 'bg-rose-100 text-rose-700',
+    VAC: 'bg-violet-100 text-violet-700',
+    VTC: 'bg-teal-100 text-teal-700',
+  };
+  return map[category] ?? 'bg-slate-100 text-slate-700';
+}
+
+function categoryLabel(category: string) {
+  if (category === 'MAJOR') return 'Major';
+  if (category === 'MINOR') return 'Minor';
+  return category;
 }
 
 export function FyugpRegistrationSection({ profile }: { profile: StudentProfile }) {
@@ -1217,9 +1351,15 @@ export function BoardExamSection({
   }));
 
   return (
-    <SectionCard title="Board Examination (Class XII)" footer={saving ? 'Saving…' : message}>
+    <ProfileToneCard
+      tone="violet"
+      icon={Award}
+      title="Board Examination (Class XII)"
+      description="Higher Secondary (Class XII) examination details and subject marks."
+      footer={saving ? 'Saving…' : message}
+    >
       <FieldGrid>
-        <Field label="School">
+        <Field label="School / Institution">
           <input
             className={inputClass}
             disabled={!canEdit}
@@ -1252,6 +1392,7 @@ export function BoardExamSection({
       </FieldGrid>
       <div className="mt-4">
         <ClassXiiSubjectMarksEditor
+          appearance="table"
           boardName={form.boardName}
           boardNameOther={form.boardNameOther}
           stream={form.stream}
@@ -1282,7 +1423,7 @@ export function BoardExamSection({
           }
         />
       </div>
-    </SectionCard>
+    </ProfileToneCard>
   );
 }
 

@@ -138,22 +138,7 @@ function ProfileTabPanel({
             <BasicSection profile={profile} canEdit={canEdit} />
             <div className="space-y-4">
               <AcademicIdentitySection profile={profile} canEdit={canEdit} />
-              <SectionCard title="Roll Number & Shift">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Roll Number</p>
-                    <p className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm">
-                      {primaryStudentId(profile)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Shift</p>
-                    <p className="mt-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                      {profile.shift || '—'}
-                    </p>
-                  </div>
-                </div>
-              </SectionCard>
+              <StudentRollShiftHistoryCard studentId={profile.id} />
               <CategorySection profile={profile} canEdit={canEdit} />
             </div>
             <ProfileSummarySidebar profile={profile} />
@@ -161,7 +146,6 @@ function ProfileTabPanel({
           <div className="grid gap-4 lg:grid-cols-2">
             <AddressSection profile={profile} canEdit={canEdit} />
             <GuardiansSection profile={profile} canEdit={canEdit} />
-            <StudentRollShiftHistoryCard studentId={profile.id} />
           </div>
         </div>
       );
