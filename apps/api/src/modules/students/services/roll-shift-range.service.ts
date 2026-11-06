@@ -13,6 +13,7 @@ import {
   shiftBandFor,
   suggestDepartmentShiftBands,
 } from '../domain/department-roll-prefix';
+import { portalLoginAfterRollChange } from '../domain/portal-roll-login';
 import { pickEquivalentOfferingSection } from '../domain/shift-section-match';
 import type { RollNumberPreview } from './roll-number.service';
 
@@ -1446,6 +1447,102 @@ export class RollShiftRangeService {
     });
   }
 
+  /** The portal username follows the new roll. The previous roll stays on the transfer. */
+  async adoptPortalLogin(
+    db: Prisma.TransactionClient | PrismaService,
+    input: {
+      tenantId: string;
+      studentId: string;
+      oldRoll: string | null;
+      newRoll: string;
+      toShiftId?: string;
+    },
+  ) {
+    const student = await db.student.findFirst({
+      where: { id: input.studentId, tenantId: input.tenantId },
+      select: {
+        userId: true,
+        enrollmentNumber: true,
+        user: { select: { username: true } },
+      },
+    });
+    if (!student) return;
+
+    const next = portalLoginAfterRollChange({
+      oldRoll: input.oldRoll,
+      newRoll: input.newRoll,
+      username: student.user.username,
+      enrollmentNumber: student.enrollmentNumber,
+    });
+
+    if (next.username) {
+      const taken = await db.user.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          deletedAt: null,
+          id: { not: student.userId },
+          username: { equals: next.username, mode: 'insensitive' },
+        },
+        select: { id: true },
+      });
+      if (taken) {
+        throw new ConflictException(
+          `Portal login ${next.username} is already used by another account.`,
+        );
+      }
+      await db.user.update({
+        where: { id: student.userId },
+        data: { username: next.username },
+      });
+    }
+
+    if (next.enrollmentNumber) {
+      const taken = await db.student.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          deletedAt: null,
+          id: { not: input.studentId },
+          enrollmentNumber: {
+            equals: next.enrollmentNumber,
+            mode: 'insensitive',
+          },
+        },
+        select: { id: true },
+      });
+      if (taken) {
+        throw new ConflictException(
+          `Admission number ${next.enrollmentNumber} is already used by another student.`,
+        );
+      }
+      await db.student.update({
+        where: { id: input.studentId },
+        data: { enrollmentNumber: next.enrollmentNumber },
+      });
+    }
+
+    if (input.toShiftId) {
+      await db.userShiftAssignment.updateMany({
+        where: {
+          userId: student.userId,
+          isPrimary: true,
+          shiftId: { not: input.toShiftId },
+        },
+        data: { isPrimary: false },
+      });
+      await db.userShiftAssignment.upsert({
+        where: {
+          userId_shiftId: { userId: student.userId, shiftId: input.toShiftId },
+        },
+        create: {
+          userId: student.userId,
+          shiftId: input.toShiftId,
+          isPrimary: true,
+        },
+        update: { isPrimary: true },
+      });
+    }
+  }
+
   async processShiftTransferRollChange(
     tenantId: string,
     input: {
@@ -1576,6 +1673,13 @@ export class RollShiftRangeService {
             primaryShiftId: input.toShiftId,
             lastModifiedById: input.actorId,
           },
+        });
+        await this.adoptPortalLogin(tx, {
+          tenantId,
+          studentId: input.studentId,
+          oldRoll: oldRollNumber,
+          newRoll: manualRollNumber,
+          toShiftId: input.toShiftId,
         });
 
         await tx.studentAcademicProfile.updateMany({
@@ -1743,6 +1847,13 @@ export class RollShiftRangeService {
           primaryShiftId: input.toShiftId,
           lastModifiedById: input.actorId,
         },
+      });
+      await this.adoptPortalLogin(tx, {
+        tenantId,
+        studentId: input.studentId,
+        oldRoll: oldRollNumber,
+        newRoll: allocated.rollNumber,
+        toShiftId: input.toShiftId,
       });
 
       await tx.studentAcademicProfile.updateMany({

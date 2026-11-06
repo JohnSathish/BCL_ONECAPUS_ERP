@@ -339,8 +339,8 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
             )}
             {key === 'enrollmentNumber' ? (
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Permanent admission ID — does not change on a shift transfer. The current shift roll
-                is in “College Roll No.”
+                This follows the current college roll after a shift transfer. The previous roll
+                stays in the transfer history.
               </p>
             ) : null}
           </Field>

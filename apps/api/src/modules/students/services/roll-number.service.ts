@@ -530,9 +530,17 @@ export class RollNumberService {
     );
 
     const oldValue = student.rollNumber;
-    await this.prisma.student.update({
-      where: { id: studentId },
-      data: { rollNumber: trimmed, lastModifiedById: options.actorId },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.student.update({
+        where: { id: studentId },
+        data: { rollNumber: trimmed, lastModifiedById: options.actorId },
+      });
+      await this.rollShiftRange.adoptPortalLogin(tx, {
+        tenantId,
+        studentId,
+        oldRoll: oldValue,
+        newRoll: trimmed,
+      });
     });
 
     await this.writeAuditLog(tenantId, {

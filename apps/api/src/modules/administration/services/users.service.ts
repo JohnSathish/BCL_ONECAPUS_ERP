@@ -302,6 +302,14 @@ export class UsersService {
         },
       },
       {
+        student: {
+          OR: [
+            { rollNumber: { contains: term, mode: 'insensitive' } },
+            { enrollmentNumber: { contains: term, mode: 'insensitive' } },
+          ],
+        },
+      },
+      {
         staffProfile: {
           department: { name: { contains: term, mode: 'insensitive' } },
         },
