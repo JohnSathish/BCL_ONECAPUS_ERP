@@ -17,9 +17,7 @@ import {
   Shield,
   ShieldAlert,
 } from 'lucide-react';
-import { AdminShell, AdminGlassCard } from '@/components/administration-module/ui/admin-shell';
-import { AcademicContextStrip } from '@/components/layout/academic-context-strip';
-import { ErpPageHero } from '@/components/layout/erp-page-layout';
+import { AdminShell } from '@/components/administration-module/ui/admin-shell';
 import { BackupManualDialog } from '@/components/backup-module/backup-manual-dialog';
 import {
   BackupDiagnosticsCard,
@@ -54,28 +52,39 @@ import {
 } from '@/services/backup';
 import { cn } from '@/utils/cn';
 
-function MetricCard({
+function StatTile({
   label,
-  children,
-  tone,
-  className,
+  value,
+  hint,
+  icon: Icon,
+  iconClass,
 }: {
   label: string;
-  children: React.ReactNode;
-  tone?: 'green' | 'blue' | 'default';
-  className?: string;
+  value: string;
+  hint: string;
+  icon: typeof Shield;
+  iconClass: string;
 }) {
-  const border =
-    tone === 'green'
-      ? 'border-emerald-500/30 bg-emerald-500/5'
-      : tone === 'blue'
-        ? 'border-blue-500/30 bg-blue-500/5'
-        : '';
   return (
-    <AdminGlassCard className={cn('p-4', border, className)}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <div className="mt-2">{children}</div>
-    </AdminGlassCard>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-slate-500">{label}</p>
+          <p className="mt-1 truncate text-xl font-semibold text-slate-900 dark:text-slate-50">
+            {value}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">{hint}</p>
+        </div>
+        <span
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+            iconClass,
+          )}
+        >
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -153,163 +162,105 @@ export function BackupDashboardPage() {
         ? 'Needs attention'
         : 'Unknown';
 
+  const storageHint = d?.storageAvailableBytes
+    ? `${formatBytes(d.storageAvailableBytes)} free`
+    : d?.diskFreePct != null
+      ? `${d.diskFreePct}% disk free`
+      : 'Local disk';
+
   return (
-    <DashboardShell role="admin" pageHeader={false}>
+    <DashboardShell role="admin" title="Backup & Disaster Recovery" pageHeader={false}>
       <AdminShell>
-        <div className="mb-2">
-          <AcademicContextStrip className="whitespace-normal sm:truncate" />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+              Backup & Disaster Recovery
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500">
+              Take a copy of the college database and files, then download it as a ZIP. A download
+              does not change the live server.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-10"
+              onClick={() => setManualOpen(true)}
+              disabled={!canManage}
+            >
+              <Database className="mr-2 h-4 w-4" /> Take backup now
+            </Button>
+            <Button
+              className="h-10 bg-[#1d4ed8] hover:bg-[#1e40af]"
+              onClick={downloadLatest}
+              disabled={!canDownload || !latest?.artifacts?.length}
+            >
+              <Download className="mr-2 h-4 w-4" /> Download latest ZIP
+            </Button>
+          </div>
         </div>
 
-        <ErpPageHero
-          icon={<Shield className="h-5 w-5 text-primary" />}
-          title="Backup & Disaster Recovery"
-        >
-          <dl className="grid gap-3 text-sm sm:grid-cols-3">
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Last backup
-              </dt>
-              <dd className="mt-1 font-semibold">
-                {latest?.completedAt
-                  ? `${formatBackupDate(latest.completedAt)} ${formatBackupTime(latest.completedAt)}`
-                  : 'No backup yet'}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Next backup
-              </dt>
-              <dd className="mt-1 font-semibold">
-                {schedule?.nextRunAt
-                  ? `${formatBackupDate(schedule.nextRunAt)} ${formatBackupTime(schedule.nextRunAt)}`
-                  : '02:00 AM daily'}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Status
-              </dt>
-              <dd
-                className={cn(
-                  'mt-1 font-semibold',
-                  backupHealthLabel === 'Healthy'
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-amber-600',
-                )}
-              >
-                {backupHealthLabel}
-              </dd>
-            </div>
-          </dl>
-        </ErpPageHero>
-
         {d?.maintenance?.active ? (
-          <AdminGlassCard className="mb-4 border-amber-500/40 bg-amber-500/10 p-4 text-sm">
-            System maintenance active: {d.maintenance.reason ?? 'Restore in progress'}
-          </AdminGlassCard>
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Maintenance is on: {d.maintenance.reason ?? 'A restore is in progress'}.
+          </div>
         ) : null}
 
-        {/* KPI strip */}
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <MetricCard label="Last Successful Backup" tone="green">
-            {latest?.completedAt ? (
-              <>
-                <p className="text-lg font-semibold">{formatBackupDate(latest.completedAt)}</p>
-                <p className="text-sm text-muted-foreground">
-                  {formatBackupTime(latest.completedAt)}
-                </p>
-                <p className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" /> Successful
-                </p>
-              </>
-            ) : (
-              <p className="text-lg font-semibold text-muted-foreground">No backup yet</p>
-            )}
-          </MetricCard>
-
-          <MetricCard label="Next Scheduled Backup" tone="blue">
-            {schedule?.nextRunAt ? (
-              <>
-                <p className="text-lg font-semibold">{formatBackupDate(schedule.nextRunAt)}</p>
-                <p className="text-sm text-muted-foreground">
-                  {formatBackupTime(schedule.nextRunAt)}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-lg font-semibold">—</p>
-                <p className="text-sm text-muted-foreground">02:00 AM daily</p>
-              </>
-            )}
-          </MetricCard>
-
-          <MetricCard label="Total Backup Storage">
-            <p className="text-lg font-semibold">{formatBytes(d?.storageUsedBytes)} Used</p>
-            <p className="text-sm text-muted-foreground">
-              {d?.storageAvailableBytes
-                ? `${formatBytes(d.storageAvailableBytes)} Available`
-                : d?.diskFreePct != null
-                  ? `${d.diskFreePct}% disk free`
-                  : 'Quota available'}
-            </p>
-          </MetricCard>
-
-          <MetricCard label="Restore Points">
-            <p className="text-2xl font-semibold tabular-nums">{d?.restorePoints ?? 0}</p>
-            <p className="text-sm text-muted-foreground">Available</p>
-          </MetricCard>
-
-          <MetricCard label="Cloud Sync Status">
-            <p className="text-sm font-medium leading-relaxed">{cloudStatusLine()}</p>
-          </MetricCard>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <StatTile
+            label="Last backup"
+            value={latest?.completedAt ? formatBackupDate(latest.completedAt) : 'None yet'}
+            hint={
+              latest?.completedAt
+                ? `${formatBackupTime(latest.completedAt)} · ${backupHealthLabel}`
+                : 'No successful backup'
+            }
+            icon={CheckCircle2}
+            iconClass="bg-emerald-100 text-emerald-600"
+          />
+          <StatTile
+            label="Next backup"
+            value={schedule?.nextRunAt ? formatBackupDate(schedule.nextRunAt) : 'Daily'}
+            hint={schedule?.nextRunAt ? formatBackupTime(schedule.nextRunAt) : '02:00 AM'}
+            icon={CalendarClock}
+            iconClass="bg-sky-100 text-sky-600"
+          />
+          <StatTile
+            label="Storage used"
+            value={formatBytes(d?.storageUsedBytes)}
+            hint={storageHint}
+            icon={HardDrive}
+            iconClass="bg-slate-100 text-slate-600"
+          />
+          <StatTile
+            label="Restore points"
+            value={String(d?.restorePoints ?? 0)}
+            hint="Successful copies"
+            icon={Archive}
+            iconClass="bg-violet-100 text-violet-600"
+          />
+          <StatTile
+            label="Cloud copies"
+            value={d?.localRepository?.healthy === false ? 'Check storage' : 'On this server'}
+            hint={cloudStatusLine()}
+            icon={Cloud}
+            iconClass="bg-amber-100 text-amber-600"
+          />
         </div>
 
         {/* Failure diagnostics */}
         {(d?.failedBackups ?? 0) > 0 || d?.diagnostics?.runId ? (
-          <div className="mb-6">
+          <div className="mt-4">
             <BackupDiagnosticsCard dashboard={d} canManage={canManage} />
           </div>
         ) : null}
 
-        {/* Quick actions */}
-        <AdminGlassCard className="mb-6 p-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Quick Actions
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Button
-              size="lg"
-              className="h-12"
-              onClick={() => setManualOpen(true)}
-              disabled={!canManage}
-            >
-              Take Backup Now
-            </Button>
-            <Button
-              size="lg"
-              variant="secondary"
-              className="h-12"
-              onClick={downloadLatest}
-              disabled={!canDownload || !latest?.artifacts?.length}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download Latest Backup
-            </Button>
-            <Button size="lg" variant="outline" className="h-12" asChild>
-              <Link href="/admin/administration/backups/repository">Open Repository</Link>
-            </Button>
-            <Button size="lg" variant="outline" className="h-12" asChild>
-              <Link href="/admin/administration/backups/restore">Restore Backup</Link>
-            </Button>
-          </div>
-        </AdminGlassCard>
-
-        <div className="mb-6 grid gap-4 lg:grid-cols-3">
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
           {/* Daily schedule */}
-          <AdminGlassCard className="p-5 lg:col-span-1">
-            <div className="mb-3 flex items-center gap-2 font-medium">
-              <CalendarClock className="h-4 w-4 text-primary" />
-              Daily Backup Schedule
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div className="mb-3 flex items-center gap-2 font-medium text-slate-900 dark:text-slate-50">
+              <CalendarClock className="h-4 w-4 text-sky-600" />
+              Daily schedule
             </div>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between gap-2">
@@ -341,15 +292,14 @@ export function BackupDashboardPage() {
               </div>
             </dl>
             <Button className="mt-4 w-full" variant="outline" size="sm" asChild>
-              <Link href="/admin/administration/backups/schedule">Edit Schedule</Link>
+              <Link href="/admin/administration/backups/schedule">Edit schedule</Link>
             </Button>
-          </AdminGlassCard>
+          </section>
 
-          {/* Health widget */}
-          <AdminGlassCard className="p-5 lg:col-span-1">
-            <div className="mb-3 flex items-center gap-2 font-medium">
-              <Shield className="h-4 w-4 text-primary" />
-              Backup Health Check
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div className="mb-3 flex items-center gap-2 font-medium text-slate-900 dark:text-slate-50">
+              <Shield className="h-4 w-4 text-emerald-600" />
+              Health check
             </div>
             <p className="mb-3 text-xs text-muted-foreground">
               Verified before every backup — PostgreSQL, storage paths, disk space, repository write
@@ -371,16 +321,17 @@ export function BackupDashboardPage() {
                 </Link>
               </p>
             ) : null}
-          </AdminGlassCard>
+          </section>
 
-          {/* Disaster recovery — super admin */}
           {isAdmin ? (
-            <AdminGlassCard className="border-primary/20 p-5 lg:col-span-1">
-              <div className="mb-3 flex items-center gap-2 font-medium">
-                <RotateCcw className="h-4 w-4 text-primary" />
-                Disaster Recovery
+            <section className="rounded-2xl border border-rose-200 bg-white p-5 shadow-sm dark:border-rose-900/60 dark:bg-slate-950">
+              <div className="mb-3 flex items-center gap-2 font-medium text-slate-900 dark:text-slate-50">
+                <RotateCcw className="h-4 w-4 text-rose-600" />
+                Restore onto this server
               </div>
-              <p className="text-xs text-muted-foreground">Super Admin · Latest restore point</p>
+              <p className="text-xs text-slate-500">
+                This replaces live data. Download the ZIP above when you only need a copy.
+              </p>
               {latest ? (
                 <>
                   <p className="mt-2 text-lg font-semibold">
@@ -425,11 +376,11 @@ export function BackupDashboardPage() {
                   </div>
                 </>
               ) : (
-                <p className="mt-2 text-sm text-muted-foreground">No restore point available.</p>
+                <p className="mt-2 text-sm text-slate-500">No restore point available.</p>
               )}
-            </AdminGlassCard>
+            </section>
           ) : (
-            <AdminGlassCard className="p-5 lg:col-span-1">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <div className="mb-2 flex items-center gap-2 font-medium">
                 <History className="h-4 w-4" />
                 Backup Verification
@@ -438,14 +389,13 @@ export function BackupDashboardPage() {
                 SHA256 verification and integrity checks run after each backup.
               </p>
               <p className="mt-2 text-sm font-medium text-emerald-600">
-                {recentRuns.some((r) => r.verified) ? '✓ Verified' : 'Pending first verification'}
+                {recentRuns.some((r) => r.verified) ? 'Verified' : 'Pending first verification'}
               </p>
-            </AdminGlassCard>
+            </section>
           )}
         </div>
 
-        {/* Repository table */}
-        <AdminGlassCard className="mb-6 overflow-hidden p-0">
+        <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2 font-medium">
               <FolderArchive className="h-4 w-4" />
@@ -462,15 +412,15 @@ export function BackupDashboardPage() {
             canManage={canManage}
             compact
           />
-          <p className="border-t px-4 py-2 text-xs text-muted-foreground">
-            Downloaded archive includes database, student photos, documents, certificates, settings,
-            and NAAC files when a full instance backup is selected.
+          <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-400">
+            The ZIP contains the database. Student photos and documents are included when the backup
+            type is a full instance copy.
           </p>
-        </AdminGlassCard>
+        </section>
 
         {/* Destinations */}
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
-          <AdminGlassCard className="p-5">
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div className="mb-2 flex items-center gap-2 font-medium">
               <HardDrive className="h-4 w-4" /> Local Repository
             </div>
@@ -496,10 +446,13 @@ export function BackupDashboardPage() {
                 </dd>
               </div>
             </dl>
-          </AdminGlassCard>
+          </section>
 
           {(d?.cloudSync ?? []).map((target) => (
-            <AdminGlassCard key={target.provider} className="p-5">
+            <section
+              key={target.provider}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950"
+            >
               <div className="mb-2 flex items-center gap-2 font-medium">
                 <Cloud className="h-4 w-4" />
                 {cloudProviderLabel(target.provider)}
@@ -531,13 +484,12 @@ export function BackupDashboardPage() {
               <Button className="mt-3 w-full" size="sm" variant="outline" asChild>
                 <Link href="/admin/administration/backups/cloud">Configure</Link>
               </Button>
-            </AdminGlassCard>
+            </section>
           ))}
         </div>
 
-        {/* Timeline + pre-operation */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <AdminGlassCard className="p-5">
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div className="mb-4 flex items-center gap-2 font-medium">
               <History className="h-4 w-4" />
               Backup History Timeline
@@ -550,9 +502,9 @@ export function BackupDashboardPage() {
                 <li className="text-sm text-muted-foreground">No backup history yet.</li>
               ) : null}
             </ol>
-          </AdminGlassCard>
+          </section>
 
-          <AdminGlassCard className="p-5">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
             <div className="mb-2 flex items-center gap-2 font-medium">
               <Database className="h-4 w-4" />
               Pre-Operation Backup
@@ -574,11 +526,10 @@ export function BackupDashboardPage() {
             <p className="mt-3 text-xs text-muted-foreground">
               Safety backups are created automatically before restore and major data operations.
             </p>
-          </AdminGlassCard>
+          </section>
         </div>
 
-        {/* Nav shortcuts */}
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
             {
               href: '/admin/administration/backups/schedule',
@@ -593,11 +544,13 @@ export function BackupDashboardPage() {
             },
             { href: '/admin/administration/backups/cloud', label: 'Cloud Storage', icon: Cloud },
           ].map((link) => (
-            <Link key={link.href} href={link.href}>
-              <AdminGlassCard className="flex items-center gap-2 p-4 transition hover:border-primary/40">
-                <link.icon className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">{link.label}</span>
-              </AdminGlassCard>
+            <Link
+              key={link.href}
+              href={link.href}
+              className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium text-slate-800 shadow-sm transition hover:border-sky-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+            >
+              <link.icon className="h-4 w-4 text-sky-600" />
+              {link.label}
             </Link>
           ))}
         </div>
