@@ -191,6 +191,7 @@ export function PortalUsersPage() {
         'Shift',
         'Status',
         'Last login',
+        'App',
       ];
       const lines = [
         header.map(csvCell).join(','),
@@ -204,6 +205,7 @@ export function PortalUsersPage() {
             row.shift?.name ?? '',
             row.accountStatus,
             row.lastLoginAt ?? '',
+            row.appInstalled ? 'Installed' : 'Not installed',
           ]
             .map(csvCell)
             .join(','),

@@ -112,13 +112,14 @@ export function PortalUsersTable({
             <th className="px-3 py-3">Shift</th>
             <th className="px-3 py-3">Status</th>
             <th className="px-3 py-3">Last Login</th>
+            <th className="px-3 py-3">App</th>
             <th className="w-28 px-3 py-3 text-right">Actions</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
+              <td colSpan={10} className="px-4 py-10 text-center text-sm text-muted-foreground">
                 No portal users match these filters.
               </td>
             </tr>
@@ -186,6 +187,15 @@ export function PortalUsersTable({
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-slate-500">
                     {row.lastLoginAt ? formatDisplayDateTime(row.lastLoginAt) : 'Never'}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs">
+                    {row.appInstalled == null ? (
+                      <span className="text-slate-400">—</span>
+                    ) : row.appInstalled ? (
+                      <span className="font-medium text-emerald-700">Installed</span>
+                    ) : (
+                      <span className="font-medium text-rose-700">Not installed</span>
+                    )}
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex items-center justify-end gap-1">

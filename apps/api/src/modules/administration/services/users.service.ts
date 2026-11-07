@@ -149,6 +149,9 @@ export class UsersService {
         ...(this.audienceWhere(query.audience)
           ? [this.audienceWhere(query.audience)!]
           : []),
+        ...(this.appUseWhere(query.appUse)
+          ? [this.appUseWhere(query.appUse)!]
+          : []),
       ],
     };
 
@@ -195,11 +198,15 @@ export class UsersService {
               primaryShift: { select: { id: true, name: true, code: true } },
             },
           },
+          _count: { select: { mobileDevices: true } },
         },
       }),
     ]);
 
-    const items = users.map((u) => this.mapUserRow(u));
+    const items = users.map((u) => ({
+      ...this.mapUserRow(u),
+      appInstalled: u._count.mobileDevices > 0,
+    }));
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
@@ -268,6 +275,15 @@ export class UsersService {
       hasStaffProfile: !!u.staffProfile,
       createdAt: u.createdAt,
     };
+  }
+
+  private appUseWhere(appUse?: string): Prisma.UserWhereInput | undefined {
+    if (appUse === 'never_login') return { lastLoginAt: null };
+    if (appUse === 'no_app') return { mobileDevices: { none: {} } };
+    if (appUse === 'web_only') {
+      return { lastLoginAt: { not: null }, mobileDevices: { none: {} } };
+    }
+    return undefined;
   }
 
   private searchWhere(term: string): Prisma.UserWhereInput[] {

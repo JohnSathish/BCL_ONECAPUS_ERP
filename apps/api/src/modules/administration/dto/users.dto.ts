@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsEmail,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -37,6 +38,11 @@ export class ListUsersQueryDto {
   @IsOptional()
   @IsString()
   audience?: string;
+
+  /** never_login | no_app | web_only */
+  @IsOptional()
+  @IsIn(['never_login', 'no_app', 'web_only'])
+  appUse?: string;
 
   @IsOptional()
   @IsUUID()

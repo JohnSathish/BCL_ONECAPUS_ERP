@@ -2,6 +2,13 @@
 
 import type { PortalUserFilters } from '@/types/administration';
 
+const APP_USE_OPTIONS = [
+  { value: '', label: 'All app use' },
+  { value: 'never_login', label: 'Never logged in' },
+  { value: 'no_app', label: 'App not installed' },
+  { value: 'web_only', label: 'Website only' },
+];
+
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
   { value: 'active', label: 'Active' },
@@ -87,6 +94,20 @@ export function PortalUsersFilterRail({
         {STATUS_OPTIONS.map((status) => (
           <option key={status.value || 'all'} value={status.value}>
             {status.label}
+          </option>
+        ))}
+      </select>
+      <select
+        className={selectClass}
+        value={filters.appUse ?? ''}
+        onChange={(event) =>
+          onChange({ ...filters, appUse: event.target.value || undefined, page: 1 })
+        }
+        aria-label="App use"
+      >
+        {APP_USE_OPTIONS.map((option) => (
+          <option key={option.value || 'all-app'} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>

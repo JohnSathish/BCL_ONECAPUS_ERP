@@ -13,6 +13,7 @@ export type PortalUserRow = {
   isActive: boolean;
   mfaEnabled: boolean;
   lastLoginAt: string | null;
+  appInstalled?: boolean;
   mustResetPassword: boolean;
   hasStudentProfile: boolean;
   hasFacultyProfile: boolean;
@@ -150,6 +151,8 @@ export type PortalUserFilters = {
   status?: string;
   /** students | faculty | staff | parents | alumni | others */
   audience?: string;
+  /** never_login | no_app | web_only */
+  appUse?: string;
   page?: number;
   limit?: number;
 };
