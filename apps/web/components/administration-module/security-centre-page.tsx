@@ -4,12 +4,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bell,
   CalendarClock,
+  CheckCircle2,
+  ChevronDown,
   Code2,
   Database,
+  Download,
   Fingerprint,
   Globe,
   HardDrive,
+  History,
+  Info,
+  KeyRound,
   Lock,
+  RotateCcw,
   ScrollText,
   Server,
   Shield,
@@ -17,6 +24,7 @@ import {
   ShieldCheck,
   TriangleAlert,
   UserRound,
+  Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -33,9 +41,10 @@ import {
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { usePermissions } from '@/hooks/use-permissions';
+import { fetchSecuritySettings } from '@/services/administration';
+import type { SecuritySettings } from '@/types/administration';
 import {
   acceptSecurityFile,
   acknowledgeSecurityAlert,
@@ -74,6 +83,87 @@ const SOURCES = [
   ['permissions', 'Denied permissions'],
   ['platform', 'Roles and configuration'],
 ] as const;
+
+const POLICY_DEFAULTS: SecurityPolicy = {
+  maxFailures: 8,
+  windowMinutes: 20,
+  lockMinutes: 5,
+  escalatedLockMinutes: 15,
+  failedLoginAlertThreshold: 5,
+  suspiciousIpMinIdentifiers: 4,
+  unauthorizedApiThreshold: 10,
+  bulkDownloadThreshold: 15,
+  bulkMutationThreshold: 25,
+  notifyInApp: true,
+  notifyEmail: true,
+  fileIntegrityEnabled: true,
+};
+
+type NumericPolicyKey = {
+  [K in keyof SecurityPolicy]: SecurityPolicy[K] extends number ? K : never;
+}[keyof SecurityPolicy];
+
+const PROTECTION_FIELDS: Array<{
+  key: NumericPolicyKey;
+  label: string;
+  unit: string;
+  hint: string;
+}> = [
+  {
+    key: 'maxFailures',
+    label: 'Failed attempts before lock',
+    unit: 'attempts',
+    hint: 'Sign-in attempts from the same address before the account locks.',
+  },
+  {
+    key: 'windowMinutes',
+    label: 'Failure window',
+    unit: 'minutes',
+    hint: 'How far back failed attempts are counted.',
+  },
+  {
+    key: 'lockMinutes',
+    label: 'Lock duration',
+    unit: 'minutes',
+    hint: 'How long the first lock lasts.',
+  },
+  {
+    key: 'escalatedLockMinutes',
+    label: 'Escalated lock (repeat offenders)',
+    unit: 'minutes',
+    hint: 'Longer lock after repeated lockouts.',
+  },
+  {
+    key: 'failedLoginAlertThreshold',
+    label: 'Failed sign-in alert threshold',
+    unit: 'attempts',
+    hint: 'Failures that raise a security alert.',
+  },
+  {
+    key: 'suspiciousIpMinIdentifiers',
+    label: 'Accounts per suspicious address',
+    unit: 'accounts',
+    hint: 'Different accounts failing from one address before it is flagged.',
+  },
+  {
+    key: 'unauthorizedApiThreshold',
+    label: 'Denied API alert threshold',
+    unit: 'attempts',
+    hint: 'Denied API calls that raise an alert.',
+  },
+  {
+    key: 'bulkDownloadThreshold',
+    label: 'Bulk download threshold',
+    unit: 'requests',
+    hint: 'Downloads that raise a bulk-export alert.',
+  },
+  {
+    key: 'bulkMutationThreshold',
+    label: 'Mass change threshold',
+    unit: 'records',
+    hint: 'Records changed in one action that raise an alert.',
+  },
+];
 
 const SERVER_LABELS: Record<string, string> = {
   nodeEnv: 'Environment',
@@ -155,7 +245,7 @@ export function SecurityCentrePage() {
   const dashboardQ = useQuery({
     queryKey: ['security-centre', 'dashboard'],
     queryFn: fetchSecurityDashboard,
-    enabled: isAdmin && tab === 'overview',
+    enabled: isAdmin && (tab === 'overview' || tab === 'protection'),
   });
   const alertsQ = useQuery({
     queryKey: ['security-centre', 'alerts', alertStatus],
@@ -175,6 +265,16 @@ export function SecurityCentrePage() {
   const policyQ = useQuery({
     queryKey: ['security-centre', 'policy'],
     queryFn: fetchSecurityPolicy,
+    enabled: isAdmin && tab === 'protection',
+  });
+  const settingsQ = useQuery({
+    queryKey: ['security-settings'],
+    queryFn: fetchSecuritySettings,
+    enabled: isAdmin && tab === 'protection',
+  });
+  const policyTrailQ = useQuery({
+    queryKey: ['security-centre', 'policy-updated'],
+    queryFn: () => fetchSecurityTrail({ source: 'security', limit: '30' }),
     enabled: isAdmin && tab === 'protection',
   });
 
@@ -202,6 +302,7 @@ export function SecurityCentrePage() {
     onSuccess: (saved) => {
       setPolicy(saved);
       void qc.invalidateQueries({ queryKey: ['security-centre', 'policy'] });
+      void qc.invalidateQueries({ queryKey: ['security-centre', 'policy-updated'] });
     },
   });
 
@@ -485,75 +586,481 @@ export function SecurityCentrePage() {
               </div>
             ) : null}
 
-            {tab === 'protection' && policy ? (
-              <Panel className="grid max-w-xl gap-3 p-4">
-                {(
-                  [
-                    ['maxFailures', 'Failed attempts before lock'],
-                    ['windowMinutes', 'Failure window (minutes)'],
-                    ['lockMinutes', 'Lock duration (minutes)'],
-                    ['escalatedLockMinutes', 'Escalated lock (minutes)'],
-                    ['failedLoginAlertThreshold', 'Failed sign-in alert threshold'],
-                    ['suspiciousIpMinIdentifiers', 'Accounts per suspicious address'],
-                    ['unauthorizedApiThreshold', 'Denied API alert threshold'],
-                    ['bulkDownloadThreshold', 'Bulk download threshold'],
-                    ['bulkMutationThreshold', 'Mass change threshold'],
-                  ] as const
-                ).map(([key, label]) => (
-                  <Label key={key} className="grid gap-1 text-xs text-slate-500">
-                    {label}
-                    <Input
-                      type="number"
-                      value={policy[key]}
-                      onChange={(event) =>
-                        setPolicy({ ...policy, [key]: Number(event.target.value) })
-                      }
-                    />
-                  </Label>
-                ))}
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={policy.notifyInApp}
-                    onChange={(event) =>
-                      setPolicy({ ...policy, notifyInApp: event.target.checked })
-                    }
-                  />
-                  In-app notices to super administrators
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={policy.notifyEmail}
-                    onChange={(event) =>
-                      setPolicy({ ...policy, notifyEmail: event.target.checked })
-                    }
-                  />
-                  Email notices to super administrators
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={policy.fileIntegrityEnabled}
-                    onChange={(event) =>
-                      setPolicy({ ...policy, fileIntegrityEnabled: event.target.checked })
-                    }
-                  />
-                  Hourly file integrity checks
-                </label>
-                <Button
-                  size="sm"
-                  onClick={() => savePolicy.mutate(policy)}
-                  disabled={savePolicy.isPending}
-                >
-                  Save protection settings
-                </Button>
-              </Panel>
+            {tab === 'protection' ? (
+              <ProtectionBoard
+                loading={policyQ.isLoading}
+                error={policyQ.isError}
+                policy={policy}
+                settings={settingsQ.data}
+                openAlerts={dashboardQ.data?.openAlerts}
+                lastUpdated={
+                  policyTrailQ.data?.items.find((row) => row.action === 'monitor_policy_updated')
+                    ?.at
+                }
+                saving={savePolicy.isPending}
+                saveError={savePolicy.isError}
+                onChange={setPolicy}
+                onSave={() => {
+                  if (policy) savePolicy.mutate(policy);
+                }}
+                onReset={() => setPolicy({ ...POLICY_DEFAULTS })}
+                onHistory={() => {
+                  setSource('security');
+                  setSearch('');
+                  setQ('');
+                  setTab('audit');
+                }}
+              />
             ) : null}
           </>
         )}
       </div>
     </DashboardShell>
+  );
+}
+
+function formatMinutes(minutes: number) {
+  if (!Number.isFinite(minutes) || minutes <= 0) return '—';
+  if (minutes % 60 === 0 && minutes >= 60) {
+    const hours = minutes / 60;
+    return `${hours} hour${hours === 1 ? '' : 's'}`;
+  }
+  return `${minutes} minutes`;
+}
+
+function ProtectionBoard({
+  loading,
+  error,
+  policy,
+  settings,
+  openAlerts,
+  lastUpdated,
+  saving,
+  saveError,
+  onChange,
+  onSave,
+  onReset,
+  onHistory,
+}: {
+  loading: boolean;
+  error: boolean;
+  policy: SecurityPolicy | null;
+  settings: SecuritySettings | undefined;
+  openAlerts: number | undefined;
+  lastUpdated: string | undefined;
+  saving: boolean;
+  saveError: boolean;
+  onChange: (policy: SecurityPolicy) => void;
+  onSave: () => void;
+  onReset: () => void;
+  onHistory: () => void;
+}) {
+  if (loading) {
+    return <div className="h-96 animate-pulse rounded-2xl bg-white/70" />;
+  }
+  if (error || !policy) {
+    return (
+      <Panel className="p-5 text-sm text-slate-600">
+        Protection settings are unavailable. Apply the security centre database migration, then
+        reload.
+      </Panel>
+    );
+  }
+
+  const strongPassword = Boolean(
+    settings?.requireUppercase &&
+    settings.requireLowercase &&
+    settings.requireNumber &&
+    settings.requireSpecial,
+  );
+  const historyCount = settings?.passwordHistoryCount ?? 5;
+  const healthy = openAlerts === 0;
+  const controls = [
+    { name: 'Data Change Monitoring', state: 'Active', on: true, icon: Database },
+    {
+      name: 'File Integrity Monitoring',
+      state: policy.fileIntegrityEnabled ? 'Active' : 'Off',
+      on: policy.fileIntegrityEnabled,
+      icon: Fingerprint,
+    },
+    { name: 'Two-Factor Authentication', state: 'Active', on: true, icon: KeyRound },
+    { name: 'Security Logging', state: 'Active', on: true, icon: ScrollText },
+    {
+      name: 'Real-time Alerts',
+      state: policy.notifyInApp || policy.notifyEmail ? 'Active' : 'Off',
+      on: policy.notifyInApp || policy.notifyEmail,
+      icon: Bell,
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Panel className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-emerald-50 text-emerald-600">
+            <ShieldCheck className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Protection Settings</h2>
+            <p className="text-xs text-slate-500">
+              Configure access security, rate limits, session policy and threat protection for your
+              ERP.
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-slate-500">
+            Current Protection Status{' '}
+            <span
+              className={cn(
+                'ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                healthy ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-700',
+              )}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {openAlerts === undefined ? 'Checking' : healthy ? 'Active' : 'Review'}
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            {openAlerts === undefined
+              ? 'Reading open alerts'
+              : healthy
+                ? 'No critical issues'
+                : `${formatCount(openAlerts)} open alert${openAlerts === 1 ? '' : 's'}`}
+            {lastUpdated ? ` · Last updated: ${formatEventTime(lastUpdated)}` : ''}
+          </p>
+        </div>
+      </Panel>
+
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <Panel className="p-4">
+          <div className="mb-4 flex items-start gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-50 text-sky-600">
+              <Lock className="h-4 w-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">Login & Access Protection</h3>
+              <p className="text-xs text-slate-500">
+                Configure login attempt limits and automatic account lockout.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {PROTECTION_FIELDS.map((field) => (
+              <label
+                key={field.key}
+                title={field.hint}
+                className="grid items-center gap-3 sm:grid-cols-[1fr_auto]"
+              >
+                <span className="flex items-center gap-1.5 text-sm text-slate-700">
+                  {field.label}
+                  <Info className="h-3.5 w-3.5 text-slate-400" aria-label={field.hint} />
+                </span>
+                <span className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={Number(policy[field.key])}
+                    onChange={(event) =>
+                      onChange({ ...policy, [field.key]: Number(event.target.value) })
+                    }
+                    className="h-9 w-[4.5rem] rounded-lg border-slate-200 bg-slate-50 text-center"
+                  />
+                  <span className="w-16 text-xs text-slate-400">{field.unit}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+            <NoticeToggle
+              checked={policy.notifyInApp}
+              title="In-app notices to super administrators"
+              detail="Show security alerts inside the ERP."
+              onChange={(checked) => onChange({ ...policy, notifyInApp: checked })}
+            />
+            <NoticeToggle
+              checked={policy.notifyEmail}
+              title="Email notices to super administrators"
+              detail="Send critical security alerts by email."
+              onChange={(checked) => onChange({ ...policy, notifyEmail: checked })}
+            />
+            <NoticeToggle
+              checked={policy.fileIntegrityEnabled}
+              title="File integrity checks"
+              detail="Keep checksums for watched application files."
+              onChange={(checked) => onChange({ ...policy, fileIntegrityEnabled: checked })}
+            />
+          </div>
+        </Panel>
+
+        <div className="space-y-4">
+          <Panel className="p-4">
+            <div className="mb-3 flex items-start gap-3">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-50 text-amber-500">
+                <Zap className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Attack & Access Controls</h3>
+                <p className="text-xs text-slate-500">
+                  Additional protection against common attacks and abuse.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <PlatformControl
+                icon={Globe}
+                title="IP Address Blocking"
+                detail="Repeated failures from the same address lock that sign-in."
+              />
+              <PlatformControl
+                icon={Shield}
+                title="Brute-force Protection"
+                detail="Detect and block repeated login attempts."
+              />
+              <PlatformControl
+                icon={Code2}
+                title="API Access Protection"
+                detail="Restrict and monitor unauthorized API requests."
+              />
+            </div>
+          </Panel>
+
+          <Panel className="p-4">
+            <h3 className="text-sm font-semibold text-slate-900">Rate Limiting</h3>
+            <p className="mb-3 text-xs text-slate-500">
+              Limit excessive requests from a single user or IP address.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <RateTile
+                icon={UserRound}
+                label="Login Attempts"
+                value="60"
+                unit="/ 15 min"
+                className="bg-sky-50 text-sky-700"
+              />
+              <RateTile
+                icon={Code2}
+                label="API Requests"
+                value="300"
+                unit="/ minute"
+                className="bg-violet-50 text-violet-700"
+              />
+              <RateTile
+                icon={Download}
+                label="Download alerts"
+                value={formatCount(policy.bulkDownloadThreshold)}
+                unit="requests"
+                className="bg-amber-50 text-amber-700"
+              />
+            </div>
+          </Panel>
+
+          <Panel className="p-4">
+            <div className="mb-3 flex items-start gap-3">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-50 text-sky-600">
+                <KeyRound className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Session & Password Policy</h3>
+                <p className="text-xs text-slate-500">
+                  Current inactivity limit, session length, and password rules.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ReadOnlyChoice label="Session timeout (inactivity)" value="15 minutes" />
+              <ReadOnlyChoice
+                label="Maximum session duration"
+                value={
+                  settings ? formatMinutes(settings.sessionTimeoutMinutes) : 'Reading settings'
+                }
+              />
+              <ReadOnlyChoice
+                label="Minimum password length"
+                value={settings ? `${settings.minPasswordLength} characters` : 'Reading settings'}
+                className="sm:col-span-2"
+              />
+            </div>
+            <div className="mt-3 space-y-2">
+              <ReadOnlyCheck
+                checked={settings ? strongPassword : true}
+                label="Require strong password (upper, lower, number, special character)"
+              />
+              <ReadOnlyCheck
+                checked={historyCount > 0}
+                label={`Prevent reuse of last ${historyCount} passwords`}
+              />
+            </div>
+          </Panel>
+
+          <Panel className="p-4">
+            <h3 className="text-sm font-semibold text-slate-900">Security Controls</h3>
+            <p className="mb-3 text-xs text-slate-500">
+              System-wide protection and monitoring options.
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+              {controls.map((control) => (
+                <div
+                  key={control.name}
+                  className="rounded-2xl border border-emerald-100 bg-emerald-50/40 px-2 py-3 text-center"
+                >
+                  <control.icon className="mx-auto h-4 w-4 text-emerald-600" />
+                  <p className="mt-2 text-[11px] font-medium leading-tight text-slate-700">
+                    {control.name}
+                  </p>
+                  <p
+                    className={cn(
+                      'mt-2 inline-flex items-center gap-1 text-[11px] font-medium',
+                      control.on ? 'text-emerald-600' : 'text-slate-400',
+                    )}
+                  >
+                    <CheckCircle2 className="h-3 w-3" />
+                    {control.state}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          onClick={onSave}
+          disabled={saving}
+          className="rounded-full bg-sky-600 px-4 text-white hover:bg-sky-700"
+        >
+          <ShieldCheck className="mr-2 h-4 w-4" />
+          {saving ? 'Saving…' : 'Save Protection Settings'}
+        </Button>
+        <Button type="button" variant="outline" onClick={onReset} className="rounded-full bg-white">
+          <RotateCcw className="mr-2 h-4 w-4" />
+          Reset to Default
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onHistory}
+          className="rounded-full bg-white"
+        >
+          <History className="mr-2 h-4 w-4" />
+          View Change History
+        </Button>
+        {saveError ? (
+          <p className="text-sm text-rose-600">The settings could not be saved. Try again.</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function NoticeToggle({
+  checked,
+  title,
+  detail,
+  onChange,
+}: {
+  checked: boolean;
+  title: string;
+  detail: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-2 text-sm text-slate-800">
+      <input
+        type="checkbox"
+        className="mt-0.5 h-4 w-4 accent-sky-600"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span>
+        <span className="font-medium">{title}</span>
+        <span className="block text-xs font-normal text-slate-500">{detail}</span>
+      </span>
+    </label>
+  );
+}
+
+function PlatformControl({
+  icon: Icon,
+  title,
+  detail,
+}: {
+  icon: typeof Shield;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-start gap-2">
+        <Icon className="mt-0.5 h-4 w-4 text-sky-500" />
+        <div>
+          <p className="text-sm font-medium text-slate-800">{title}</p>
+          <p className="text-xs text-slate-500">{detail}</p>
+        </div>
+      </div>
+      <span
+        className="relative inline-flex h-6 w-11 shrink-0 rounded-full bg-sky-500"
+        role="img"
+        aria-label={`${title} is on`}
+      >
+        <span className="absolute right-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow" />
+      </span>
+    </div>
+  );
+}
+
+function RateTile({
+  icon: Icon,
+  label,
+  value,
+  unit,
+  className,
+}: {
+  icon: typeof Shield;
+  label: string;
+  value: string;
+  unit: string;
+  className: string;
+}) {
+  return (
+    <div className={cn('rounded-2xl px-3 py-3', className)}>
+      <Icon className="h-4 w-4" />
+      <p className="mt-2 text-[11px] font-medium uppercase tracking-wide opacity-80">{label}</p>
+      <p className="text-lg font-semibold leading-tight">{value}</p>
+      <p className="text-xs opacity-80">{unit}</p>
+    </div>
+  );
+}
+
+function ReadOnlyChoice({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <p className="mb-1 flex items-center gap-1.5 text-sm text-slate-700">
+        {label}
+        <Info className="h-3.5 w-3.5 text-slate-400" />
+      </p>
+      <div className="flex h-10 items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800">
+        {value}
+        <ChevronDown className="h-4 w-4 text-slate-400" />
+      </div>
+    </div>
+  );
+}
+
+function ReadOnlyCheck({ checked, label }: { checked: boolean; label: string }) {
+  return (
+    <p className="flex items-center gap-2 text-sm text-slate-700">
+      <input type="checkbox" className="h-4 w-4 accent-sky-600" checked={checked} disabled />
+      {label}
+    </p>
   );
 }
 
