@@ -14,6 +14,7 @@ import { hasGlobalUnsavedChanges } from '@/lib/auth/unsaved-changes-registry';
 import { broadcastSessionMessage, subscribeSessionBroadcast } from '@/lib/auth/session-broadcast';
 import { confirmGlobalUnsavedDiscard } from '@/lib/auth/unsaved-changes-registry';
 import { isAuthColdPath } from '@/lib/auth/auth-cold-path';
+import { noteBackLogoutSession } from '@/lib/auth/back-logout-history';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { logout as logoutApi, bootstrapSession } from '@/services/auth';
 import { useAuthStore } from '@/store/auth-store';
@@ -46,6 +47,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (forcedLogoutRef.current) return;
       if (!skipUnsavedCheck && !confirmGlobalUnsavedDiscard()) return;
 
+      noteBackLogoutSession(false);
       forcedLogoutRef.current = true;
       // Keep bootstrap "done" so clearing the session does not kick off a 30s refresh retry.
       initialBootstrapDoneRef.current = true;
@@ -173,6 +175,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return subscribeSessionBroadcast((message) => {
       if (message.type === 'LOGOUT') {
+        noteBackLogoutSession(false);
         forcedLogoutRef.current = true;
         initialBootstrapDoneRef.current = true;
         clear();

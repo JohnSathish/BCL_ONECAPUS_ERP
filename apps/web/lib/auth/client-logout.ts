@@ -4,6 +4,7 @@ import { logout as logoutApi } from '@/services/auth';
 import { useAuthStore } from '@/store/auth-store';
 import { useWorkspaceStore } from '@/store/workspace-store';
 import { broadcastSessionMessage } from './session-broadcast';
+import { noteBackLogoutSession } from './back-logout-history';
 import { tokenRefreshManager } from './token-refresh-manager';
 
 type RouterLike = {
@@ -26,6 +27,7 @@ type LogoutClientOptions = {
 export function logoutClientSide(router: RouterLike, options: LogoutClientOptions = {}) {
   const { broadcast = true, redirectTo = '/login', clearWorkspace = true } = options;
 
+  noteBackLogoutSession(false);
   tokenRefreshManager.clearSchedule();
   useAuthStore.getState().clear();
   useAuthStore.getState().setBootstrapping(false);

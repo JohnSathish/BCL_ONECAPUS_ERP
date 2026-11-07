@@ -5,6 +5,11 @@ import {
   resolveHomePath,
 } from '@/lib/permissions/portal-access';
 import { resolveSchoolSisHomePath } from '@/lib/school-sis/portal-access';
+import {
+  clearBackLogoutTrap,
+  markCollegeBackLogoutPending,
+  shouldArmBackLogout,
+} from '@/lib/auth/back-logout-history';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { useAuthStore } from '@/store/auth-store';
 import type { AuthSession } from '@/types/auth';
@@ -26,6 +31,7 @@ export function finishWebLogin(input: {
   useAuthStore.getState().setPrefs({ rememberMe: input.rememberMe });
   useAuthStore.getState().setBootstrapping(false);
   tokenRefreshManager.scheduleProactiveRefresh(session);
+  if (typeof window !== 'undefined') clearBackLogoutTrap();
   if (session.user.mustResetPassword) {
     input.router.replace('/change-password');
     return;
@@ -58,6 +64,12 @@ export function finishWebLogin(input: {
   ) {
     input.router.replace(destination);
     return;
+  }
+  if (
+    typeof window !== 'undefined' &&
+    shouldArmBackLogout({ schoolSession: Boolean(schoolSession), destination })
+  ) {
+    markCollegeBackLogoutPending();
   }
   window.location.assign(destination);
 }

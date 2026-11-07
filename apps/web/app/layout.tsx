@@ -4,6 +4,7 @@ import { GeistSans } from 'geist/font/sans';
 import Script from 'next/script';
 import { Suspense } from 'react';
 import { AppProviders } from '@/components/providers/app-providers';
+import { BACK_LOGOUT_BOOT_SCRIPT } from '@/lib/auth/back-logout-history';
 import { THEME_FOUC_SCRIPT } from '@/lib/theme/css-variables';
 import './globals.css';
 
@@ -32,6 +33,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <Script id="theme-fouc" strategy="beforeInteractive">
           {THEME_FOUC_SCRIPT}
+        </Script>
+        <Script id="bc-back-logout" strategy="beforeInteractive">
+          {BACK_LOGOUT_BOOT_SCRIPT}
         </Script>
       </head>
       <body

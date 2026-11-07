@@ -10,11 +10,18 @@ import { Label } from '@/components/ui/label';
 import { changePassword } from '@/services/student-portal';
 import { logout } from '@/services/auth';
 import { useAuthStore } from '@/store/auth-store';
+import {
+  clearBackLogoutTrap,
+  markCollegeBackLogoutPending,
+  noteBackLogoutSession,
+  shouldArmBackLogout,
+} from '@/lib/auth/back-logout-history';
 import { tokenRefreshManager } from '@/lib/auth/token-refresh-manager';
 import { evaluatePasswordPolicy } from '@/utils/password-policy';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 import { resolveHomePath } from '@/lib/permissions/portal-access';
+import { isSchoolErpSession } from '@/lib/school-admissions-branding';
 import { isSecondarySchoolSisSession } from '@/lib/school-erp/product';
 import { resolveSchoolSisHomePath } from '@/lib/school-sis/portal-access';
 
@@ -180,21 +187,36 @@ export default function ForceChangePasswordPage() {
         tokenRefreshManager.scheduleProactiveRefresh(next);
         const nextRoles = next.user.roles ?? [];
         const nextPerms = next.user.permissions ?? [];
+        const schoolSession = isSchoolErpSession({
+          tenantSlug: next.user.tenantSlug,
+          hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+        });
         const dest = isLibraryKioskHost()
           ? '/library-desk'
           : isSecondarySchoolSisSession({
+                tenantSlug: next.user.tenantSlug,
                 hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
               })
             ? resolveSchoolSisHomePath(nextRoles, nextPerms)
             : nextRoles.includes('school-student') || nextRoles.includes('school-parent')
               ? '/school-sis-portal/student'
               : resolveHomePath(nextRoles, nextPerms);
+        if (
+          shouldArmBackLogout({
+            schoolSession: schoolSession || isLibraryKioskHost(),
+            destination: dest,
+          })
+        ) {
+          markCollegeBackLogoutPending();
+        }
         // Soft navigate so the new in-memory session is not wiped by a full reload.
         router.replace(dest);
         return;
       }
       tokenRefreshManager.clearSchedule();
       clear();
+      noteBackLogoutSession(false);
+      clearBackLogoutTrap();
       void logout().catch(() => undefined);
       router.replace(loginPathAfterReset());
     } catch (err) {

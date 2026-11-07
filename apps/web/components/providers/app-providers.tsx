@@ -4,6 +4,7 @@ import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { BrandingDocumentTitle } from '@/components/branding/branding-document-title';
+import { BackLogoutGuard } from '@/components/auth/back-logout-guard';
 import { SessionProvider } from '@/components/providers/session-provider';
 import { StudentNameFormatProvider } from '@/components/providers/student-name-format-provider';
 import { ThemeProvider as InstitutionThemeProvider } from '@/lib/theme/theme-provider';
@@ -33,6 +34,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     >
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
+          <BackLogoutGuard />
           <StudentNameFormatProvider>
             <InstitutionThemeProvider>
               <BrandingDocumentTitle />
