@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { PrismaService } from '../../../database/prisma.service';
 import { CommunicationSmsService } from '../../communication/services/communication-sms.service';
@@ -21,7 +21,7 @@ import {
   type ProfileMonitorFieldKey,
 } from '../domain/profile-completion-monitor.logic';
 
-const MAX_RECIPIENTS = 250;
+const SYNC_RECIPIENTS = 40;
 const COLLEGE_NAME = 'Don Bosco College, Tura';
 
 type Channel = 'WHATSAPP' | 'SMS' | 'PUSH';
@@ -44,6 +44,8 @@ type LoadedStudent = Awaited<
 
 @Injectable()
 export class ProfileCompletionMonitorService {
+  private readonly logger = new Logger(ProfileCompletionMonitorService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsapp: CommunicationWhatsAppService,
@@ -335,9 +337,19 @@ export class ProfileCompletionMonitorService {
       throw new BadRequestException(
         'No incomplete students match this reminder.',
       );
-    if (recipients.length > MAX_RECIPIENTS) {
+    const channelReady =
+      input.channel === 'PUSH'
+        ? this.fcm.isConfigured()
+        : input.channel === 'WHATSAPP'
+          ? this.whatsapp.isConfigured()
+          : this.sms.isConfigured();
+    if (!channelReady) {
       throw new BadRequestException(
-        `This reminder matches ${recipients.length} students. Narrow the filters to ${MAX_RECIPIENTS} or fewer before sending.`,
+        input.channel === 'WHATSAPP'
+          ? 'WhatsApp is not configured, so the reminder was not sent.'
+          : input.channel === 'SMS'
+            ? 'SMS is not configured, so the reminder was not sent.'
+            : 'Push notifications are not configured, so the reminder was not sent.',
       );
     }
 
@@ -352,6 +364,50 @@ export class ProfileCompletionMonitorService {
       },
     });
 
+    const work = () =>
+      this.deliverBatch(
+        batch.id,
+        tenantId,
+        actorId,
+        recipients,
+        { channel: input.channel, audience: input.audience, message },
+        intervalHours,
+      );
+    if (recipients.length > SYNC_RECIPIENTS) {
+      void work().catch((error) =>
+        this.logger.error(
+          `Profile reminder ${batch.id} failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+      return {
+        batchId: batch.id,
+        recipients: recipients.length,
+        success: 0,
+        failed: 0,
+        skipped: 0,
+        queued: true,
+      };
+    }
+    const counts = await work();
+    return { batchId: batch.id, recipients: recipients.length, ...counts };
+  }
+
+  private async deliverBatch(
+    batchId: string,
+    tenantId: string,
+    actorId: string,
+    recipients: Array<{
+      studentId: string;
+      fullName: string;
+      rollNumber: string | null;
+      mobileNumber: string | null;
+      whatsappNumber: string | null;
+      userId: string;
+      missing: Array<{ label: string }>;
+    }>,
+    input: { channel: Channel; audience: Audience; message: string },
+    intervalHours: number,
+  ) {
     let success = 0;
     let failed = 0;
     let skipped = 0;
@@ -367,7 +423,7 @@ export class ProfileCompletionMonitorService {
         },
         select: { id: true },
       });
-      const body = personalizeReminder(message, {
+      const body = personalizeReminder(input.message, {
         studentName: student.fullName,
         rollNumber: student.rollNumber ?? '',
         missingFields: student.missing.map((item) => item.label),
@@ -376,7 +432,7 @@ export class ProfileCompletionMonitorService {
       if (recent) {
         skipped += 1;
         await this.recordDelivery(
-          batch.id,
+          batchId,
           tenantId,
           student,
           input.channel,
@@ -391,7 +447,7 @@ export class ProfileCompletionMonitorService {
       if (result.status === 'SENT') success += 1;
       else failed += 1;
       await this.recordDelivery(
-        batch.id,
+        batchId,
         tenantId,
         student,
         input.channel,
@@ -401,7 +457,7 @@ export class ProfileCompletionMonitorService {
     }
 
     await this.prisma.profileReminderBatch.update({
-      where: { id: batch.id },
+      where: { id: batchId },
       data: {
         successCount: success,
         failedCount: failed,
@@ -415,7 +471,7 @@ export class ProfileCompletionMonitorService {
         module: 'students',
         action: 'PROFILE_COMPLETION_REMINDER',
         entityType: 'profile_reminder_batch',
-        entityId: batch.id,
+        entityId: batchId,
         metadata: {
           channel: input.channel,
           audience: input.audience,
@@ -426,13 +482,7 @@ export class ProfileCompletionMonitorService {
         },
       },
     });
-    return {
-      batchId: batch.id,
-      recipients: recipients.length,
-      success,
-      failed,
-      skipped,
-    };
+    return { success, failed, skipped };
   }
 
   private async deliver(

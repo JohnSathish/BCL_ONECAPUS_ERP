@@ -136,6 +136,7 @@ export async function sendProfileReminder(
     success: number;
     failed: number;
     skipped: number;
+    queued?: boolean;
   };
 }
 

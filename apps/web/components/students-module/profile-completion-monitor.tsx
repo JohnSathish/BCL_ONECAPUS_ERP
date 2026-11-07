@@ -80,6 +80,13 @@ export function ProfileCompletionMonitor() {
   const departmentsQ = useQuery({ queryKey: ['departments'], queryFn: () => fetchDepartments() });
   const shiftsQ = useQuery({ queryKey: ['shifts', 'monitor'], queryFn: () => fetchShifts() });
 
+  const channelReady = Boolean(
+    channel === 'WHATSAPP'
+      ? monitorQ.data?.channels.whatsapp
+      : channel === 'SMS'
+        ? monitorQ.data?.channels.sms
+        : monitorQ.data?.channels.push,
+  );
   const rows = monitorQ.data?.rows ?? [];
   const summary = monitorQ.data?.summary;
   const selectedIds = useMemo(
@@ -118,7 +125,9 @@ export function ProfileCompletionMonitor() {
     onSuccess: async (result) => {
       setConfirming(false);
       setNotice(
-        `Reminder finished. ${result.success} confirmed, ${result.failed} failed, ${result.skipped} skipped.`,
+        result.queued
+          ? `Reminder queued for ${result.recipients} students. Message history fills in as each delivery is confirmed.`
+          : `Reminder finished. ${result.success} confirmed, ${result.failed} failed, ${result.skipped} skipped.`,
       );
       await qc.invalidateQueries({ queryKey: ['profile-monitor', 'history'] });
     },
@@ -545,9 +554,10 @@ export function ProfileCompletionMonitor() {
               </p>
               <div className="flex gap-2">
                 <Button
+                  type="button"
                   size="sm"
                   className="bg-emerald-600 text-white"
-                  disabled={sendMut.isPending}
+                  disabled={sendMut.isPending || !channelReady}
                   onClick={() => sendMut.mutate()}
                 >
                   {sendMut.isPending ? 'Sending…' : 'Confirm send'}
@@ -558,20 +568,33 @@ export function ProfileCompletionMonitor() {
               </div>
             </div>
           ) : (
-            <Button
-              className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
-              disabled={
-                !message.trim() ||
-                sendMut.isPending ||
-                (audience === 'missing_field' && !filters.missingField) ||
-                recipientCount === 0
-              }
-              onClick={() => setConfirming(true)}
-            >
-              <Send className="mr-1 h-4 w-4" />
-              Send {channel === 'WHATSAPP' ? 'WhatsApp' : channel === 'SMS' ? 'SMS' : 'Push'}{' '}
-              Message
-            </Button>
+            <>
+              {!channelReady ? (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {channel === 'WHATSAPP'
+                    ? 'WhatsApp is not configured, so this reminder cannot be sent.'
+                    : channel === 'SMS'
+                      ? 'SMS is not configured, so this reminder cannot be sent.'
+                      : 'Push notifications are not configured, so this reminder cannot be sent.'}
+                </p>
+              ) : null}
+              <Button
+                type="button"
+                className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
+                disabled={
+                  !channelReady ||
+                  !message.trim() ||
+                  sendMut.isPending ||
+                  (audience === 'missing_field' && !filters.missingField) ||
+                  recipientCount === 0
+                }
+                onClick={() => setConfirming(true)}
+              >
+                <Send className="mr-1 h-4 w-4" />
+                Send {channel === 'WHATSAPP' ? 'WhatsApp' : channel === 'SMS' ? 'SMS' : 'Push'}{' '}
+                Message
+              </Button>
+            </>
           )}
         </aside>
       </div>
@@ -656,6 +679,11 @@ export function ProfileCompletionMonitor() {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="font-semibold">Message history</h2>
+        {historyQ.isError ? (
+          <p className="mt-2 text-sm text-rose-700">
+            {apiErrorMessage(historyQ.error, 'Message history could not be loaded')}
+          </p>
+        ) : null}
         <div className="mt-3 overflow-auto">
           <table className="min-w-full text-sm">
             <thead className="text-left text-xs uppercase text-slate-500">

@@ -18,7 +18,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   CurrentUser,
   type JwtUser,
@@ -29,20 +29,56 @@ import {
   type MonitorFilters,
 } from './services/profile-completion-monitor.service';
 
+function emptyAsUndefined({ value }: { value: unknown }) {
+  return typeof value === 'string' && value.trim() === '' ? undefined : value;
+}
+
 class MonitorQueryDto {
-  @IsOptional() @IsString() search?: string;
-  @IsOptional() @IsUUID() departmentId?: string;
-  @IsOptional() @Type(() => Number) @IsInt() semester?: number;
-  @IsOptional() @IsUUID() shiftId?: string;
-  @IsOptional() @IsString() gender?: string;
-  @IsOptional() @IsString() missingField?: string;
-  @IsOptional() @IsIn(['incomplete', 'complete', 'all']) status?:
-    | 'incomplete'
-    | 'complete'
-    | 'all';
-  @IsOptional() @IsUUID() academicYearId?: string;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(5) pageSize?: number;
+  @IsOptional()
+  @IsString()
+  @Transform(emptyAsUndefined)
+  search?: string;
+  @IsOptional()
+  @IsUUID()
+  @Transform(emptyAsUndefined)
+  departmentId?: string;
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  @Transform(emptyAsUndefined)
+  semester?: number;
+  @IsOptional()
+  @IsUUID()
+  @Transform(emptyAsUndefined)
+  shiftId?: string;
+  @IsOptional()
+  @IsString()
+  @Transform(emptyAsUndefined)
+  gender?: string;
+  @IsOptional()
+  @IsString()
+  @Transform(emptyAsUndefined)
+  missingField?: string;
+  @IsOptional()
+  @IsIn(['incomplete', 'complete', 'all'])
+  @Transform(emptyAsUndefined)
+  status?: 'incomplete' | 'complete' | 'all';
+  @IsOptional()
+  @IsUUID()
+  @Transform(emptyAsUndefined)
+  academicYearId?: string;
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  @Transform(emptyAsUndefined)
+  page?: number;
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Type(() => Number)
+  @Transform(emptyAsUndefined)
+  pageSize?: number;
 }
 
 class SaveMonitorSettingsDto {
