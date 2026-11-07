@@ -28,16 +28,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { ChartContainer } from '@/components/dashboard/chart-container';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1240,51 +1232,49 @@ function Overview({
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">Threat Activity (Last 7 Days)</h2>
           </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={activity} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid stroke="#e8eef7" vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Line
-                  type="monotone"
-                  dataKey="failedSignIns"
-                  name="Failed Sign-ins"
-                  stroke="#3b82f6"
-                  strokeWidth={2.4}
-                  dot={{ r: 3 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="suspiciousIps"
-                  name="Suspicious IPs"
-                  stroke="#8b5cf6"
-                  strokeWidth={2.4}
-                  dot={{ r: 3 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="unauthorizedApi"
-                  name="Unauthorized API"
-                  stroke="#fb7185"
-                  strokeWidth={2.4}
-                  dot={{ r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <ChartContainer height={256}>
+            <LineChart data={activity} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid stroke="#e8eef7" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+              <Line
+                type="monotone"
+                dataKey="failedSignIns"
+                name="Failed Sign-ins"
+                stroke="#3b82f6"
+                strokeWidth={2.4}
+                dot={{ r: 3 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="suspiciousIps"
+                name="Suspicious IPs"
+                stroke="#8b5cf6"
+                strokeWidth={2.4}
+                dot={{ r: 3 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="unauthorizedApi"
+                name="Unauthorized API"
+                stroke="#fb7185"
+                strokeWidth={2.4}
+                dot={{ r: 3 }}
+              />
+            </LineChart>
+          </ChartContainer>
         </Panel>
 
         <Panel className="p-4 xl:col-span-3">
