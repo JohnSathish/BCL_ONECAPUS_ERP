@@ -69,7 +69,9 @@ export class SecurityCentreService {
 
   async dashboard(tenantId: string) {
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
     const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const since14d = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
     const now = new Date();
 
     const [
@@ -83,6 +85,14 @@ export class SecurityCentreService {
       latestBackup,
       failedSamples,
       sensitiveCounts,
+      sensitive48h,
+      successfulLogins7d,
+      successfulLoginsPrev7d,
+      failedLoginsPrev24h,
+      unauthorizedApiPrev7d,
+      lockoutsPrev7d,
+      activity7d,
+      recentEvents,
     ] = await Promise.all([
       this.prisma.authLoginEvent.count({
         where: { tenantId, outcome: 'success' },
@@ -132,6 +142,40 @@ export class SecurityCentreService {
         take: 1000,
       }),
       this.sensitiveChangeCounts(tenantId, since24h),
+      this.sensitiveChangeCounts(tenantId, since48h),
+      this.prisma.authLoginEvent.count({
+        where: { tenantId, outcome: 'success', createdAt: { gte: since7d } },
+      }),
+      this.prisma.authLoginEvent.count({
+        where: {
+          tenantId,
+          outcome: 'success',
+          createdAt: { gte: since14d, lt: since7d },
+        },
+      }),
+      this.prisma.authLoginEvent.count({
+        where: {
+          tenantId,
+          outcome: 'failure',
+          createdAt: { gte: since48h, lt: since24h },
+        },
+      }),
+      this.prisma.permissionAuditLog.count({
+        where: {
+          tenantId,
+          outcome: 'denied',
+          createdAt: { gte: since14d, lt: since7d },
+        },
+      }),
+      this.prisma.authLoginEvent.count({
+        where: {
+          tenantId,
+          outcome: 'lockout',
+          createdAt: { gte: since14d, lt: since7d },
+        },
+      }),
+      this.threatActivity(tenantId, since7d),
+      this.recentSecurityEvents(tenantId),
     ]);
 
     const ipCounts = new Map<string, number>();
@@ -156,6 +200,19 @@ export class SecurityCentreService {
       sensitiveBreakdown: sensitiveCounts.breakdown,
       openAlerts,
       recentAlerts,
+      activity7d,
+      comparison: {
+        successfulLogins7d,
+        successfulLoginsPrev7d,
+        failedLoginsPrev24h,
+        unauthorizedApiPrev7d,
+        lockoutsPrev7d,
+        sensitiveModificationsPrev24h: Math.max(
+          0,
+          sensitive48h.total - sensitiveCounts.total,
+        ),
+      },
+      recentEvents,
       server: this.serverStatus(),
       backup: {
         lastSuccessAt: latestBackup?.completedAt ?? null,
@@ -403,6 +460,152 @@ export class SecurityCentreService {
 
   acceptFile(tenantId: string, actorUserId: string, relativePath: string) {
     return this.files.accept(tenantId, actorUserId, relativePath);
+  }
+
+  private async threatActivity(tenantId: string, since: Date) {
+    if (!/^[0-9a-f-]{36}$/i.test(tenantId))
+      return this.fillThreatActivity([], [], []);
+    const [failed, suspicious, denied] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ day: Date | string; c: number }>>`
+        SELECT (created_at AT TIME ZONE 'Asia/Kolkata')::date AS day, COUNT(*)::int AS c
+        FROM platform.auth_login_events
+        WHERE tenant_id = ${tenantId}::uuid
+          AND outcome = 'failure'
+          AND created_at >= ${since}
+        GROUP BY 1
+      `,
+      this.prisma.$queryRaw<Array<{ day: Date | string; c: number }>>`
+        SELECT day, COUNT(*)::int AS c
+        FROM (
+          SELECT (created_at AT TIME ZONE 'Asia/Kolkata')::date AS day, ip_address
+          FROM platform.auth_login_events
+          WHERE tenant_id = ${tenantId}::uuid
+            AND outcome = 'failure'
+            AND ip_address IS NOT NULL
+            AND created_at >= ${since}
+          GROUP BY 1, ip_address
+          HAVING COUNT(*) >= 5
+        ) AS hits
+        GROUP BY day
+      `,
+      this.prisma.$queryRaw<Array<{ day: Date | string; c: number }>>`
+        SELECT (created_at AT TIME ZONE 'Asia/Kolkata')::date AS day, COUNT(*)::int AS c
+        FROM platform.permission_audit_logs
+        WHERE tenant_id = ${tenantId}::uuid
+          AND outcome = 'denied'
+          AND created_at >= ${since}
+        GROUP BY 1
+      `,
+    ]);
+    return this.fillThreatActivity(failed, suspicious, denied);
+  }
+
+  private fillThreatActivity(
+    failed: Array<{ day: Date | string; c: number }>,
+    suspicious: Array<{ day: Date | string; c: number }>,
+    denied: Array<{ day: Date | string; c: number }>,
+  ) {
+    const toMap = (rows: Array<{ day: Date | string; c: number }>) =>
+      new Map(rows.map((row) => [this.dayKey(row.day), Number(row.c) || 0]));
+    const failedMap = toMap(failed);
+    const suspiciousMap = toMap(suspicious);
+    const deniedMap = toMap(denied);
+    return this.kolkataDayKeys().map((date) => ({
+      date,
+      label: this.dayLabel(date),
+      failedSignIns: failedMap.get(date) ?? 0,
+      suspiciousIps: suspiciousMap.get(date) ?? 0,
+      unauthorizedApi: deniedMap.get(date) ?? 0,
+    }));
+  }
+
+  private kolkataDayKeys() {
+    const format = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const keys: string[] = [];
+    for (let offset = 6; offset >= 0; offset -= 1) {
+      keys.push(
+        format.format(new Date(Date.now() - offset * 24 * 60 * 60 * 1000)),
+      );
+    }
+    return keys;
+  }
+
+  private dayKey(value: Date | string) {
+    if (typeof value === 'string') return value.slice(0, 10);
+    const year = value.getUTCFullYear();
+    const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(value.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private dayLabel(date: string) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    const [, month, day] = date.split('-');
+    return `${day} ${months[Number(month) - 1] ?? ''}`.trim();
+  }
+
+  private async recentSecurityEvents(tenantId: string) {
+    const rows = await this.prisma.securityEvent.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 6,
+      select: {
+        id: true,
+        createdAt: true,
+        summary: true,
+        actorUserId: true,
+        ipAddress: true,
+      },
+    });
+    const actorIds = [
+      ...new Set(
+        rows
+          .map((row) => row.actorUserId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const actors = actorIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, displayName: true, username: true, email: true },
+        })
+      : [];
+    const names = new Map(
+      actors.map((actor) => [
+        actor.id,
+        actor.displayName ||
+          actor.username ||
+          actor.email.split('@')[0] ||
+          'unknown',
+      ]),
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      createdAt: row.createdAt,
+      summary: row.summary,
+      actor: row.actorUserId
+        ? (names.get(row.actorUserId) ?? 'unknown')
+        : 'unknown',
+      ipAddress: row.ipAddress,
+    }));
   }
 
   private serverStatus() {

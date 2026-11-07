@@ -12,6 +12,28 @@ export type SecurityDashboard = {
   sensitiveModifications24h: number;
   sensitiveBreakdown: Record<string, number>;
   openAlerts: number;
+  activity7d?: Array<{
+    date: string;
+    label: string;
+    failedSignIns: number;
+    suspiciousIps: number;
+    unauthorizedApi: number;
+  }>;
+  comparison?: {
+    successfulLogins7d: number;
+    successfulLoginsPrev7d: number;
+    failedLoginsPrev24h: number;
+    unauthorizedApiPrev7d: number;
+    lockoutsPrev7d: number;
+    sensitiveModificationsPrev24h: number;
+  };
+  recentEvents?: Array<{
+    id: string;
+    createdAt: string;
+    summary: string;
+    actor: string;
+    ipAddress: string | null;
+  }>;
   recentAlerts: Array<{
     id: string;
     ruleCode: string;
