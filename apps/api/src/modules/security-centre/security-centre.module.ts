@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DeviceSecurityModule } from '../administration/device-security.module';
 import { CommunicationModule } from '../communication/communication.module';
 import { SecurityAlertNotifier } from './security-alert-notifier.service';
 import { SecurityCentreController } from './security-centre.controller';
@@ -10,7 +11,7 @@ import { SecurityThreatService } from './security-threat.service';
 import { SuperAdminGuard } from './super-admin.guard';
 
 @Module({
-  imports: [CommunicationModule],
+  imports: [CommunicationModule, DeviceSecurityModule],
   controllers: [SecurityCentreController],
   providers: [
     SuperAdminGuard,

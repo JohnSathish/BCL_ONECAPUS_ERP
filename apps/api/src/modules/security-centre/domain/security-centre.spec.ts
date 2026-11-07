@@ -191,22 +191,84 @@ describe('security centre rules', () => {
       },
       facts: {
         detectedAt: new Date('2026-11-07T08:28:00.000Z'),
-        ipAddress: '223.25.10.8',
-        account: 'student@donboscocollege.ac.in<script>',
         lockExpiresAt: new Date('2026-11-07T09:28:00.000Z'),
         securityCentreUrl:
           'https://erp.example/admin/administration/security-centre',
+        person: {
+          kind: 'erp',
+          name: 'Mary <script>',
+          rollNumber: 'BA25-101',
+          employeeCode: null,
+          email: 'mary@demo.edu',
+          phone: '9876543210',
+          attempted: 'mary@demo.edu',
+          ipAddress: '223.25.10.8',
+          location: 'Tura, Meghalaya, India',
+          network: null,
+        },
       },
     });
 
     expect(message.subject).toBe('[MEDIUM] Account temporarily locked');
     expect(message.html).toContain('SECURITY ALERT');
     expect(message.html).toContain('Don Bosco College Tura');
-    expect(message.html).toContain('223.25.XXX.XXX');
-    expect(message.html).toContain('s***@donboscocollege.ac.in');
-    expect(message.html).not.toContain('student@donboscocollege.ac.in');
+    expect(message.html).toContain('BA25-101');
+    expect(message.html).toContain('mary@demo.edu');
+    expect(message.html).toContain('223.25.10.8');
+    expect(message.html).toContain('Tura, Meghalaya, India');
+    expect(message.html).toContain('Mary &lt;script&gt;');
     expect(message.html).not.toContain('<script>');
     expect(message.html).toContain('Temporarily Locked');
     expect(message.text).toContain('Dear Administrator');
+  });
+
+  it('shows the address and location when the sign-in is not an ERP user', () => {
+    const message = buildSecurityAlertEmail({
+      ctx: {
+        institutionName: 'Don Bosco College Tura',
+        productName: 'Bosco Connect',
+        productTagline: 'Smart Education Management Platform',
+        tagline: 'Tura',
+        address: 'Tura, West Garo Hills, Meghalaya - 794101',
+        website: 'https://www.donboscocollege.ac.in',
+        email: 'mailconnect@donboscocollege.ac.in',
+        phone: '',
+        logoUrl: null,
+        primaryColor: '#0b3a73',
+        accentColor: '#1d4ed8',
+        showPoweredBy: true,
+        poweredByText: 'Powered by BaseCode Labs',
+        customFooterHtml: null,
+        senderName: null,
+        replyEmail: null,
+      },
+      finding: {
+        ruleCode: 'REPEATED_FAILED_LOGIN',
+        severity: 'HIGH',
+        title: 'Repeated failed sign-ins',
+        summary: '5 failed sign-ins were recorded.',
+      },
+      facts: {
+        detectedAt: new Date('2026-11-07T09:06:00.000Z'),
+        person: {
+          kind: 'outsider',
+          name: null,
+          rollNumber: null,
+          employeeCode: null,
+          email: null,
+          phone: null,
+          attempted: 'eunknown',
+          ipAddress: '152.59.10.4',
+          location: 'Guwahati, Assam, India',
+          network: 'Example Net',
+        },
+      },
+    });
+
+    expect(message.html).toContain('Not an ERP user');
+    expect(message.html).toContain('eunknown');
+    expect(message.html).toContain('152.59.10.4');
+    expect(message.html).toContain('Guwahati, Assam, India');
+    expect(message.html).toContain('Example Net');
   });
 });

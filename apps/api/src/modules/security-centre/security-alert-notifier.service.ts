@@ -1,11 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { IpGeoService } from '../administration/services/ip-geo.service';
 import { BrandedEmailLayoutService } from '../communication/services/branded-email-layout.service';
 import { CommunicationEmailService } from '../communication/services/communication-email.service';
 import { UserNotificationsService } from '../communication/services/user-notifications.service';
 import type { LoginProtection } from './domain/login-protection';
-import { buildSecurityAlertEmail } from './domain/security-alert-email';
+import {
+  buildSecurityAlertEmail,
+  type SecurityAlertPerson,
+} from './domain/security-alert-email';
 import type { ThreatFinding } from './domain/threat-rules';
 
 const SUPER_ADMIN_ROLES = ['college-admin', 'super-admin', 'university-admin'];
@@ -19,6 +24,7 @@ export class SecurityAlertNotifier {
     private readonly notifications: UserNotificationsService,
     private readonly email: CommunicationEmailService,
     private readonly layout: BrandedEmailLayoutService,
+    private readonly geo: IpGeoService,
     private readonly config: ConfigService,
   ) {}
 
@@ -29,6 +35,7 @@ export class SecurityAlertNotifier {
     policy: Pick<LoginProtection, 'notifyEmail' | 'notifyInApp'>;
     detectedAt?: Date;
     ipAddress?: string | null;
+    actorUserId?: string | null;
     account?: string | null;
     lockExpiresAt?: Date | null;
   }) {
@@ -107,10 +114,12 @@ export class SecurityAlertNotifier {
     finding: ThreatFinding;
     detectedAt?: Date;
     ipAddress?: string | null;
+    actorUserId?: string | null;
     account?: string | null;
     lockExpiresAt?: Date | null;
   }) {
     const ctx = await this.layout.resolveContext(input.tenantId);
+    const person = await this.describePerson(input);
     const origin = (
       this.config.get<string>('PUBLIC_APP_URL') ??
       this.config.get<string>('WEB_APP_URL') ??
@@ -121,9 +130,8 @@ export class SecurityAlertNotifier {
       finding: input.finding,
       facts: {
         detectedAt: input.detectedAt ?? new Date(),
-        ipAddress: input.ipAddress,
-        account: input.account,
         lockExpiresAt: input.lockExpiresAt,
+        person,
         securityCentreUrl: origin
           ? `${origin}/admin/administration/security-centre`
           : null,
@@ -134,4 +142,129 @@ export class SecurityAlertNotifier {
       fromName: ctx.senderName || ctx.institutionName,
     };
   }
+
+  private async describePerson(input: {
+    tenantId: string;
+    actorUserId?: string | null;
+    account?: string | null;
+    ipAddress?: string | null;
+  }): Promise<SecurityAlertPerson> {
+    const attempted = input.account?.trim() || null;
+    const ipAddress = input.ipAddress?.trim() || null;
+    const user = await this.findErpUser(
+      input.tenantId,
+      input.actorUserId,
+      attempted,
+    );
+    let location: string | null = null;
+    let network: string | null = null;
+    try {
+      const geo = await this.geo.lookup(ipAddress);
+      const place = [geo.city, geo.region, geo.country]
+        .filter(Boolean)
+        .join(', ');
+      location =
+        place ||
+        (isPrivateAddress(ipAddress) ? 'Private or local network' : null);
+      network = geo.isp;
+    } catch (error) {
+      this.logger.warn(
+        `Location lookup skipped: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    if (!user) {
+      return {
+        kind: 'outsider',
+        name: null,
+        rollNumber: null,
+        employeeCode: null,
+        email: null,
+        phone: null,
+        attempted,
+        ipAddress,
+        location,
+        network,
+      };
+    }
+    return {
+      kind: 'erp',
+      name:
+        user.displayName ||
+        user.staffProfile?.fullName ||
+        user.username ||
+        user.email,
+      rollNumber: user.student?.rollNumber ?? null,
+      employeeCode: user.staffProfile?.employeeCode ?? null,
+      email: user.email,
+      phone: user.phone || user.staffProfile?.mobile || null,
+      attempted,
+      ipAddress,
+      location,
+      network,
+    };
+  }
+
+  private findErpUser(
+    tenantId: string,
+    actorUserId: string | null | undefined,
+    attempted: string | null,
+  ) {
+    const matches: Prisma.UserWhereInput[] = [];
+    if (actorUserId) matches.push({ id: actorUserId });
+    if (attempted) {
+      matches.push(
+        { email: { equals: attempted, mode: 'insensitive' } },
+        { username: { equals: attempted, mode: 'insensitive' } },
+        {
+          student: {
+            is: {
+              deletedAt: null,
+              OR: [
+                { rollNumber: { equals: attempted, mode: 'insensitive' } },
+                {
+                  enrollmentNumber: { equals: attempted, mode: 'insensitive' },
+                },
+              ],
+            },
+          },
+        },
+        {
+          staffProfile: {
+            is: { employeeCode: { equals: attempted, mode: 'insensitive' } },
+          },
+        },
+      );
+    }
+    if (!matches.length) return Promise.resolve(null);
+    return this.prisma.user.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        OR: matches,
+      },
+      select: {
+        displayName: true,
+        email: true,
+        username: true,
+        phone: true,
+        student: {
+          select: { rollNumber: true },
+        },
+        staffProfile: {
+          select: { fullName: true, employeeCode: true, mobile: true },
+        },
+      },
+    });
+  }
+}
+
+function isPrivateAddress(ip: string | null) {
+  if (!ip) return false;
+  return (
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip.startsWith('10.') ||
+    ip.startsWith('192.168.') ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)
+  );
 }

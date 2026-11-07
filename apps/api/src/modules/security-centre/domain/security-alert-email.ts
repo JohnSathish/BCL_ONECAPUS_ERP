@@ -1,14 +1,25 @@
 import type { BrandedEmailContext } from '../../communication/services/branded-email-layout.service';
 import { escapeHtml } from '../../communication/utils/email-template-helpers';
-import { maskSecurityIdentifier } from './redact-security-payload';
 import type { ThreatFinding } from './threat-rules';
+
+export type SecurityAlertPerson = {
+  kind: 'erp' | 'outsider';
+  name: string | null;
+  rollNumber: string | null;
+  employeeCode: string | null;
+  email: string | null;
+  phone: string | null;
+  attempted: string | null;
+  ipAddress: string | null;
+  location: string | null;
+  network: string | null;
+};
 
 export type SecurityAlertEmailFacts = {
   detectedAt: Date;
-  ipAddress?: string | null;
-  account?: string | null;
   lockExpiresAt?: Date | null;
   securityCentreUrl?: string | null;
+  person: SecurityAlertPerson;
 };
 
 const SEVERITY_COLOR: Record<string, string> = {
@@ -32,8 +43,7 @@ export function buildSecurityAlertEmail(input: {
   const expiry = input.facts.lockExpiresAt
     ? formatWhen(input.facts.lockExpiresAt)
     : null;
-  const account = maskSecurityIdentifier(input.facts.account);
-  const ip = maskIp(input.facts.ipAddress);
+  const personRows = personDetailRows(input.facts.person);
   const guidance = guidanceFor(input.finding.ruleCode, input.finding.summary);
   const subject = `[${severity}] ${input.finding.title}`;
   const reviewUrl = input.facts.securityCentreUrl?.trim() || '';
@@ -53,15 +63,14 @@ export function buildSecurityAlertEmail(input: {
     `Status: ${status}`,
     `Trigger: ${guidance.trigger}`,
     `Detection time: ${detected}`,
-    `Account: ${account}`,
-    `IP address: ${ip}`,
+    ...personRows.map((row) => `${row.label}: ${row.value}`),
     expiry ? `Lock expiry: ${expiry}` : '',
     '',
     guidance.why,
     '',
     ...guidance.steps.map((step, index) => `${index + 1}. ${step}`),
     '',
-    'This notice does not include passwords, access tokens, or student records.',
+    'This notice does not include passwords or access tokens.',
     'Please do not reply directly to this email.',
   ]
     .filter((line) => line !== '')
@@ -74,8 +83,7 @@ export function buildSecurityAlertEmail(input: {
     { label: 'Status', value: status },
     { label: 'Trigger', value: guidance.trigger },
     { label: 'Detection time', value: detected },
-    { label: 'Account', value: account },
-    { label: 'IP address', value: ip },
+    ...personRows,
   ];
   if (expiry)
     rows.push({ label: 'Lock expiry', value: expiry, highlight: true });
@@ -322,7 +330,7 @@ function renderHtml(input: {
           <tr>
             <td style="background:#0b3a73;padding:14px 24px;font-size:12px;line-height:1.5;color:#dbe7ff;">
               This is an automated security notification. Please do not reply directly to this email.<br/>
-              This notice does not include passwords, access tokens, or student records.
+              This notice does not include passwords or access tokens.
             </td>
           </tr>
         </table>
@@ -331,6 +339,39 @@ function renderHtml(input: {
   </table>
 </body>
 </html>`;
+}
+
+function personDetailRows(person: SecurityAlertPerson) {
+  const rows: Array<{ label: string; value: string }> = [
+    {
+      label: 'Person',
+      value: person.kind === 'erp' ? 'ERP user' : 'Not an ERP user',
+    },
+  ];
+  if (person.kind === 'erp') {
+    rows.push({ label: 'Name', value: person.name || 'Name not recorded' });
+    if (person.rollNumber)
+      rows.push({ label: 'Roll number', value: person.rollNumber });
+    if (person.employeeCode) {
+      rows.push({ label: 'Employee code', value: person.employeeCode });
+    }
+    if (person.email) rows.push({ label: 'Email', value: person.email });
+    if (person.phone) rows.push({ label: 'Phone', value: person.phone });
+    if (person.attempted)
+      rows.push({ label: 'Signed in as', value: person.attempted });
+  } else if (person.attempted) {
+    rows.push({ label: 'Tried to sign in as', value: person.attempted });
+  }
+  rows.push({
+    label: 'IP address',
+    value: person.ipAddress || 'Not recorded',
+  });
+  rows.push({
+    label: 'Location',
+    value: person.location || 'Location not available',
+  });
+  if (person.network) rows.push({ label: 'Network', value: person.network });
+  return rows;
 }
 
 function formatWhen(value: Date) {
@@ -343,15 +384,4 @@ function formatWhen(value: Date) {
     minute: '2-digit',
     hour12: true,
   }).format(value);
-}
-
-function maskIp(value: string | null | undefined) {
-  const raw = (value ?? '').trim();
-  if (!raw) return 'Not recorded';
-  const parts = raw.split('.');
-  if (parts.length === 4 && parts.every((part) => /^\d{1,3}$/.test(part))) {
-    return `${parts[0]}.${parts[1]}.XXX.XXX`;
-  }
-  if (raw.includes(':')) return `${raw.split(':')[0]}:XXXX`;
-  return 'Recorded';
 }

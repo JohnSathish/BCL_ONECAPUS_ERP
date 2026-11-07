@@ -65,6 +65,7 @@ export class SecurityThreatService {
           policy,
           detectedAt: new Date(),
           ipAddress: input.ipAddress,
+          actorUserId: input.actorUserId,
           account: metaText(input.metadata, 'identifier'),
           lockExpiresAt: metaDate(input.metadata, 'lockedUntil'),
         });
