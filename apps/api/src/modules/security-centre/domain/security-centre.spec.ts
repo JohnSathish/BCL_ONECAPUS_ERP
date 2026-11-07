@@ -10,6 +10,7 @@ import {
   inferAdminSecurityEvent,
 } from './security-event.types';
 import { superAdminAccessDenial } from './super-admin-access';
+import { buildSecurityAlertEmail } from './security-alert-email';
 import { evaluateThreats } from './threat-rules';
 import { resolveWatchedPath } from './watched-path';
 
@@ -160,5 +161,52 @@ describe('security centre rules', () => {
     expect(superAdminAccessDenial({ roles: ['college-admin'] })).toBeNull();
     expect(csvCell('=cmd|evil')).toBe("'=cmd|evil");
     expect(toCsv(['note'], [['safe']])).toBe('note\nsafe');
+  });
+
+  it('builds a branded security alert without passwords or the full account', () => {
+    const message = buildSecurityAlertEmail({
+      ctx: {
+        institutionName: 'Don Bosco College Tura',
+        productName: 'Bosco Connect',
+        productTagline: 'Smart Education Management Platform',
+        tagline: 'Tura',
+        address: 'Tura, West Garo Hills, Meghalaya - 794101',
+        website: 'https://www.donboscocollege.ac.in',
+        email: 'mailconnect@donboscocollege.ac.in',
+        phone: '',
+        logoUrl: null,
+        primaryColor: '#0b3a73',
+        accentColor: '#1d4ed8',
+        showPoweredBy: true,
+        poweredByText: 'Powered by BaseCode Labs',
+        customFooterHtml: null,
+        senderName: 'Don Bosco College Tura Admissions',
+        replyEmail: 'mailconnect@donboscocollege.ac.in',
+      },
+      finding: {
+        ruleCode: 'ACCOUNT_LOCKOUT',
+        severity: 'MEDIUM',
+        title: 'Account temporarily locked',
+        summary: 'Sign-in was paused after too many failed attempts.',
+      },
+      facts: {
+        detectedAt: new Date('2026-11-07T08:28:00.000Z'),
+        ipAddress: '223.25.10.8',
+        account: 'student@donboscocollege.ac.in<script>',
+        lockExpiresAt: new Date('2026-11-07T09:28:00.000Z'),
+        securityCentreUrl:
+          'https://erp.example/admin/administration/security-centre',
+      },
+    });
+
+    expect(message.subject).toBe('[MEDIUM] Account temporarily locked');
+    expect(message.html).toContain('SECURITY ALERT');
+    expect(message.html).toContain('Don Bosco College Tura');
+    expect(message.html).toContain('223.25.XXX.XXX');
+    expect(message.html).toContain('s***@donboscocollege.ac.in');
+    expect(message.html).not.toContain('student@donboscocollege.ac.in');
+    expect(message.html).not.toContain('<script>');
+    expect(message.html).toContain('Temporarily Locked');
+    expect(message.text).toContain('Dear Administrator');
   });
 });

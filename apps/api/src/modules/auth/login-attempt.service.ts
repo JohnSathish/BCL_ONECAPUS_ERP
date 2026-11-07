@@ -166,7 +166,11 @@ export class LoginAttemptService {
           action: 'account_lockout',
           ipAddress,
           summary: 'Sign-in was temporarily paused after repeated failures',
-          metadata: { identifier: normalizedEmail, failedCount },
+          metadata: {
+            identifier: normalizedEmail,
+            failedCount,
+            lockedUntil: lockedUntil?.toISOString() ?? null,
+          },
           subjectKey: `ip:${ipAddress}`,
         });
       } catch {

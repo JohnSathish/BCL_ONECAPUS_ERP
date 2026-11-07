@@ -63,6 +63,10 @@ export class SecurityThreatService {
           alertId: alert.id,
           finding,
           policy,
+          detectedAt: new Date(),
+          ipAddress: input.ipAddress,
+          account: metaText(input.metadata, 'identifier'),
+          lockExpiresAt: metaDate(input.metadata, 'lockedUntil'),
         });
         await this.prisma.securityAlert.update({
           where: { id: alert.id },
@@ -154,4 +158,22 @@ export class SecurityThreatService {
       recentMutations,
     };
   }
+}
+
+function metaText(
+  metadata: Record<string, unknown> | null | undefined,
+  key: string,
+) {
+  const value = metadata?.[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function metaDate(
+  metadata: Record<string, unknown> | null | undefined,
+  key: string,
+) {
+  const value = metaText(metadata, key);
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
