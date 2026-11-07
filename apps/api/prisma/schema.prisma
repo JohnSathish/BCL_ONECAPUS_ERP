@@ -917,6 +917,99 @@ model BackupAuditLog {
   @@schema("platform")
 }
 
+/// Append-only security trail. Application accounts must not update or delete rows.
+/// Database triggers reject mutation unless a DBA sets onecampus.allow_security_purge.
+model SecurityEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  seq           BigInt   @default(autoincrement())
+  tenantId      String   @map("tenant_id") @db.Uuid
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  eventType     String   @map("event_type")
+  severity      String   @default("info")
+  module        String?
+  entityType    String?  @map("entity_type")
+  entityId      String?  @map("entity_id")
+  action        String
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  summary       String
+  previousValue Json?    @map("previous_value")
+  newValue      Json?    @map("new_value")
+  metadata      Json     @default("{}")
+  subjectKey    String?  @map("subject_key")
+  prevHash      String?  @map("prev_hash")
+  recordHash    String   @map("record_hash")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, eventType, createdAt])
+  @@index([tenantId, subjectKey, createdAt])
+  @@index([tenantId, seq])
+  @@map("security_events")
+  @@schema("platform")
+}
+
+/// Generated threat alerts. Facts are immutable; only acknowledgement fields may change.
+model SecurityAlert {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  ruleCode         String    @map("rule_code")
+  severity         String
+  title            String
+  summary          String
+  status           String    @default("open")
+  subjectKey       String?   @map("subject_key")
+  sourceEventId    String?   @map("source_event_id") @db.Uuid
+  metadata         Json      @default("{}")
+  notifiedAt       DateTime? @map("notified_at")
+  acknowledgedAt   DateTime? @map("acknowledged_at")
+  acknowledgedById String?   @map("acknowledged_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, ruleCode, subjectKey, createdAt])
+  @@map("security_alerts")
+  @@schema("platform")
+}
+
+model SecurityMonitorConfig {
+  id                         String   @id @default(uuid()) @db.Uuid
+  tenantId                   String   @unique @map("tenant_id") @db.Uuid
+  maxFailures                Int      @default(8) @map("max_failures")
+  windowMinutes              Int      @default(20) @map("window_minutes")
+  lockMinutes                Int      @default(5) @map("lock_minutes")
+  escalatedLockMinutes       Int      @default(15) @map("escalated_lock_minutes")
+  failedLoginAlertThreshold  Int      @default(5) @map("failed_login_alert_threshold")
+  suspiciousIpMinIdentifiers Int      @default(4) @map("suspicious_ip_min_identifiers")
+  unauthorizedApiThreshold   Int      @default(10) @map("unauthorized_api_threshold")
+  bulkDownloadThreshold      Int      @default(15) @map("bulk_download_threshold")
+  bulkMutationThreshold      Int      @default(25) @map("bulk_mutation_threshold")
+  notifyInApp                Boolean  @default(true) @map("notify_in_app")
+  notifyEmail                Boolean  @default(true) @map("notify_email")
+  fileIntegrityEnabled       Boolean  @default(true) @map("file_integrity_enabled")
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@map("security_monitor_configs")
+  @@schema("platform")
+}
+
+model SecurityFileBaseline {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  relativePath   String   @map("relative_path")
+  sha256         String
+  sizeBytes      Int      @default(0) @map("size_bytes")
+  status         String   @default("BASELINE")
+  baselineAt     DateTime @default(now()) @map("baseline_at")
+  lastCheckedAt  DateTime @default(now()) @map("last_checked_at")
+
+  @@unique([tenantId, relativePath])
+  @@index([tenantId, status])
+  @@map("security_file_baselines")
+  @@schema("platform")
+}
+
 model SystemMaintenanceFlag {
   id              String    @id @default("singleton")
   active          Boolean   @default(false)

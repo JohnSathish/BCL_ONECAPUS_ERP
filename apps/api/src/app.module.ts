@@ -88,6 +88,7 @@ import { LicensingModule } from './modules/licensing/licensing.module';
 import { MobileAppModule } from './modules/mobile-app/mobile-app.module';
 import { CampusAccessModule } from './modules/campus-access/campus-access.module';
 import { BackupEngineModule } from './modules/backup-engine/backup-engine.module';
+import { SecurityCentreModule } from './modules/security-centre/security-centre.module';
 import { PrincipalDeskModule } from './modules/principal-desk/principal-desk.module';
 import { PrincipalCommsModule } from './modules/principal-comms/principal-comms.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
@@ -201,6 +202,7 @@ import { MoodleModule } from './modules/moodle/moodle.module';
     PrincipalCommsModule,
     MarketingModule,
     BackupEngineModule,
+    SecurityCentreModule,
     OfficialDocumentsModule,
     ProposalsModule,
     WorkflowEngineModule,

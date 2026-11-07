@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -10,6 +11,7 @@ import { authenticator } from 'otplib';
 import { PrismaService } from '../../../database/prisma.service';
 import { FieldEncryptionService } from '../../../common/crypto/field-encryption.service';
 import { CacheService } from '../../../shared/cache/cache.service';
+import { SecurityEventRecorder } from '../../security-centre/security-event.recorder';
 
 export const MFA_ENFORCED_ROLE_SLUGS = [
   'super-admin',
@@ -26,6 +28,7 @@ export class MfaService {
     private readonly prisma: PrismaService,
     private readonly encryption: FieldEncryptionService,
     private readonly cache: CacheService,
+    @Optional() private readonly securityEvents?: SecurityEventRecorder,
   ) {
     authenticator.options = { window: 1 };
   }
@@ -72,6 +75,22 @@ export class MfaService {
       }),
     ]);
     const recovery = await this.issueRecoveryCodes(userId);
+    const owner = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { tenantId: true },
+    });
+    if (owner) {
+      void this.securityEvents?.capture({
+        tenantId: owner.tenantId,
+        actorUserId: userId,
+        eventType: 'MFA_CHANGE',
+        severity: 'medium',
+        module: 'auth',
+        action: 'mfa_enabled',
+        summary: 'Multi-factor authentication was enabled',
+        subjectKey: `user:${userId}`,
+      });
+    }
     return { enabled: true, recoveryCodes: recovery };
   }
 
@@ -91,6 +110,16 @@ export class MfaService {
         data: { mfaEnabled: false },
       }),
     ]);
+    void this.securityEvents?.capture({
+      tenantId: user.tenantId,
+      actorUserId: userId,
+      eventType: 'MFA_CHANGE',
+      severity: 'medium',
+      module: 'auth',
+      action: 'mfa_disabled',
+      summary: 'Multi-factor authentication was disabled',
+      subjectKey: `user:${userId}`,
+    });
     return { disabled: true };
   }
 

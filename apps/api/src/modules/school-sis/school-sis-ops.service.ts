@@ -1077,20 +1077,19 @@ export class SchoolSisOpsService implements OnModuleInit {
   }
 
   private async buildBackupPayload(tenantId: string, kind: string) {
-    const tables = (await this.prisma.$queryRawUnsafe(
-      `SELECT tablename FROM pg_tables WHERE schemaname = 'school' ORDER BY tablename`,
-    )) as Array<{ tablename: string }>;
+    const tables = await this.prisma.$queryRaw<Array<{ tablename: string }>>`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'school' ORDER BY tablename
+    `;
     const dump: Record<string, unknown> = {};
     if (!/^[0-9a-f-]{36}$/i.test(tenantId)) {
       throw new BadRequestException('Invalid tenant');
     }
     for (const t of tables) {
-      if (!/^[a-z0-9_]+$/i.test(t.tablename)) continue;
-      const countRows = (await this.prisma
-        .$queryRawUnsafe(
-          `SELECT COUNT(*)::int AS c FROM school.${t.tablename} WHERE tenant_id = '${tenantId}'::uuid`,
-        )
-        .catch(() => [{ c: 0 }])) as Array<{ c: number }>;
+      if (!/^[a-z_][a-z0-9_]*$/i.test(t.tablename)) continue;
+      const table = Prisma.raw(`"school"."${t.tablename}"`);
+      const countRows = await this.prisma.$queryRaw<Array<{ c: number }>>`
+          SELECT COUNT(*)::int AS c FROM ${table} WHERE tenant_id = ${tenantId}::uuid
+        `.catch(() => [{ c: 0 }]);
       dump[t.tablename] = { count: countRows[0]?.c ?? 0 };
     }
     let uploads: unknown = null;
@@ -1131,14 +1130,16 @@ export class SchoolSisOpsService implements OnModuleInit {
     try {
       const t0 = Date.now();
       await this.prisma.$queryRaw`SELECT 1`;
-      const size = (await this.prisma.$queryRawUnsafe(
-        `SELECT pg_database_size(current_database())::bigint AS bytes, version() AS v`,
-      )) as Array<{ bytes: bigint; v: string }>;
-      const migrations = (await this.prisma
-        .$queryRawUnsafe(
-          `SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 1`,
-        )
-        .catch(() => [])) as Array<{ migration_name: string }>;
+      const size = await this.prisma.$queryRaw<
+        Array<{ bytes: bigint; v: string }>
+      >`
+        SELECT pg_database_size(current_database())::bigint AS bytes, version() AS v
+      `;
+      const migrations = await this.prisma.$queryRaw<
+        Array<{ migration_name: string }>
+      >`
+          SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 1
+        `.catch(() => []);
       return {
         connection: 'Operational' as const,
         pingMs: Date.now() - t0,

@@ -46,6 +46,8 @@ export type NavChild = {
   /** Any-of permission slugs required to see this menu item */
   permissions?: string[];
   requireAllPermissions?: string[];
+  /** Visible only to college super-administrator roles. */
+  superAdminOnly?: boolean;
   /** RegExp source — marks item active for detail/sub-routes (e.g. student profile) */
   activePattern?: string;
 };
@@ -2513,6 +2515,12 @@ export const ADMIN_NAV: NavGroup[] = [
             label: 'Audit Logs',
             href: '/admin/administration/audit-logs',
             permissions: ['audit:read'],
+          },
+          {
+            label: 'Security Centre',
+            href: '/admin/administration/security-centre',
+            superAdminOnly: true,
+            activePattern: '^/admin/administration/security-centre(?:/.*)?$',
           },
           {
             label: 'License',

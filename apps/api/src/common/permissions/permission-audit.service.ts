@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { SecurityEventRecorder } from '../../modules/security-centre/security-event.recorder';
 
 export type PermissionAuditEntry = {
   tenantId: string;
@@ -17,7 +18,10 @@ export type PermissionAuditEntry = {
 
 @Injectable()
 export class PermissionAuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly securityEvents?: SecurityEventRecorder,
+  ) {}
 
   async log(entry: PermissionAuditEntry): Promise<void> {
     await this.prisma.permissionAuditLog.create({
@@ -35,6 +39,27 @@ export class PermissionAuditService {
           | Prisma.InputJsonValue
           | undefined,
       },
+    });
+    if ((entry.outcome ?? 'allowed') !== 'denied') return;
+    void this.securityEvents?.capture({
+      tenantId: entry.tenantId,
+      actorUserId: entry.userId,
+      eventType: 'UNAUTHORIZED_API',
+      severity: 'medium',
+      module: entry.module ?? 'api',
+      action: entry.action,
+      ipAddress: entry.ipAddress,
+      userAgent: entry.userAgent,
+      summary: 'An API request was denied by the permission check',
+      metadata: {
+        permission: entry.permissionSlug ?? null,
+        role: entry.roleSlug ?? null,
+      },
+      subjectKey: entry.userId
+        ? `user:${entry.userId}`
+        : entry.ipAddress
+          ? `ip:${entry.ipAddress}`
+          : 'anonymous',
     });
   }
 }

@@ -1,14 +1,13 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-
-/** Failed password attempts allowed before a temporary lock (per IP + identifier). */
-const MAX_FAILURES = 8;
-/** Failures older than this window no longer count toward the lock. */
-const WINDOW_MS = 20 * 60 * 1000;
-/** First lock duration — short enough for honest typos, long enough to slow bots. */
-const LOCK_MS = 5 * 60 * 1000;
-/** Escalated lock after repeated lockouts in the same window. */
-const LOCK_ESCALATED_MS = 15 * 60 * 1000;
+import { DEFAULT_LOGIN_PROTECTION } from '../security-centre/domain/login-protection';
+import { SecurityEventRecorder } from '../security-centre/security-event.recorder';
+import { SecurityPolicyService } from '../security-centre/security-policy.service';
 
 export type LoginFailureOutcome = {
   remaining: number;
@@ -19,7 +18,19 @@ export type LoginFailureOutcome = {
 
 @Injectable()
 export class LoginAttemptService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly policy?: SecurityPolicyService,
+    @Optional() private readonly securityEvents?: SecurityEventRecorder,
+  ) {}
+
+  private async protection(tenantId: string) {
+    try {
+      return (await this.policy?.get(tenantId)) ?? DEFAULT_LOGIN_PROTECTION;
+    } catch {
+      return DEFAULT_LOGIN_PROTECTION;
+    }
+  }
 
   private normalizeKey(value: string) {
     return value.trim().toLowerCase();
@@ -36,7 +47,9 @@ export class LoginAttemptService {
 
   private failureMessage(remaining: number) {
     if (remaining <= 0) {
-      return this.lockMessage(new Date(Date.now() + LOCK_MS));
+      return this.lockMessage(
+        new Date(Date.now() + DEFAULT_LOGIN_PROTECTION.lockMinutes * 60_000),
+      );
     }
     if (remaining <= 2) {
       return `Incorrect username or password. ${remaining} attempt${remaining === 1 ? '' : 's'} left before a temporary lock. Double-check your details or use Forgot password.`;
@@ -79,6 +92,10 @@ export class LoginAttemptService {
   ): Promise<LoginFailureOutcome> {
     const normalizedEmail = this.normalizeKey(email);
     const now = new Date();
+    const limits = await this.protection(tenantId);
+    const windowMs = limits.windowMinutes * 60_000;
+    const lockMs = limits.lockMinutes * 60_000;
+    const escalatedMs = limits.escalatedLockMinutes * 60_000;
     const existing = await this.prisma.loginAttempt.findUnique({
       where: {
         tenantId_ipAddress_email: {
@@ -90,18 +107,18 @@ export class LoginAttemptService {
     });
 
     const windowExpired =
-      !existing || now.getTime() - existing.lastAttemptAt.getTime() > WINDOW_MS;
+      !existing || now.getTime() - existing.lastAttemptAt.getTime() > windowMs;
 
     const failedCount = windowExpired ? 1 : existing.failedCount + 1;
     const escalate =
       !windowExpired &&
       Boolean(existing?.lockedUntil) &&
       existing!.lockedUntil! <= now &&
-      failedCount >= MAX_FAILURES;
+      failedCount >= limits.maxFailures;
 
-    const lockDurationMs = escalate ? LOCK_ESCALATED_MS : LOCK_MS;
+    const lockDurationMs = escalate ? escalatedMs : lockMs;
     const lockedUntil =
-      failedCount >= MAX_FAILURES
+      failedCount >= limits.maxFailures
         ? new Date(now.getTime() + lockDurationMs)
         : null;
 
@@ -141,6 +158,17 @@ export class LoginAttemptService {
             metadata: { failedCount, lockDurationMs },
           },
         });
+        void this.securityEvents?.capture({
+          tenantId,
+          eventType: 'ACCOUNT_LOCKOUT',
+          severity: 'high',
+          module: 'auth',
+          action: 'account_lockout',
+          ipAddress,
+          summary: 'Sign-in was temporarily paused after repeated failures',
+          metadata: { identifier: normalizedEmail, failedCount },
+          subjectKey: `ip:${ipAddress}`,
+        });
       } catch {
         // ignore audit write failures
       }
@@ -159,7 +187,7 @@ export class LoginAttemptService {
       );
     }
 
-    const remaining = Math.max(0, MAX_FAILURES - failedCount);
+    const remaining = Math.max(0, limits.maxFailures - failedCount);
     return {
       remaining,
       locked: false,

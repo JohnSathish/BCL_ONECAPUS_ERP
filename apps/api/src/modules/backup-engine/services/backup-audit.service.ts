@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { backupActionToSecurityEvent } from '../../security-centre/domain/security-event.types';
+import { SecurityEventRecorder } from '../../security-centre/security-event.recorder';
 
 export type BackupAuditAction =
   | 'CREATE'
@@ -12,7 +14,10 @@ export type BackupAuditAction =
 
 @Injectable()
 export class BackupAuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly securityEvents?: SecurityEventRecorder,
+  ) {}
 
   async log(input: {
     action: BackupAuditAction;
@@ -20,8 +25,9 @@ export class BackupAuditService {
     ipAddress?: string;
     runId?: string;
     metadata?: Record<string, unknown>;
+    tenantId?: string;
   }) {
-    return this.prisma.backupAuditLog.create({
+    const row = await this.prisma.backupAuditLog.create({
       data: {
         action: input.action,
         actorId: input.actorId,
@@ -32,6 +38,51 @@ export class BackupAuditService {
           | undefined,
       },
     });
+    if (input.action !== 'DOWNLOAD') {
+      const tenantIds = await this.tenantIdsFor(input);
+      const mapped = backupActionToSecurityEvent(input.action);
+      for (const tenantId of tenantIds) {
+        void this.securityEvents?.capture({
+          tenantId,
+          actorUserId: input.actorId,
+          eventType: mapped.eventType,
+          severity: mapped.severity,
+          module: 'backup',
+          action: input.action,
+          ipAddress: input.ipAddress,
+          entityId: input.runId,
+          summary:
+            input.action === 'DELETE'
+              ? 'A backup was deleted'
+              : `Backup action ${input.action}`,
+          metadata: input.metadata,
+          subjectKey: input.runId ? `backup:${input.runId}` : 'backup',
+        });
+      }
+    }
+    return row;
+  }
+
+  private async tenantIdsFor(input: {
+    action: BackupAuditAction;
+    runId?: string;
+    tenantId?: string;
+  }) {
+    if (input.tenantId) return [input.tenantId];
+    if (input.runId) {
+      const run = await this.prisma.backupRun.findUnique({
+        where: { id: input.runId },
+        select: { tenantId: true },
+      });
+      if (run?.tenantId) return [run.tenantId];
+    }
+    if (input.action !== 'DELETE') return [];
+    const tenants = await this.prisma.tenant.findMany({
+      where: { deletedAt: null },
+      select: { id: true },
+      take: 20,
+    });
+    return tenants.map((tenant) => tenant.id);
   }
 
   async list(query: { page?: number; limit?: number; action?: string }) {

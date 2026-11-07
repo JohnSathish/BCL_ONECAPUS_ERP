@@ -19,6 +19,11 @@ describe('AuthService refresh rotation', () => {
     userRole: { findMany: jest.fn().mockResolvedValue([]) },
     tenant: { findFirst: jest.fn() },
     auditLog: { create: jest.fn() },
+    erpUserAccount: { findUnique: jest.fn().mockResolvedValue(null) },
+    tenantSecuritySettings: { findUnique: jest.fn().mockResolvedValue(null) },
+    $transaction: jest.fn(async (fn: (tx: typeof prisma) => Promise<unknown>) =>
+      fn(prisma),
+    ),
   };
 
   const jwt = { signAsync: jest.fn().mockResolvedValue('access-jwt') };
@@ -45,6 +50,12 @@ describe('AuthService refresh rotation', () => {
     }),
   };
 
+  const passwordPolicy = {
+    validateForUser: jest.fn().mockResolvedValue(undefined),
+    getRules: jest.fn().mockResolvedValue({ historyCount: 0 }),
+    recordHistory: jest.fn().mockResolvedValue(undefined),
+  };
+
   const auth = new AuthService(
     prisma as never,
     jwt as unknown as JwtService,
@@ -52,6 +63,7 @@ describe('AuthService refresh rotation', () => {
     {} as ChallengeService,
     {} as LoginAttemptService,
     permissionResolver as unknown as PermissionResolverService,
+    passwordPolicy as never,
   );
 
   const activeUser = {
@@ -95,8 +107,8 @@ describe('AuthService refresh rotation', () => {
         data: expect.objectContaining({ familyId }),
       }),
     );
-    expect(prisma.refreshSession.update).toHaveBeenCalledWith({
-      where: { id: 'session-old' },
+    expect(prisma.refreshSession.updateMany).toHaveBeenCalledWith({
+      where: { id: 'session-old', revokedAt: null },
       data: expect.objectContaining({
         replacedById: 'session-new',
         revokedAt: expect.any(Date),
@@ -106,6 +118,7 @@ describe('AuthService refresh rotation', () => {
 
   it('revokes entire family when a revoked refresh token is reused', async () => {
     prisma.refreshSession.findFirst
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({
         id: 'session-revoked',
@@ -129,6 +142,11 @@ describe('AuthService refresh rotation', () => {
   });
 
   it('revokes all sessions when password is reset', async () => {
+    prisma.user.findFirst.mockResolvedValue({
+      id: 'user-1',
+      tenantId: 'tenant-1',
+      deletedAt: null,
+    });
     prisma.user.update.mockResolvedValue({});
     prisma.refreshSession.updateMany.mockResolvedValue({ count: 2 });
 

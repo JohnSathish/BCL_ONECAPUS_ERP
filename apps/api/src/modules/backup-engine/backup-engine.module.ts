@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CommunicationModule } from '../communication/communication.module';
+import { SecurityCentreModule } from '../security-centre/security-centre.module';
 import { AdministrationModule } from '../administration/administration.module';
 import { BackupEngineController } from './backup-engine.controller';
 import { BackupQueueProcessor } from './processors/backup-run.processor';
@@ -29,7 +30,7 @@ const backupQueueProcessors = API_RUNS_BACKUP_JOBS
   : [];
 
 @Module({
-  imports: [CommunicationModule, AdministrationModule],
+  imports: [CommunicationModule, AdministrationModule, SecurityCentreModule],
   controllers: [BackupEngineController],
   providers: [
     BackupAuditService,

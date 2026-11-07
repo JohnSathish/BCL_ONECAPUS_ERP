@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -23,6 +24,7 @@ import { SuspiciousLoginService } from '../administration/services/suspicious-lo
 import { erpAccessBlockReason } from '../administration/domain/erp-users.logic';
 import { MfaService } from './mfa/mfa.service';
 import { AdminEmailOtpService } from './admin-email-otp/admin-email-otp.service';
+import { SecurityEventRecorder } from '../security-centre/security-event.recorder';
 import type { AdminEmailOtpChallengeResponse } from './auth.types';
 import {
   resolveLoginHintFromRoles,
@@ -101,6 +103,7 @@ export class AuthService {
     private readonly suspiciousLogin: SuspiciousLoginService,
     private readonly securityNotify: SecurityNotifyService,
     private readonly adminEmailOtp: AdminEmailOtpService,
+    @Optional() private readonly securityEvents?: SecurityEventRecorder,
   ) {}
 
   private hashToken(token: string) {
@@ -267,6 +270,59 @@ export class AuthService {
           metadata: (input.metadata ?? {}) as object,
         },
       });
+      const flags = Array.isArray(input.metadata?.suspiciousFlags)
+        ? input.metadata?.suspiciousFlags
+        : [];
+      const subjectKey = input.ipAddress
+        ? `ip:${input.ipAddress}`
+        : `id:${input.identifier}`;
+      void this.securityEvents?.capture({
+        tenantId: input.tenantId,
+        actorUserId: input.userId,
+        eventType:
+          input.outcome === 'success'
+            ? 'LOGIN_SUCCESS'
+            : input.outcome === 'lockout'
+              ? 'ACCOUNT_LOCKOUT'
+              : 'LOGIN_FAILED',
+        severity:
+          input.outcome === 'success'
+            ? 'info'
+            : input.outcome === 'lockout'
+              ? 'high'
+              : 'medium',
+        module: 'auth',
+        action: `login_${input.outcome}`,
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+        summary:
+          input.outcome === 'success'
+            ? 'Successful sign-in'
+            : input.outcome === 'lockout'
+              ? 'Sign-in locked after repeated failures'
+              : 'Failed sign-in',
+        metadata: {
+          identifier: input.identifier,
+          method: input.method,
+          reason: input.reason ?? null,
+        },
+        subjectKey,
+      });
+      if (input.outcome === 'success' && flags.includes('NEW_DEVICE')) {
+        void this.securityEvents?.capture({
+          tenantId: input.tenantId,
+          actorUserId: input.userId,
+          eventType: 'NEW_DEVICE_LOGIN',
+          severity: 'low',
+          module: 'auth',
+          action: 'login_new_device',
+          ipAddress: input.ipAddress,
+          userAgent: input.userAgent,
+          summary: 'Sign-in from a new device',
+          metadata: { identifier: input.identifier, method: input.method },
+          subjectKey: input.userId ? `user:${input.userId}` : subjectKey,
+        });
+      }
     } catch {
       // Non-blocking: login must not fail because audit insert failed.
     }
@@ -1332,6 +1388,31 @@ export class AuthService {
       },
     });
 
+    if (!activeSession) {
+      const expiredSession = await this.prisma.refreshSession.findFirst({
+        where: {
+          hashedToken: hashed,
+          revokedAt: null,
+          expiresAt: { lte: new Date() },
+        },
+        select: { tenantId: true, userId: true },
+      });
+      if (expiredSession) {
+        void this.securityEvents?.capture({
+          tenantId: expiredSession.tenantId,
+          actorUserId: expiredSession.userId,
+          eventType: 'SESSION_EXPIRED',
+          severity: 'info',
+          module: 'auth',
+          action: 'session_expired',
+          summary: 'Refresh session expired',
+          ipAddress: meta?.ipAddress,
+          userAgent: meta?.userAgent,
+          subjectKey: `user:${expiredSession.userId}`,
+        });
+      }
+    }
+
     if (activeSession) {
       if (
         !activeSession.user.isActive ||
@@ -1553,6 +1634,17 @@ export class AuthService {
           metadata: { ipAddress: meta?.ipAddress },
         },
       });
+      void this.securityEvents?.capture({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        eventType: 'LOGOUT',
+        severity: 'info',
+        module: 'auth',
+        action: 'logout',
+        summary: 'Signed out',
+        ipAddress: meta?.ipAddress,
+        subjectKey: `user:${session.userId}`,
+      });
     }
     return { success: true };
   }
@@ -1571,8 +1663,18 @@ export class AuthService {
         action: 'auth.password_reset_requested',
         entityType: 'user',
         entityId: user.id,
-        metadata: { tokenPreview: token.slice(0, 8) },
+        metadata: {},
       },
+    });
+    void this.securityEvents?.capture({
+      tenantId,
+      actorUserId: user.id,
+      eventType: 'PASSWORD_RESET',
+      severity: 'medium',
+      module: 'auth',
+      action: 'password_reset_requested',
+      summary: 'Password reset was requested',
+      subjectKey: `user:${user.id}`,
     });
 
     return { accepted: true, resetToken: token };
@@ -1592,6 +1694,7 @@ export class AuthService {
     userId: string,
     newPassword: string,
     tenantId?: string,
+    source: 'change' | 'reset' = 'reset',
   ): Promise<{ success: true }> {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
@@ -1620,6 +1723,17 @@ export class AuthService {
       rules.historyCount,
     );
     await this.revokeAllSessionsForUser(userId);
+    void this.securityEvents?.capture({
+      tenantId: user.tenantId,
+      actorUserId: userId,
+      eventType: source === 'change' ? 'PASSWORD_CHANGE' : 'PASSWORD_RESET',
+      severity: 'medium',
+      module: 'auth',
+      action: source === 'change' ? 'password_changed' : 'password_reset',
+      summary:
+        source === 'change' ? 'Password was changed' : 'Password was reset',
+      subjectKey: `user:${userId}`,
+    });
     return { success: true };
   }
 
@@ -1755,7 +1869,12 @@ export class AuthService {
       );
     }
 
-    await this.resetPasswordAndRevokeSessions(userId, newPassword);
+    await this.resetPasswordAndRevokeSessions(
+      userId,
+      newPassword,
+      undefined,
+      'change',
+    );
     await this.securityNotify.notify({
       tenantId: user.tenantId,
       userId,

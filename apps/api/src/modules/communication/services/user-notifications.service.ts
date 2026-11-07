@@ -13,6 +13,7 @@ const ADMIN_OPS_ENTITY_TYPES = new Set([
   'backup_run',
   'license',
   'server_alert',
+  'security_alert',
 ]);
 
 /** Fix common UTF-8 mojibake (e.g. em dash shown as â€”). */
@@ -36,8 +37,10 @@ function isAdminOpsNotification(row: {
   const entityType = String(meta.entityType ?? '');
   const triggerKey = String(meta.triggerKey ?? meta.trigger ?? '');
   if (ADMIN_OPS_ENTITY_TYPES.has(entityType)) return true;
-  if (triggerKey.startsWith('backup.')) return true;
+  if (triggerKey.startsWith('backup.') || triggerKey.startsWith('security.'))
+    return true;
   if (/^backup\b/i.test(row.title) || /^backup\b/i.test(row.body)) return true;
+  if (/^security alert\b/i.test(row.title)) return true;
   return false;
 }
 

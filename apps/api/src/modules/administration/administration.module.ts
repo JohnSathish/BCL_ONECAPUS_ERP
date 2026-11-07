@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ImportModule } from '../../common/import/import.module';
 import { AuthModule } from '../auth/auth.module';
+import { SecurityCentreModule } from '../security-centre/security-centre.module';
 import { StaffModule } from '../staff/staff.module';
 import { AdminAuditHelper } from './admin-audit.helper';
 import { DeviceSecurityModule } from './device-security.module';
@@ -31,6 +32,7 @@ import { UsersService } from './services/users.service';
   imports: [
     DeviceSecurityModule,
     AuthModule,
+    SecurityCentreModule,
     ImportModule,
     forwardRef(() => StaffModule),
   ],

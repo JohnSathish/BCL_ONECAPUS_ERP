@@ -48,6 +48,7 @@ function childVisible(
   parentPermissions?: string[],
   parentRequireAll?: string[],
 ): boolean {
+  if (child.superAdminOnly && !isSuperAdmin(ctx.roles)) return false;
   if (child.requireAllPermissions?.length) {
     return hasAllListedPermissions(ctx.permissions, ctx.roles, child.requireAllPermissions);
   }

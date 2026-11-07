@@ -604,7 +604,12 @@ export class BackupOrchestratorService {
       await rm(a.localPath, { force: true }).catch(() => undefined);
     }
     await this.prisma.backupRun.delete({ where: { id: runId } });
-    await this.audit.log({ action: 'DELETE', actorId, runId });
+    await this.audit.log({
+      action: 'DELETE',
+      actorId,
+      runId,
+      tenantId: run.tenantId ?? undefined,
+    });
     return { deleted: true };
   }
 

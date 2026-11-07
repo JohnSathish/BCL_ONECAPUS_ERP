@@ -16,6 +16,7 @@ import { MfaController } from './mfa/mfa.controller';
 import { AdminEmailOtpService } from './admin-email-otp/admin-email-otp.service';
 import { AdminEmailOtpController } from './admin-email-otp/admin-email-otp.controller';
 import { CommunicationModule } from '../communication/communication.module';
+import { SecurityCentreModule } from '../security-centre/security-centre.module';
 import { StepUpService } from './step-up.service';
 import { StepUpController } from './step-up.controller';
 import { AuthQrService } from './login-methods/auth-qr.service';
@@ -29,6 +30,7 @@ import { LoginMethodsController } from './login-methods/login-methods.controller
     CryptoModule,
     DeviceSecurityModule,
     CommunicationModule,
+    SecurityCentreModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
