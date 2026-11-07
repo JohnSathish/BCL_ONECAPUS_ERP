@@ -1,3 +1,4 @@
+import { buildAdminOtpEmail } from './admin-email-otp-email';
 import {
   accountRequiresAdminEmailOtp,
   buildAdminOtpMessage,
@@ -164,6 +165,39 @@ describe('admin email OTP policy', () => {
     });
     expect(message.subject.includes('482913')).toBe(false);
     expect(message.text.includes('482913')).toBe(true);
+
+    const branded = buildAdminOtpEmail({
+      code: '482913',
+      collegeName: 'Fallback College',
+      displayName: 'College <script>',
+      ctx: {
+        institutionName: 'Don Bosco College Tura',
+        productName: 'Bosco Connect',
+        productTagline: 'Smart Education Management Platform',
+        tagline: 'Tura',
+        address: 'Tura, West Garo Hills, Meghalaya - 794101',
+        website: 'https://www.donboscocollege.ac.in',
+        email: 'mailconnect@donboscocollege.ac.in',
+        phone: '',
+        logoUrl: null,
+        primaryColor: '#0b3a73',
+        accentColor: '#1d4ed8',
+        showPoweredBy: true,
+        poweredByText: 'Powered by BaseCode Labs',
+        customFooterHtml: null,
+        senderName: 'Don Bosco College Tura Admissions',
+        replyEmail: 'mailconnect@donboscocollege.ac.in',
+      },
+    });
+    expect(branded.subject.includes('482913')).toBe(false);
+    expect(branded.html).toContain('SIGN-IN VERIFICATION');
+    expect(branded.html).toContain('Don Bosco College Tura');
+    expect(branded.html).toContain(
+      '4&nbsp;&nbsp;8&nbsp;&nbsp;2&nbsp;&nbsp;9&nbsp;&nbsp;1&nbsp;&nbsp;3',
+    );
+    expect(branded.html).toContain('College &lt;script&gt;');
+    expect(branded.html).not.toContain('<script>');
+    expect(branded.fromName).toBe('Don Bosco College Tura Admissions');
   });
 
   it('selects email for admins and no channel for other audiences', () => {

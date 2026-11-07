@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { BrandedEmailLayoutService } from '../../communication/services/branded-email-layout.service';
 import { CommunicationEmailService } from '../../communication/services/communication-email.service';
 import { isSchoolSisTenant } from '../../school-sis/school-sis-login-lookup';
 import type { LoginDeviceMeta } from '../auth.service';
@@ -18,7 +19,6 @@ import {
   OTP_TTL_MS,
   TRUSTED_DEVICE_MS,
   accountRequiresAdminEmailOtp,
-  buildAdminOtpMessage,
   checkOtpCode,
   describeClientDevice,
   generateOtpCode,
@@ -28,6 +28,7 @@ import {
   resendAllowed,
   selectOtpChannel,
 } from './admin-email-otp.policy';
+import { buildAdminOtpEmail } from './admin-email-otp-email';
 
 export type AdminEmailOtpChallengeResponse = {
   emailOtpRequired: true;
@@ -49,6 +50,7 @@ export class AdminEmailOtpService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly email: CommunicationEmailService,
+    private readonly layout: BrandedEmailLayoutService,
   ) {}
 
   /**
@@ -436,7 +438,9 @@ export class AdminEmailOtpService {
     collegeName: string;
     displayName?: string | null;
   }) {
-    const message = buildAdminOtpMessage({
+    const ctx = await this.layout.resolveContext(input.tenantId);
+    const message = buildAdminOtpEmail({
+      ctx,
       code: input.code,
       collegeName: input.collegeName,
       displayName: input.displayName,
@@ -445,6 +449,9 @@ export class AdminEmailOtpService {
       to: input.to,
       subject: message.subject,
       text: message.text,
+      html: message.html,
+      fromName: message.fromName,
+      replyTo: ctx.replyEmail,
     });
     try {
       await this.prisma.auditLog.create({
