@@ -813,6 +813,8 @@ export class AcademicEngineService {
       bypassRegistrationWindow?: boolean;
       promotionBypass?: boolean;
       skipFeeEnforcement?: boolean;
+      /** Admin subject correction, not student self-registration. */
+      bypassRegistrationLock?: boolean;
     },
   ) {
     const student = await this.assertStudent(tenantId, studentId);
@@ -825,7 +827,7 @@ export class AcademicEngineService {
         'Student academic standing not initialized. Contact administration.',
       );
     }
-    if (standing.registrationLocked) {
+    if (standing.registrationLocked && !opts?.bypassRegistrationLock) {
       throw new BadRequestException('Registration is locked for this student');
     }
     const skipFeeEnforcement =

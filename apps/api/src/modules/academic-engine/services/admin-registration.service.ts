@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -501,20 +502,28 @@ export class AdminRegistrationService {
       }
     }
 
-    const registration = targetSemesterId
+    const registrationInclude = {
+      lines: {
+        include: {
+          offering: { include: { course: true } },
+          offeringSection: { include: { shift: true } },
+        },
+      },
+      semester: true,
+    } as const;
+    let registration = targetSemesterId
       ? await this.prisma.semesterRegistration.findFirst({
           where: { tenantId, studentId, semesterId: targetSemesterId },
-          include: {
-            lines: {
-              include: {
-                offering: { include: { course: true } },
-                offeringSection: { include: { shift: true } },
-              },
-            },
-            semester: true,
-          },
+          include: registrationInclude,
         })
       : null;
+    if (!registration) {
+      registration = await this.prisma.semesterRegistration.findFirst({
+        where: { tenantId, studentId, semesterSequence: seq },
+        include: registrationInclude,
+        orderBy: { updatedAt: 'desc' },
+      });
+    }
 
     const workflow = await this.getWorkflowForStudent(tenantId, studentId);
 
@@ -551,6 +560,46 @@ export class AdminRegistrationService {
           | { name: string }[]
           | null) ?? [],
     };
+  }
+
+  /**
+   * Admin subject correction. Creates the current-semester registration when
+   * the student was admitted after the self-service window closed.
+   */
+  async ensureAdminRegistration(tenantId: string, studentId: string) {
+    const context = await this.getStudentRegistrationContext(
+      tenantId,
+      studentId,
+    );
+    if (context.registration) return context.registration;
+    if (!context.semesterId) {
+      throw new BadRequestException(
+        'No active semester is configured, so subjects cannot be assigned yet.',
+      );
+    }
+    try {
+      return await this.engine.createRegistration(
+        tenantId,
+        studentId,
+        {
+          semesterId: context.semesterId,
+          semesterSequence: context.semesterSequence,
+        },
+        {
+          bypassRegistrationWindow: true,
+          skipFeeEnforcement: true,
+          bypassRegistrationLock: true,
+        },
+      );
+    } catch (error) {
+      if (!(error instanceof ConflictException)) throw error;
+      const again = await this.getStudentRegistrationContext(
+        tenantId,
+        studentId,
+      );
+      if (again.registration) return again.registration;
+      throw error;
+    }
   }
 
   async autoAssignRegistration(

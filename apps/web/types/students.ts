@@ -50,6 +50,7 @@ export type StudentDirectoryRow = {
   semester: number;
   cycle?: string | null;
   stream?: string | null;
+  streamId?: string | null;
   streamCode?: string | null;
   shift?: string | null;
   shiftCode?: string | null;

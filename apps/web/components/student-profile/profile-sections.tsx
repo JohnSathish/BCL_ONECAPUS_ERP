@@ -23,6 +23,7 @@ import {
   uploadStudentPhoto,
   verifyStudentDocument,
 } from '@/services/students';
+import { fetchAcademicStreams } from '@/services/academic-engine';
 import { fetchAcademicDepartments } from '@/services/organization';
 import { fetchBoardNames } from '@/services/support-data';
 import { ClassXiiSubjectMarksEditor } from '@/components/students-module/class-xii-subject-marks-editor';
@@ -934,6 +935,25 @@ export function AcademicSection({
   const major = majorChoice?.subjectName ?? majorChoice?.subjectSlug;
   const minor = minorChoice?.subjectName ?? minorChoice?.subjectSlug;
 
+  const streams = useQuery({
+    queryKey: ['academic-engine', 'streams', 'profile-stream'],
+    queryFn: fetchAcademicStreams,
+    enabled: canEdit,
+  });
+  const [streamId, setStreamId] = useState(profile.streamId ?? '');
+  const [streamTouched, setStreamTouched] = useState(false);
+  const matchedStreamId =
+    profile.streamId ||
+    streams.data?.find(
+      (stream) =>
+        stream.name.localeCompare(profile.stream ?? '', undefined, { sensitivity: 'accent' }) ===
+          0 ||
+        stream.code.localeCompare(profile.streamCode ?? '', undefined, {
+          sensitivity: 'accent',
+        }) === 0,
+    )?.id ||
+    '';
+
   const [residenceForm, setResidenceForm] = useState({
     residenceType: profile.residenceType ?? '',
     hostelBlock: profile.hostelBlock ?? '',
@@ -957,6 +977,11 @@ export function AcademicSection({
   }, [profile.residenceType, profile.hostelBlock, profile.hostelRoom]);
 
   useEffect(() => {
+    if (streamTouched) return;
+    setStreamId(matchedStreamId);
+  }, [matchedStreamId, streamTouched]);
+
+  useEffect(() => {
     setAdvancedForm({
       aggregatePercentageThroughSem6:
         profile.aggregatePercentageThroughSem6 != null
@@ -972,8 +997,9 @@ export function AcademicSection({
       residenceType: residenceForm.residenceType || undefined,
       hostelBlock: residenceForm.hostelBlock || undefined,
       hostelRoom: residenceForm.hostelRoom || undefined,
+      ...(streamTouched && streamId ? { streamId } : {}),
     }),
-    [residenceForm],
+    [residenceForm, streamTouched, streamId],
   );
   const { message: residenceMessage, saving: residenceSaving } = useDebouncedSave(
     profile.id,
@@ -1023,7 +1049,26 @@ export function AcademicSection({
           <input className={inputClass} disabled value={minor ?? '—'} />
         </Field>
         <Field label="Stream">
-          <input className={inputClass} disabled value={profile.stream ?? '—'} />
+          {canEdit ? (
+            <select
+              className={inputClass}
+              value={streamId}
+              disabled={streams.isLoading}
+              onChange={(event) => {
+                setStreamTouched(true);
+                setStreamId(event.target.value);
+              }}
+            >
+              {!streamId ? <option value="">Select stream</option> : null}
+              {(streams.data ?? []).map((stream) => (
+                <option key={stream.id} value={stream.id}>
+                  {stream.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input className={inputClass} disabled value={profile.stream ?? '—'} />
+          )}
         </Field>
         <Field label="Session / Academic Year">
           <input className={inputClass} disabled value={profile.entrySession ?? '—'} />
@@ -1032,8 +1077,9 @@ export function AcademicSection({
       <div className="flex gap-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-800">
         <Info className="mt-0.5 h-4 w-4 shrink-0" />
         <p>
-          To correct a wrong Major, Minor, MDC, AEC, SEC, or VAC, open Change Subjects / Shift.
-          Admins can save those changes after registration is completed.
+          Stream is the college stream, such as Arts. Change it here if the student was admitted
+          under the wrong stream, then use Change subjects / shift for Major, Minor, MDC, AEC, SEC,
+          and VAC.
         </p>
       </div>
       {showAdvanced ? (

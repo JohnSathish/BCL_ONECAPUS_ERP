@@ -119,6 +119,7 @@ export default function StudentAcademicPage() {
     mutationFn: () =>
       upsertStudentAcademicProfile(studentId, {
         streamId: streamId || undefined,
+        forceStreamChange: true,
         admissionYearId: admissionYearId || undefined,
         class12Subjects,
         languagePreferences: { preferred: 'english' },

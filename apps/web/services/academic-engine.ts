@@ -696,6 +696,7 @@ export async function upsertStudentAcademicProfile(
   studentId: string,
   payload: {
     streamId?: string;
+    forceStreamChange?: boolean;
     admissionYearId?: string;
     class12Subjects?: { name: string; code?: string; marks?: number }[];
     languagePreferences?: Record<string, unknown>;

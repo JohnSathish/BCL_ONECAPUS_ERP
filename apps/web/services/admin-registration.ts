@@ -93,6 +93,11 @@ export async function fetchStudentRegistrationContext(studentId: string, semeste
   return data as StudentRegistrationContext;
 }
 
+export async function ensureAdminRegistration(studentId: string) {
+  const { data } = await api.post(`/v1/academic-engine/registrations/students/${studentId}/ensure`);
+  return data as SemesterRegistration;
+}
+
 export async function createRegistrationForStudent(
   studentId: string,
   payload: { semesterId: string; semesterSequence: number },

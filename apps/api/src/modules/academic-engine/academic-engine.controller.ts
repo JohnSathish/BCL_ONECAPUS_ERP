@@ -925,6 +925,15 @@ export class AcademicEngineController {
     return this.adminRegistration.listRegistrations(user.tid, query);
   }
 
+  @Post('registrations/students/:studentId/ensure')
+  @RequirePermissions('academic-engine:manage')
+  ensureStudentRegistration(
+    @CurrentUser() user: JwtUser,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.adminRegistration.ensureAdminRegistration(user.tid, studentId);
+  }
+
   @Get('registrations/students/:studentId/context')
   @RequirePermissions('academic-engine:manage')
   studentRegistrationContext(

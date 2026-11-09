@@ -9,6 +9,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Field, inputClass } from '@/components/student-profile/student-profile-shell';
 import { ShiftTransferConfirmDialog } from '@/components/students-module/profile/shift-transfer-confirm-dialog';
 import {
+  ensureAdminRegistration,
   fetchStudentRegistrationContext,
   updateAdminRegistrationLines,
 } from '@/services/admin-registration';
@@ -64,6 +65,7 @@ function departmentFromCourseCode(code?: string | null) {
   const map: Record<string, string> = {
     ECO: 'Economics',
     EDU: 'Education',
+    EDN: 'Education',
     ENG: 'English',
     GAR: 'Garo',
     GEO: 'Geography',
@@ -161,8 +163,10 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
   const programmeName = context.data?.student.programCode ?? profile.programme ?? 'Programme';
   const registration = context.data?.registration;
   const registrationEditable = registration?.status === 'draft';
-  /** Admins may correct major, minor, and basket subjects after submit. */
-  const subjectsEditable = Boolean(registration);
+  const existingLineCount = registration?.lines?.length ?? 0;
+  /** Admins can assign or correct subjects even when no registration exists yet. */
+  const subjectsEditable = !context.isLoading && !context.isError;
+  const assigningFresh = existingLineCount === 0;
   const currentPrimaryShiftId =
     context.data?.student.primaryShiftId ?? profile.primaryShiftId ?? '';
   const shiftChanging = Boolean(shiftId && shiftId !== currentPrimaryShiftId);
@@ -392,8 +396,8 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
     normalizeLabel(minorDepartment) !== normalizeLabel(currentMinorDepartment);
 
   const selectedMinorPapers = useMemo(() => {
-    if (!minorChanging) return [] as PaperRef[];
     const wanted = normalizeLabel(minorDepartment);
+    if (!wanted) return [] as PaperRef[];
     const fromCurriculum = departmentPapers(
       minorDepartments.find((department) => normalizeLabel(department.departmentName) === wanted),
     );
@@ -418,14 +422,14 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
       });
     }
     return fromCatalog;
-  }, [minorChanging, minorDepartment, minorDepartments, sections]);
+  }, [minorDepartment, minorDepartments, sections]);
 
   useEffect(() => {
     if (!open) return;
     setShiftId(context.data?.student.primaryShiftId ?? profile.primaryShiftId ?? '');
     setMajorDepartment(currentMajorDepartment === '—' ? '' : currentMajorDepartment);
     setMinorDepartment(currentMinorDepartment === '—' ? '' : currentMinorDepartment);
-    setKeepExistingElectives(true);
+    setKeepExistingElectives(existingLineCount > 0);
     setElectives({});
     setMessage('');
     setRollMode('manual');
@@ -436,6 +440,7 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
     profile.primaryShiftId,
     currentMajorDepartment,
     currentMinorDepartment,
+    existingLineCount,
   ]);
 
   const resolveSectionForPaper = (paper: PaperRef, category: string) => {
@@ -471,7 +476,10 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
 
   const changeSummary = useMemo(() => {
     const changed: string[] = [];
-    const unchanged: string[] = ['Major Department', 'Major Papers'];
+    const unchanged: string[] = assigningFresh
+      ? ['Major Department']
+      : ['Major Department', 'Major Papers'];
+    if (assigningFresh) changed.push('Major Papers');
     if (shiftChanging) changed.push('Shift', 'Roll Number');
     else unchanged.push('Shift', 'Roll Number');
     if (
@@ -480,8 +488,10 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
       normalizeLabel(majorDepartment) !== normalizeLabel(currentMajorDepartment)
     ) {
       changed.push('Major Department', 'Major Papers');
-      unchanged.splice(unchanged.indexOf('Major Department'), 1);
-      unchanged.splice(unchanged.indexOf('Major Papers'), 1);
+      for (const label of ['Major Department', 'Major Papers']) {
+        const index = unchanged.indexOf(label);
+        if (index >= 0) unchanged.splice(index, 1);
+      }
     }
     if (
       majorDepartmentEditable(semesterSequence) &&
@@ -508,14 +518,11 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
     electiveCategories,
     selectedElectivePreview,
     keepExistingElectives,
+    assigningFresh,
   ]);
 
   const saveMut = useMutation({
     mutationFn: async () => {
-      if (!registration?.id) {
-        throw new Error(`No Semester ${semesterSequence} registration found for this student`);
-      }
-
       let auditCount = 0;
       let shiftTransferResult: Awaited<ReturnType<typeof executeShiftTransfer>> | null = null;
 
@@ -549,8 +556,13 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
         return { auditCount, shiftTransferResult, onlyShiftTransfer: true as const };
       }
 
-      if (!registration) {
-        throw new Error('No semester registration found for this student.');
+      let registrationId = registration?.id;
+      if (!registrationId) {
+        const created = await ensureAdminRegistration(profile.id);
+        registrationId = created.id;
+      }
+      if (!registrationId) {
+        throw new Error(`No Semester ${semesterSequence} registration found for this student`);
       }
 
       const preservedLines: Array<{
@@ -573,9 +585,14 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
       const majorPapers =
         majorDepartmentEditable(semesterSequence) &&
         selectedMajor?.papers?.length &&
-        (registrationEditable || majorChanging)
+        (assigningFresh || registrationEditable || majorChanging)
           ? selectedMajor.papers
           : currentMajorPapers;
+      if (assigningFresh && majorDepartmentEditable(semesterSequence) && !majorPapers.length) {
+        throw new Error(
+          `Could not find Semester ${semesterSequence} major papers for ${majorDepartment || currentMajorDepartment}.`,
+        );
+      }
 
       for (const paper of majorPapers) {
         const section = resolveSectionForPaper(paper, 'MAJOR');
@@ -610,7 +627,9 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
         });
       }
 
-      if (minorChanging) {
+      const writeMinor =
+        semesterSequence <= 2 && Boolean(minorDepartment) && (assigningFresh || minorChanging);
+      if (writeMinor) {
         if (!selectedMinorPapers.length) {
           throw new Error(
             `Could not find a Semester ${semesterSequence} minor paper for ${minorDepartment}.`,
@@ -629,7 +648,7 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
         }
       }
 
-      if (!keepExistingElectives) {
+      if (assigningFresh || !keepExistingElectives) {
         for (const category of electiveCategories) {
           const value = electives[category] ?? KEEP;
           if (value === KEEP || !value) continue;
@@ -667,7 +686,7 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
         // Overlay major/elective changes if any (already handled by onlyShiftTransfer early return)
       }
 
-      const regResult = await updateAdminRegistrationLines(registration.id, linesToSave, {
+      const regResult = await updateAdminRegistrationLines(registrationId, linesToSave, {
         auditReason: auditReason.trim() || undefined,
       });
       auditCount += regResult.auditRecorded ?? 0;
@@ -740,6 +759,17 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   Registration status: <strong>{registration.status}</strong>. Admin can still
                   correct Major, Minor, MDC, AEC, SEC, VAC, and the other semester subjects.
+                </div>
+              ) : null}
+              {!context.isLoading && !registration ? (
+                <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+                  No Semester {semesterSequence} registration yet. Choose MDC, AEC, SEC, and VAC,
+                  then save. Major and minor papers are added from the departments on this form.
+                </div>
+              ) : null}
+              {context.isError ? (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                  {apiErrorMessage(context.error, 'Could not load semester registration.')}
                 </div>
               ) : null}
 
@@ -901,31 +931,35 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
                 </div>
               ) : null}
 
-              <div className="rounded-md border border-border p-3">
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={keepExistingElectives}
-                    onChange={(event) => {
-                      setKeepExistingElectives(event.target.checked);
-                      if (event.target.checked) setElectives({});
-                    }}
-                  />
-                  <span>
-                    <span className="font-medium">Keep existing selections</span>
-                    <span className="block text-xs text-muted-foreground">
-                      Uncheck to change MDC, AEC, SEC, VAC, or VTC. Major and Minor are changed
-                      above.
+              {existingLineCount > 0 ? (
+                <div className="rounded-md border border-border p-3">
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={keepExistingElectives}
+                      onChange={(event) => {
+                        setKeepExistingElectives(event.target.checked);
+                        if (event.target.checked) setElectives({});
+                      }}
+                    />
+                    <span>
+                      <span className="font-medium">Keep existing selections</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Uncheck to change MDC, AEC, SEC, VAC, or VTC. Major and Minor are changed
+                        above.
+                      </span>
                     </span>
-                  </span>
-                </label>
-              </div>
+                  </label>
+                </div>
+              ) : null}
 
-              {!keepExistingElectives ? (
+              {!keepExistingElectives || existingLineCount === 0 ? (
                 <div className="space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Subjects that may be changed
+                    {existingLineCount === 0
+                      ? 'MDC, AEC, SEC, and VAC'
+                      : 'Subjects that may be changed'}
                   </p>
                   {electiveCategories.map((category) => {
                     const options = electiveOptions.get(category) ?? [];
@@ -942,7 +976,9 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
                             }))
                           }
                         >
-                          <option value={KEEP}>Keep existing</option>
+                          <option value={KEEP}>
+                            {existingLineCount === 0 ? 'Select subject' : 'Keep existing'}
+                          </option>
                           {options.map((paper) => (
                             <option key={paper.code} value={paper.code}>
                               {paper.title}
@@ -1078,7 +1114,8 @@ export function SubjectChangeEditor({ profile }: { profile: StudentProfile }) {
               size="sm"
               disabled={
                 saveMut.isPending ||
-                !registration?.id ||
+                context.isLoading ||
+                (!registration?.id && !context.data?.semesterId && !shiftChanging) ||
                 (shiftChanging && rollMode === 'manual' && !manualRollReady) ||
                 (shiftChanging &&
                   rollMode === 'auto' &&

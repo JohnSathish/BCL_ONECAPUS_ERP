@@ -1158,6 +1158,18 @@ export class StudentProfileSectionsService {
     if (dto.class12Subjects !== undefined && !excelImported) {
       await this.assertClass12SubjectsExist(tenantId, dto.class12Subjects);
     }
+    if (dto.streamId) {
+      const stream = await this.prisma.academicStream.findFirst({
+        where: {
+          id: dto.streamId,
+          tenantId,
+          deletedAt: null,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      if (!stream) throw new BadRequestException('Invalid academic stream');
+    }
     if (dto.majorSubjectSlug && dto.minorSubjectSlug) {
       await this.eligibility.assertValidMajorMinorPairForStudent(
         tenantId,

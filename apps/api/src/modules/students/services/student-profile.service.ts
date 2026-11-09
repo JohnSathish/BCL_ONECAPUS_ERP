@@ -325,7 +325,7 @@ export class StudentProfileService {
       } | null;
       primaryShift: { code: string; name: string } | null;
       academicProfile: {
-        stream: { code: string; name: string } | null;
+        stream: { id?: string; code: string; name: string } | null;
         admissionBatch: {
           batchCode: string;
           admissionYear: number;
@@ -385,6 +385,7 @@ export class StudentProfileService {
       semester: resolved.semester,
       cycle: resolved.cycle,
       stream: student.academicProfile?.stream?.name,
+      streamId: student.academicProfile?.stream?.id ?? null,
       streamCode: student.academicProfile?.stream?.code,
       shift: student.primaryShift?.name,
       shiftCode: student.primaryShift?.code,
