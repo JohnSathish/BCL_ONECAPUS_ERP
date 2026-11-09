@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const KIOSK_PATH = '/digital-notice-board';
+const KIOSK_PATH = '/campus-tv';
 
 function isNoticeboardHost(host: string) {
   const name = host.split(',')[0]?.trim().split(':')[0]?.toLowerCase() ?? '';

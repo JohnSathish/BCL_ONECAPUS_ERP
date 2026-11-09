@@ -309,7 +309,7 @@ export function DigitalNoticeBoard({
   );
 
   return (
-    <div className="nb">
+    <div className="nb" data-kiosk="dbc-noticeboard">
       <header className="nb-header">
         <div className="nb-brand">
           <img src="/images/college-logo.png" alt="" />

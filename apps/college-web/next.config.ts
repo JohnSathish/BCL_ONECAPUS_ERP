@@ -24,18 +24,28 @@ const nextConfig: NextConfig = {
         ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '').replace(/\/api$/, '')
         : '') ||
       (process.env.NODE_ENV === 'production' ? 'http://api:3001' : 'http://127.0.0.1:3001');
-    return [
-      {
-        source: '/uploads/:path*',
-        destination: `${apiOrigin}/uploads/:path*`,
-      },
-      // When nginx forwards all /api to college-web, proxy Nest paths here.
-      // App Router handlers (/api/contact, /api/revalidate, …) still win first.
-      {
-        source: '/api/v1/:path*',
-        destination: `${apiOrigin}/api/v1/:path*`,
-      },
-    ];
+    return {
+      // Run before the cached homepage, so this host never receives that page.
+      beforeFiles: [
+        {
+          source: '/',
+          has: [{ type: 'host', value: 'noticeboard.donboscocollege.ac.in' }],
+          destination: '/campus-tv',
+        },
+      ],
+      afterFiles: [
+        {
+          source: '/uploads/:path*',
+          destination: `${apiOrigin}/uploads/:path*`,
+        },
+        // When nginx forwards all /api to college-web, proxy Nest paths here.
+        // App Router handlers (/api/contact, /api/revalidate, …) still win first.
+        {
+          source: '/api/v1/:path*',
+          destination: `${apiOrigin}/api/v1/:path*`,
+        },
+      ],
+    };
   },
   async redirects() {
     return [

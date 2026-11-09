@@ -42,5 +42,13 @@ if [[ -n "$CHUNK" ]]; then
   echo "sample chunk ${CHUNK} -> Content-Type: ${CT}"
 fi
 
+NB_CODE=$(curl -sk -o /tmp/noticeboard-home.html -w "%{http_code}" --max-time 20 https://noticeboard.donboscocollege.ac.in/ || echo 000)
+if grep -q 'data-kiosk="dbc-noticeboard"' /tmp/noticeboard-home.html; then
+  echo "https://noticeboard.donboscocollege.ac.in/ -> HTTP ${NB_CODE} kiosk"
+else
+  echo "ERROR: https://noticeboard.donboscocollege.ac.in/ -> HTTP ${NB_CODE} and is not the notice board" >&2
+  exit 1
+fi
+
 echo
 echo "Done. On the browser: hard refresh (Ctrl+Shift+R) or clear site cache for donboscocollege.ac.in"
