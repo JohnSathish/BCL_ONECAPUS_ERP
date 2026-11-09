@@ -456,7 +456,7 @@ export function DigitalNoticeBoard({
         )}
       </section>
 
-      <footer className="nb-ticker">
+      <div className="nb-ticker" role="region" aria-label="Announcements">
         <strong>Announcements</strong>
         <div>
           {tickerLoop.length ? (
@@ -473,7 +473,7 @@ export function DigitalNoticeBoard({
             </p>
           )}
         </div>
-      </footer>
+      </div>
     </div>
   );
 }

@@ -22,7 +22,7 @@ body:has(.nb) {
 body:has(.nb) .skip-link,
 body:has(.nb) .utility,
 body:has(.nb) .site-header,
-body:has(.nb) footer {
+body:has(.nb) .site-footer {
   display: none !important;
 }
 
