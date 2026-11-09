@@ -25,6 +25,11 @@ echo "=== NEP ERP — quick update ==="
 bash scripts/deploy/vps-pull.sh
 echo "Deploying commit: $(git log -1 --oneline)"
 
+if [[ -f nginx/nginx.combined-dbc.ssl.conf ]] \
+  && grep -q 'live/noticeboard.donboscocollege.ac.in/' nginx/nginx.combined-dbc.ssl.conf; then
+  bash scripts/deploy/vps-noticeboard-ssl.sh --cert-only
+fi
+
 resolve_erp_net() {
   local cid
   cid=$("${COMPOSE[@]}" ps -q nginx 2>/dev/null | head -1 || true)

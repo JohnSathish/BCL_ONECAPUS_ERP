@@ -75,6 +75,13 @@ echo "Pulling latest code…"
 bash scripts/deploy/vps-pull.sh
 echo "Deploying commit: $(git log -1 --oneline)"
 
+# The combined file's notice-board vhost references its own certificate.
+# Issue that cert before nginx.conf is replaced, or nginx -t fails and HTTPS stays down.
+if [[ -f nginx/nginx.combined-dbc.ssl.conf ]] \
+  && grep -q 'live/noticeboard.donboscocollege.ac.in/' nginx/nginx.combined-dbc.ssl.conf; then
+  bash scripts/deploy/vps-noticeboard-ssl.sh --cert-only
+fi
+
 # vps-pull.sh checks out the HTTP-only nginx.conf from git. Put the SSL
 # config back afterwards, or the recreated nginx only listens on port 80
 # while Docker still publishes 443.
