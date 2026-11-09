@@ -72,6 +72,7 @@ export function SupportDataPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['support-data', selectedCategory] });
       qc.invalidateQueries({ queryKey: ['support-data', 'categories'] });
+      qc.invalidateQueries({ queryKey: ['class12-subjects'] });
       setDrawerOpen(false);
       setEditingRow(null);
       setForm({});
@@ -108,6 +109,7 @@ export function SupportDataPage() {
   const toggleStatus = async (row: SupportDataRow) => {
     await setSupportDataStatus(selectedCategory, row.id, !row.isActive);
     qc.invalidateQueries({ queryKey: ['support-data', selectedCategory] });
+    qc.invalidateQueries({ queryKey: ['class12-subjects'] });
   };
 
   const moveRow = async (row: SupportDataRow, direction: -1 | 1) => {
@@ -119,6 +121,7 @@ export function SupportDataPage() {
     [ids[idx], ids[target]] = [ids[target], ids[idx]];
     await reorderSupportData(selectedCategory, ids);
     qc.invalidateQueries({ queryKey: ['support-data', selectedCategory] });
+    qc.invalidateQueries({ queryKey: ['class12-subjects'] });
   };
 
   const handleExport = async () => {
@@ -139,6 +142,7 @@ export function SupportDataPage() {
     }
     await commitSupportDataImport(selectedCategory, result.rows);
     qc.invalidateQueries({ queryKey: ['support-data', selectedCategory] });
+    qc.invalidateQueries({ queryKey: ['class12-subjects'] });
   };
 
   return (
@@ -211,6 +215,13 @@ export function SupportDataPage() {
                 <p className="text-xs text-muted-foreground">
                   {categoryMeta?.group ?? ''} · {(rowsQ.data ?? []).length} entries
                 </p>
+                {selectedCategory === 'board-subjects' ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Class XII subject lists read this table. Set Board Type to MBOSE and Stream to
+                    Science, Arts, or Commerce. Saved subjects appear on the admission form without
+                    a new deploy.
+                  </p>
+                ) : null}
               </div>
               <MasterDataTable
                 rows={rowsQ.data ?? []}

@@ -204,7 +204,7 @@ export const SUPPORT_DATA_CATEGORIES: SupportDataCategoryDef[] = [
       },
       {
         key: 'category',
-        label: 'Category',
+        label: 'Stream',
         type: 'select',
         required: true,
         options: BOARD_SUBJECT_CATEGORIES,

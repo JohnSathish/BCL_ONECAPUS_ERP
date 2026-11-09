@@ -39,6 +39,9 @@ export class Class12SubjectsService {
     if (this.isMboseArts(boardRaw, streamCode)) {
       await this.ensureMboseArtsComputerScience(tenantId);
     }
+    if (this.isMboseScience(boardRaw, streamCode)) {
+      await this.ensureMboseScienceGaroMil(tenantId);
+    }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);
     const streamAliases = class12StreamLookupAliases(streamCode);
@@ -99,6 +102,52 @@ export class Class12SubjectsService {
       normalizeClass12Stream(streamCode) === 'ARTS' &&
       class12BoardLookupAliases(boardRaw).some((alias) => alias === 'MBOSE')
     );
+  }
+
+  private isMboseScience(boardRaw: string, streamCode: string) {
+    return (
+      normalizeClass12Stream(streamCode) === 'SCIENCE' &&
+      class12BoardLookupAliases(boardRaw).some((alias) => alias === 'MBOSE')
+    );
+  }
+
+  /**
+   * MBOSE Science MIL list shipped without Garo. Insert it once.
+   * A row already saved or removed in Support Data is left as the office set it.
+   */
+  private async ensureMboseScienceGaroMil(tenantId: string) {
+    const subjectName = 'Garo (MIL)';
+    const subjectCode = buildClass12SubjectCode(
+      'MBOSE',
+      'SCIENCE',
+      subjectName,
+    );
+    const existing = await this.prisma.supportBoardSubject.findFirst({
+      where: {
+        tenantId,
+        OR: [
+          { subjectCode },
+          {
+            boardType: { equals: 'MBOSE', mode: 'insensitive' },
+            category: { equals: 'SCIENCE', mode: 'insensitive' },
+            subjectName: { equals: subjectName, mode: 'insensitive' },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    if (existing) return;
+    await this.prisma.supportBoardSubject.create({
+      data: {
+        tenantId,
+        subjectCode,
+        subjectName,
+        boardType: 'MBOSE',
+        category: 'SCIENCE',
+        sortOrder: 75,
+        isActive: true,
+      },
+    });
   }
 
   /** Optional MBOSE Arts paper. Science and Commerce already have their own rows. */
@@ -311,6 +360,9 @@ export class Class12SubjectsService {
     }
     if (this.isMboseArts(boardRaw, streamCode)) {
       await this.ensureMboseArtsComputerScience(tenantId);
+    }
+    if (this.isMboseScience(boardRaw, streamCode)) {
+      await this.ensureMboseScienceGaroMil(tenantId);
     }
 
     const boardAliases = await this.resolveBoardAliases(tenantId, boardRaw);
