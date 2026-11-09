@@ -1194,6 +1194,10 @@ export class AcademicCalendarService {
       source: 'ERP',
       type: row.type,
       description: row.description,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      venue: row.venue,
+      isAllDay: row.isAllDay,
     }));
   }
 

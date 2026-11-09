@@ -1,4 +1,6 @@
+import { headers } from 'next/headers';
 import { preload } from 'react-dom';
+import DigitalNoticeBoardPage from './digital-notice-board/page';
 import {
   HomepageCoatOfArms,
   HomepageResearchAndLinks,
@@ -14,7 +16,19 @@ import { getActiveHomePopups } from '@/lib/popups';
 import { isRecord } from '@/lib/cms-client';
 import { normalizeEventCategory, type HubEvent } from '@/lib/information-hub';
 
+function isNoticeboardRequest(host: string, marked: string | null) {
+  if (marked === '1') return true;
+  const name = host.split(',')[0]?.trim().split(':')[0]?.toLowerCase() ?? '';
+  return name === 'noticeboard.donboscocollege.ac.in' || name.startsWith('noticeboard.');
+}
+
 export default async function HomePage() {
+  const headerList = await headers();
+  const host = headerList.get('x-forwarded-host') ?? headerList.get('host') ?? '';
+  if (isNoticeboardRequest(host, headerList.get('x-noticeboard'))) {
+    return <DigitalNoticeBoardPage />;
+  }
+
   const [content, academicDepartments, heroSlides, homepage, upcoming, activePopups] =
     await Promise.all([
       getCollegeContent(),

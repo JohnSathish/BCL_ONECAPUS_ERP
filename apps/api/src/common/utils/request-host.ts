@@ -24,7 +24,10 @@ export function normalizeHost(raw: string): string {
   return withoutPort.startsWith('www.') ? withoutPort.slice(4) : withoutPort;
 }
 
-/** OPAC uses the college tenant already stored for erp.* and the apex domain. */
+/**
+ * OPAC uses the college tenant already stored for erp.* and the apex domain.
+ * The campus TV host uses the same tenant as the public college website.
+ */
 export function portalHostCandidates(host: string): string[] {
   const name = normalizeHost(host);
   if (!name) return [];
@@ -32,6 +35,10 @@ export function portalHostCandidates(host: string): string[] {
   if (name.startsWith('opac.')) {
     const rest = name.slice('opac.'.length);
     if (rest) candidates.push(`erp.${rest}`, rest);
+  }
+  if (name.startsWith('noticeboard.')) {
+    const rest = name.slice('noticeboard.'.length);
+    if (rest) candidates.push(rest);
   }
   return candidates;
 }

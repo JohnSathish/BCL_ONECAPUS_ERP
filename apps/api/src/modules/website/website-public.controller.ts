@@ -70,6 +70,13 @@ export class WebsitePublicController {
   }
 
   @Public()
+  @Get('noticeboard')
+  async noticeboard(@Req() req: Request, @Query('tenant') tenantSlug?: string) {
+    const tenant = await this.resolveTenant(req, tenantSlug);
+    return this.enterprise.getPublicNoticeboard(tenant.id);
+  }
+
+  @Public()
   @Get('notices')
   async notices(@Req() req: Request, @Query('tenant') tenantSlug?: string) {
     const tenant = await this.resolveTenant(req, tenantSlug);

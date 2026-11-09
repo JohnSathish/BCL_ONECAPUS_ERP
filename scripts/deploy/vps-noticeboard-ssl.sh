@@ -45,7 +45,12 @@ else
   restore_nginx() {
     if [[ -f "$BACKUP" ]]; then
       cp "$BACKUP" nginx/nginx.conf
+    fi
+    # Do not replace the running proxy with a config that cannot load.
+    if "${COMPOSE[@]}" run --rm --no-deps nginx nginx -t >/dev/null 2>&1; then
       "${COMPOSE[@]}" up -d nginx || true
+    else
+      echo "WARN: nginx.conf is not loadable yet; leaving the current proxy process alone." >&2
     fi
   }
 

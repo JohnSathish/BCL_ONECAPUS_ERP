@@ -24,6 +24,7 @@ import { WebsiteService } from './website.service';
 import { sanitizeWebsiteHtml } from './utils/website-html-sanitizer';
 import { isDemoWebsiteContentSlug } from './website-content-catalog';
 import { AcademicCalendarService } from '../academic-calendar/academic-calendar.service';
+import { buildNoticeboardPayload } from './noticeboard-payload';
 
 export type WebsiteMenuTreeNode = {
   id: string;
@@ -734,6 +735,40 @@ export class WebsiteCmsEnterpriseService {
     return rows.map((row) => this.mapAnnouncement(row));
   }
 
+  /** Public 65-inch notice board. Reuses published notices, the ticker, and the academic calendar. */
+  async getPublicNoticeboard(tenantId: string) {
+    const [notices, announcements, events] = await Promise.all([
+      this.listPublicNotices(tenantId),
+      this.listPublicAnnouncements(tenantId, { ticker: true }),
+      this.listUpcomingEvents(tenantId),
+    ]);
+    return buildNoticeboardPayload({
+      notices: Array.isArray(notices) ? notices : [],
+      announcements: Array.isArray(announcements)
+        ? announcements.map((row) => ({ id: row.id, title: row.title }))
+        : [],
+      events: (Array.isArray(events) ? events : []).flatMap((row) => {
+        if (!row || typeof row !== 'object') return [];
+        return [
+          {
+            id: String(row.id),
+            title: row.title,
+            date: row.date,
+            endDate: 'endDate' in row ? (row.endDate ?? null) : null,
+            category: row.category,
+            type: 'type' in row ? (row.type ?? null) : null,
+            description:
+              'description' in row ? (row.description ?? null) : null,
+            startTime: 'startTime' in row ? (row.startTime ?? null) : null,
+            endTime: 'endTime' in row ? (row.endTime ?? null) : null,
+            venue: 'venue' in row ? (row.venue ?? null) : null,
+            isAllDay: 'isAllDay' in row ? row.isAllDay !== false : true,
+          },
+        ];
+      }),
+    });
+  }
+
   async listPublicNotices(
     tenantId: string,
     opts: { slug: string; homepage?: boolean },
@@ -991,6 +1026,14 @@ export class WebsiteCmsEnterpriseService {
           featured: Boolean(item.featured),
           showCountdown: Boolean(item.showCountdown),
           source: typeof item.source === 'string' ? item.source : 'ERP',
+          endDate: typeof item.endDate === 'string' ? item.endDate : date,
+          type: typeof item.type === 'string' ? item.type : null,
+          description:
+            typeof item.description === 'string' ? item.description : null,
+          startTime: typeof item.startTime === 'string' ? item.startTime : null,
+          endTime: typeof item.endTime === 'string' ? item.endTime : null,
+          venue: typeof item.venue === 'string' ? item.venue : null,
+          isAllDay: item.isAllDay !== false,
         };
       })
       .filter(Boolean)

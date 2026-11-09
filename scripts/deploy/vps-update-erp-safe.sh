@@ -75,11 +75,27 @@ echo "Pulling latest code…"
 bash scripts/deploy/vps-pull.sh
 echo "Deploying commit: $(git log -1 --oneline)"
 
+# git pull can replace this file while it is running. Re-exec so the pulled
+# script, not the copy that started the deploy, decides when nginx is switched.
+if [[ "${ERP_SAFE_UPDATE_REEXEC:-}" != "1" ]]; then
+  echo "Re-reading deploy script after git pull…"
+  export ERP_SAFE_UPDATE_REEXEC=1
+  exec bash "$0" "$@"
+fi
+
 # The combined file's notice-board vhost references its own certificate.
 # Issue that cert before nginx.conf is replaced, or nginx -t fails and HTTPS stays down.
 if [[ -f nginx/nginx.combined-dbc.ssl.conf ]] \
-  && grep -q 'live/noticeboard.donboscocollege.ac.in/' nginx/nginx.combined-dbc.ssl.conf; then
+  && grep -q 'live/noticeboard.donboscocollege.ac.in/' nginx/nginx.combined-dbc.ssl.conf \
+  && [[ ! -f /etc/letsencrypt/live/noticeboard.donboscocollege.ac.in/fullchain.pem ]]; then
+  echo "Notice board certificate is missing. Issuing it before nginx is switched."
   bash scripts/deploy/vps-noticeboard-ssl.sh --cert-only
+fi
+if [[ -f nginx/nginx.combined-dbc.ssl.conf ]] \
+  && grep -q 'live/noticeboard.donboscocollege.ac.in/' nginx/nginx.combined-dbc.ssl.conf \
+  && [[ ! -f /etc/letsencrypt/live/noticeboard.donboscocollege.ac.in/fullchain.pem ]]; then
+  echo "ERROR: refusing to load nginx without /etc/letsencrypt/live/noticeboard.donboscocollege.ac.in/fullchain.pem" >&2
+  exit 1
 fi
 
 # vps-pull.sh checks out the HTTP-only nginx.conf from git. Put the SSL

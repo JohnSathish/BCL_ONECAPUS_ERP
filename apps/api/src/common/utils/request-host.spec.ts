@@ -14,4 +14,11 @@ describe('portalHostCandidates', () => {
       'erp.donboscocollege.ac.in',
     ]);
   });
+
+  it('maps the notice board TV host onto the public college website', () => {
+    expect(portalHostCandidates('noticeboard.donboscocollege.ac.in')).toEqual([
+      'noticeboard.donboscocollege.ac.in',
+      'donboscocollege.ac.in',
+    ]);
+  });
 });

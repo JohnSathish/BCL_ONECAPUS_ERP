@@ -25,9 +25,23 @@ echo "=== NEP ERP — quick update ==="
 bash scripts/deploy/vps-pull.sh
 echo "Deploying commit: $(git log -1 --oneline)"
 
+if [[ "${ERP_UPDATE_REEXEC:-}" != "1" ]]; then
+  echo "Re-reading deploy script after git pull…"
+  export ERP_UPDATE_REEXEC=1
+  exec bash "$0" "$@"
+fi
+
 if [[ -f nginx/nginx.combined-dbc.ssl.conf ]] \
-  && grep -q 'live/noticeboard.donboscocollege.ac.in/' nginx/nginx.combined-dbc.ssl.conf; then
+  && grep -q 'live/noticeboard.donboscocollege.ac.in/' nginx/nginx.combined-dbc.ssl.conf \
+  && [[ ! -f /etc/letsencrypt/live/noticeboard.donboscocollege.ac.in/fullchain.pem ]]; then
+  echo "Notice board certificate is missing. Issuing it before nginx is switched."
   bash scripts/deploy/vps-noticeboard-ssl.sh --cert-only
+fi
+if [[ -f nginx/nginx.combined-dbc.ssl.conf ]] \
+  && grep -q 'live/noticeboard.donboscocollege.ac.in/' nginx/nginx.combined-dbc.ssl.conf \
+  && [[ ! -f /etc/letsencrypt/live/noticeboard.donboscocollege.ac.in/fullchain.pem ]]; then
+  echo "ERROR: refusing to load nginx without /etc/letsencrypt/live/noticeboard.donboscocollege.ac.in/fullchain.pem" >&2
+  exit 1
 fi
 
 resolve_erp_net() {
