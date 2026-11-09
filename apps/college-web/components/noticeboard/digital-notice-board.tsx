@@ -315,8 +315,8 @@ export function DigitalNoticeBoard({
           <img src="/images/college-logo.png" alt="" />
           <div>
             <strong>Don Bosco College, Tura</strong>
+            <em>In Pursuit of Excellence</em>
             <span>Affiliated to North-Eastern Hill University (NEHU)</span>
-            <em>Motto: Duty and Love</em>
           </div>
         </div>
         <div className="nb-clock">
@@ -338,8 +338,10 @@ export function DigitalNoticeBoard({
         <section className="nb-stage" aria-label="Notice images">
           {!data ? (
             <div className="nb-empty">
-              <img src="/images/college-logo.png" alt="" />
-              <h2>Connecting to the college notice board</h2>
+              <div className="nb-empty-card">
+                <img src="/images/college-logo.png" alt="" />
+                <h2>Connecting to the notice board</h2>
+              </div>
             </div>
           ) : banner ? (
             <article className="nb-banner" key={banner.id}>
@@ -362,11 +364,11 @@ export function DigitalNoticeBoard({
             </article>
           ) : (
             <div className="nb-empty">
-              <img src="/images/college-logo.png" alt="" />
-              <h2>No image notice is published</h2>
-              <p>
-                Add a JPG, PNG, or WebP image to a published notice in Website CMS → Notice Board.
-              </p>
+              <div className="nb-empty-card">
+                <img src="/images/college-logo.png" alt="" />
+                <h2>Campus notice board</h2>
+                <p>Image notices published by the college are displayed in this panel.</p>
+              </div>
             </div>
           )}
           {banners.length > 1 ? (
@@ -413,11 +415,10 @@ export function DigitalNoticeBoard({
               })}
             </ul>
           ) : (
-            <p className="nb-list-empty">
-              {data
-                ? 'No notice is published right now.'
-                : 'Connecting to the college notice board…'}
-            </p>
+            <div className="nb-list-empty">
+              <Bell aria-hidden="true" />
+              <p>{data ? 'Notices will appear here as they are published.' : 'Connecting…'}</p>
+            </div>
           )}
         </section>
       </main>
@@ -459,16 +460,19 @@ export function DigitalNoticeBoard({
             })}
           </ol>
         ) : (
-          <p className="nb-events-empty">
-            {data
-              ? 'No upcoming event is on the published academic calendar.'
-              : 'Connecting to the academic calendar…'}
-          </p>
+          <div className="nb-events-empty">
+            <CalendarDays aria-hidden="true" />
+            <p>
+              {data
+                ? 'Upcoming events from the academic calendar will be listed here.'
+                : 'Connecting to the academic calendar…'}
+            </p>
+          </div>
         )}
       </section>
 
       <footer className="nb-ticker">
-        <strong>Latest update</strong>
+        <strong>Latest</strong>
         <div>
           {tickerLoop.length ? (
             <p style={{ animationDuration: `${tickerSeconds}s` }}>
