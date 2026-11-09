@@ -2190,6 +2190,18 @@ export const ADMIN_NAV: NavGroup[] = [
             ],
           },
           {
+            label: 'Image Notices',
+            href: '/admin/website/image-notices',
+            permissions: [
+              'website:notices:read',
+              'website:notices:edit',
+              'website:read',
+              'website:edit',
+              'website:manage',
+              'website:media',
+            ],
+          },
+          {
             label: 'Announcements',
             href: '/admin/website/announcements',
             permissions: [

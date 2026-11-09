@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 import { AnnouncementsView } from '@/components/website-cms/announcements-view';
+import { ImageNoticesView } from '@/components/website-cms/image-notices-view';
 import { PopupsView } from '@/components/website-cms/popups-view';
 import { AcademicCalendarSourceNotice } from '@/components/website-cms/academic-calendar-source-notice';
 import { AcademicYearPlannerView } from '@/components/website-cms/academic-year-planner-view';
@@ -134,6 +135,7 @@ export type WebsiteCmsSection =
   | 'publishing'
   | 'departments'
   | 'notices'
+  | 'image-notices'
   | 'news'
   | 'homepage'
   | 'announcements'
@@ -240,6 +242,7 @@ export function WebsiteCmsWorkspace({ section }: { section: WebsiteCmsSection })
           {section === 'departments' ? <DepartmentsPublishView onMessage={setMessage} /> : null}
           {section === 'publishing' ? <PublishingView onMessage={setMessage} /> : null}
           {section === 'notices' ? <NoticesView onMessage={setMessage} /> : null}
+          {section === 'image-notices' ? <ImageNoticesView onMessage={setMessage} /> : null}
           {section === 'announcements' ? <AnnouncementsView onMessage={setMessage} /> : null}
           {section === 'popups' ? <PopupsView onMessage={setMessage} /> : null}
           {section === 'blood-donors' ? <BloodDonorsView /> : null}

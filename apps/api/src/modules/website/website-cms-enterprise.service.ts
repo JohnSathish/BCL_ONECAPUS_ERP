@@ -735,15 +735,31 @@ export class WebsiteCmsEnterpriseService {
     return rows.map((row) => this.mapAnnouncement(row));
   }
 
-  /** Public 65-inch notice board. Reuses published notices, the ticker, and the academic calendar. */
+  /** Public 65-inch notice board. Image notices fill the left panel; text notices stay on the right. */
   async getPublicNoticeboard(tenantId: string) {
-    const [notices, announcements, events] = await Promise.all([
+    const site = await this.prisma.websiteSite.findFirst({
+      where: { tenantId, status: 'ACTIVE' },
+    });
+    const [notices, imageRows, announcements, events] = await Promise.all([
       this.listPublicNotices(tenantId),
+      site
+        ? this.prisma.websiteImageNotice.findMany({
+            where: { tenantId, siteId: site.id, isVisible: true },
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+          })
+        : Promise.resolve([]),
       this.listPublicAnnouncements(tenantId, { ticker: true }),
       this.listUpcomingEvents(tenantId),
     ]);
     return buildNoticeboardPayload({
       notices: Array.isArray(notices) ? notices : [],
+      imageNotices: imageRows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        caption: row.caption,
+        imageUrl: row.imageUrl,
+        createdAt: row.createdAt,
+      })),
       announcements: Array.isArray(announcements)
         ? announcements.map((row) => ({ id: row.id, title: row.title }))
         : [],

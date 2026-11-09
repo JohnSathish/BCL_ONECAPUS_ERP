@@ -139,6 +139,43 @@ export const reorderWebsiteHeroSlides = (slideIds: string[]) =>
 export const deleteWebsiteHeroSlide = (id: string) =>
   api.delete(`${base}/hero-slides/${id}`).then((response) => response.data);
 
+export const fetchWebsiteImageNotices = () =>
+  api
+    .get<import('@/types/website-cms').WebsiteImageNotice[]>(`${base}/image-notices`)
+    .then((response) => response.data);
+
+export const createWebsiteImageNotice = (file: File, title: string, caption: string) => {
+  const form = new FormData();
+  form.append('image', file);
+  form.append('title', title);
+  form.append('caption', caption);
+  return api
+    .post<import('@/types/website-cms').WebsiteImageNotice>(`${base}/image-notices`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    .then((response) => response.data);
+};
+
+export const updateWebsiteImageNotice = (
+  id: string,
+  payload: Partial<
+    Pick<import('@/types/website-cms').WebsiteImageNotice, 'title' | 'caption' | 'isVisible'>
+  >,
+) =>
+  api
+    .patch<import('@/types/website-cms').WebsiteImageNotice>(`${base}/image-notices/${id}`, payload)
+    .then((response) => response.data);
+
+export const reorderWebsiteImageNotices = (ids: string[]) =>
+  api
+    .put<
+      import('@/types/website-cms').WebsiteImageNotice[]
+    >(`${base}/image-notices/reorder`, { ids })
+    .then((response) => response.data);
+
+export const deleteWebsiteImageNotice = (id: string) =>
+  api.delete(`${base}/image-notices/${id}`).then((response) => response.data);
+
 export const fetchWebsiteHomepageLayout = () =>
   api
     .get<import('@/types/website-cms').WebsiteHomepageSection[]>(`${base}/homepage-layout`)

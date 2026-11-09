@@ -367,7 +367,7 @@ export function DigitalNoticeBoard({
               <div className="nb-empty-card">
                 <img src="/images/college-logo.png" alt="" />
                 <h2>Campus notice board</h2>
-                <p>Image notices published by the college are displayed in this panel.</p>
+                <p>Upload a JPG, PNG, or WebP in Website CMS → Image Notices.</p>
               </div>
             </div>
           )}

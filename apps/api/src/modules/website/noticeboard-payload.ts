@@ -1,7 +1,7 @@
 /**
  * Shapes the public digital notice board from Website CMS notices,
- * ticker announcements, and academic-calendar events.
- * Notices without a JPG, PNG, or WebP stay in the text list only.
+ * image notices, ticker announcements, and academic-calendar events.
+ * The left carousel uses Image Notices only. PDF notices stay in the text list.
  */
 
 const IMAGE_EXT = /\.(?:jpe?g|png|webp)$/i;
@@ -30,6 +30,14 @@ export type NoticeboardSourceNotice = {
   publishAt?: Date | string | null;
   attachments?: Array<{ url?: string | null; name?: string | null }> | null;
   attachmentUrl?: string | null;
+};
+
+export type NoticeboardSourceImage = {
+  id: string;
+  title: string;
+  caption?: string | null;
+  imageUrl: string;
+  createdAt?: Date | string | null;
 };
 
 export type NoticeboardSourceAnnouncement = {
@@ -174,45 +182,46 @@ function compareNotices(
 
 export function buildNoticeboardPayload(input: {
   notices: NoticeboardSourceNotice[];
+  imageNotices?: NoticeboardSourceImage[];
   announcements: NoticeboardSourceAnnouncement[];
   events: NoticeboardSourceEvent[];
   now?: Date;
 }): NoticeboardPayload {
   const now = input.now ?? new Date();
   const notices = [...input.notices].sort(compareNotices);
-  const banners: NoticeboardBanner[] = [];
-  const cards: NoticeboardNoticeCard[] = [];
-
-  for (const notice of notices) {
-    const images = noticeImageUrls(notice);
+  const cards: NoticeboardNoticeCard[] = notices.map((notice) => {
     const priority = (notice.priority ?? 'NORMAL').toUpperCase();
-    const excerpt = noticeExcerpt(notice.bodyHtml);
-    const publishAt = isoDate(notice.publishAt);
     const publishedMs = publishTime(notice.publishAt);
-    cards.push({
+    return {
       id: notice.id,
       title: notice.title,
-      excerpt,
+      excerpt: noticeExcerpt(notice.bodyHtml),
       category: notice.category || 'GENERAL',
       priority,
-      publishAt,
+      publishAt: isoDate(notice.publishAt),
       isNew: publishedMs > 0 && now.getTime() - publishedMs <= NEW_WINDOW_MS,
-      hasImage: images.length > 0,
-    });
-    images.forEach((imageUrl, index) => {
-      banners.push({
-        id: images.length > 1 ? `${notice.id}-${index + 1}` : notice.id,
-        noticeId: notice.id,
-        title: notice.title,
-        category: notice.category || 'GENERAL',
-        priority,
-        imageUrl,
-        excerpt,
-        publishAt,
-        durationMs: DURATION_MS[priority] ?? DURATION_MS.NORMAL,
-      });
-    });
-  }
+      hasImage: false,
+    };
+  });
+  const banners: NoticeboardBanner[] = (input.imageNotices ?? []).flatMap(
+    (image) => {
+      const imageUrl = image.imageUrl?.trim() ?? '';
+      if (!isNoticeboardImageUrl(imageUrl)) return [];
+      return [
+        {
+          id: image.id,
+          noticeId: image.id,
+          title: image.title.trim() || 'Notice',
+          category: 'IMAGE',
+          priority: 'NORMAL',
+          imageUrl,
+          excerpt: (image.caption ?? '').trim(),
+          publishAt: isoDate(image.createdAt),
+          durationMs: DURATION_MS.IMPORTANT,
+        },
+      ];
+    },
+  );
 
   const tickerSource = input.announcements.filter((row) => row.title?.trim());
   const ticker =

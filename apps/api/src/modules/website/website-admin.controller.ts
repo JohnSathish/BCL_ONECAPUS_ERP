@@ -29,6 +29,8 @@ import {
   ReorderWebsiteSectionsDto,
   UpdateStaffWebsiteVisibilityDto,
   UpdateWebsiteHeroSlideDto,
+  UpdateWebsiteImageNoticeDto,
+  ReorderWebsiteImageNoticesDto,
   UpdateWebsiteMediaDto,
   UpdateWebsiteMenuDto,
   UpsertWebsiteDepartmentProfileDto,
@@ -344,6 +346,81 @@ export class WebsiteAdminController {
     @Param('slideId') slideId: string,
   ) {
     return this.admin.deleteHeroSlide(user, slideId);
+  }
+
+  @Get('image-notices')
+  @RequireAnyPermission(
+    'website:notices:read',
+    'website:notices:edit',
+    'website:read',
+    'website:edit',
+    'website:manage',
+    'website:media',
+  )
+  imageNotices(@CurrentUser() user: JwtUser) {
+    return this.admin.listImageNotices(user.tid);
+  }
+
+  @Post('image-notices')
+  @RequireAnyPermission(
+    'website:notices:edit',
+    'website:edit',
+    'website:manage',
+    'website:media',
+  )
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  createImageNotice(
+    @CurrentUser() user: JwtUser,
+    @UploadedFile() image: Express.Multer.File | undefined,
+    @Body('title') title?: string,
+    @Body('caption') caption?: string,
+  ) {
+    return this.admin.createImageNotice(user, image, title, caption);
+  }
+
+  @Patch('image-notices/:id')
+  @RequireAnyPermission(
+    'website:notices:edit',
+    'website:edit',
+    'website:manage',
+    'website:media',
+  )
+  updateImageNotice(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateWebsiteImageNoticeDto,
+  ) {
+    return this.admin.updateImageNotice(user, id, dto);
+  }
+
+  @Put('image-notices/reorder')
+  @RequireAnyPermission(
+    'website:notices:edit',
+    'website:edit',
+    'website:manage',
+    'website:media',
+  )
+  reorderImageNotices(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: ReorderWebsiteImageNoticesDto,
+  ) {
+    return this.admin.reorderImageNotices(user, dto.ids);
+  }
+
+  @Delete('image-notices/:id')
+  @RequireAnyPermission(
+    'website:notices:edit',
+    'website:edit',
+    'website:manage',
+    'website:media',
+  )
+  deleteImageNotice(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.admin.deleteImageNotice(user, id);
   }
 
   @Get('revisions')

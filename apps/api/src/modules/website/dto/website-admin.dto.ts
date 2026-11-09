@@ -154,3 +154,15 @@ export class ReorderWebsiteHeroSlidesDto {
   @IsUUID(undefined, { each: true })
   slideIds!: string[];
 }
+
+export class UpdateWebsiteImageNoticeDto {
+  @IsOptional() @IsString() @MaxLength(200) title?: string;
+  @IsOptional() @IsString() @MaxLength(500) caption?: string;
+  @IsOptional() @IsBoolean() isVisible?: boolean;
+}
+
+export class ReorderWebsiteImageNoticesDto {
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  ids!: string[];
+}

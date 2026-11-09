@@ -37,7 +37,7 @@ describe('buildNoticeboardPayload', () => {
     },
   ];
 
-  it('rotates only notices that have a jpg, png, or webp', () => {
+  it('keeps PDF notices in the text list and does not use them as banners', () => {
     const payload = buildNoticeboardPayload({
       notices,
       announcements: [],
@@ -45,36 +45,35 @@ describe('buildNoticeboardPayload', () => {
       now,
     });
 
-    expect(payload.banners.map((row) => row.imageUrl)).toEqual([
-      '/uploads/admit-card.png',
-      '/uploads/career.WEBP?v=1',
-    ]);
-    expect(payload.banners[0]).toMatchObject({
-      title: 'Semester examination admit cards',
-      priority: 'URGENT',
-      durationMs: 20_000,
-    });
+    expect(payload.banners).toEqual([]);
     expect(payload.notices.map((row) => row.id)).toEqual([
       'urgent',
       'photo',
       'normal',
     ]);
-    expect(payload.notices.find((row) => row.id === 'normal')?.hasImage).toBe(
-      false,
-    );
+    expect(payload.notices.every((row) => row.hasImage === false)).toBe(true);
   });
 
-  it('ignores inline data images and keeps each uploaded image once', () => {
+  it('rotates only images uploaded in Image Notices', () => {
     const payload = buildNoticeboardPayload({
-      notices: [
+      notices,
+      imageNotices: [
         {
-          id: 'dup',
-          title: 'Two photos',
-          slug: 'two-photos',
-          priority: 'NORMAL',
-          publishAt: '2026-11-08T00:00:00.000Z',
-          bodyHtml:
-            '<img src="data:image/png;base64,abc"><img src="/uploads/a.jpg"><img src="/uploads/a.jpg"><img src="/uploads/b.jpeg">',
+          id: 'slide-pdf',
+          title: 'Not an image',
+          imageUrl: '/uploads/notice.pdf',
+        },
+        {
+          id: 'slide-1',
+          title: 'College week',
+          caption: '10–15 August',
+          imageUrl: '/uploads/college-week.png',
+          createdAt: '2026-11-08T00:00:00.000Z',
+        },
+        {
+          id: 'slide-2',
+          title: 'Admissions',
+          imageUrl: '/uploads/admissions.WEBP?v=1',
         },
       ],
       announcements: [],
@@ -82,11 +81,15 @@ describe('buildNoticeboardPayload', () => {
       now,
     });
 
-    expect(payload.banners.map((row) => row.id)).toEqual(['dup-1', 'dup-2']);
     expect(payload.banners.map((row) => row.imageUrl)).toEqual([
-      '/uploads/a.jpg',
-      '/uploads/b.jpeg',
+      '/uploads/college-week.png',
+      '/uploads/admissions.WEBP?v=1',
     ]);
+    expect(payload.banners[0]).toMatchObject({
+      title: 'College week',
+      excerpt: '10–15 August',
+      durationMs: 15_000,
+    });
   });
 
   it('uses ticker announcements, then important notice titles', () => {

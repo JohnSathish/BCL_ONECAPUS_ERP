@@ -57,6 +57,13 @@ export const WEBSITE_CMS_NAV: WebsiteCmsNavItem[] = [
     group: 'content',
   },
   {
+    id: 'image-notices',
+    label: 'Image Notices',
+    href: '/admin/website/image-notices',
+    icon: ImageIcon,
+    group: 'content',
+  },
+  {
     id: 'blood-donors',
     label: 'Blood Donors',
     href: '/admin/website/blood-donors',

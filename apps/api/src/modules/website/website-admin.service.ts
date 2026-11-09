@@ -1027,6 +1027,114 @@ export class WebsiteAdminService {
     return { ok: true };
   }
 
+  async listImageNotices(tenantId: string) {
+    const site = await this.website.getOrCreateSite(tenantId);
+    const rows = await this.prisma.websiteImageNotice.findMany({
+      where: { tenantId, siteId: site.id },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+    return rows.map((row) => this.mapImageNotice(row));
+  }
+
+  async createImageNotice(
+    user: JwtUser,
+    image: Express.Multer.File | undefined,
+    title?: string,
+    caption?: string,
+  ) {
+    if (!image) {
+      throw new BadRequestException('An image file is required');
+    }
+    const label = title?.trim() || image.originalname.replace(/\.[^.]+$/, '');
+    if (!label) {
+      throw new BadRequestException('A title is required');
+    }
+    const media = await this.website.uploadMedia(
+      user,
+      image,
+      'IMAGE',
+      label,
+      'website-hero',
+    );
+    const site = await this.website.getOrCreateSite(user.tid, user.sub);
+    const max = await this.prisma.websiteImageNotice.aggregate({
+      where: { tenantId: user.tid, siteId: site.id },
+      _max: { sortOrder: true },
+    });
+    const row = await this.prisma.websiteImageNotice.create({
+      data: {
+        tenantId: user.tid,
+        siteId: site.id,
+        title: label.slice(0, 200),
+        caption: (caption ?? '').trim().slice(0, 500),
+        imageUrl: media.publicUrl,
+        sortOrder: (max._max.sortOrder ?? -1) + 1,
+        isVisible: true,
+        createdById: user.sub,
+      },
+    });
+    return this.mapImageNotice(row);
+  }
+
+  async updateImageNotice(
+    user: JwtUser,
+    id: string,
+    dto: { title?: string; caption?: string; isVisible?: boolean },
+  ) {
+    const row = await this.prisma.websiteImageNotice.findFirst({
+      where: { id, tenantId: user.tid },
+    });
+    if (!row) throw new NotFoundException('Image notice not found');
+    const title = dto.title?.trim();
+    if (dto.title !== undefined && !title) {
+      throw new BadRequestException('A title is required');
+    }
+    const updated = await this.prisma.websiteImageNotice.update({
+      where: { id: row.id },
+      data: {
+        ...(title ? { title: title.slice(0, 200) } : {}),
+        ...(dto.caption !== undefined
+          ? { caption: dto.caption.trim().slice(0, 500) }
+          : {}),
+        ...(dto.isVisible !== undefined ? { isVisible: dto.isVisible } : {}),
+      },
+    });
+    return this.mapImageNotice(updated);
+  }
+
+  async reorderImageNotices(user: JwtUser, ids: string[]) {
+    const site = await this.website.getOrCreateSite(user.tid, user.sub);
+    const existing = await this.prisma.websiteImageNotice.findMany({
+      where: { tenantId: user.tid, siteId: site.id },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((row) => row.id));
+    if (
+      ids.length !== existing.length ||
+      ids.some((id) => !existingIds.has(id))
+    ) {
+      throw new BadRequestException('Invalid image notice order');
+    }
+    await this.prisma.$transaction(
+      ids.map((id, sortOrder) =>
+        this.prisma.websiteImageNotice.update({
+          where: { id },
+          data: { sortOrder },
+        }),
+      ),
+    );
+    return this.listImageNotices(user.tid);
+  }
+
+  async deleteImageNotice(user: JwtUser, id: string) {
+    const row = await this.prisma.websiteImageNotice.findFirst({
+      where: { id, tenantId: user.tid },
+    });
+    if (!row) throw new NotFoundException('Image notice not found');
+    await this.prisma.websiteImageNotice.delete({ where: { id: row.id } });
+    return { ok: true };
+  }
+
   async listPublicHeroSlides(tenantId: string) {
     const site = await this.prisma.websiteSite.findFirst({
       where: { tenantId, status: 'ACTIVE' },
@@ -1543,6 +1651,28 @@ export class WebsiteAdminService {
       createdAt: extras?.createdAt ?? page.createdAt ?? page.updatedAt,
       updatedAt: page.updatedAt,
       publishedAt: page.publishedAt,
+    };
+  }
+
+  private mapImageNotice(row: {
+    id: string;
+    title: string;
+    caption: string;
+    imageUrl: string;
+    sortOrder: number;
+    isVisible: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      id: row.id,
+      title: row.title,
+      caption: row.caption,
+      imageUrl: row.imageUrl,
+      sortOrder: row.sortOrder,
+      isVisible: row.isVisible,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     };
   }
 

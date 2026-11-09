@@ -177,6 +177,17 @@ export type WebsiteMediaAsset = {
   createdAt: string;
 };
 
+export type WebsiteImageNotice = {
+  id: string;
+  title: string;
+  caption: string;
+  imageUrl: string;
+  sortOrder: number;
+  isVisible: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type WebsiteHeroSlide = {
   id: string;
   altText: string;

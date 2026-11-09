@@ -15967,6 +15967,7 @@ model WebsiteSite {
   mediaFolders WebsiteMediaFolder[]
   heroSlides  WebsiteHeroSlide[]
   notices     WebsiteNotice[]
+  imageNotices WebsiteImageNotice[]
   announcements WebsiteAnnouncement[]
   homepageSections WebsiteHomepageSection[]
   redirects   WebsiteRedirect[]
@@ -16302,6 +16303,27 @@ model WebsiteNotice {
   @@index([tenantId, siteId, status, deletedAt, publishAt])
   @@index([siteId, showOnHomepage, status, deletedAt])
   @@map("website_notices")
+  @@schema("academic")
+}
+
+model WebsiteImageNotice {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  siteId      String   @map("site_id") @db.Uuid
+  title       String
+  caption     String   @default("")
+  imageUrl    String   @map("image_url")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isVisible   Boolean  @default(true) @map("is_visible")
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  site WebsiteSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, siteId, sortOrder])
+  @@index([siteId, isVisible, sortOrder])
+  @@map("website_image_notices")
   @@schema("academic")
 }
 
