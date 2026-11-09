@@ -3,7 +3,7 @@
   inset: 0;
   z-index: 400;
   display: grid;
-  grid-template-rows: 13.2vh minmax(0, 1fr) 18vh 5.6vh;
+  grid-template-rows: 12.4vh minmax(0, 1fr) 16.5vh 7.2vh;
   overflow: hidden;
   background: #e8eef5;
   color: #10233f;

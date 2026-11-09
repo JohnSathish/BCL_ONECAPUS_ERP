@@ -88,7 +88,7 @@ describe('buildNoticeboardPayload', () => {
     expect(payload.banners[0]).toMatchObject({
       title: 'College week',
       excerpt: '10–15 August',
-      durationMs: 15_000,
+      durationMs: 8_000,
     });
   });
 

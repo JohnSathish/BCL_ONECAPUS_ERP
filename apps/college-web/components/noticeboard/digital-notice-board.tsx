@@ -304,8 +304,8 @@ export function DigitalNoticeBoard({
 
   const tickerLoop = ticker.length ? [...ticker, ...ticker] : [];
   const tickerSeconds = Math.max(
-    36,
-    ticker.reduce((sum, item) => sum + item.text.length, 0) * 0.22,
+    18,
+    ticker.reduce((sum, item) => sum + item.text.length, 0) * 0.12,
   );
 
   return (
@@ -346,21 +346,6 @@ export function DigitalNoticeBoard({
           ) : banner ? (
             <article className="nb-banner" key={banner.id}>
               <img src={banner.imageUrl} alt="" />
-              <div className="nb-banner-copy">
-                <p>
-                  <span className={`nb-badge nb-badge-${banner.priority.toLowerCase()}`}>
-                    {banner.priority === 'NORMAL'
-                      ? labelize(banner.category)
-                      : labelize(banner.priority)}
-                  </span>
-                  <span>{labelize(banner.category)}</span>
-                </p>
-                <h2>{banner.title}</h2>
-                {banner.excerpt ? <small>{banner.excerpt}</small> : null}
-                {banner.publishAt ? (
-                  <time dateTime={banner.publishAt}>{formatPublished(banner.publishAt)}</time>
-                ) : null}
-              </div>
             </article>
           ) : (
             <div className="nb-empty">
@@ -472,7 +457,7 @@ export function DigitalNoticeBoard({
       </section>
 
       <footer className="nb-ticker">
-        <strong>Latest</strong>
+        <strong>Announcements</strong>
         <div>
           {tickerLoop.length ? (
             <p style={{ animationDuration: `${tickerSeconds}s` }}>

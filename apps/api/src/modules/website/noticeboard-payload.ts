@@ -217,7 +217,7 @@ export function buildNoticeboardPayload(input: {
           imageUrl,
           excerpt: (image.caption ?? '').trim(),
           publishAt: isoDate(image.createdAt),
-          durationMs: DURATION_MS.IMPORTANT,
+          durationMs: 8_000,
         },
       ];
     },

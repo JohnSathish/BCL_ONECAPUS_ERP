@@ -128,7 +128,7 @@ export function ImageNoticesView({ onMessage }: Props) {
           <p className={`text-xs ${wrongType ? 'text-destructive' : 'text-muted-foreground'}`}>
             {wrongType
               ? 'Only JPG, PNG, and WebP images can be uploaded here.'
-              : 'Use a landscape image, about 1600×900. Maximum size is 5 MB. Drag the list to change the order on the television.'}
+              : 'Best size is 1920×1080 pixels, JPG, PNG, or WebP, under 5 MB. Drag the list to change the order on the television.'}
           </p>
         </CompactCardBody>
       </CompactCard>
