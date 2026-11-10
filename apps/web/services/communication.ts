@@ -241,6 +241,82 @@ export const clearNotificationHistory = (audience: 'STUDENTS' | 'STAFF' | 'ALL')
 export const fetchCampaignRecipients = (id: string) =>
   api.get<CommunicationRecipient[]>(`${base}/campaigns/${id}/recipients`).then((res) => res.data);
 
+export type CampaignRecipientRow = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  rollNumber: string | null;
+  staffCode: string | null;
+  department: string | null;
+  role: string;
+  status: string;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  openedAt: string | null;
+  failureReason: string | null;
+  channel: string | null;
+  photoPath: string | null;
+  renderedTitle: string | null;
+  renderedBody: string | null;
+  campaignSubject?: string;
+  campaignBodyText?: string | null;
+  campaignBodyHtml?: string | null;
+  inboxRemoved?: boolean;
+};
+
+export type CampaignRecipientDirectory = {
+  page: number;
+  limit: number;
+  total: number;
+  departments: string[];
+  items: CampaignRecipientRow[];
+};
+
+export const fetchCampaignDetail = (id: string) =>
+  api.get<CommunicationCampaign>(`${base}/campaigns/${id}`).then((res) => res.data);
+
+export const fetchCampaignRecipientDirectory = (
+  id: string,
+  params: Record<string, string | number | undefined>,
+) =>
+  api
+    .get<CampaignRecipientDirectory>(`${base}/campaigns/${id}/recipients/directory`, { params })
+    .then((res) => res.data);
+
+export const fetchCampaignRecipientDetail = (id: string, recipientId: string) =>
+  api
+    .get<CampaignRecipientRow>(`${base}/campaigns/${id}/recipients/${recipientId}`)
+    .then((res) => res.data);
+
+export const duplicateCommunicationCampaign = (id: string) =>
+  api.post<CommunicationCampaign>(`${base}/campaigns/${id}/duplicate`).then((res) => res.data);
+
+export const resendFailedCampaign = (id: string) =>
+  api
+    .post<{
+      campaignId: string;
+      queued: number;
+      status: string;
+    }>(`${base}/campaigns/${id}/resend-failed`)
+    .then((res) => res.data);
+
+export const downloadCampaignRecipients = (
+  id: string,
+  params: Record<string, string | number | undefined>,
+) =>
+  api
+    .get<Blob>(`${base}/campaigns/${id}/recipients/export`, { params, responseType: 'blob' })
+    .then((res) => res.data);
+
+export const downloadCampaignReport = (
+  id: string,
+  params: Record<string, string | number | undefined>,
+) =>
+  api
+    .get<Blob>(`${base}/campaigns/${id}/report`, { params, responseType: 'blob' })
+    .then((res) => res.data);
+
 export const fetchDeliveryLogs = (params?: Record<string, string | number | undefined>) =>
   api.get<DeliveryLog[]>(`${base}/delivery-logs`, { params }).then((res) => res.data);
 

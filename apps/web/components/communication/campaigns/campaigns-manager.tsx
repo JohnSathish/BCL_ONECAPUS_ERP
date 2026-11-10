@@ -8,12 +8,16 @@ import { AlertTriangle, CheckCircle2, Clock, Send, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { QueryErrorPanel } from '@/components/erp/query-error-panel';
-import { useAuthQueryEnabled } from '@/hooks/use-auth';
+import { useAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
+import { hasPermission } from '@/lib/permissions/portal-access';
 import { confirmRevokeCampaign } from '@/components/communication/notifications/notification-history-admin';
+import {
+  CampaignDetailsDrawer,
+  type CampaignDrawerTab,
+} from '@/components/communication/campaigns/campaign-details-drawer';
 import {
   cancelCommunicationCampaign,
   fetchCampaignDesk,
-  fetchCampaignRecipients,
   fetchCommunicationCampaigns,
   revokeCommunicationCampaign,
   sendCommunicationCampaign,
@@ -92,6 +96,12 @@ function when(value?: string | null) {
 
 export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
   const enabled = useAuthQueryEnabled();
+  const { session } = useAuth();
+  const canManage = hasPermission(
+    session?.user.permissions ?? [],
+    session?.user.roles ?? [],
+    'communication:manage',
+  );
   const qc = useQueryClient();
   const [kind, setKind] = useState<'all' | 'automated' | 'manual'>('all');
   const [page, setPage] = useState(1);
@@ -104,7 +114,7 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
     to: todayKey(),
   });
   const [applied, setApplied] = useState(draft);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<{ id: string; tab: CampaignDrawerTab } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState<string | null>(null);
 
@@ -128,11 +138,6 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
         to: applied.to || undefined,
       }),
     enabled: enabled && !statusFilter,
-  });
-  const recipients = useQuery({
-    queryKey: ['communication', 'recipients', expandedId],
-    queryFn: () => fetchCampaignRecipients(expandedId!),
-    enabled: Boolean(expandedId),
   });
   const send = useMutation({
     mutationFn: sendCommunicationCampaign,
@@ -184,13 +189,8 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
           <CampaignCard
             key={campaign.id}
             campaign={campaign}
-            expanded={expandedId === campaign.id}
-            onToggle={() => setExpandedId(expandedId === campaign.id ? null : campaign.id)}
-            recipients={expandedId === campaign.id ? recipients.data : undefined}
-            recipientsError={
-              expandedId === campaign.id && recipients.isError ? recipients.error : null
-            }
-            onRetryRecipients={() => void recipients.refetch()}
+            onView={() => setDrawer({ id: campaign.id, tab: 'message' })}
+            onRecipients={() => setDrawer({ id: campaign.id, tab: 'recipients' })}
             onSend={() => send.mutate(campaign.id)}
             onCancel={() => cancel.mutate(campaign.id)}
             onRevoke={() => {
@@ -202,6 +202,15 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
         ))}
         {!rows.length && !campaigns.isError ? (
           <p className="text-sm text-slate-500">No campaigns.</p>
+        ) : null}
+        {drawer ? (
+          <CampaignDetailsDrawer
+            campaignId={drawer.id}
+            tab={drawer.tab}
+            onTab={(tab) => setDrawer({ id: drawer.id, tab })}
+            onClose={() => setDrawer(null)}
+            canManage={canManage}
+          />
         ) : null}
       </div>
     );
@@ -443,10 +452,11 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
               <tr>
                 {[
                   '#',
-                  'Message / Campaign ID',
+                  'Campaign',
                   'Type',
                   'Recipients',
                   'Status',
+                  'Delivery',
                   'Sent at',
                   'Actions',
                 ].map((header) => (
@@ -466,7 +476,10 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                     <td className="px-3 py-2">{(page - 1) * 50 + index + 1}</td>
                     <td className="px-3 py-2">
                       <p className="font-medium text-slate-900">{row.name}</p>
-                      <p className="text-xs text-slate-500">{row.template?.code ?? row.id}</p>
+                      <p className="font-mono text-[11px] text-slate-500">{row.id}</p>
+                      {row.template?.code ? (
+                        <p className="text-[11px] text-slate-400">{row.template.code}</p>
+                      ) : null}
                     </td>
                     <td className="px-3 py-2">
                       <span
@@ -476,7 +489,9 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                       </span>
                       {automated ? (
                         <p className="mt-1 text-[10px] uppercase text-blue-700">Automated</p>
-                      ) : null}
+                      ) : (
+                        <p className="mt-1 text-[10px] uppercase text-slate-400">Manual</p>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       {campaignRecipientLabel(row)}
@@ -484,10 +499,13 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                     </td>
                     <td className="px-3 py-2">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs ${row.status === 'FAILED' ? 'bg-rose-50 text-rose-700' : row.status === 'REVOKED' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}
+                        className={`rounded-full px-2 py-0.5 text-xs ${row.status === 'FAILED' ? 'bg-rose-50 text-rose-700' : row.status === 'REVOKED' || row.status === 'CANCELLED' ? 'bg-slate-100 text-slate-600' : row.status === 'PENDING' || row.status === 'SENDING' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}
                       >
                         {row.status}
                       </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <DeliveryCell campaign={row} />
                     </td>
                     <td className="px-3 py-2 text-slate-500">
                       {when(row.sentAt ?? row.createdAt)}
@@ -497,69 +515,67 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
+                          onClick={() => setDrawer({ id: row.id, tab: 'message' })}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setDrawer({ id: row.id, tab: 'recipients' })}
                         >
                           Recipients
                         </Button>
-                        {['DRAFT', 'SCHEDULED'].includes(row.status) ? (
-                          <Button
-                            size="sm"
-                            disabled={send.isPending}
-                            onClick={() => send.mutate(row.id)}
-                          >
-                            Send
-                          </Button>
-                        ) : null}
-                        {['DRAFT', 'SCHEDULED'].includes(row.status) ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={cancel.isPending}
-                            onClick={() => cancel.mutate(row.id)}
-                          >
-                            Cancel
-                          </Button>
-                        ) : null}
-                        {['SENT', 'SENDING', 'FAILED'].includes(row.status) ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={revoke.isPending}
-                            onClick={() => {
-                              if (!confirmRevokeCampaign(row.name)) return;
-                              revoke.mutate(row.id);
-                            }}
-                          >
-                            Revoke
-                          </Button>
+                        {['DRAFT', 'SCHEDULED'].includes(row.status) ||
+                        ['SENT', 'SENDING', 'FAILED'].includes(row.status) ? (
+                          <details>
+                            <summary className="cursor-pointer list-none rounded-md border px-2 py-1 text-xs">
+                              More
+                            </summary>
+                            <div className="mt-1 flex w-28 flex-col gap-1">
+                              {['DRAFT', 'SCHEDULED'].includes(row.status) ? (
+                                <Button
+                                  size="sm"
+                                  disabled={send.isPending}
+                                  onClick={() => send.mutate(row.id)}
+                                >
+                                  Send
+                                </Button>
+                              ) : null}
+                              {['DRAFT', 'SCHEDULED'].includes(row.status) ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={cancel.isPending}
+                                  onClick={() => cancel.mutate(row.id)}
+                                >
+                                  Cancel
+                                </Button>
+                              ) : null}
+                              {['SENT', 'SENDING', 'FAILED'].includes(row.status) ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={revoke.isPending}
+                                  onClick={() => {
+                                    if (!confirmRevokeCampaign(row.name)) return;
+                                    revoke.mutate(row.id);
+                                  }}
+                                >
+                                  Revoke
+                                </Button>
+                              ) : null}
+                            </div>
+                          </details>
                         ) : null}
                       </div>
-                      {expandedId === row.id && recipients.isError ? (
-                        <div className="mt-2">
-                          <QueryErrorPanel
-                            title="Unable to load recipients"
-                            error={recipients.error}
-                            onRetry={() => void recipients.refetch()}
-                            isRetrying={recipients.isFetching}
-                          />
-                        </div>
-                      ) : null}
-                      {expandedId === row.id && recipients.data ? (
-                        <ul className="mt-2 max-h-32 overflow-y-auto text-xs text-slate-600">
-                          {recipients.data.slice(0, 50).map((person) => (
-                            <li key={person.id}>
-                              {person.displayName} · {person.deliveryStatus}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
                     </td>
                   </tr>
                 );
               })}
               {!items.length ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
                     {desk.isLoading ? 'Loading campaigns…' : 'No campaigns match these filters.'}
                   </td>
                 </tr>
@@ -586,28 +602,31 @@ export function CampaignsManager({ statusFilter }: { statusFilter?: string }) {
           </Button>
         </div>
       </section>
+      {drawer ? (
+        <CampaignDetailsDrawer
+          campaignId={drawer.id}
+          tab={drawer.tab}
+          onTab={(tab) => setDrawer({ id: drawer.id, tab })}
+          onClose={() => setDrawer(null)}
+          canManage={canManage}
+        />
+      ) : null}
     </div>
   );
 }
 
 function CampaignCard({
   campaign,
-  expanded,
-  onToggle,
-  recipients,
-  recipientsError,
-  onRetryRecipients,
+  onView,
+  onRecipients,
   onSend,
   onCancel,
   onRevoke,
   busy,
 }: {
   campaign: CommunicationCampaign;
-  expanded: boolean;
-  onToggle: () => void;
-  recipients?: { id: string; displayName?: string | null; deliveryStatus: string }[];
-  recipientsError: unknown;
-  onRetryRecipients: () => void;
+  onView: () => void;
+  onRecipients: () => void;
   onSend: () => void;
   onCancel: () => void;
   onRevoke: () => void;
@@ -623,7 +642,10 @@ function CampaignCard({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={onToggle}>
+          <Button size="sm" variant="outline" onClick={onView}>
+            View
+          </Button>
+          <Button size="sm" variant="outline" onClick={onRecipients}>
             Recipients
           </Button>
           {['DRAFT', 'SCHEDULED'].includes(campaign.status) ? (
@@ -643,26 +665,55 @@ function CampaignCard({
           ) : null}
         </div>
       </div>
-      {expanded && recipientsError ? (
-        <div className="mt-3">
-          <QueryErrorPanel
-            title="Unable to load recipients"
-            error={recipientsError}
-            onRetry={onRetryRecipients}
-          />
-        </div>
-      ) : null}
-      {expanded && recipients ? (
-        <ul className="mt-3 max-h-40 overflow-y-auto text-xs">
-          {recipients.slice(0, 50).map((person) => (
-            <li key={person.id}>
-              {person.displayName} · {person.deliveryStatus}
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
+}
+
+function DeliveryCell({ campaign }: { campaign: CommunicationCampaign }) {
+  const total = campaign._count?.recipients ?? 0;
+  const confirmed = campaign.delivery?.confirmed ?? 0;
+  const accepted = campaign.delivery?.accepted ?? 0;
+  const failed = campaign.delivery?.failed ?? 0;
+  if (!total) return <span className="text-xs text-slate-400">—</span>;
+  const success = confirmed + accepted;
+  const pct = Math.round((success / total) * 1000) / 10;
+  if (confirmed > 0 && accepted === 0) {
+    return (
+      <span className="text-sm font-medium text-emerald-600">
+        {confirmed.toLocaleString('en-IN')} ({pct}%)
+        <span className="mt-0.5 block text-[11px] font-normal text-slate-500">delivered</span>
+      </span>
+    );
+  }
+  if (accepted > 0 && confirmed === 0) {
+    return (
+      <span className="text-sm font-medium text-[#155EEF]">
+        {accepted.toLocaleString('en-IN')} ({pct}%)
+        <span className="mt-0.5 block text-[11px] font-normal text-slate-500">
+          accepted by service
+        </span>
+      </span>
+    );
+  }
+  if (success > 0) {
+    return (
+      <span className="text-sm font-medium text-emerald-600">
+        {success.toLocaleString('en-IN')} ({pct}%)
+        <span className="mt-0.5 block text-[11px] font-normal text-slate-500">
+          {confirmed.toLocaleString('en-IN')} delivered · {accepted.toLocaleString('en-IN')}{' '}
+          accepted
+        </span>
+      </span>
+    );
+  }
+  if (failed > 0) {
+    return (
+      <span className="text-sm font-medium text-rose-600">
+        {failed.toLocaleString('en-IN')} failed
+      </span>
+    );
+  }
+  return <span className="text-xs text-amber-600">Pending</span>;
 }
 
 function Stat({

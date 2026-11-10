@@ -62,6 +62,16 @@ export class CommunicationNotificationProcessor extends WorkerHost {
       });
     }
 
+    if (jobType === 'campaign-resend-failed') {
+      const tenantId = String(job.data.tenantId);
+      const campaignId = String(job.data.campaignId);
+      try {
+        return await this.delivery.resendFailed(tenantId, campaignId);
+      } finally {
+        await this.campaigns.releaseResendLock(tenantId, campaignId);
+      }
+    }
+
     return this.delivery.processLegacyNotificationJob(job.data);
   }
 }

@@ -929,6 +929,35 @@ export class CommunicationDeliveryService {
     });
   }
 
+  async resendFailed(tenantId: string, campaignId: string) {
+    const pairs = await this.prisma.$queryRaw<
+      { recipient_id: string; channel: string }[]
+    >`
+      SELECT DISTINCT l.recipient_id, l.channel
+      FROM platform.communication_delivery_logs l
+      WHERE l.tenant_id = CAST(${tenantId} AS uuid)
+        AND l.campaign_id = CAST(${campaignId} AS uuid)
+        AND l.status = 'FAILED'
+        AND NOT EXISTS (
+          SELECT 1 FROM platform.communication_delivery_logs ok
+          WHERE ok.recipient_id = l.recipient_id
+            AND ok.campaign_id = l.campaign_id
+            AND ok.channel = l.channel
+            AND ok.status IN ('SENT', 'DELIVERED')
+        )
+    `;
+    let retried = 0;
+    for (const pair of pairs) {
+      await this.deliverCampaignBatch(tenantId, campaignId, 0, 1, {
+        recipientId: pair.recipient_id,
+        channel: pair.channel,
+        finalize: false,
+      });
+      retried++;
+    }
+    return { retried };
+  }
+
   async processLegacyNotificationJob(data: Record<string, unknown>) {
     const tenantId = String(data.tenantId ?? '');
     const userIds = (data.userIds as string[]) ?? [];

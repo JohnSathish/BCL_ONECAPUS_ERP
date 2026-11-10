@@ -36,6 +36,16 @@ export type CommunicationCampaign = {
     size?: number;
   }>;
   template?: { id: string; name: string; code: string } | null;
+  createdBy?: { id: string; displayName?: string | null; email?: string | null } | null;
+  delivery?: {
+    recipients?: number;
+    confirmed: number;
+    accepted: number;
+    failed: number;
+    pending?: number;
+    skipped?: number;
+    opened?: number;
+  };
   _count?: { recipients: number; deliveryLogs: number; notifications?: number };
 };
 

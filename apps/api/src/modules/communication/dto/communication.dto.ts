@@ -427,6 +427,43 @@ export class CampaignDeskQueryDto {
   to?: string;
 }
 
+export class CampaignRecipientQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 25;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  search?: string;
+
+  @IsOptional()
+  @IsIn(['delivered', 'accepted', 'pending', 'failed', 'skipped'])
+  status?: 'delivered' | 'accepted' | 'pending' | 'failed' | 'skipped';
+
+  @IsOptional()
+  @IsIn(['students', 'staff'])
+  role?: 'students' | 'staff';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  department?: string;
+
+  @IsOptional()
+  @IsIn(['name', 'department', 'status', 'delivered'])
+  sort?: 'name' | 'department' | 'status' | 'delivered' = 'name';
+}
+
 export const INBOX_CLEAR_AUDIENCES = ['STUDENTS', 'STAFF', 'ALL'] as const;
 
 export class ClearNotificationHistoryDto {

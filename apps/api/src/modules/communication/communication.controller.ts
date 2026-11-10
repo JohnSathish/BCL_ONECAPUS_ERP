@@ -26,6 +26,7 @@ import {
 } from '../../common/decorators/require-permissions.decorator';
 import {
   CampaignDeskQueryDto,
+  CampaignRecipientQueryDto,
   ClearNotificationHistoryDto,
   CommunicationCampaignDto,
   CommunicationTemplateDto,
@@ -435,7 +436,73 @@ export class CommunicationController {
   @Get('campaigns/:id')
   @RequireAnyPermission('communication:read', 'communication:manage')
   getCampaign(@CurrentUser() user: JwtUser, @Param('id') id: string) {
-    return this.campaigns.get(user.tid, id);
+    return this.campaigns.detail(user.tid, id);
+  }
+
+  @Get('campaigns/:id/recipients/directory')
+  @RequireAnyPermission('communication:read', 'communication:manage')
+  campaignRecipientDirectory(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query() query: CampaignRecipientQueryDto,
+  ) {
+    return this.campaigns.recipientDirectory(user.tid, id, query);
+  }
+
+  @Get('campaigns/:id/recipients/export')
+  @RequireAnyPermission('communication:read', 'communication:manage')
+  async exportCampaignRecipients(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query() query: CampaignRecipientQueryDto,
+    @Res() res: Response,
+  ) {
+    const file = await this.campaigns.exportRecipients(user.tid, id, query);
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res.send(file.buffer);
+  }
+
+  @Get('campaigns/:id/report')
+  @RequireAnyPermission('communication:read', 'communication:manage')
+  async exportCampaignReport(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Query() query: CampaignRecipientQueryDto,
+    @Res() res: Response,
+  ) {
+    const file = await this.campaigns.exportReport(user.tid, id, query);
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res.send(file.buffer);
+  }
+
+  @Get('campaigns/:id/recipients/:recipientId')
+  @RequireAnyPermission('communication:read', 'communication:manage')
+  campaignRecipientDetail(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('recipientId') recipientId: string,
+  ) {
+    return this.campaigns.recipientDetail(user.tid, id, recipientId);
+  }
+
+  @Post('campaigns/:id/duplicate')
+  @RequirePermissions('communication:manage')
+  duplicateCampaign(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.campaigns.duplicate(user, id);
+  }
+
+  @Post('campaigns/:id/resend-failed')
+  @RequirePermissions('communication:manage')
+  resendFailedCampaign(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.campaigns.queueResendFailed(user, id);
   }
 
   @Post('campaigns/:id/send')
