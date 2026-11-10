@@ -465,7 +465,7 @@ export function BarcodeManagementWorkspace() {
       <p className="text-xs text-slate-500">
         {summary.data?.note}{' '}
         {template?.preset === 'ZEBRA_2UP'
-          ? 'Each book prints twice on one row: the left sticker for the cover and the right sticker for inside the book. Each book is one page, exactly 4.00 × 0.98 inch, so the next book starts on the next sticker. In the print window set Margins to None, Scale to 100, and turn off Headers and footers. Leave Layout on Portrait.'
+          ? 'Each book prints twice on one row: the left sticker for the cover and the right sticker for inside the book. The row stays just under the 4.00 × 0.98 inch stock so the printer does not feed a blank sticker between books. Keep the printer settings you already saved. In the print window set Margins to None, Scale to 100, and turn off Headers and footers. Leave Layout on Portrait.'
           : 'For A4 sheets, set the paper to A4, scale 100% or Actual Size, and turn off browser headers and footers.'}
       </p>
 
@@ -1144,10 +1144,10 @@ function SettingsPanel({
       </div>
       {template.preset === 'ZEBRA_2UP' ? (
         <p className="mt-3 text-xs leading-5 text-slate-500">
-          Zebra GT800 user-defined stock, 4.00 × 0.98 inch, portrait. Each book is one page of that
-          size, so the printer moves exactly one sticker. In the print window set Margins to None,
-          Scale to 100, and turn off Headers and footers. Leave Layout on Portrait. Chrome remembers
-          this for the GT800.
+          Zebra GT800 user-defined stock, 4.00 × 0.98 inch, portrait. The printed row is kept just
+          under that height so a blank sticker is not fed between books. Keep the printer settings
+          you already saved. In the print window set Margins to None, Scale to 100, and turn off
+          Headers and footers. Leave Layout on Portrait.
         </p>
       ) : null}
       <div className="mt-3 grid grid-cols-2 gap-2">

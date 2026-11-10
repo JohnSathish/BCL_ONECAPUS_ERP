@@ -219,6 +219,8 @@ export function barcodeLabelDocument(
       : '<script>window.addEventListener("load", function () { window.print(); });</script>';
   const pageWidth = zebra ? '4in' : `${settings.pageWidthMm}mm`;
   const pageHeight = zebra ? '0.98in' : `${settings.pageHeightMm}mm`;
+  // A full 0.98in row is one pixel over the GT800 form and Chrome feeds a blank sticker after every book.
+  const zebraRowHeight = '0.97in';
   // A CSS size wider than it is tall makes Chrome send a landscape print ticket.
   // The GT800 driver stock is portrait 4.00 × 0.98 inch, so that ticket is rotated
   // 90 degrees until Printing Preferences is opened and confirmed. size:auto keeps
@@ -327,9 +329,9 @@ export function barcodeLabelDocument(
       display: block;
       position: relative;
       width: 4in;
-      /* One book is exactly one stock length. A shorter page makes the next book start early and walk onto the following sticker. */
-      height: ${pageHeight};
-      max-height: ${pageHeight};
+      /* Stay a hair under the 0.98in stock. A full-height row feeds one extra blank label. */
+      height: ${zebraRowHeight};
+      max-height: ${zebraRowHeight};
       margin: 0;
       padding: 0;
       overflow: hidden;
@@ -348,8 +350,8 @@ export function barcodeLabelDocument(
       position: absolute;
       top: 0;
       width: 1.968in;
-      height: 100%;
-      max-height: 100%;
+      height: ${zebraRowHeight};
+      max-height: ${zebraRowHeight};
       margin: 0;
       border: 0;
       padding: 0.05in 0.08in;
@@ -401,8 +403,8 @@ export function barcodeLabelDocument(
       .sheet { page-break-after: always; break-after: page; }
       .sheet.last { page-break-after: auto; break-after: auto; }
       .sheet.zebra {
-        height: ${pageHeight};
-        max-height: ${pageHeight};
+        height: ${zebraRowHeight};
+        max-height: ${zebraRowHeight};
         overflow: hidden;
         break-inside: avoid;
         page-break-inside: avoid;
