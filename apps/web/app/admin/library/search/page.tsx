@@ -3,7 +3,7 @@ import { LibrarySearchWorkspace } from '@/components/library/library-search-work
 
 export default function LibrarySearchPage() {
   return (
-    <DashboardShell role="admin" title="Library Search">
+    <DashboardShell role="admin" title="Library Search" pageHeader={false}>
       <LibrarySearchWorkspace />
     </DashboardShell>
   );
