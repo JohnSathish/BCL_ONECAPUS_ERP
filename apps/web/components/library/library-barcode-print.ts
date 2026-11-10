@@ -327,19 +327,18 @@ export function barcodeLabelDocument(
       display: block;
       position: relative;
       width: 4in;
-      /* Stay a hair under the 0.98in stock. A full-height row feeds one extra blank label. */
-      height: 0.97in;
+      /* One book is exactly one stock length. A shorter page makes the next book start early and walk onto the following sticker. */
+      height: ${pageHeight};
+      max-height: ${pageHeight};
       margin: 0;
       padding: 0;
       overflow: hidden;
       break-inside: avoid;
       page-break-inside: avoid;
+      break-before: avoid;
+      page-break-before: avoid;
       break-after: page;
       page-break-after: always;
-    }
-    .sheet.zebra + .sheet.zebra {
-      break-before: page;
-      page-break-before: always;
     }
     .sheet.zebra.last {
       break-after: avoid;
@@ -349,7 +348,8 @@ export function barcodeLabelDocument(
       position: absolute;
       top: 0;
       width: 1.968in;
-      height: 0.97in;
+      height: 100%;
+      max-height: 100%;
       margin: 0;
       border: 0;
       padding: 0.05in 0.08in;
@@ -401,16 +401,15 @@ export function barcodeLabelDocument(
       .sheet { page-break-after: always; break-after: page; }
       .sheet.last { page-break-after: auto; break-after: auto; }
       .sheet.zebra {
-        height: 0.97in;
+        height: ${pageHeight};
+        max-height: ${pageHeight};
         overflow: hidden;
         break-inside: avoid;
         page-break-inside: avoid;
+        break-before: avoid;
+        page-break-before: avoid;
         break-after: page;
         page-break-after: always;
-      }
-      .sheet.zebra + .sheet.zebra {
-        break-before: page;
-        page-break-before: always;
       }
       .sheet.zebra.last {
         break-after: avoid;
