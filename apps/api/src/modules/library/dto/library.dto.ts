@@ -202,12 +202,16 @@ export class DashboardUsageQueryDto {
   @IsOptional()
   @IsString()
   to?: string;
+
+  @IsOptional()
+  @IsIn(['year'])
+  span?: 'year';
 }
 
 export class LibraryDashboardQueryDto {
   @IsOptional()
-  @IsIn(['today', 'week', 'month'])
-  period?: 'today' | 'week' | 'month' = 'today';
+  @IsIn(['today', 'week', 'month', 'year'])
+  period?: 'today' | 'week' | 'month' | 'year' = 'today';
 }
 
 export class CreateReadingZoneDto {

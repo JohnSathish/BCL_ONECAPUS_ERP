@@ -5,7 +5,7 @@ import { libraryHealth } from '../library-health.logic';
 import { fillUsageDays, usageRange } from '../library-usage-days';
 import { LibrarySettingsService } from './library-settings.service';
 
-export type LibraryDashboardPeriod = 'today' | 'week' | 'month';
+export type LibraryDashboardPeriod = 'today' | 'week' | 'month' | 'year';
 export type OccupancySnapshot = {
   studentsInside: number;
   maleStudents: number;
@@ -145,17 +145,21 @@ export class LibraryAnalyticsService {
     const stockCutoff = new Date(startOfDay);
     stockCutoff.setDate(stockCutoff.getDate() - 30);
     const periodStart =
-      period === 'month'
-        ? new Date(startOfDay.getTime() - 29 * 86_400_000)
-        : period === 'week'
-          ? startOfWeek
-          : startOfDay;
+      period === 'year'
+        ? new Date(startOfDay.getFullYear(), 0, 1)
+        : period === 'month'
+          ? new Date(startOfDay.getTime() - 29 * 86_400_000)
+          : period === 'week'
+            ? startOfWeek
+            : startOfDay;
     const periodLabel =
-      period === 'month'
-        ? 'in the last 30 days'
-        : period === 'week'
-          ? 'in the last 7 days'
-          : 'today';
+      period === 'year'
+        ? 'this year'
+        : period === 'month'
+          ? 'in the last 30 days'
+          : period === 'week'
+            ? 'in the last 7 days'
+            : 'today';
 
     const [
       todayVisitors,
@@ -177,6 +181,7 @@ export class LibraryAnalyticsService {
       coverage,
       attention,
       departments,
+      collection,
       periodIssues,
       periodReturns,
       periodRenewals,
@@ -253,6 +258,7 @@ export class LibraryAnalyticsService {
       this.collectionCoverage(tenantId),
       this.attentionCounts(tenantId),
       this.departmentCollection(tenantId),
+      this.collectionMix(tenantId),
       this.prisma.libraryLoan.count({
         where: { tenantId, issuedAt: { gte: periodStart, lt: endOfDay } },
       }),
@@ -382,6 +388,7 @@ export class LibraryAnalyticsService {
       },
       attention,
       departments,
+      collection,
       period,
       entryAnalytics: camsFootfall,
     };
@@ -600,8 +607,9 @@ export class LibraryAnalyticsService {
 
   async dashboardUsage(
     tenantId: string,
-    query: { days?: number; from?: string; to?: string },
+    query: { days?: number; from?: string; to?: string; span?: 'year' },
   ) {
+    if (query.span === 'year') return this.dashboardUsageByMonth(tenantId);
     let range: ReturnType<typeof usageRange>;
     try {
       range = usageRange(query);
@@ -831,6 +839,155 @@ export class LibraryAnalyticsService {
         printHistoryUnknown: 0,
       }
     );
+  }
+
+  private async collectionMix(tenantId: string) {
+    const rows = await this.prisma.$queryRaw<
+      { bucket: string; categoryId: string | null; copies: number }[]
+    >`
+      SELECT
+        CASE
+          WHEN UPPER(COALESCE(cat.code, '')) IN ('JOURNAL', 'MAGAZINE', 'NEWSPAPER')
+            OR UPPER(COALESCE(b.book_type, '')) IN ('JOURNAL', 'PERIODICAL', 'MAGAZINE', 'NEWSPAPER')
+            THEN 'journals'
+          WHEN UPPER(COALESCE(cat.code, '')) IN ('REFERENCE', 'RARE')
+            OR UPPER(COALESCE(b.book_type, '')) IN ('REFERENCE', 'RARE')
+            OR UPPER(COALESCE(c.copy_type, '')) IN ('REFERENCE', 'RARE')
+            THEN 'reference'
+          WHEN UPPER(COALESCE(cat.code, '')) IN ('TEXTBOOK', 'TEXT')
+            OR UPPER(COALESCE(b.book_type, '')) IN ('TEXTBOOK', 'TEXT')
+            OR UPPER(COALESCE(c.copy_type, '')) = 'TEXTBOOK'
+            THEN 'textbooks'
+          ELSE 'other'
+        END AS bucket,
+        b.category_id AS "categoryId",
+        COUNT(*)::int AS copies
+      FROM library.library_book_copies c
+      JOIN library.library_books b ON b.id = c.book_id
+      LEFT JOIN library.library_categories cat ON cat.id = b.category_id
+      WHERE c.tenant_id = CAST(${tenantId} AS uuid)
+        AND b.deleted_at IS NULL
+      GROUP BY 1, b.category_id
+    `;
+    const labels = {
+      textbooks: 'Text Books',
+      reference: 'Reference Books',
+      journals: 'Journals & Periodicals',
+      other: 'Other Collections',
+    } as const;
+    const grouped = new Map<
+      string,
+      { copies: number; categoryId: string | null; categoryCopies: number }
+    >();
+    for (const row of rows) {
+      const copies = Number(row.copies);
+      const current = grouped.get(row.bucket) ?? {
+        copies: 0,
+        categoryId: null,
+        categoryCopies: 0,
+      };
+      current.copies += copies;
+      if (row.categoryId && copies >= current.categoryCopies) {
+        current.categoryId = row.categoryId;
+        current.categoryCopies = copies;
+      }
+      grouped.set(row.bucket, current);
+    }
+    const totalCopies = [...grouped.values()].reduce(
+      (sum, row) => sum + row.copies,
+      0,
+    );
+    const slices = (Object.keys(labels) as Array<keyof typeof labels>).map(
+      (key) => {
+        const row = grouped.get(key);
+        const copies = row?.copies ?? 0;
+        return {
+          key,
+          label: labels[key],
+          copies,
+          percent: totalCopies ? Math.round((copies / totalCopies) * 100) : 0,
+          categoryId: row?.categoryId ?? null,
+        };
+      },
+    );
+    return { totalCopies, slices };
+  }
+
+  private async dashboardUsageByMonth(tenantId: string) {
+    const from = new Date(new Date().getFullYear(), 0, 1);
+    const to = new Date();
+    to.setHours(0, 0, 0, 0);
+    to.setDate(to.getDate() + 1);
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const tenant = Prisma.sql`CAST(${tenantId} AS uuid)`;
+    const [issuedRows, returnedRows, books] = await Promise.all([
+      this.prisma.$queryRaw<{ month: string; count: number }[]>`
+        SELECT to_char(issued_at AT TIME ZONE ${timeZone}, 'YYYY-MM') AS month,
+          COUNT(*)::int AS count
+        FROM library.library_loans
+        WHERE tenant_id = ${tenant}
+          AND issued_at >= ${from}
+          AND issued_at < ${to}
+        GROUP BY 1
+      `,
+      this.prisma.$queryRaw<{ month: string; count: number }[]>`
+        SELECT to_char(returned_at AT TIME ZONE ${timeZone}, 'YYYY-MM') AS month,
+          COUNT(*)::int AS count
+        FROM library.library_loans
+        WHERE tenant_id = ${tenant}
+          AND returned_at >= ${from}
+          AND returned_at < ${to}
+        GROUP BY 1
+      `,
+      this.prisma.$queryRaw<
+        { bookId: string; title: string; issues: number }[]
+      >`
+        SELECT b.id AS "bookId", b.title, COUNT(*)::int AS issues
+        FROM library.library_loans l
+        JOIN library.library_book_copies c ON c.id = l.copy_id
+        JOIN library.library_books b ON b.id = c.book_id
+        WHERE l.tenant_id = ${tenant}
+          AND l.issued_at >= ${from}
+          AND l.issued_at < ${to}
+          AND b.deleted_at IS NULL
+        GROUP BY b.id, b.title
+        ORDER BY issues DESC, b.title
+        LIMIT 5
+      `,
+    ]);
+    const issued = new Map(
+      issuedRows.map((row) => [row.month, Number(row.count)]),
+    );
+    const returned = new Map(
+      returnedRows.map((row) => [row.month, Number(row.count)]),
+    );
+    const year = from.getFullYear();
+    const through = new Date().getMonth();
+    const series = Array.from({ length: through + 1 }, (_, month) => {
+      const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const label = new Date(year, month, 1).toLocaleDateString('en-GB', {
+        month: 'short',
+      });
+      return {
+        date: key,
+        label,
+        issued: issued.get(key) ?? 0,
+        returned: returned.get(key) ?? 0,
+      };
+    });
+    const topIssues = Math.max(1, ...books.map((book) => Number(book.issues)));
+    return {
+      from: series[0]?.date,
+      days: series.length,
+      newMembers: null,
+      series,
+      topBooks: books.map((book) => ({
+        bookId: book.bookId,
+        title: book.title,
+        issues: Number(book.issues),
+        share: Math.round((Number(book.issues) / topIssues) * 100),
+      })),
+    };
   }
 
   private async departmentCollection(tenantId: string) {

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -109,12 +110,14 @@ export function LibraryCatalogueWorkspace() {
   const canExport = canAny('library:reports', 'library:manage', 'library:read');
   const [draft, setDraft] = useState(EMPTY);
   const [filters, setFilters] = useState(EMPTY);
+  const searchParams = useSearchParams();
   useEffect(() => {
-    const search = new URLSearchParams(window.location.search).get('search')?.trim();
-    if (!search) return;
-    setDraft((current) => ({ ...current, search }));
-    setFilters((current) => ({ ...current, search, page: 1 }));
-  }, []);
+    if (!searchParams.has('search') && !searchParams.has('categoryId')) return;
+    const search = searchParams.get('search')?.trim() ?? '';
+    const categoryId = searchParams.get('categoryId')?.trim() ?? '';
+    setDraft((current) => ({ ...current, search, categoryId }));
+    setFilters((current) => ({ ...current, search, categoryId, page: 1 }));
+  }, [searchParams]);
   const [advanced, setAdvanced] = useState(true);
   const [view, setView] = useState<'table' | 'grid'>('table');
   const [selected, setSelected] = useState<string[]>([]);

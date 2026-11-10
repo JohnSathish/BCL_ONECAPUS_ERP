@@ -21,11 +21,6 @@ import type { LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  librarySearchButtonClass,
-  librarySearchInputClass,
-  librarySearchPanelClass,
-} from '@/components/library/library-search-panel';
 import { useAuth, useAuthQueryEnabled } from '@/hooks/use-auth';
 import { useBranding } from '@/hooks/use-branding';
 import {
@@ -71,6 +66,9 @@ type IssuedLine = {
   dueAt: string;
   issuedAt: string;
 };
+
+const outlineAction =
+  'inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50';
 
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'issue', label: 'Issue Book', icon: BookOpen },
@@ -387,6 +385,12 @@ export function LibraryCirculationDesk() {
     memberRef.current?.focus();
   }
 
+  function completeIssue() {
+    if (!member || !issuedNow.length) return;
+    printVisitReceipt();
+    finishMember();
+  }
+
   function reprintFromHistory(loan: LibraryLoan) {
     if (!member) return;
     const pool = [...member.activeLoans, ...(member.returnedLoans ?? [])];
@@ -544,56 +548,52 @@ export function LibraryCirculationDesk() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white">
-            <BookOpen className="h-5 w-5" />
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#155EEF] text-white shadow-sm">
+            <Library className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="text-xl font-semibold text-slate-900">Library Circulation</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+              Library Circulation
+            </h1>
             <p className="text-sm text-slate-500">
               Issue, return and renew books for library members.
             </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" asChild>
-            <Link href="/admin/library/settings">
-              <Settings className="mr-1 h-4 w-4" />
-              Circulation Rules
-            </Link>
-          </Button>
-          <Button type="button" variant="outline" asChild>
-            <Link href="/admin/library/settings">
-              <RotateCcw className="mr-1 h-4 w-4" />
-              Renewal Settings
-            </Link>
-          </Button>
-          <Button type="button" variant="outline" asChild>
-            <Link href="/admin/library/members">
-              <UserPlus className="mr-1 h-4 w-4" />
-              Add Member
-            </Link>
-          </Button>
-          <Button
+          <Link href="/admin/library/settings" className={outlineAction}>
+            <Settings className="h-4 w-4" />
+            Circulation Rules
+          </Link>
+          <Link href="/admin/library/settings" className={outlineAction}>
+            <RotateCcw className="h-4 w-4" />
+            Renewal Settings
+          </Link>
+          <Link href="/admin/library/members" className={outlineAction}>
+            <UserPlus className="h-4 w-4" />
+            Add Member
+          </Link>
+          <button
             type="button"
-            variant="outline"
+            className={outlineAction}
             onClick={() => {
               setTab('history');
               memberRef.current?.focus();
             }}
           >
-            <Search className="mr-1 h-4 w-4" />
+            <Search className="h-4 w-4" />
             Member Search
-          </Button>
+          </button>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Stat
           href="/admin/library/catalogue"
           icon={Library}
-          tone="bg-blue-50 text-blue-700"
+          tone="bg-blue-50 text-blue-600"
           label="Total Books"
           value={stats?.totalCopies}
           hint="Physical copies in library"
@@ -601,14 +601,14 @@ export function LibraryCirculationDesk() {
         <Stat
           href="/admin/library/members"
           icon={Users}
-          tone="bg-emerald-50 text-emerald-700"
+          tone="bg-emerald-50 text-emerald-600"
           label="Total Members"
           value={stats?.totalMembers}
           hint="Students and staff on record"
         />
         <Stat
           icon={BookOpen}
-          tone="bg-violet-50 text-violet-700"
+          tone="bg-violet-50 text-violet-600"
           label="Issued Today"
           value={stats?.issuedToday}
           change={dayChange(stats?.issuedToday, stats?.issuedYesterday)}
@@ -616,7 +616,7 @@ export function LibraryCirculationDesk() {
         />
         <Stat
           icon={RotateCcw}
-          tone="bg-orange-50 text-orange-700"
+          tone="bg-orange-50 text-orange-600"
           label="Returned Today"
           value={stats?.returnedToday}
           change={dayChange(stats?.returnedToday, stats?.returnedYesterday)}
@@ -625,7 +625,7 @@ export function LibraryCirculationDesk() {
         <button type="button" className="text-left" onClick={() => setShowOverdue((open) => !open)}>
           <Stat
             icon={AlertTriangle}
-            tone="bg-rose-50 text-rose-700"
+            tone="bg-rose-50 text-rose-600"
             label="Overdue Books"
             value={stats?.overdueLoans}
             hint="Books not yet returned"
@@ -634,7 +634,7 @@ export function LibraryCirculationDesk() {
         <button type="button" className="text-left" onClick={() => setShowDueWeek((open) => !open)}>
           <Stat
             icon={Calendar}
-            tone="bg-sky-50 text-sky-700"
+            tone="bg-cyan-50 text-cyan-600"
             label="Due This Week"
             value={stats?.dueThisWeek}
             hint="Books due in the next 7 days"
@@ -652,8 +652,8 @@ export function LibraryCirculationDesk() {
               type="button"
               className={
                 active
-                  ? 'flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-sm font-medium text-white shadow-sm'
-                  : 'flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-600'
+                  ? 'flex items-center justify-center gap-2 rounded-xl bg-[#155EEF] px-3 py-2.5 text-sm font-medium text-white shadow-sm'
+                  : 'flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:border-blue-200'
               }
               onClick={() => setTab(item.id)}
             >
@@ -682,8 +682,13 @@ export function LibraryCirculationDesk() {
       {tab === 'issue' ? (
         <div className="space-y-4">
           <div className="grid gap-4 xl:grid-cols-2">
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="font-semibold text-slate-900">1. Select Member</h2>
+            <section className="rounded-[18px] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+              <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-[#155EEF]">
+                  <Users className="h-4 w-4" />
+                </span>
+                1. Select Member
+              </h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 {(
                   [
@@ -697,8 +702,8 @@ export function LibraryCirculationDesk() {
                     type="button"
                     className={
                       memberMode === id
-                        ? 'rounded-lg bg-blue-600 px-3 py-1.5 text-xs text-white'
-                        : 'rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600'
+                        ? 'rounded-lg bg-[#155EEF] px-3 py-1.5 text-xs font-medium text-white'
+                        : 'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50'
                     }
                     onClick={() => {
                       setMemberMode(id);
@@ -709,13 +714,13 @@ export function LibraryCirculationDesk() {
                   </button>
                 ))}
               </div>
-              <div className={`mt-3 flex gap-3 ${librarySearchPanelClass}`}>
+              <div className="mt-3 flex gap-2">
                 <div className="relative min-w-0 flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <Barcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     ref={memberRef}
-                    className={librarySearchInputClass}
-                    placeholder="Scan member card or search name, enrolment no."
+                    className="h-10 border-slate-200 bg-[#F4F7FC] pl-9 text-sm"
+                    placeholder="Scan member card or search name, enrolment number or roll number..."
                     value={memberQuery}
                     onChange={(event) => {
                       setMemberQuery(event.target.value);
@@ -728,7 +733,7 @@ export function LibraryCirculationDesk() {
                 </div>
                 <Button
                   type="button"
-                  className={librarySearchButtonClass}
+                  className="h-10 shrink-0 bg-[#155EEF] px-4 hover:bg-blue-700"
                   onClick={() => void loadMember(memberQuery)}
                 >
                   Search
@@ -752,52 +757,28 @@ export function LibraryCirculationDesk() {
                 </ul>
               ) : null}
               {member ? (
-                <MemberCard member={member} />
+                <MemberCard member={member} blocked={blockReason} />
               ) : (
-                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_0.8fr]">
-                  <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-                    <Users className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-                    No member selected
-                    <p className="mt-1 text-xs">Scan a card or search to load member details.</p>
-                  </div>
-                  <div>
-                    <p className="mb-2 text-xs font-medium uppercase text-slate-400">
-                      Recent members
-                    </p>
-                    {recentMembers.length ? (
-                      recentMembers.map((item) => (
-                        <button
-                          key={item.profile.memberId}
-                          type="button"
-                          className="mb-2 block w-full rounded-lg border border-slate-100 px-2 py-1.5 text-left text-sm hover:bg-slate-50"
-                          onClick={() =>
-                            void loadMember(
-                              item.profile.registrationNumber || item.profile.memberId,
-                            )
-                          }
-                        >
-                          <span className="font-medium">{item.profile.fullName}</span>
-                          <span className="block text-xs text-slate-500">
-                            {item.profile.registrationNumber || item.profile.memberType}
-                          </span>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="text-xs text-slate-400">
-                        Members you open in this session appear here.
-                      </p>
-                    )}
-                  </div>
+                <div className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                  <Users className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+                  No member selected
+                  <p className="mt-1 text-xs">Scan a card or search to load member details.</p>
                 </div>
               )}
+              <RecentMembers members={recentMembers} onPick={(code) => void loadMember(code)} />
               {blockReason ? (
                 <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   {blockReason}
                 </p>
               ) : null}
             </section>
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h2 className="font-semibold text-slate-900">2. Select Book</h2>
+            <section className="rounded-[18px] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+              <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-[#155EEF]">
+                  <BookOpen className="h-4 w-4" />
+                </span>
+                2. Select Book
+              </h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 {(
                   [
@@ -812,8 +793,8 @@ export function LibraryCirculationDesk() {
                     type="button"
                     className={
                       bookMode === id
-                        ? 'rounded-lg bg-blue-600 px-3 py-1.5 text-xs text-white'
-                        : 'rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600'
+                        ? 'rounded-lg bg-[#155EEF] px-3 py-1.5 text-xs font-medium text-white'
+                        : 'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50'
                     }
                     onClick={() => {
                       setBookMode(id);
@@ -844,15 +825,15 @@ export function LibraryCirculationDesk() {
                   Latest accession numbers on record. Acquisition date is not used.
                 </p>
               ) : null}
-              <div className={`mt-3 flex gap-3 ${librarySearchPanelClass}`}>
+              <div className="mt-3 flex gap-2">
                 <div className="relative min-w-0 flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                  <Barcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     ref={bookRef}
-                    className={librarySearchInputClass}
+                    className="h-10 border-slate-200 bg-[#F4F7FC] pl-9 text-sm"
                     placeholder={
                       bookMode === 'scan'
-                        ? 'Scan book barcode — it is issued to the member immediately'
+                        ? 'Scan book barcode or enter accession number...'
                         : 'Search title, author, accession no.'
                     }
                     value={bookQuery}
@@ -870,7 +851,7 @@ export function LibraryCirculationDesk() {
                 </div>
                 <Button
                   type="button"
-                  className={librarySearchButtonClass}
+                  className="h-10 shrink-0 bg-[#155EEF] px-4 hover:bg-blue-700"
                   disabled={busy}
                   onClick={() =>
                     bookMode === 'scan' ? void issueCopy(bookQuery) : void loadBook(bookQuery)
@@ -948,76 +929,77 @@ export function LibraryCirculationDesk() {
               </div>
             </section>
           </div>
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold text-slate-900">
-                3. Issued This Visit
-                {member && issuedNow.length ? (
-                  <span className="ml-2 text-sm font-normal text-slate-500">
-                    {member.profile.fullName} · {issuedNow.length}{' '}
-                    {issuedNow.length === 1 ? 'book' : 'books'}
-                  </span>
-                ) : null}
-              </h2>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!issuedNow.length || !member}
-                  onClick={printVisitReceipt}
-                >
-                  <Printer className="mr-1 h-4 w-4" /> Print Receipt
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!member}
-                  onClick={finishMember}
-                >
-                  Done — next member
-                </Button>
+          <section className="rounded-[18px] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+            <h2 className="font-semibold text-slate-900">
+              3. Issued This Visit
+              {issuedNow.length ? (
+                <span className="ml-1 text-sm font-normal text-slate-500">
+                  ({issuedNow.length} {issuedNow.length === 1 ? 'book' : 'books'})
+                </span>
+              ) : null}
+            </h2>
+            <div className="mt-3 grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
+              {issuedNow.length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-left text-sm">
+                    <thead className="text-xs text-slate-500">
+                      <tr>
+                        {['Sl. No.', 'Book Title', 'Accession No.', 'Issue Date', 'Due Date'].map(
+                          (header) => (
+                            <th key={header} className="py-2 pr-3 font-medium">
+                              {header}
+                            </th>
+                          ),
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {issuedNow.map((line, index) => (
+                        <tr key={line.loanId} className="border-t border-slate-100">
+                          <td className="py-2">{index + 1}</td>
+                          <td className="py-2 font-medium text-slate-800">{line.title}</td>
+                          <td className="py-2 font-mono text-xs">{line.accession}</td>
+                          <td className="py-2">{fmtDate(line.issuedAt)}</td>
+                          <td className="py-2">{fmtDate(line.dueAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="mt-2 text-xs text-slate-500">
+                    A scanned book is issued immediately. A wrong book is taken back on the Return
+                    Book tab.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-500">
+                  <Library className="mx-auto mb-2 h-10 w-10 text-slate-300" />
+                  No books issued yet
+                  <p className="mt-1">
+                    Scan the member card, then scan each book. Every scanned book is issued at once.
+                  </p>
+                </div>
+              )}
+              <div className="rounded-xl border border-slate-100 bg-[#F8FAFC] p-3 text-sm">
+                <p className="font-semibold text-slate-900">Issue Summary</p>
+                <dl className="mt-2 space-y-2">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-slate-500">Books in this visit</dt>
+                    <dd className="font-semibold">{issuedNow.length}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-slate-500">Member limit</dt>
+                    <dd className="font-semibold">{member ? member.maxBooks : '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-slate-500">Remaining limit</dt>
+                    <dd className="font-semibold">
+                      {member ? Math.max(0, member.maxBooks - member.borrowedCount) : '—'}
+                    </dd>
+                  </div>
+                </dl>
               </div>
             </div>
-            {issuedNow.length ? (
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[640px] text-left text-sm">
-                  <thead className="text-xs text-slate-500">
-                    <tr>
-                      {['#', 'Accession No.', 'Book Title', 'Author', 'Due Date'].map((header) => (
-                        <th key={header} className="py-2 pr-3 font-medium">
-                          {header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {issuedNow.map((line, index) => (
-                      <tr key={line.loanId} className="border-t">
-                        <td className="py-2">{index + 1}</td>
-                        <td className="py-2 font-mono text-xs">{line.accession}</td>
-                        <td className="py-2">{line.title}</td>
-                        <td className="py-2">{line.author || '—'}</td>
-                        <td className="py-2">{fmtDate(line.dueAt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="mt-2 text-xs text-slate-500">
-                  Scanned a wrong book? Take it back on the Return Book tab.
-                </p>
-              </div>
-            ) : (
-              <div className="py-10 text-center text-sm text-slate-500">
-                <Library className="mx-auto mb-2 h-10 w-10 text-slate-300" />
-                No books issued yet
-                <p className="mt-1">
-                  Scan the member card, then scan each book. Every scanned book is issued at once.
-                </p>
-              </div>
-            )}
-            <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t pt-4">
+            <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t border-slate-100 pt-4">
               <label className="block min-w-[240px] flex-1 text-sm">
                 <span className="text-slate-500">Issue notes (optional)</span>
                 <Input
@@ -1063,6 +1045,27 @@ export function LibraryCirculationDesk() {
                 />
                 Print receipt after each scan
               </label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!issuedNow.length || !member}
+                  onClick={printVisitReceipt}
+                >
+                  <Printer className="mr-1 h-4 w-4" /> Print Receipt
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-[#155EEF] hover:bg-blue-700"
+                  disabled={!issuedNow.length || !member || busy}
+                  onClick={completeIssue}
+                >
+                  Complete Issue
+                </Button>
+                <Button type="button" variant="outline" disabled={!member} onClick={finishMember}>
+                  Done – Next Member
+                </Button>
+              </div>
             </div>
             {rules ? (
               <p className="mt-3 text-xs text-slate-500">
@@ -1077,14 +1080,14 @@ export function LibraryCirculationDesk() {
       ) : null}
 
       {tab === 'return' ? (
-        <section className="rounded-xl border bg-white p-4 shadow-sm">
+        <section className="rounded-[18px] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
           <h2 className="text-sm font-semibold">Scan the returned book</h2>
-          <div className={`mt-3 flex gap-3 ${librarySearchPanelClass}`}>
+          <div className="mt-3 flex gap-2">
             <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <Barcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 ref={returnRef}
-                className={librarySearchInputClass}
+                className="h-10 border-slate-200 bg-[#F4F7FC] pl-9 text-sm"
                 placeholder="Book barcode or accession number"
                 value={returnCode}
                 onChange={(event) => setReturnCode(event.target.value)}
@@ -1095,7 +1098,7 @@ export function LibraryCirculationDesk() {
             </div>
             <Button
               type="button"
-              className={librarySearchButtonClass}
+              className="h-10 shrink-0 bg-[#155EEF] px-4 hover:bg-blue-700"
               onClick={() => void loadReturn(returnCode)}
             >
               Find loan
@@ -1279,14 +1282,14 @@ export function LibraryCirculationDesk() {
       ) : null}
 
       {tab === 'renew' ? (
-        <section className="rounded-xl border bg-white p-4 shadow-sm">
+        <section className="rounded-[18px] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
           <h2 className="text-sm font-semibold">Find the active loan</h2>
-          <div className={`mt-3 flex gap-3 ${librarySearchPanelClass}`}>
+          <div className="mt-3 flex gap-2">
             <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <Barcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 ref={renewRef}
-                className={librarySearchInputClass}
+                className="h-10 border-slate-200 bg-[#F4F7FC] pl-9 text-sm"
                 placeholder="Book barcode or accession number"
                 value={renewCode}
                 onChange={(event) => setRenewCode(event.target.value)}
@@ -1297,7 +1300,7 @@ export function LibraryCirculationDesk() {
             </div>
             <Button
               type="button"
-              className={librarySearchButtonClass}
+              className="h-10 shrink-0 bg-[#155EEF] px-4 hover:bg-blue-700"
               onClick={() => void loadRenew(renewCode)}
             >
               Check renewal
@@ -1366,13 +1369,13 @@ export function LibraryCirculationDesk() {
 
       {tab === 'history' ? (
         <section className="space-y-4">
-          <div className="rounded-xl border bg-white p-4 shadow-sm">
-            <div className={`flex gap-3 ${librarySearchPanelClass}`}>
+          <div className="rounded-[18px] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+            <div className="flex gap-2">
               <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   ref={memberRef}
-                  className={librarySearchInputClass}
+                  className="h-10 border-slate-200 bg-[#F4F7FC] pl-9 text-sm"
                   placeholder="Member ID, enrolment number or card"
                   value={memberQuery}
                   onChange={(event) => setMemberQuery(event.target.value)}
@@ -1383,7 +1386,7 @@ export function LibraryCirculationDesk() {
               </div>
               <Button
                 type="button"
-                className={librarySearchButtonClass}
+                className="h-10 shrink-0 bg-[#155EEF] px-4 hover:bg-blue-700"
                 onClick={() => void loadMember(memberQuery)}
               >
                 Search
@@ -1524,61 +1527,154 @@ function Stat({
   href?: string;
 }) {
   const body = (
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}>
-        <Icon className="h-5 w-5" />
-      </span>
-      <div>
-        <p className="text-sm text-slate-500">{label}</p>
-        <p className="text-2xl font-semibold text-slate-900">
-          {value ?? '—'}
+    <div className="flex h-full items-start justify-between gap-2 rounded-[16px] bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5">
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-slate-500">{label}</p>
+        <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+          {value == null ? '—' : value.toLocaleString('en-IN')}
           {change ? (
             <span
-              className={change.up ? 'ml-2 text-xs text-emerald-600' : 'ml-2 text-xs text-rose-600'}
+              className={change.up ? 'ml-1 text-xs text-emerald-600' : 'ml-1 text-xs text-rose-600'}
               title="Compared with yesterday"
             >
               {change.text}
             </span>
           ) : null}
         </p>
-        <p className="text-xs text-slate-500">{hint}</p>
+        <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p>
       </div>
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tone}`}>
+        <Icon className="h-4 w-4" />
+      </span>
     </div>
   );
   return href ? <Link href={href}>{body}</Link> : body;
 }
 
-function MemberCard({ member }: { member: LibraryMemberSummary }) {
+function eligibilityOf(member: LibraryMemberSummary, blocked?: string | null) {
+  if (member.membershipStatus === 'EXPIRED') {
+    return { label: 'Membership expired', tone: 'bg-orange-50 text-orange-700' };
+  }
+  if (member.membershipStatus === 'BLOCKED' || blocked) {
+    return { label: 'Borrowing restricted', tone: 'bg-rose-50 text-rose-700' };
+  }
+  if (!member.profile.active) {
+    return { label: 'Pending action', tone: 'bg-orange-50 text-orange-700' };
+  }
+  return { label: 'Eligible to Borrow', tone: 'bg-emerald-50 text-emerald-700' };
+}
+
+function MemberCard({
+  member,
+  blocked,
+}: {
+  member: LibraryMemberSummary;
+  blocked?: string | null;
+}) {
   const profile = member.profile;
+  const overdue = member.activeLoans.filter((loan) => new Date(loan.dueAt) < new Date()).length;
+  const eligibility = eligibilityOf(member, blocked);
+  const roleLine =
+    profile.memberType === 'FACULTY' || profile.memberType === 'STAFF'
+      ? profile.designation || memberKind(profile.memberType)
+      : profile.semester
+        ? `Semester ${profile.semester}`
+        : profile.programme || memberKind(profile.memberType);
   return (
-    <div className="mt-4 flex gap-3 rounded-xl border p-3">
-      {profile.photoUrl ? (
-        <img src={profile.photoUrl} alt="" className="h-16 w-16 rounded-full object-cover" />
-      ) : (
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-xs">
-          Photo
+    <div className="mt-4 rounded-xl border border-slate-100 bg-[#F8FAFC] p-3">
+      <div className="flex gap-3">
+        {profile.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={profile.photoUrl} alt="" className="h-16 w-16 rounded-xl object-cover" />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-blue-100 text-sm font-semibold text-[#155EEF]">
+            {profile.fullName.slice(0, 2).toUpperCase()}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold text-slate-900">{profile.fullName}</p>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${eligibility.tone}`}
+            >
+              {eligibility.label}
+            </span>
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-600">
+            <div>
+              <dt className="text-slate-400">Roll / Staff ID</dt>
+              <dd className="font-medium text-slate-800">{profile.registrationNumber || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Department</dt>
+              <dd className="font-medium text-slate-800">{profile.department || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Semester / Designation</dt>
+              <dd className="font-medium text-slate-800">{roleLine}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Membership ID</dt>
+              <dd className="font-medium text-slate-800">{profile.memberId}</dd>
+            </div>
+          </dl>
         </div>
-      )}
-      <div className="text-sm">
-        <p className="font-semibold">
-          {profile.fullName}{' '}
-          <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">
-            {profile.active ? 'Active' : profile.status}
-          </span>
-        </p>
-        <p>
-          {profile.registrationNumber || 'No enrolment number'} · {profile.memberType}
-        </p>
-        <p>
-          {profile.programme || 'Course not recorded'} ·{' '}
-          {profile.department || 'Department not recorded'}
-        </p>
-        <p>
-          Issued {member.borrowedCount} / {member.maxBooks} · Overdue{' '}
-          {member.activeLoans.filter((loan) => new Date(loan.dueAt) < new Date()).length} · Fine{' '}
-          {money(member.outstandingFine)}
-        </p>
       </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+        <div className="rounded-lg bg-white px-2 py-2">
+          <p className="text-slate-400">Books issued</p>
+          <p className="font-semibold text-slate-900">
+            {member.borrowedCount} / {member.maxBooks}
+          </p>
+        </div>
+        <div className="rounded-lg bg-white px-2 py-2">
+          <p className="text-slate-400">Pending returns</p>
+          <p className="font-semibold text-slate-900">{overdue}</p>
+        </div>
+        <div className="rounded-lg bg-white px-2 py-2">
+          <p className="text-slate-400">Outstanding fine</p>
+          <p className="font-semibold text-slate-900">{money(member.outstandingFine)}</p>
+        </div>
+      </div>
+      {blocked ? <p className="mt-2 text-xs text-rose-700">{blocked}</p> : null}
+    </div>
+  );
+}
+
+function RecentMembers({
+  members,
+  onPick,
+}: {
+  members: LibraryMemberSummary[];
+  onPick: (code: string) => void;
+}) {
+  return (
+    <div className="mt-3">
+      <p className="mb-2 text-xs font-medium text-slate-500">Recent members</p>
+      {members.length ? (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {members.map((item) => (
+            <button
+              key={item.profile.memberId}
+              type="button"
+              className="flex w-28 shrink-0 flex-col items-center rounded-xl border border-slate-100 bg-white px-2 py-2 text-center hover:border-blue-200"
+              onClick={() => onPick(item.profile.registrationNumber || item.profile.memberId)}
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[11px] font-semibold text-[#155EEF]">
+                {item.profile.fullName.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="mt-1 w-full truncate text-xs font-medium text-slate-800">
+                {item.profile.fullName}
+              </span>
+              <span className="w-full truncate text-[10px] text-slate-400">
+                {item.profile.registrationNumber || item.profile.memberType}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400">Members you open in this session appear here.</p>
+      )}
     </div>
   );
 }
@@ -1588,44 +1684,83 @@ function copyTypeName(type?: string | null) {
   return COPY_TYPE_LABELS[type as CopyType] ?? type;
 }
 
+function bookAvailability(book: LibraryBookPreview) {
+  if (book.issueAllowed === false) {
+    return {
+      label: 'Not available',
+      tone: 'bg-slate-100 text-slate-600',
+    };
+  }
+  const status = book.copy.status.toUpperCase();
+  if (status === 'AVAILABLE') return { label: 'Available', tone: 'bg-emerald-50 text-emerald-700' };
+  if (status === 'ISSUED' || status === 'ON_LOAN') {
+    return { label: 'Already Issued', tone: 'bg-rose-50 text-rose-700' };
+  }
+  if (status === 'RESERVED') return { label: 'Reserved', tone: 'bg-orange-50 text-orange-700' };
+  return { label: book.copy.status || 'Not available', tone: 'bg-slate-100 text-slate-600' };
+}
+
 function BookCard({ book }: { book: LibraryBookPreview }) {
-  const available = book.copy.status === 'AVAILABLE';
+  const availability = bookAvailability(book);
+  const shelf = [book.book.shelf, book.book.rack].filter(Boolean).join(' / ');
   return (
-    <div className="mt-4 rounded-xl border p-3 text-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold">{book.book.title}</p>
-          <p>{book.book.author || 'Author not recorded'}</p>
-          <p>
-            Accession {book.book.accessionNo} · Barcode {book.copy.barcode}
-          </p>
-          <p>
-            {copyTypeName(book.copy.copyType)} ·{' '}
-            {book.issueAllowed === false ? 'Issue not allowed' : 'Issue allowed'}
-          </p>
+    <div className="mt-4 rounded-xl border border-slate-100 bg-[#F8FAFC] p-3 text-sm">
+      <div className="flex gap-3">
+        {book.book.coverImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={book.book.coverImageUrl}
+            alt=""
+            className="h-24 w-16 shrink-0 rounded-lg object-cover"
+          />
+        ) : (
+          <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-[#155EEF]">
+            <BookOpen className="h-6 w-6" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-semibold text-slate-900">{book.book.title}</p>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${availability.tone}`}
+            >
+              {availability.label}
+            </span>
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-600">
+            <div>
+              <dt className="text-slate-400">Author</dt>
+              <dd>{book.book.author || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Accession No.</dt>
+              <dd className="font-mono">{book.book.accessionNo}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">ISBN</dt>
+              <dd>{book.book.isbn || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Publisher</dt>
+              <dd>{book.book.publisher || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Edition</dt>
+              <dd>{book.book.edition || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Category</dt>
+              <dd>{book.book.category || copyTypeName(book.copy.copyType)}</dd>
+            </div>
+            <div className="col-span-2">
+              <dt className="text-slate-400">Shelf / Rack</dt>
+              <dd>{shelf || book.book.location || '—'}</dd>
+            </div>
+          </dl>
           {book.issueAllowed === false && book.issueMessage ? (
-            <p className="mt-1 font-medium text-rose-700">{book.issueMessage}</p>
+            <p className="mt-2 text-xs font-medium text-rose-700">{book.issueMessage}</p>
           ) : null}
-          <p>
-            Call no. {book.book.callNumber || 'Not recorded'} ·{' '}
-            {book.book.category || 'No category'}
-          </p>
-          <p>
-            ISBN {book.book.isbn || 'Not recorded'} ·{' '}
-            {book.book.publisher || 'Publisher not recorded'} ·{' '}
-            {book.book.edition || 'Edition not recorded'}
-          </p>
-          <p>Location {book.book.location || 'Not recorded'}</p>
         </div>
-        <span
-          className={
-            available
-              ? 'rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-800'
-              : 'rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-900'
-          }
-        >
-          {book.copy.status}
-        </span>
       </div>
     </div>
   );
@@ -1641,7 +1776,7 @@ function LoanList({
   onReprint?: (loan: LibraryLoan) => void;
 }) {
   return (
-    <section className="rounded-xl border bg-white p-4 shadow-sm">
+    <section className="rounded-[18px] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
       <h2 className="text-sm font-semibold">{title}</h2>
       {loans.length ? (
         <table className="mt-2 w-full text-left text-sm">
@@ -1691,7 +1826,7 @@ function LoanList({
 
 function Summary({ title, rows }: { title: string; rows: [string, string][] }) {
   return (
-    <section className="rounded-xl border bg-white p-4 text-sm shadow-sm">
+    <section className="rounded-[18px] bg-white p-4 text-sm shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
       <h2 className="font-semibold">{title}</h2>
       <dl className="mt-2 space-y-1">
         {rows.map(([label, value]) => (

@@ -176,7 +176,8 @@ export type LibraryDashboard = {
   recentActivity?: LibraryActivityItem[];
   attention?: LibraryAttention;
   departments?: LibraryDepartmentCollection;
-  period?: 'today' | 'week' | 'month';
+  collection?: LibraryCollectionMix;
+  period?: 'today' | 'week' | 'month' | 'year';
   entryAnalytics?: LibraryEntryAnalytics;
 };
 
@@ -212,6 +213,19 @@ export type LibraryAttention = {
   duplicateGroups: number;
   unprintedLocal: number;
   printHistoryUnknown: number;
+};
+
+export type LibraryCollectionSlice = {
+  key: 'textbooks' | 'reference' | 'journals' | 'other';
+  label: string;
+  copies: number;
+  percent: number;
+  categoryId: string | null;
+};
+
+export type LibraryCollectionMix = {
+  totalCopies: number;
+  slices: LibraryCollectionSlice[];
 };
 
 export type LibraryDepartmentCollection = {

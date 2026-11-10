@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { EnterpriseSidebar } from '@/components/layout/enterprise-sidebar';
 import { EnterpriseTopbar } from '@/components/layout/enterprise-topbar';
@@ -35,7 +36,22 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const collapsed = useDashboardUiStore((s) => s.sidebarCollapsed);
+  const pathname = usePathname() ?? '';
   const showPageHeader = pageHeader !== false && Boolean(title) && role === 'admin';
+  const libraryModule = role === 'admin' && pathname.startsWith('/admin/library');
+
+  if (libraryModule) {
+    return (
+      <ErpPageLayoutProvider shellTitle={title}>
+        <div className="px-4 py-4 sm:px-5 lg:px-6">
+          {showPageHeader && pathname !== '/admin/library' ? (
+            <h1 className="mb-4 text-lg font-semibold tracking-tight text-slate-900">{title}</h1>
+          ) : null}
+          {children}
+        </div>
+      </ErpPageLayoutProvider>
+    );
+  }
 
   if (role === 'admin') {
     return (

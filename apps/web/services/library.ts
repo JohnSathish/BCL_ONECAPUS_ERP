@@ -44,7 +44,7 @@ import type {
 
 const base = '/v1/library';
 
-export const fetchLibraryDashboard = (period: 'today' | 'week' | 'month' = 'today') =>
+export const fetchLibraryDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'today') =>
   api.get<LibraryDashboard>(`${base}/dashboard`, { params: { period } }).then((r) => r.data);
 
 export const fetchLibraryDashboardActivity = (
@@ -66,8 +66,12 @@ export type LibraryDashboardUsage = {
   topBooks: { bookId: string; title: string; issues: number; share: number }[];
 };
 
-export const fetchLibraryDashboardUsage = (params: { days?: number; from?: string; to?: string }) =>
-  api.get<LibraryDashboardUsage>(`${base}/dashboard/usage`, { params }).then((r) => r.data);
+export const fetchLibraryDashboardUsage = (params: {
+  days?: number;
+  from?: string;
+  to?: string;
+  span?: 'year';
+}) => api.get<LibraryDashboardUsage>(`${base}/dashboard/usage`, { params }).then((r) => r.data);
 
 export const fetchLibraryMemberSummary = (scanCode: string) =>
   api
