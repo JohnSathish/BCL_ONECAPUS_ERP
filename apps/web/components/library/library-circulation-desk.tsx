@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   Barcode,
+  CheckCircle2,
   BookOpen,
   Calendar,
   History,
@@ -665,10 +666,27 @@ export function LibraryCirculationDesk() {
       </div>
 
       {notice ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-          <p>{notice}</p>
-          {lastReceipt ? (
-            <Button type="button" variant="outline" onClick={() => printIssueReceipt(lastReceipt)}>
+        <div
+          className={
+            notice.startsWith('Issued ')
+              ? 'flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-700 bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm'
+              : notice.startsWith('Returned ')
+                ? 'flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-700 bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm'
+                : 'flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950'
+          }
+        >
+          <p className="flex items-center gap-2">
+            {notice.startsWith('Issued ') ? <CheckCircle2 className="h-5 w-5 shrink-0" /> : null}
+            {notice.startsWith('Returned ') ? <RotateCcw className="h-5 w-5 shrink-0" /> : null}
+            {notice}
+          </p>
+          {lastReceipt && notice.startsWith('Issued ') ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="border-white bg-white text-emerald-800 hover:bg-emerald-50"
+              onClick={() => printIssueReceipt(lastReceipt)}
+            >
               Print receipt
             </Button>
           ) : null}
@@ -1080,14 +1098,14 @@ export function LibraryCirculationDesk() {
       ) : null}
 
       {tab === 'return' ? (
-        <section className="rounded-[18px] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
-          <h2 className="text-sm font-semibold">Scan the returned book</h2>
+        <section className="rounded-[18px] border border-orange-200 bg-orange-50/70 p-4 shadow-[0_8px_24px_rgba(154,52,18,0.06)]">
+          <h2 className="text-sm font-semibold text-orange-950">Scan the returned book</h2>
           <div className="mt-3 flex gap-2">
             <div className="relative min-w-0 flex-1">
-              <Barcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Barcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-orange-500" />
               <Input
                 ref={returnRef}
-                className="h-10 border-slate-200 bg-[#F4F7FC] pl-9 text-sm"
+                className="h-10 border-orange-200 bg-white pl-9 text-sm"
                 placeholder="Book barcode or accession number"
                 value={returnCode}
                 onChange={(event) => setReturnCode(event.target.value)}
@@ -1098,7 +1116,7 @@ export function LibraryCirculationDesk() {
             </div>
             <Button
               type="button"
-              className="h-10 shrink-0 bg-[#155EEF] px-4 hover:bg-blue-700"
+              className="h-10 shrink-0 bg-orange-600 px-4 hover:bg-orange-700"
               onClick={() => void loadReturn(returnCode)}
             >
               Find loan
@@ -1106,8 +1124,8 @@ export function LibraryCirculationDesk() {
           </div>
           {returnPreview ? (
             <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr_0.7fr]">
-              <div className="space-y-1.5 rounded-xl border border-slate-200 p-4 text-sm">
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="space-y-1.5 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-700">
                   Borrower Information
                 </h3>
                 <p className="text-base font-semibold text-slate-900">
@@ -1117,7 +1135,7 @@ export function LibraryCirculationDesk() {
                   {returnPreview.member?.registrationNumber || 'No ID'}
                   {returnPreview.member?.department ? ` · ${returnPreview.member.department}` : ''}
                 </p>
-                <div className="my-2 border-t" />
+                <div className="my-2 border-t border-sky-200" />
                 <p className="font-medium text-slate-900">{returnPreview.book.title}</p>
                 <p className="text-slate-600">
                   Accession {returnPreview.book.accessionNo} ·{' '}
@@ -1144,8 +1162,8 @@ export function LibraryCirculationDesk() {
                 </p>
               </div>
 
-              <div className="space-y-3 rounded-xl border border-slate-200 p-4 text-sm">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="space-y-3 rounded-xl border border-orange-200 bg-white p-4 text-sm">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-orange-700">
                   Return Information
                 </h3>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -1240,12 +1258,17 @@ export function LibraryCirculationDesk() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Button type="button" disabled={busy} onClick={() => void confirmReturn('return')}>
+                <Button
+                  type="button"
+                  className="bg-orange-600 hover:bg-orange-700"
+                  disabled={busy}
+                  onClick={() => void confirmReturn('return')}
+                >
                   Confirm Return
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
+                  className="bg-emerald-600 hover:bg-emerald-700"
                   disabled={busy || returnPreview.projectedFine <= 0}
                   onClick={() => void confirmReturn('pay')}
                 >
@@ -1254,6 +1277,7 @@ export function LibraryCirculationDesk() {
                 <Button
                   type="button"
                   variant="outline"
+                  className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
                   disabled={busy || returnPreview.projectedFine <= 0}
                   onClick={() => void confirmReturn('return')}
                 >
@@ -1261,7 +1285,8 @@ export function LibraryCirculationDesk() {
                 </Button>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
+                  className="border-rose-200 bg-white text-rose-700 hover:bg-rose-50"
                   disabled={busy || returnPreview.projectedFine <= 0}
                   onClick={() => void confirmReturn('waive')}
                 >
