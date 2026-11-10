@@ -524,7 +524,7 @@ export function LibraryAccessionEntryForm({ onOpenQueue }: { onOpenQueue: () => 
               ref={coverInput}
               type="file"
               accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5"
+              className="block w-full cursor-pointer rounded-md border border-slate-300 bg-slate-50 px-1 py-1 text-sm font-medium text-slate-800 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-[#155EEF] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-[#124fd0]"
               onChange={(event) => chooseCover(event.target.files?.[0] ?? null)}
             />
             <span className="block text-xs text-slate-500">
