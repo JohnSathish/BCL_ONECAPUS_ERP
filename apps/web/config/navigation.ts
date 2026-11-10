@@ -2560,6 +2560,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['mobile:settings:read', 'mobile:settings:manage'],
           },
           {
+            label: 'App Installation Report',
+            href: '/admin/administration/app-installation-report',
+            permissions: ['mobile:settings:read', 'mobile:settings:manage'],
+          },
+          {
             label: 'Payment Gateway Management',
             href: '/admin/administration/payment-gateway',
             permissions: ['payment-gateway:read', 'payment-gateway:manage', 'fees:manage'],

@@ -19,6 +19,7 @@ import {
   ScrollText,
   Server,
   Shield,
+  Smartphone,
   ShieldCheck,
   UserCheck,
   UserPlus,
@@ -170,6 +171,13 @@ const MODULES: Array<{
     icon: Shield,
     desc: 'Manage active sessions, devices & policies.',
     accent: 'sky',
+  },
+  {
+    href: '/admin/administration/app-installation-report',
+    label: 'App Installation Report',
+    icon: Smartphone,
+    desc: 'Department-wise mobile app installation status for the notice board.',
+    accent: 'teal',
   },
   {
     href: '/admin/administration/audit-logs',

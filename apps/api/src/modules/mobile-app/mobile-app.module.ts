@@ -6,6 +6,8 @@ import { TenantsModule } from '../tenants/tenants.module';
 import { StudentsModule } from '../students/students.module';
 import { StaffModule } from '../staff/staff.module';
 import { MobileAppController } from './mobile-app.controller';
+import { AppInstallationReportController } from './app-installation-report.controller';
+import { AppInstallationReportService } from './app-installation-report.service';
 import { MobileAppSettingsService } from './mobile-app-settings.service';
 import { MobileDeviceService } from './mobile-device.service';
 import { MobileAnalyticsService } from './mobile-analytics.service';
@@ -23,7 +25,11 @@ import { AppUpdatePolicyService } from './app-update-policy.service';
     forwardRef(() => StudentsModule),
     forwardRef(() => StaffModule),
   ],
-  controllers: [MobileAppController, AppUpdateController],
+  controllers: [
+    MobileAppController,
+    AppUpdateController,
+    AppInstallationReportController,
+  ],
   providers: [
     AppUpdatePolicyService,
     MobileAppSettingsService,
@@ -31,6 +37,7 @@ import { AppUpdatePolicyService } from './app-update-policy.service';
     MobileAnalyticsService,
     MobileHomeService,
     MobileSessionService,
+    AppInstallationReportService,
     MobileAppGateInterceptor,
     { provide: APP_INTERCEPTOR, useClass: MobileAppGateInterceptor },
   ],
