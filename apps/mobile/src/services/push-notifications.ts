@@ -1,13 +1,16 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { Alert, AppState, Linking, Platform } from 'react-native';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as SecureStore from 'expo-secure-store';
+import { Alert, AppState, Linking, PermissionsAndroid, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { apiFetch } from '@/api/client';
 import { getDeviceId } from '@/auth/device';
 import { getSchoolConfig } from '@/auth/school-config';
 import { isSchoolSisConfig } from '@/auth/school-product';
 import { getAccessToken, getStoredAppType, getUserSnapshot } from '@/auth/session';
+import { APP_VERSION } from '@/constants/release';
 import {
   resolveMobileDeepLink,
   fallbackNotificationCenter,
@@ -76,13 +79,138 @@ export async function ensureAndroidDefaultChannel() {
   });
 }
 
-export async function requestPushPermissions(): Promise<boolean> {
-  if (!Device.isDevice && Platform.OS === 'ios') {
+const SETTINGS_HINT_KEY = 'push.notification.settingsHintVersion';
+/**
+ * Ask only after the activity is resumed and the native splash window is gone.
+ * Asking on the first tick makes Android 13+ and iOS drop the dialog and treat
+ * the request as finished, so a fresh install or an update never shows it.
+ */
+const PERMISSION_PROMPT_DELAY_MS = 800;
+
+let permissionRequest: Promise<boolean> | null = null;
+let promptedThisSession = false;
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitUntilAppIsActive() {
+  if (AppState.currentState === 'active') return;
+  await new Promise<void>((resolve) => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      sub.remove();
+      resolve();
+    });
+  });
+}
+
+async function waitForPermissionHost() {
+  await waitUntilAppIsActive();
+  await delay(PERMISSION_PROMPT_DELAY_MS);
+}
+
+function androidPackageName() {
+  return Constants.expoConfig?.android?.package ?? 'edu.onecampus.mobile';
+}
+
+async function openNotificationSettings() {
+  if (Platform.OS === 'android') {
+    try {
+      await IntentLauncher.startActivityAsync(
+        IntentLauncher.ActivityAction.APP_NOTIFICATION_SETTINGS,
+        {
+          data: `package:${androidPackageName()}`,
+          extra: {
+            'android.provider.extra.APP_PACKAGE': androidPackageName(),
+          },
+        },
+      );
+      return;
+    } catch (err) {
+      console.warn('[push] notification settings intent failed', err);
+    }
+  }
+  await Linking.openSettings().catch(() => undefined);
+}
+
+/** One explanation per installed version when the OS will not show its own dialog. */
+async function offerNotificationSettingsOnce() {
+  try {
+    const seen = await SecureStore.getItemAsync(SETTINGS_HINT_KEY);
+    if (seen === APP_VERSION) return;
+    await SecureStore.setItemAsync(SETTINGS_HINT_KEY, APP_VERSION);
+  } catch (err) {
+    console.warn('[push] could not remember settings hint', err);
+    return;
+  }
+  Alert.alert(
+    'Allow notifications',
+    'Turn on notifications so college notices, reminders, and messages reach this phone.',
+    [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Open Settings', onPress: () => void openNotificationSettings() },
+    ],
+  );
+}
+
+async function readNotificationPermission() {
+  try {
+    return await Notifications.getPermissionsAsync();
+  } catch (err) {
+    console.warn('[push] getPermissionsAsync failed', err);
+    return null;
+  }
+}
+
+async function requestAndroidNotificationPermission(): Promise<boolean> {
+  if (Number(Platform.Version) < 33) {
+    const current = await readNotificationPermission();
+    if (current && alertsAllowed(current)) return true;
+    promptedThisSession = true;
+    await offerNotificationSettingsOnce();
     return false;
   }
-  await ensureAndroidDefaultChannel();
-  const current = await Notifications.getPermissionsAsync();
-  if (alertsAllowed(current)) return true;
+
+  if (promptedThisSession) {
+    const current = await readNotificationPermission();
+    return Boolean(current && alertsAllowed(current));
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const result = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+      );
+      promptedThisSession = true;
+      if (result === PermissionsAndroid.RESULTS.GRANTED) return true;
+      if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+        await offerNotificationSettingsOnce();
+      }
+      return false;
+    } catch (err) {
+      console.warn('[push] Android notification permission request failed', err);
+      await waitUntilAppIsActive();
+      await delay(700);
+    }
+  }
+  return false;
+}
+
+async function requestIosNotificationPermission(): Promise<boolean> {
+  if (promptedThisSession) {
+    const current = await readNotificationPermission();
+    return Boolean(current && alertsAllowed(current));
+  }
+
+  const current = await readNotificationPermission();
+  if (current && alertsAllowed(current)) return true;
+  if (current && current.status !== 'undetermined' && current.canAskAgain === false) {
+    promptedThisSession = true;
+    await offerNotificationSettingsOnce();
+    return false;
+  }
+
   const asked = await Notifications.requestPermissionsAsync({
     ios: {
       allowAlert: true,
@@ -90,7 +218,48 @@ export async function requestPushPermissions(): Promise<boolean> {
       allowSound: true,
     },
   });
+  promptedThisSession = true;
   return alertsAllowed(asked);
+}
+
+async function requestPushPermissionsOnce(): Promise<boolean> {
+  if (!Device.isDevice && Platform.OS === 'ios') {
+    return false;
+  }
+
+  const current = await readNotificationPermission();
+  if (current && alertsAllowed(current)) return true;
+  if (promptedThisSession) return false;
+
+  await waitForPermissionHost();
+  await ensureAndroidDefaultChannel();
+
+  const ready = await readNotificationPermission();
+  if (ready && alertsAllowed(ready)) return true;
+
+  if (Platform.OS === 'android') {
+    return requestAndroidNotificationPermission();
+  }
+  return requestIosNotificationPermission();
+}
+
+/**
+ * Shows the system notification dialog once the activity is in the foreground.
+ * A later call in the same session only re-reads the grant, so opening Settings
+ * and coming back can still register the device.
+ */
+export function requestPushPermissions(): Promise<boolean> {
+  if (!permissionRequest) {
+    permissionRequest = requestPushPermissionsOnce()
+      .catch((err) => {
+        console.warn('[push] permission request failed', err);
+        return false;
+      })
+      .finally(() => {
+        permissionRequest = null;
+      });
+  }
+  return permissionRequest;
 }
 
 /**

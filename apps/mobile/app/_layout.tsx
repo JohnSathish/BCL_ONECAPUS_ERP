@@ -28,6 +28,8 @@ export default function RootLayout() {
 
     try {
       void ensureAndroidDefaultChannel();
+      // Waits until the splash window is gone. Asking here on the first tick
+      // makes Android 13+ and iOS drop the permission dialog.
       void requestPushPermissions();
       attachPushResponseListener();
       void refreshPushRegistrationIfLoggedIn();
