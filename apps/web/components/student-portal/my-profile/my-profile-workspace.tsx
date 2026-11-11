@@ -1156,12 +1156,19 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
     }>
   >(
     (exam?.subjectMarks ?? []).length
-      ? (exam?.subjectMarks ?? []).map((s: any) => ({
-          subjectName: s.subjectName ?? '',
-          marksObtained: s.marksObtained ?? undefined,
-          maxMarks: s.maxMarks ?? 100,
-          grade: s.grade ?? '',
-        }))
+      ? (exam?.subjectMarks ?? []).map((s: any) => {
+          const storedMax = s.maxMarks == null ? 100 : Number(s.maxMarks);
+          const obtainedEmpty = s.marksObtained == null || s.marksObtained === '';
+          return {
+            subjectName: s.subjectName ?? '',
+            marksObtained:
+              obtainedEmpty && storedMax !== 100 && storedMax > 0
+                ? storedMax
+                : (s.marksObtained ?? undefined),
+            maxMarks: 100,
+            grade: s.grade ?? '',
+          };
+        })
       : Array.from({ length: 5 }, () => ({
           subjectName: '',
           marksObtained: undefined,
@@ -1197,6 +1204,9 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
       if (new Set(names).size !== names.length) {
         throw new Error('Duplicate subjects are not allowed');
       }
+      if (named.some((s) => s.marksObtained == null || s.marksObtained === ('' as never))) {
+        throw new Error('Enter the marks obtained for every subject. The total is fixed at 100.');
+      }
       return upsertMyClassXii({
         boardName: form.boardName || null,
         boardNameOther: ['OTHERS', 'OTHER'].includes(form.boardName.trim().toUpperCase())
@@ -1214,7 +1224,7 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
         subjects: named.map((s) => ({
           subjectName: s.subjectName,
           marksObtained: s.marksObtained ?? null,
-          maxMarks: s.maxMarks ?? null,
+          maxMarks: 100,
           grade: s.grade || null,
         })),
       });
@@ -1308,6 +1318,7 @@ function ClassXiiForm({ bootstrap, onDirty, onDone, onDraft, refresh }: FormShel
             setForm((p) => ({ ...p, stream }));
             onDirty();
           }}
+          lockMaxMarks
           onSubjectMarksChange={(rows) => {
             setSubjects(rows);
             onDirty();

@@ -38,6 +38,8 @@ type Props = {
    * Excel-imported students did not enter Class XII marks — allow empty / free text.
    */
   requireCatalog?: boolean;
+  /** Students cannot change the out-of mark. Class XII subjects are out of 100. */
+  lockMaxMarks?: boolean;
   className?: string;
   inputClassName?: string;
   appearance?: 'stack' | 'table';
@@ -169,6 +171,7 @@ export function ClassXiiSubjectMarksEditor({
   showBoardSelect = true,
   minSubjects = 5,
   requireCatalog = true,
+  lockMaxMarks = false,
   className,
   inputClassName = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm',
   appearance = 'stack',
@@ -218,7 +221,9 @@ export function ClassXiiSubjectMarksEditor({
   }, [subjectMarks]);
 
   function updateRow(idx: number, patch: Partial<ClassXiiSubjectMarkRow>) {
-    const next = subjectMarks.map((row, i) => (i === idx ? { ...row, ...patch } : row));
+    const next = subjectMarks.map((row, i) =>
+      i === idx ? { ...row, ...patch, ...(lockMaxMarks ? { maxMarks: 100 } : {}) } : row,
+    );
     onSubjectMarksChange(next);
   }
 
@@ -364,18 +369,24 @@ export function ClassXiiSubjectMarksEditor({
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <input
-                        className={inputClassName}
-                        type="number"
-                        placeholder="Max"
-                        disabled={disabled}
-                        value={row.maxMarks ?? ''}
-                        onChange={(e) =>
-                          updateRow(idx, {
-                            maxMarks: e.target.value === '' ? undefined : Number(e.target.value),
-                          })
-                        }
-                      />
+                      {lockMaxMarks ? (
+                        <span className="inline-flex h-10 items-center px-1 text-sm font-semibold text-muted-foreground">
+                          / 100
+                        </span>
+                      ) : (
+                        <input
+                          className={inputClassName}
+                          type="number"
+                          placeholder="Max"
+                          disabled={disabled}
+                          value={row.maxMarks ?? ''}
+                          onChange={(e) =>
+                            updateRow(idx, {
+                              maxMarks: e.target.value === '' ? undefined : Number(e.target.value),
+                            })
+                          }
+                        />
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <button
@@ -421,18 +432,24 @@ export function ClassXiiSubjectMarksEditor({
                   })
                 }
               />
-              <input
-                className={inputClassName}
-                type="number"
-                placeholder="Max"
-                disabled={disabled}
-                value={row.maxMarks ?? ''}
-                onChange={(e) =>
-                  updateRow(idx, {
-                    maxMarks: e.target.value === '' ? undefined : Number(e.target.value),
-                  })
-                }
-              />
+              {lockMaxMarks ? (
+                <span className="inline-flex h-10 items-center px-1 text-sm font-semibold text-muted-foreground">
+                  / 100
+                </span>
+              ) : (
+                <input
+                  className={inputClassName}
+                  type="number"
+                  placeholder="Max"
+                  disabled={disabled}
+                  value={row.maxMarks ?? ''}
+                  onChange={(e) =>
+                    updateRow(idx, {
+                      maxMarks: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                />
+              )}
               <button
                 type="button"
                 className="inline-flex h-10 items-center justify-center rounded-md border border-border px-2 text-destructive disabled:opacity-40"

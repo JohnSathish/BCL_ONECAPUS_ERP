@@ -236,12 +236,21 @@ export default function CompleteProfileScreen() {
       grade: String(exam?.grade ?? ''),
       division: String(exam?.division ?? ''),
     });
-    const rows = (exam?.subjectMarks ?? []).map((s: any) => ({
-      subjectName: String(s.subjectName ?? ''),
-      marksObtained: s.marksObtained != null ? String(s.marksObtained) : '',
-      maxMarks: s.maxMarks != null ? String(s.maxMarks) : '100',
-      grade: String(s.grade ?? ''),
-    }));
+    const rows = (exam?.subjectMarks ?? []).map((s: any) => {
+      const storedMax = s.maxMarks != null ? Number(s.maxMarks) : 100;
+      const obtained =
+        s.marksObtained != null && s.marksObtained !== ''
+          ? String(s.marksObtained)
+          : storedMax !== 100 && storedMax > 0
+            ? String(storedMax)
+            : '';
+      return {
+        subjectName: String(s.subjectName ?? ''),
+        marksObtained: obtained,
+        maxMarks: '100',
+        grade: String(s.grade ?? ''),
+      };
+    });
     setSubjects(
       rows.length >= MIN_CLASS12_SUBJECTS
         ? rows
@@ -603,7 +612,7 @@ export default function CompleteProfileScreen() {
         .map((s) => ({
           subjectName: s.subjectName.trim(),
           marksObtained: s.marksObtained ? Number(s.marksObtained) : null,
-          maxMarks: s.maxMarks ? Number(s.maxMarks) : null,
+          maxMarks: 100,
           grade: s.grade || null,
         }));
       if (subjectPayload.length < MIN_CLASS12_SUBJECTS) {
@@ -612,6 +621,9 @@ export default function CompleteProfileScreen() {
       const names = subjectPayload.map((s) => s.subjectName.toLowerCase());
       if (new Set(names).size !== names.length) {
         throw new Error('Duplicate subjects are not allowed');
+      }
+      if (subjectPayload.some((s) => s.marksObtained == null)) {
+        throw new Error('Enter the marks obtained for every subject. The total is fixed at 100.');
       }
       await upsertMyClassXii({
         boardName: classXii.boardName || null,
@@ -1337,17 +1349,7 @@ export default function CompleteProfileScreen() {
                     setSubjects(next);
                   }}
                 />
-                <TextInput
-                  style={[styles.input, styles.subjectHalf]}
-                  placeholder="Max"
-                  keyboardType="number-pad"
-                  value={row.maxMarks}
-                  onChangeText={(t) => {
-                    const next = [...subjects];
-                    next[idx] = { ...row, maxMarks: t.replace(/\D/g, '') };
-                    setSubjects(next);
-                  }}
-                />
+                <Text style={styles.maxMarksFixed}>/ 100</Text>
                 {subjects.length > MIN_CLASS12_SUBJECTS ? (
                   <Pressable
                     style={styles.removeBtn}
@@ -1734,6 +1736,12 @@ const styles = StyleSheet.create({
   },
   subjectRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   subjectHalf: { flex: 1 },
+  maxMarksFixed: {
+    minWidth: 52,
+    fontSize: 16,
+    fontWeight: '700',
+    color: studentTheme.textMuted,
+  },
   removeBtn: { paddingHorizontal: 8, paddingVertical: 10 },
   removeText: { color: '#DC2626', fontWeight: '700', fontSize: 12 },
   button: {
