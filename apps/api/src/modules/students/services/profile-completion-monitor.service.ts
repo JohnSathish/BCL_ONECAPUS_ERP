@@ -4,6 +4,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { CommunicationSmsService } from '../../communication/services/communication-sms.service';
 import { CommunicationWhatsAppService } from '../../communication/services/communication-whatsapp.service';
 import { FcmPushService } from '../../communication/services/fcm-push.service';
+import { UserNotificationsService } from '../../communication/services/user-notifications.service';
 import { normalizeGenderCode } from '../domain/gender';
 import {
   DEFAULT_PROFILE_REMINDER,
@@ -51,6 +52,7 @@ export class ProfileCompletionMonitorService {
     private readonly whatsapp: CommunicationWhatsAppService,
     private readonly sms: CommunicationSmsService,
     private readonly fcm: FcmPushService,
+    private readonly notifications: UserNotificationsService,
   ) {}
 
   async overview(
@@ -443,7 +445,7 @@ export class ProfileCompletionMonitorService {
         );
         continue;
       }
-      const result = await this.deliver(student, input.channel, body);
+      const result = await this.deliver(tenantId, student, input.channel, body);
       if (result.status === 'SENT') success += 1;
       else failed += 1;
       await this.recordDelivery(
@@ -486,7 +488,9 @@ export class ProfileCompletionMonitorService {
   }
 
   private async deliver(
+    tenantId: string,
     student: {
+      studentId: string;
       mobileNumber: string | null;
       whatsappNumber: string | null;
       userId: string;
@@ -586,27 +590,76 @@ export class ProfileCompletionMonitorService {
           'Firebase Cloud Messaging is not configured, so the notification was not sent.',
       };
     }
-    const result = await this.fcm.sendToTokens(tokens, {
-      title: 'Complete Your Student Profile',
-      body: body.slice(0, 180),
-      data: { type: 'PROFILE_COMPLETION' },
-    });
-    if (
-      result.ok &&
-      result.provider !== 'fcm-demo' &&
-      (result.successCount ?? 0) > 0
-    ) {
+    const title = 'Complete Your Student Profile';
+    const menuLink = '/student/my-profile';
+    const mobilePath = '/(student)/complete-profile';
+    // Write the inbox row before the device push so the in-app menu still has
+    // the message after the system notification bar clears it.
+    const inbox = await this.notifications
+      .createInApp({
+        tenantId,
+        userId: student.userId,
+        type: 'PROFILE_COMPLETION',
+        title,
+        body,
+        link: menuLink,
+        metadata: {
+          source: 'profile_completion_monitor',
+          studentId: student.studentId,
+          mobilePath,
+          category: 'general',
+        },
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Profile reminder was not stored in the notification menu for ${student.userId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return null;
+      });
+    let confirmed = false;
+    try {
+      const result = await this.fcm.sendToTokens(tokens, {
+        title,
+        body: body.slice(0, 180),
+        data: {
+          type: 'PROFILE_COMPLETION',
+          notificationId: inbox?.id ?? '',
+          link: menuLink,
+          mobilePath,
+          category: 'general',
+        },
+      });
+      confirmed =
+        result.ok &&
+        result.provider !== 'fcm-demo' &&
+        (result.successCount ?? 0) > 0;
+      if (confirmed) {
+        return {
+          status: 'SENT',
+          provider: result.provider,
+          providerRef: result.providerRef,
+        };
+      }
       return {
-        status: 'SENT',
+        status: 'FAILED',
         provider: result.provider,
-        providerRef: result.providerRef,
+        error: result.error || 'Push notification was not confirmed.',
       };
+    } finally {
+      if (!confirmed && inbox?.id) {
+        await this.prisma.userNotification
+          .delete({ where: { id: inbox.id } })
+          .catch((error: unknown) => {
+            this.logger.warn(
+              `Could not remove unsent profile reminder ${inbox.id}: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          });
+      }
     }
-    return {
-      status: 'FAILED',
-      provider: result.provider,
-      error: result.error || 'Push notification was not confirmed.',
-    };
   }
 
   private recordDelivery(
