@@ -113,7 +113,15 @@ export function DemoAccountsPage() {
             ))}
           </ul>
         </div>
-      ) : null}
+      ) : (
+        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+          <p className="font-medium">Sign in with these accounts</p>
+          <ul className="mt-2 space-y-1">
+            <li>Student DEMO-STUDENT · DemoStudent@2026</li>
+            <li>Staff DEMO-STAFF · DemoStaff@2026</li>
+          </ul>
+        </div>
+      )}
       {notice ? (
         <p className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
           {notice}

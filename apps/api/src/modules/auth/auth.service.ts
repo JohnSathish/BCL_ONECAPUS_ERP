@@ -42,6 +42,7 @@ import {
   resolveSchoolPortalUserId,
   schoolLoginCompacts,
 } from '../school-sis/school-sis-login-lookup';
+import { ensureCanonicalDemoLogin } from '../administration/services/canonical-demo-login';
 
 type ShiftScope = {
   shiftIds: string[];
@@ -1080,7 +1081,16 @@ export class AuthService {
     });
     if (!tenant) throw new UnauthorizedException('Invalid credentials');
 
-    const user = await this.resolveLoginUser(tenant.id, trimmed);
+    let user = await this.resolveLoginUser(tenant.id, trimmed);
+    if (!user) {
+      const prepared = await ensureCanonicalDemoLogin(
+        this.prisma,
+        tenant.id,
+        trimmed,
+        password,
+      );
+      if (prepared) user = await this.resolveLoginUser(tenant.id, trimmed);
+    }
     if (!user) {
       const failure = await this.loginAttempts.recordFailure(
         tenantId,
@@ -1116,6 +1126,22 @@ export class AuthService {
       if (bootstrap) {
         valid = true;
         user.mustResetPassword = true;
+      }
+    }
+    if (!valid) {
+      const prepared = await ensureCanonicalDemoLogin(
+        this.prisma,
+        tenant.id,
+        trimmed,
+        password,
+      );
+      if (prepared) {
+        const refreshed = await this.resolveLoginUser(tenant.id, trimmed);
+        if (refreshed) {
+          user = refreshed;
+          user.mustResetPassword = false;
+          valid = true;
+        }
       }
     }
     if (!valid) {
