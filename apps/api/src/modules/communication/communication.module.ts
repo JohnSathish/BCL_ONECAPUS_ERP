@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BirthdayWishesController } from './birthday-wishes.controller';
 import { CommunicationController } from './communication.controller';
 import { CommunicationAnalyticsService } from './services/communication-analytics.service';
 import { CommunicationApprovalService } from './services/communication-approval.service';
@@ -14,6 +15,7 @@ import { CommunicationSchedulerService } from './services/communication-schedule
 import { BirthdayQueryService } from './services/birthday-query.service';
 import { BirthdayNotificationService } from './services/birthday-notification.service';
 import { BirthdaySchedulerService } from './services/birthday-scheduler.service';
+import { BirthdayWishesService } from './services/birthday-wishes.service';
 import { CommunicationSettingsService } from './services/communication-settings.service';
 import { CommunicationTemplateRendererService } from './services/communication-template-renderer.service';
 import { CommunicationTemplatesService } from './services/communication-templates.service';
@@ -26,7 +28,7 @@ import { CommunicationAssetsService } from './services/communication-assets.serv
 import { BrandedEmailLayoutService } from './services/branded-email-layout.service';
 
 @Module({
-  controllers: [CommunicationController],
+  controllers: [CommunicationController, BirthdayWishesController],
   providers: [
     CommunicationTemplatesService,
     CommunicationCampaignsService,
@@ -49,6 +51,7 @@ import { BrandedEmailLayoutService } from './services/branded-email-layout.servi
     BirthdayQueryService,
     BirthdayNotificationService,
     BirthdaySchedulerService,
+    BirthdayWishesService,
     UserNotificationsService,
     CommunicationNotificationProcessor,
     FcmPushService,

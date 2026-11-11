@@ -1,6 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
+import {
+  birthdayChannels,
+  type BirthdayChannel,
+} from '../domain/birthday-calendar';
 import { CommunicationTriggerService } from './communication-trigger.service';
 import { BirthdayQueryService } from './birthday-query.service';
+
+type BirthdayRunOptions = {
+  channels?: BirthdayChannel[];
+  templateCode?: string;
+  notifyPeers?: boolean;
+};
 
 @Injectable()
 export class BirthdayNotificationService {
@@ -11,9 +21,16 @@ export class BirthdayNotificationService {
     private readonly triggers: CommunicationTriggerService,
   ) {}
 
-  async processTenantStudentBirthdays(tenantId: string, year: number) {
+  async processTenantStudentBirthdays(
+    tenantId: string,
+    year: number,
+    options?: BirthdayRunOptions,
+  ) {
     const institutionName = await this.triggers.getInstitutionName(tenantId);
     const birthdays = await this.query.findStudentBirthdaysToday(tenantId);
+    const channels = birthdayChannels(options?.channels);
+    const templateCode = options?.templateCode || 'STUDENT_BIRTHDAY_SELF';
+    const notifyPeers = options?.notifyPeers ?? true;
 
     let selfSent = 0;
     let peerSent = 0;
@@ -21,7 +38,7 @@ export class BirthdayNotificationService {
     for (const birthday of birthdays) {
       const selfResult = await this.triggers.trigger({
         tenantId,
-        templateCode: 'STUDENT_BIRTHDAY_SELF',
+        templateCode,
         triggerKey: `student.birthday.self.${year}.${birthday.studentId}`,
         entityType: 'student_birthday',
         entityId: birthday.studentId,
@@ -31,6 +48,7 @@ export class BirthdayNotificationService {
           studentId: birthday.studentId,
           displayName: birthday.fullName,
           email: birthday.email ?? undefined,
+          phone: birthday.whatsappNumber || birthday.mobileNumber || undefined,
         },
         variables: {
           student_name: birthday.fullName,
@@ -38,9 +56,10 @@ export class BirthdayNotificationService {
           program_name: birthday.programName ?? '',
           department_name: birthday.departmentName ?? '',
         },
-        channels: ['IN_APP', 'PUSH'],
+        channels,
       });
       if (!selfResult.skipped) selfSent += 1;
+      if (!notifyPeers) continue;
 
       const peers = await this.query.findStudentPeers(
         tenantId,
@@ -68,7 +87,7 @@ export class BirthdayNotificationService {
             program_name: birthday.programName ?? '',
             department_name: birthday.departmentName ?? '',
           },
-          channels: ['IN_APP', 'PUSH'],
+          channels,
         });
         if (!peerResult.skipped) peerSent += 1;
       }
@@ -79,9 +98,16 @@ export class BirthdayNotificationService {
     );
   }
 
-  async processTenantStaffBirthdays(tenantId: string, year: number) {
+  async processTenantStaffBirthdays(
+    tenantId: string,
+    year: number,
+    options?: BirthdayRunOptions,
+  ) {
     const institutionName = await this.triggers.getInstitutionName(tenantId);
     const birthdays = await this.query.findStaffBirthdaysToday(tenantId);
+    const channels = birthdayChannels(options?.channels);
+    const templateCode = options?.templateCode || 'STAFF_BIRTHDAY_SELF';
+    const notifyPeers = options?.notifyPeers ?? true;
 
     let selfSent = 0;
     let colleagueSent = 0;
@@ -89,7 +115,7 @@ export class BirthdayNotificationService {
     for (const birthday of birthdays) {
       const selfResult = await this.triggers.trigger({
         tenantId,
-        templateCode: 'STAFF_BIRTHDAY_SELF',
+        templateCode,
         triggerKey: `staff.birthday.self.${year}.${birthday.staffProfileId}`,
         entityType: 'staff_birthday',
         entityId: birthday.staffProfileId,
@@ -99,15 +125,17 @@ export class BirthdayNotificationService {
           staffProfileId: birthday.staffProfileId,
           displayName: birthday.fullName,
           email: birthday.email ?? undefined,
+          phone: birthday.mobile ?? undefined,
         },
         variables: {
           staff_name: birthday.fullName,
           institution_name: institutionName,
           department_name: birthday.departmentName ?? '',
         },
-        channels: ['IN_APP', 'PUSH'],
+        channels,
       });
       if (!selfResult.skipped) selfSent += 1;
+      if (!notifyPeers) continue;
 
       const colleagues = await this.query.findStaffColleagues(
         tenantId,
@@ -134,7 +162,7 @@ export class BirthdayNotificationService {
             institution_name: institutionName,
             department_name: birthday.departmentName ?? '',
           },
-          channels: ['IN_APP', 'PUSH'],
+          channels,
         });
         if (!colleagueResult.skipped) colleagueSent += 1;
       }

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
 import { PrismaService } from '../../../database/prisma.service';
+import { istCalendar } from '../domain/birthday-calendar';
 
 const ACTIVE_REGISTRATION_STATUSES = [
   'submitted',
@@ -16,6 +17,8 @@ export type BirthdayStudentRow = {
   userId: string;
   fullName: string;
   email: string | null;
+  mobileNumber: string | null;
+  whatsappNumber: string | null;
   photoPath: string | null;
   programVersionId: string | null;
   departmentId: string | null;
@@ -29,6 +32,7 @@ export type BirthdayStaffRow = {
   portalUserId: string;
   fullName: string;
   email: string | null;
+  mobile: string | null;
   photoUrl: string | null;
   departmentId: string | null;
   departmentName: string | null;
@@ -67,7 +71,8 @@ export class BirthdayQueryService {
   constructor(private readonly prisma: PrismaService) {}
 
   todayParts(date = new Date()) {
-    return { month: date.getMonth() + 1, day: date.getDate() };
+    const parts = istCalendar(date);
+    return { month: parts.month, day: parts.day, year: parts.year };
   }
 
   async findStudentBirthdaysToday(
@@ -81,6 +86,8 @@ export class BirthdayQueryService {
         s.user_id AS "userId",
         sp.full_name AS "fullName",
         sp.email AS email,
+        sp.mobile_number AS "mobileNumber",
+        sp.whatsapp_number AS "whatsappNumber",
         sp.photo_path AS "photoPath",
         s.program_version_id AS "programVersionId",
         s.department_id AS "departmentId",
@@ -114,6 +121,7 @@ export class BirthdayQueryService {
         sp.portal_user_id AS "portalUserId",
         sp.full_name AS "fullName",
         sp.email AS email,
+        sp.mobile AS mobile,
         sp.photo_url AS "photoUrl",
         sp.department_id AS "departmentId",
         d.name AS "departmentName"

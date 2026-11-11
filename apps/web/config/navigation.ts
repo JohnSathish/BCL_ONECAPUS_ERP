@@ -1880,6 +1880,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: [...P.communication],
           },
           {
+            label: 'Birthday Wishes',
+            href: '/admin/communication/birthdays',
+            permissions: [...P.communication],
+          },
+          {
             label: 'Audience Builder',
             href: '/admin/communication/audience',
             permissions: [...P.communication],

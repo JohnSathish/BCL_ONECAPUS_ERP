@@ -11,6 +11,7 @@ export const COMM_CENTER_NAV = [
   { label: 'SMS Center', href: '/admin/communication/sms', icon: 'MessageSquare' },
   { label: 'WhatsApp', href: '/admin/communication/whatsapp', icon: 'Phone' },
   { label: 'Push Center', href: '/admin/communication/push', icon: 'Smartphone' },
+  { label: 'Birthday Wishes', href: '/admin/communication/birthdays', icon: 'Cake' },
   { label: 'Logs', href: '/admin/communication/logs', icon: 'ScrollText' },
   { label: 'Reports', href: '/admin/communication/reports', icon: 'FileBarChart' },
   { label: 'Failed', href: '/admin/communication/failed', icon: 'AlertTriangle' },
