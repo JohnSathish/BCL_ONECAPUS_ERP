@@ -116,6 +116,27 @@ export class CommunicationDeliveryService {
     const total = await this.prisma.communicationRecipient.count({
       where: { tenantId, campaignId },
     });
+    const notice = await this.prisma.communicationCampaign.findFirst({
+      where: { id: campaignId, tenantId },
+      select: { subject: true, bodyText: true, bodyHtml: true },
+    });
+    if (notice && total) {
+      const plain =
+        notice.bodyText?.trim() ||
+        notice.bodyHtml
+          ?.replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim() ||
+        notice.subject;
+      await this.notifications.copyToDemoStudent({
+        tenantId,
+        type: 'CAMPAIGN',
+        title: notice.subject,
+        body: plain,
+        campaignId,
+        metadata: { source: 'campaign' },
+      });
+    }
     if (!total) {
       await this.prisma.communicationCampaign.update({
         where: { id: campaignId },

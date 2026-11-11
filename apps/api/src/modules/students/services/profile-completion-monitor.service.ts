@@ -413,6 +413,20 @@ export class ProfileCompletionMonitorService {
     let success = 0;
     let failed = 0;
     let skipped = 0;
+    await this.notifications.copyToDemoStudent({
+      tenantId,
+      type: 'PROFILE_COMPLETION',
+      title: 'Complete Your Student Profile',
+      body: input.message,
+      link: '/student/my-profile',
+      metadata: {
+        source: 'profile_completion_monitor',
+        channel: input.channel,
+        audience: input.audience,
+        mobilePath: '/(student)/complete-profile',
+        category: 'general',
+      },
+    });
     const since = new Date(Date.now() - intervalHours * 60 * 60 * 1000);
     for (const student of recipients) {
       const recent = await this.prisma.profileReminderDelivery.findFirst({

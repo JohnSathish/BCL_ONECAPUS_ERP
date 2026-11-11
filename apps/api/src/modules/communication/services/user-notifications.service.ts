@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -62,6 +63,8 @@ function canViewAdminOpsNotifications(user: JwtUser): boolean {
 
 @Injectable()
 export class UserNotificationsService {
+  private readonly logger = new Logger(UserNotificationsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   private mapRow<
@@ -289,7 +292,7 @@ export class UserNotificationsService {
       ? sanitizeNotificationLink(roles, input.link)
       : undefined;
 
-    return this.prisma.userNotification.create({
+    const created = await this.prisma.userNotification.create({
       data: {
         tenantId: input.tenantId,
         userId: input.userId,
@@ -301,6 +304,100 @@ export class UserNotificationsService {
         metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
       },
     });
+    if (!input.metadata?.demoCopy) {
+      await this.copyToDemoStudent({
+        ...input,
+        sourceUserId: input.userId,
+      });
+    }
+    return created;
+  }
+
+  /**
+   * One copy of a notice or outbound message for the published demo student,
+   * so that login can see what was sent to students and staff.
+   */
+  async copyToDemoStudent(input: {
+    tenantId: string;
+    type: string;
+    title: string;
+    body: string;
+    link?: string;
+    campaignId?: string;
+    sourceUserId?: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    try {
+      const meta = input.metadata ?? {};
+      const entityType = String(meta.entityType ?? '');
+      const triggerKey = String(meta.triggerKey ?? meta.trigger ?? '');
+      if (
+        ADMIN_OPS_ENTITY_TYPES.has(entityType) ||
+        triggerKey.startsWith('backup.') ||
+        triggerKey.startsWith('security.') ||
+        input.type === 'SECURITY_ALERT'
+      ) {
+        return;
+      }
+      const demo = await this.prisma.user.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          accountType: 'DEMO',
+          deletedAt: null,
+          isActive: true,
+          OR: [
+            { username: { equals: 'DEMO-STUDENT', mode: 'insensitive' } },
+            {
+              email: {
+                equals: 'demo-student@demo.onecampus.invalid',
+                mode: 'insensitive',
+              },
+            },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!demo || demo.id === input.sourceUserId) return;
+
+      const title = sanitizeNotificationText(input.title).slice(0, 300);
+      const body = sanitizeNotificationText(input.body).slice(0, 4000);
+      if (!title && !body) return;
+
+      const existing = await this.prisma.userNotification.findFirst({
+        where: {
+          tenantId: input.tenantId,
+          userId: demo.id,
+          type: input.type,
+          title: title || 'Notice',
+          createdAt: { gte: new Date(Date.now() - 15 * 60 * 1000) },
+        },
+        select: { id: true },
+      });
+      if (existing) return;
+
+      const roles = await this.userRoleSlugs(input.tenantId, demo.id);
+      const safeLink = input.link
+        ? sanitizeNotificationLink(roles, input.link)
+        : undefined;
+      await this.prisma.userNotification.create({
+        data: {
+          tenantId: input.tenantId,
+          userId: demo.id,
+          type: input.type,
+          title: title || 'Notice',
+          body,
+          link: safeLink,
+          campaignId: input.campaignId,
+          metadata: { ...meta, demoCopy: true } as Prisma.InputJsonValue,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Demo student notice copy failed: ${
+          error instanceof Error ? error.name : 'error'
+        }`,
+      );
+    }
   }
 
   private async userRoleSlugs(tenantId: string, userId: string) {
