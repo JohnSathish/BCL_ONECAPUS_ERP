@@ -184,7 +184,11 @@ export function CollectionReportsWorkspace() {
           </div>
           {departments.length ? (
             <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                initialDimension={{ width: 320, height: 180 }}
+              >
                 {chart === 'bar' ? (
                   <BarChart data={departments} layout="vertical" margin={{ left: 16 }}>
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
@@ -218,7 +222,11 @@ export function CollectionReportsWorkspace() {
             <div>
               <div className="grid items-center gap-3 sm:grid-cols-[180px_1fr]">
                 <div className="relative h-44">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    initialDimension={{ width: 320, height: 180 }}
+                  >
                     <PieChart>
                       <Pie
                         data={status.filter((row) => row.value > 0)}

@@ -621,6 +621,7 @@ export class StudentDirectoryEnrichmentService {
         ON st.student_id = s.id AND st.tenant_id = s.tenant_id
       WHERE s.tenant_id = ${tenantId}::uuid
         AND s.deleted_at IS NULL
+        AND s.account_type = 'NORMAL'
         AND NOT EXISTS (
           SELECT 1
           FROM academic.semester_registrations sr

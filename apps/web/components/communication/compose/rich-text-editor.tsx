@@ -56,7 +56,7 @@ export function RichTextEditor({ value, onChange, className, onUploadImage }: Pr
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({ link: false }),
       Link.configure({ openOnClick: false }),
       Image.configure({
         inline: false,

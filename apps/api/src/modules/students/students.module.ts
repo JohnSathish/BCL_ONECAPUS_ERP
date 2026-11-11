@@ -48,6 +48,7 @@ import { StudentPortalController } from './student-portal.controller';
 import { StudentsService } from './students.service';
 import { FyugpReadmissionService } from './services/fyugp-readmission.service';
 import { StudentPortalService } from './services/student-portal.service';
+import { StudentBirthdayPopupService } from './services/student-birthday-popup.service';
 import { StudentPortalCalendarService } from './services/student-portal-calendar.service';
 import { StudentPortalProfileService } from './services/student-portal-profile.service';
 import { StudentLeaveService } from './services/student-leave.service';
@@ -95,6 +96,7 @@ import { ProfileCompletionMonitorService } from './services/profile-completion-m
   providers: [
     StudentsService,
     StudentPortalService,
+    StudentBirthdayPopupService,
     FyugpReadmissionService,
     StudentPortalCalendarService,
     StudentPortalProfileService,

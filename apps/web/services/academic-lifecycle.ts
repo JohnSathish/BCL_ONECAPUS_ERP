@@ -6,6 +6,8 @@ import type {
   CycleRolloverPreview,
   InstitutionAcademicConfig,
   PromotionLogRow,
+  PromotionPreviewResponse,
+  PromotionValidateResponse,
 } from '@/types/academic-lifecycle';
 
 export type {
@@ -172,7 +174,7 @@ export async function previewPromotion(params: {
   programVersionId?: string;
 }) {
   const { data } = await api.get('/v1/academic-lifecycle/promotion-runs/preview', { params });
-  return data;
+  return data as PromotionPreviewResponse;
 }
 
 export async function previewPromotionMappings(params: {
@@ -201,7 +203,7 @@ export async function validatePromotion(params: {
   programVersionId?: string;
 }) {
   const { data } = await api.get('/v1/academic-lifecycle/promotion-runs/validate', { params });
-  return data;
+  return data as PromotionValidateResponse;
 }
 
 export async function createPromotionRun(payload: {

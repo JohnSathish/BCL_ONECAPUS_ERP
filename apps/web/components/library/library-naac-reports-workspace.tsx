@@ -393,7 +393,11 @@ export function LibraryNaacReportsWorkspace() {
             <ChartCard title="Collection Distribution by Department">
               {departments.length ? (
                 <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    initialDimension={{ width: 320, height: 180 }}
+                  >
                     <BarChart data={departments} layout="vertical" margin={{ left: 8 }}>
                       <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
@@ -412,7 +416,11 @@ export function LibraryNaacReportsWorkspace() {
               {overview.resourceTypes.length ? (
                 <div className="grid items-center gap-2 sm:grid-cols-[160px_1fr]">
                   <div className="relative h-44">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer
+                      width="100%"
+                      height="100%"
+                      initialDimension={{ width: 320, height: 180 }}
+                    >
                       <PieChart>
                         <Pie
                           data={overview.resourceTypes}
@@ -465,7 +473,11 @@ export function LibraryNaacReportsWorkspace() {
             >
               {yearsShown.length ? (
                 <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                    initialDimension={{ width: 320, height: 180 }}
+                  >
                     <ComposedChart data={yearsShown}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="year" tick={{ fontSize: 11 }} />

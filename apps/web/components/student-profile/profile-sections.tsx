@@ -35,6 +35,7 @@ import { formatDisplayDateTime } from '@/utils/format-date';
 import { apiErrorMessage } from '@/utils/api-error';
 import { cn } from '@/utils/cn';
 import { fetchStudentRollShiftHistory } from '@/services/roll-number';
+import { canWarnBeforeLeave } from '@/lib/browser/before-unload';
 import { emptyBoardExamSubjectRows, sanitizeBoardExamPayload } from '@/lib/board-exam-form';
 import { isExcelImportedStudent } from '@/lib/student-admission-source';
 import { formatCourseDisplayTitle } from '@/utils/format-course-title';
@@ -225,7 +226,7 @@ export function BasicSection({ profile, canEdit }: { profile: StudentProfile; ca
     return () => window.removeEventListener('student-profile-edit', openEditor);
   }, []);
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty || !canWarnBeforeLeave()) return;
     const onLeave = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';

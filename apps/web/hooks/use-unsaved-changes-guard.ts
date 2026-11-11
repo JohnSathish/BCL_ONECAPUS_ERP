@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { canWarnBeforeLeave } from '@/lib/browser/before-unload';
 import { setGlobalUnsavedChanges } from '@/lib/auth/unsaved-changes-registry';
 
 type Options = {
@@ -30,6 +31,8 @@ export function useUnsavedChangesGuard({
 
   useEffect(() => {
     if (!enabled) return;
+
+    if (!canWarnBeforeLeave()) return;
 
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       if (!isDirtyRef.current) return;

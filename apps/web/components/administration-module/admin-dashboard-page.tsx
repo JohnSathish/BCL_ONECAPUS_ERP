@@ -124,6 +124,13 @@ const MODULES: Array<{
     accent: 'blue',
   },
   {
+    href: '/admin/administration/demo-accounts',
+    label: 'Demo Accounts',
+    icon: Users,
+    desc: 'Test student and staff logins, devices, and push notifications.',
+    accent: 'amber',
+  },
+  {
     href: '/admin/administration/roles',
     label: 'Roles & Permissions',
     icon: KeyRound,

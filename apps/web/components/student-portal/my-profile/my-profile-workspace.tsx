@@ -17,7 +17,7 @@ import {
   UserRound,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { canWarnBeforeLeave } from '@/lib/browser/before-unload';
 import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -141,6 +141,7 @@ export function MyProfileWorkspace({ section }: { section: SectionKey }) {
   }, [dirty]);
 
   useEffect(() => {
+    if (!canWarnBeforeLeave()) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (!dirtyRef.current) return;
       e.preventDefault();

@@ -49,7 +49,13 @@ export function ChartContainer({ height, className, children }: Props) {
       aria-hidden={!ready}
     >
       {ready ? (
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+        <ResponsiveContainer
+          width="100%"
+          height="100%"
+          minWidth={0}
+          minHeight={0}
+          initialDimension={{ width: 320, height: 180 }}
+        >
           {children}
         </ResponsiveContainer>
       ) : null}

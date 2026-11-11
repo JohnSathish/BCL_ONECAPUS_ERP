@@ -27,6 +27,7 @@ import {
   UpsertClassXiiDto,
 } from './dto/student-portal-profile.dto';
 import { StudentPortalProfileService } from './services/student-portal-profile.service';
+import { StudentBirthdayPopupService } from './services/student-birthday-popup.service';
 import { StudentPortalService } from './services/student-portal.service';
 import { StudentLeaveService } from './services/student-leave.service';
 import { StudentProfileChangeRequestService } from './services/student-profile-change-request.service';
@@ -40,6 +41,7 @@ export class StudentPortalController {
   constructor(
     private readonly portal: StudentPortalService,
     private readonly portalProfile: StudentPortalProfileService,
+    private readonly birthdayPopup: StudentBirthdayPopupService,
     private readonly studentLeave: StudentLeaveService,
     private readonly changeRequests: StudentProfileChangeRequestService,
   ) {}
@@ -48,6 +50,24 @@ export class StudentPortalController {
   @RequireAnyPermission('student:portal:self')
   getMe(@CurrentUser() user: JwtUser) {
     return this.portal.getMe(user);
+  }
+
+  @Get('me/birthday-popup')
+  @RequireAnyPermission('student:portal:self')
+  birthdayPopupStatus(@CurrentUser() user: JwtUser) {
+    return this.birthdayPopup.status(user);
+  }
+
+  @Post('me/birthday-popup/shown')
+  @RequireAnyPermission('student:portal:self')
+  birthdayPopupShown(@CurrentUser() user: JwtUser) {
+    return this.birthdayPopup.markShown(user);
+  }
+
+  @Post('me/birthday-popup/dismiss')
+  @RequireAnyPermission('student:portal:self')
+  birthdayPopupDismiss(@CurrentUser() user: JwtUser) {
+    return this.birthdayPopup.dismiss(user);
   }
 
   @Get('me/dashboard')

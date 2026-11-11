@@ -100,12 +100,34 @@ export type PromotionLogRow = {
   createdAt: string;
   actor?: { email: string } | null;
   run?: {
+    id?: string;
+    status?: string;
     fromSequence: number;
     toSemesterSequence: number;
     trigger: string;
-    admissionBatch?: { batchCode: string } | null;
+    counts?: {
+      eligible?: number;
+      detained?: number;
+      failed?: number;
+      total?: number;
+    } | null;
+    admissionBatch?: {
+      batchCode: string;
+      entrySession?: { name: string } | null;
+    } | null;
     appliedBy?: { email: string } | null;
   } | null;
+};
+
+export type PromotionPreviewStudent = {
+  studentId: string;
+  enrollmentNumber?: string | null;
+  email?: string | null;
+  studentName?: string | null;
+  departmentName?: string | null;
+  eligible: boolean;
+  status: string;
+  messages: string[];
 };
 
 export type AdmissionBatchRow = {
@@ -148,9 +170,9 @@ export type PromotionPreviewResponse = {
     failed: number;
     total: number;
   };
-  eligible: unknown[];
-  detained: unknown[];
-  failed: unknown[];
+  eligible: PromotionPreviewStudent[];
+  detained: PromotionPreviewStudent[];
+  failed: PromotionPreviewStudent[];
 };
 
 export type PromotionValidateResponse = {

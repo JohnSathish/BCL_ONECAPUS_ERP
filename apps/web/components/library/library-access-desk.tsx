@@ -196,7 +196,11 @@ function HourlyFootfallChart({
         </div>
       </div>
       <div className="h-52">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer
+          width="100%"
+          height="100%"
+          initialDimension={{ width: 320, height: 180 }}
+        >
           <BarChart data={chartRows}>
             <CartesianGrid vertical={false} stroke="#e2e8f0" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />

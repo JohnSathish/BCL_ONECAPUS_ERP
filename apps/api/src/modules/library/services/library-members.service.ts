@@ -908,6 +908,7 @@ export class LibraryMembersService {
         LEFT JOIN academic.programs p ON p.id = pv.program_id
         WHERE s.tenant_id = ${tenant}
           AND s.deleted_at IS NULL
+          AND s.account_type = 'NORMAL'
           ${idFilter}
       ),
       ins AS (
@@ -970,6 +971,7 @@ export class LibraryMembersService {
         LEFT JOIN core.designations dg ON dg.id = sf.designation_id
         WHERE sf.tenant_id = ${tenant}
           AND sf.deleted_at IS NULL
+          AND sf.account_type = 'NORMAL'
           ${scopeFilter}
           ${idFilter}
       ),

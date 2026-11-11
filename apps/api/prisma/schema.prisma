@@ -366,6 +366,8 @@ model User {
   emailVerifiedAt   DateTime? @map("email_verified_at")
   isActive          Boolean   @default(true) @map("is_active")
   accountStatus     String    @default("active") @map("account_status")
+  /// NORMAL accounts belong to the college. DEMO accounts are for app testing only.
+  accountType       String    @default("NORMAL") @map("account_type")
   lastLoginAt       DateTime? @map("last_login_at")
   passwordChangedAt DateTime? @map("password_changed_at")
   mustResetPassword Boolean   @default(false) @map("must_reset_password")
@@ -461,6 +463,7 @@ model User {
   @@unique([tenantId, username])
   @@index([tenantId])
   @@index([tenantId, accountStatus])
+  @@index([tenantId, accountType])
   @@map("users")
   @@schema("platform")
 }
@@ -1616,6 +1619,40 @@ model UserNotification {
   @@schema("platform")
 }
 
+model DemoNotificationTest {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  sentById       String?  @map("sent_by_id") @db.Uuid
+  title          String
+  body           String   @db.Text
+  pushStatus     String   @map("push_status")
+  pushDetail     String?  @map("push_detail")
+  notificationId String?  @map("notification_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, userId, createdAt])
+  @@map("demo_notification_tests")
+  @@schema("platform")
+}
+
+/// One row per person per birthday date. Dismissal on any device hides the popup everywhere.
+model BirthdayPopupAck {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  userType     String    @default("STUDENT") @map("user_type")
+  birthdayDate String    @map("birthday_date") @db.VarChar(10)
+  shownAt      DateTime? @map("shown_at")
+  dismissedAt  DateTime? @map("dismissed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@unique([tenantId, userId, userType, birthdayDate], map: "birthday_popup_acks_user_day_key")
+  @@index([tenantId, userId])
+  @@map("birthday_popup_acks")
+  @@schema("platform")
+}
+
 model NotificationPreference {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
@@ -2503,6 +2540,7 @@ model Student {
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
   deletedAt              DateTime? @map("deleted_at")
+  accountType            String    @default("NORMAL") @map("account_type")
 
   user                  User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdBy             User?                       @relation("StudentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -2552,6 +2590,7 @@ model Student {
   @@unique([tenantId, rollNumber])
   @@unique([tenantId, rfidNumber])
   @@index([tenantId])
+  @@index([tenantId, accountType])
   @@index([tenantId, applicationNumber])
   @@index([tenantId, admissionNumber])
   @@index([primaryShiftId])
@@ -3617,6 +3656,7 @@ model StaffProfile {
   lastWorkingDate           DateTime? @map("last_working_date") @db.Date
   resignationReason         String?   @map("resignation_reason")
   status                    String    @default("ACTIVE")
+  accountType               String    @default("NORMAL") @map("account_type")
   qualification             String?
   specialization            String?
   experienceYears           Int?      @map("experience_years")
@@ -3701,6 +3741,7 @@ model StaffProfile {
   @@unique([tenantId, websiteSlug])
   @@unique([campusId, shortCode])
   @@index([tenantId])
+  @@index([tenantId, accountType])
   @@index([departmentId])
   @@index([campusId])
   @@index([staffType])

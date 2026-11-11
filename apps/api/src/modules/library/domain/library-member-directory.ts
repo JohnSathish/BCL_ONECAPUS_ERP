@@ -156,6 +156,7 @@ export function memberDirectoryCte(tenantId: string, memberId?: string) {
       LEFT JOIN core.academic_years ay ON ay.id = ab.entry_session_id
       WHERE s.tenant_id = ${tenant}
         AND s.deleted_at IS NULL
+        AND s.account_type = 'NORMAL'
         ${studentIdFilter}
       UNION ALL
       SELECT
@@ -185,6 +186,7 @@ export function memberDirectoryCte(tenantId: string, memberId?: string) {
       LEFT JOIN platform.users pu ON pu.id = sf.portal_user_id
       WHERE sf.tenant_id = ${tenant}
         AND sf.deleted_at IS NULL
+        AND sf.account_type = 'NORMAL'
         ${staffIdFilter}
     ),
     members AS (

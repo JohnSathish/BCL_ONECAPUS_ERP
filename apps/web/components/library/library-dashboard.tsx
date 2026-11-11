@@ -532,7 +532,11 @@ export function LibraryDashboard() {
           ) : (
             <div className="mt-2 grid grid-cols-[160px_minmax(0,1fr)] items-center gap-2">
               <div className="relative h-44">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                  initialDimension={{ width: 320, height: 180 }}
+                >
                   <PieChart>
                     <Pie
                       data={pie}
@@ -636,7 +640,11 @@ export function LibraryDashboard() {
             />
           ) : (
             <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                initialDimension={{ width: 320, height: 180 }}
+              >
                 <BarChart data={usage.data?.series ?? []}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />

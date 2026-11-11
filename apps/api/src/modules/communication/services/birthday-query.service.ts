@@ -101,6 +101,7 @@ export class BirthdayQueryService {
       LEFT JOIN academic.programs p ON p.id = pv.program_id
       WHERE sp.tenant_id = ${tenantId}::uuid
         AND s.deleted_at IS NULL
+        AND s.account_type = 'NORMAL'
         AND sp.date_of_birth IS NOT NULL
         AND s.user_id IS NOT NULL
         AND EXTRACT(MONTH FROM sp.date_of_birth) = ${month}
@@ -129,6 +130,7 @@ export class BirthdayQueryService {
       LEFT JOIN core.departments d ON d.id = sp.department_id
       WHERE sp.tenant_id = ${tenantId}::uuid
         AND sp.deleted_at IS NULL
+        AND sp.account_type = 'NORMAL'
         AND sp.status = 'ACTIVE'
         AND sp.date_of_birth IS NOT NULL
         AND sp.portal_user_id IS NOT NULL
@@ -190,6 +192,7 @@ export class BirthdayQueryService {
         INNER JOIN academic.student_profiles sp ON sp.student_id = s.id
         WHERE sr.tenant_id = ${tenantId}::uuid
           AND s.deleted_at IS NULL
+        AND s.account_type = 'NORMAL'
           AND s.user_id IS NOT NULL
           AND s.id <> ${birthdayStudentId}::uuid
           AND srl.offering_section_id IN (${sectionList})
@@ -219,7 +222,7 @@ export class BirthdayQueryService {
 
     const conditions: Prisma.Sql[] = [
       Prisma.sql`s.tenant_id = ${tenantId}::uuid`,
-      Prisma.sql`s.deleted_at IS NULL`,
+      Prisma.sql`s.deleted_at IS NULL AND s.account_type = 'NORMAL'`,
       Prisma.sql`s.user_id IS NOT NULL`,
       Prisma.sql`s.id <> ${birthdayStudentId}::uuid`,
     ];
@@ -269,6 +272,7 @@ export class BirthdayQueryService {
       FROM academic.staff_profiles sp
       WHERE sp.tenant_id = ${tenantId}::uuid
         AND sp.deleted_at IS NULL
+        AND sp.account_type = 'NORMAL'
         AND sp.status = 'ACTIVE'
         AND sp.portal_user_id IS NOT NULL
         AND sp.department_id = ${departmentId}::uuid

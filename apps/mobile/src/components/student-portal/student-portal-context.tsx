@@ -55,6 +55,7 @@ type StudentPortalContextValue = {
   drawerOpen: boolean;
   expandedSectionId: string | null;
   home: StudentHomeSnapshot | null;
+  homeSettled: boolean;
   openDrawer: () => void;
   closeDrawer: () => void;
   toggleSection: (sectionId: string) => void;
@@ -67,13 +68,16 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null);
   const [home, setHome] = useState<StudentHomeSnapshot | null>(null);
+  const [homeSettled, setHomeSettled] = useState(false);
 
   const refreshHome = useCallback(async () => {
     try {
       const data = await apiFetch<StudentHomeSnapshot>('/v1/mobile-app/student/home');
       setHome(data);
     } catch {
-      // optional endpoint
+      // The home snapshot is optional. Birthday and other screens keep working.
+    } finally {
+      setHomeSettled(true);
     }
   }, []);
 
@@ -86,13 +90,14 @@ export function StudentPortalProvider({ children }: { children: ReactNode }) {
       drawerOpen,
       expandedSectionId,
       home,
+      homeSettled,
       openDrawer: () => setDrawerOpen(true),
       closeDrawer: () => setDrawerOpen(false),
       toggleSection: (sectionId) =>
         setExpandedSectionId((current) => (current === sectionId ? null : sectionId)),
       refreshHome,
     }),
-    [drawerOpen, expandedSectionId, home, refreshHome],
+    [drawerOpen, expandedSectionId, home, homeSettled, refreshHome],
   );
 
   return <StudentPortalContext.Provider value={value}>{children}</StudentPortalContext.Provider>;

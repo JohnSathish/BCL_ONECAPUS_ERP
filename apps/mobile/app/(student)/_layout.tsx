@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, BackHandler, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StudentDrawer } from '@/components/student-portal/student-drawer';
+import { BirthdayPopupHost } from '@/components/student-portal/birthday-popup-host';
 import { StudentPortalProvider } from '@/components/student-portal/student-portal-context';
 import { CHANGE_PASSWORD_HREF, getMustResetPassword } from '@/auth/password-reset-guard';
 import { getAccessToken, getRefreshToken } from '@/auth/session';
@@ -76,6 +77,7 @@ export default function StudentLayout() {
           <Stack.Screen name="about" />
           <Stack.Screen name="account-deletion" />
         </Stack>
+        <BirthdayPopupHost />
       </StudentPortalProvider>
     </SyncGuardProvider>
   );

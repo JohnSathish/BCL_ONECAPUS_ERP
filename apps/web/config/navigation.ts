@@ -2478,6 +2478,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['users:read', 'users:manage'],
           },
           {
+            label: 'Demo Accounts',
+            href: '/admin/administration/demo-accounts',
+            permissions: ['users:read', 'users:manage'],
+          },
+          {
             label: 'Roles & Permissions',
             href: '/admin/administration/roles',
             permissions: ['rbac:manage'],

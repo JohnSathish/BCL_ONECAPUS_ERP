@@ -1,5 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ImportModule } from '../../common/import/import.module';
+import { CommunicationModule } from '../communication/communication.module';
+import { DemoAccountsController } from './controllers/demo-accounts.controller';
+import { DemoAccountsService } from './services/demo-accounts.service';
 import { AuthModule } from '../auth/auth.module';
 import { SecurityCentreModule } from '../security-centre/security-centre.module';
 import { StaffModule } from '../staff/staff.module';
@@ -34,6 +37,7 @@ import { UsersService } from './services/users.service';
     AuthModule,
     SecurityCentreModule,
     ImportModule,
+    CommunicationModule,
     forwardRef(() => StaffModule),
   ],
   controllers: [
@@ -46,6 +50,7 @@ import { UsersService } from './services/users.service';
     RollNumberSettingsController,
     StudentDisplaySettingsController,
     ImportCenterController,
+    DemoAccountsController,
   ],
   providers: [
     AdminAuditHelper,
@@ -54,6 +59,7 @@ import { UsersService } from './services/users.service';
     StudentDisplaySettingsService,
     UserProvisioningService,
     UsersService,
+    DemoAccountsService,
     ErpUsersService,
     RbacService,
     AuditService,

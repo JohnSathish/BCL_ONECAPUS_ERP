@@ -134,7 +134,7 @@ export async function exportBirthdayHistory(format: 'xlsx' | 'pdf', audience?: B
     params: { format, audience },
     responseType: 'blob',
   });
-  downloadBlob(data, format === 'pdf' ? 'birthday-wishes.pdf' : 'birthday-wishes.xlsx');
+  downloadBlob(data, format === 'pdf' ? 'birthday-wishes-report.pdf' : 'birthday-wishes.xlsx');
 }
 
 export function fetchBirthdayTemplates() {

@@ -271,7 +271,11 @@ export function LibraryAnalyticsWorkspace() {
           </div>
           {departments.length ? (
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                initialDimension={{ width: 320, height: 180 }}
+              >
                 <BarChart data={departments}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
@@ -309,7 +313,11 @@ export function LibraryAnalyticsWorkspace() {
             </Link>
           </div>
           <div className="h-52">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              initialDimension={{ width: 320, height: 180 }}
+            >
               <LineChart data={report?.weeklyIssues ?? []}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -376,7 +384,11 @@ export function LibraryAnalyticsWorkspace() {
             </span>
           </div>
           <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              initialDimension={{ width: 320, height: 180 }}
+            >
               <BarChart
                 data={(gender.data?.weekly ?? []).map((row) => ({
                   name: `Week ${row.week}`,

@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import ExcelJS from 'exceljs';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { renderBirthdayWishesPdf } from './birthday-wishes-report.document';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { toPublicUploadUrl } from '../../../common/uploads/public-upload-url';
 import { PrismaService } from '../../../database/prisma.service';
@@ -274,7 +274,7 @@ export class BirthdayWishesService {
       if (!next.rows.length) break;
       offsetPage += 1;
     }
-    if (query.format === 'pdf') return this.toPdf(all);
+    if (query.format === 'pdf') return this.toPdf(tenantId, all);
     return this.toExcel(all);
   }
 
@@ -1070,6 +1070,7 @@ export class BirthdayWishesService {
       LEFT JOIN academic.student_academic_standings sas ON sas.student_id = s.id
       WHERE sp.tenant_id = ${tenantId}::uuid
         AND s.deleted_at IS NULL
+        AND s.account_type = 'NORMAL'
         AND sp.date_of_birth IS NOT NULL
         AND ${match}
         ${searchSql}
@@ -1118,6 +1119,7 @@ export class BirthdayWishesService {
       LEFT JOIN core.departments d ON d.id = sp.department_id
       WHERE sp.tenant_id = ${tenantId}::uuid
         AND sp.deleted_at IS NULL
+        AND sp.account_type = 'NORMAL'
         AND sp.status = 'ACTIVE'
         AND sp.date_of_birth IS NOT NULL
         AND ${match}
@@ -1158,6 +1160,7 @@ export class BirthdayWishesService {
         LEFT JOIN academic.student_academic_standings sas ON sas.student_id = s.id
         WHERE s.tenant_id = ${tenantId}::uuid
           AND s.deleted_at IS NULL
+        AND s.account_type = 'NORMAL'
           AND s.id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})
       `;
     }
@@ -1181,6 +1184,7 @@ export class BirthdayWishesService {
       LEFT JOIN core.departments d ON d.id = sp.department_id
       WHERE sp.tenant_id = ${tenantId}::uuid
         AND sp.deleted_at IS NULL
+        AND sp.account_type = 'NORMAL'
         AND sp.id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})
     `;
   }
@@ -1196,6 +1200,7 @@ export class BirthdayWishesService {
       INNER JOIN academic.students s ON s.id = sp.student_id
       WHERE sp.tenant_id = ${tenantId}::uuid
         AND s.deleted_at IS NULL
+        AND s.account_type = 'NORMAL'
         AND sp.date_of_birth IS NOT NULL
         AND ${match}
     `;
@@ -1219,6 +1224,7 @@ export class BirthdayWishesService {
       FROM academic.staff_profiles sp
       WHERE sp.tenant_id = ${tenantId}::uuid
         AND sp.deleted_at IS NULL
+        AND sp.account_type = 'NORMAL'
         AND sp.status = 'ACTIVE'
         AND sp.date_of_birth IS NOT NULL
         AND ${match}
@@ -1240,6 +1246,7 @@ export class BirthdayWishesService {
             INNER JOIN academic.students s ON s.id = sp.student_id
             WHERE sp.tenant_id = ${tenantId}::uuid
               AND s.deleted_at IS NULL
+        AND s.account_type = 'NORMAL'
               AND sp.date_of_birth IS NOT NULL
               AND EXTRACT(MONTH FROM sp.date_of_birth)::int = ${month}
             GROUP BY 1
@@ -1249,6 +1256,7 @@ export class BirthdayWishesService {
             FROM academic.staff_profiles sp
             WHERE sp.tenant_id = ${tenantId}::uuid
               AND sp.deleted_at IS NULL
+        AND sp.account_type = 'NORMAL'
               AND sp.status = 'ACTIVE'
               AND sp.date_of_birth IS NOT NULL
               AND EXTRACT(MONTH FROM sp.date_of_birth)::int = ${month}
@@ -1295,6 +1303,7 @@ export class BirthdayWishesService {
             INNER JOIN academic.students s ON s.id = sp.student_id
             WHERE s.id = t.entity_id
               AND s.deleted_at IS NULL
+        AND s.account_type = 'NORMAL'
               AND EXTRACT(MONTH FROM sp.date_of_birth)::int = ${today.month}
               AND EXTRACT(DAY FROM sp.date_of_birth)::int = ${today.day}
           )
@@ -1303,6 +1312,7 @@ export class BirthdayWishesService {
             FROM academic.staff_profiles sp
             WHERE sp.id = t.entity_id
               AND sp.deleted_at IS NULL
+        AND sp.account_type = 'NORMAL'
               AND EXTRACT(MONTH FROM sp.date_of_birth)::int = ${today.month}
               AND EXTRACT(DAY FROM sp.date_of_birth)::int = ${today.day}
           )
@@ -1551,6 +1561,7 @@ export class BirthdayWishesService {
   }
 
   private async toPdf(
+    tenantId: string,
     rows: Array<{
       recipientName: string | null;
       category: string;
@@ -1558,37 +1569,25 @@ export class BirthdayWishesService {
       status: string | null;
       sentAt: string | null;
       sentBy: string | null;
+      failureReason: string | null;
     }>,
   ) {
-    const doc = await PDFDocument.create();
-    const font = await doc.embedFont(StandardFonts.Helvetica);
-    let page = doc.addPage([842, 595]);
-    let y = 560;
-    const draw = (text: string, size = 10) => {
-      if (y < 40) {
-        page = doc.addPage([842, 595]);
-        y = 560;
-      }
-      page.drawText(text.slice(0, 140), {
-        x: 32,
-        y,
-        size,
-        font,
-        color: rgb(0.1, 0.1, 0.15),
-      });
-      y -= size + 8;
-    };
-    draw('Birthday wish history', 16);
-    for (const row of rows) {
-      draw(
-        `${row.recipientName ?? '—'} · ${row.category} · ${row.channel ?? '—'} · ${row.status ?? '—'} · ${row.sentBy ?? '—'} · ${row.sentAt ?? ''}`,
-      );
-    }
-    if (!rows.length) draw('No birthday wishes have been recorded yet.');
+    const branding = await this.prisma.tenantBranding.findUnique({
+      where: { tenantId },
+      select: { displayName: true, shortName: true, logoUrl: true },
+    });
+    const collegeName =
+      branding?.displayName?.trim() ||
+      branding?.shortName?.trim() ||
+      (await this.triggers.getInstitutionName(tenantId));
     return {
-      filename: 'birthday-wishes.pdf',
+      filename: 'birthday-wishes-report.pdf',
       contentType: 'application/pdf',
-      body: Buffer.from(await doc.save()),
+      body: await renderBirthdayWishesPdf({
+        collegeName,
+        logoUrl: branding?.logoUrl ?? null,
+        rows,
+      }),
     };
   }
 

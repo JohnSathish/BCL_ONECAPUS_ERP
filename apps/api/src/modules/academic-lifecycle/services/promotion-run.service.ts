@@ -70,12 +70,22 @@ export class PromotionRunService {
       );
       const student = await this.prisma.student.findUnique({
         where: { id: studentId },
-        include: { user: { select: { email: true } } },
+        select: {
+          enrollmentNumber: true,
+          user: { select: { email: true, displayName: true } },
+          masterProfile: { select: { fullName: true } },
+          department: { select: { name: true } },
+        },
       });
       const row = {
         studentId,
         enrollmentNumber: student?.enrollmentNumber,
         email: student?.user?.email,
+        studentName:
+          student?.masterProfile?.fullName?.trim() ||
+          student?.user?.displayName?.trim() ||
+          null,
+        departmentName: student?.department?.name ?? null,
         ...result,
       };
       if (

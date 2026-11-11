@@ -187,7 +187,9 @@ export class AcademicLifecycleService {
       include: {
         run: {
           include: {
-            admissionBatch: true,
+            admissionBatch: {
+              include: { entrySession: { select: { name: true } } },
+            },
             appliedBy: { select: { email: true } },
           },
         },

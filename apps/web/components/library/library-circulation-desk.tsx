@@ -321,13 +321,27 @@ export function LibraryCirculationDesk() {
       bookRef.current?.select();
       return;
     }
-    const memberScan = member.profile.registrationNumber || member.profile.memberId;
+    const memberScan = (member.profile.registrationNumber || member.profile.memberId || '').trim();
+    if (!memberScan) {
+      setNotice('This member has no card number, so the book cannot be issued.');
+      return;
+    }
     const receiptNo =
       visit?.memberId === member.profile.memberId ? visit.receiptNo : newIssueReceiptNo();
     issuingRef.current = true;
     setBusy(true);
     setNotice('');
     try {
+      const preview = await fetchLibraryBookPreview(scan);
+      setBook(preview);
+      if (preview.copy.status !== 'AVAILABLE' || preview.issueAllowed === false) {
+        setNotice(
+          preview.issueMessage?.trim() ||
+            `This copy is ${preview.copy.status.toLowerCase()} and cannot be issued.`,
+        );
+        setBookQuery(preview.book.title);
+        return;
+      }
       const { loan } = await issueLibraryBook(memberScan, scan, receiptNo);
       const storedReceipt = loan.receiptNo || receiptNo;
       const line: IssuedLine = {

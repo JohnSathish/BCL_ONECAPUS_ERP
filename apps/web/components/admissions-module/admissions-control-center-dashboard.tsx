@@ -837,7 +837,11 @@ export function AdmissionsControlCenterDashboard() {
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Applications Trend</h2>
             <div className="mt-2 h-40">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                initialDimension={{ width: 320, height: 180 }}
+              >
                 <AreaChart data={trendData}>
                   <defs>
                     <linearGradient id="admTrend" x1="0" y1="0" x2="0" y2="1">

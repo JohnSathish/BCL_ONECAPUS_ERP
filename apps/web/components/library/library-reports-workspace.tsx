@@ -261,7 +261,11 @@ export function LibraryReportsWorkspace() {
             </select>
           </div>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              initialDimension={{ width: 320, height: 180 }}
+            >
               <BarChart data={report?.months ?? []}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -293,7 +297,11 @@ export function LibraryReportsWorkspace() {
           {slices.length ? (
             <div className="grid items-center gap-3 sm:grid-cols-[180px_1fr]">
               <div className="relative h-44">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                  initialDimension={{ width: 320, height: 180 }}
+                >
                   <PieChart>
                     <Pie
                       data={slices}

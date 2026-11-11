@@ -71,7 +71,11 @@ export function CirculationReportCharts({ data }: { data: CirculationAnalytics }
     <div className="grid gap-4 lg:grid-cols-2">
       <Panel title="Monthly issues vs returns">
         <div className="h-60">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            initialDimension={{ width: 320, height: 180 }}
+          >
             <LineChart data={monthly}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -98,7 +102,11 @@ export function CirculationReportCharts({ data }: { data: CirculationAnalytics }
       </Panel>
       <Panel title="Monthly renewals and overdue books">
         <div className="h-60">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            initialDimension={{ width: 320, height: 180 }}
+          >
             <BarChart data={monthly}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -113,7 +121,11 @@ export function CirculationReportCharts({ data }: { data: CirculationAnalytics }
       </Panel>
       <Panel title="Department-wise circulation">
         <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            initialDimension={{ width: 320, height: 180 }}
+          >
             <BarChart data={data.departments} layout="vertical" margin={{ left: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
@@ -128,7 +140,11 @@ export function CirculationReportCharts({ data }: { data: CirculationAnalytics }
       </Panel>
       <Panel title="Circulation by member type">
         <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            initialDimension={{ width: 320, height: 180 }}
+          >
             <BarChart data={data.byMemberType}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />

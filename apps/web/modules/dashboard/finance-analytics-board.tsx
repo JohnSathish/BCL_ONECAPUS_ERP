@@ -222,7 +222,11 @@ function KpiCard({ metric }: { metric: DashboardKpiMetric }) {
       <p className="mt-1 line-clamp-2 text-[11px] text-slate-500">{metric.context}</p>
       {chart.length > 1 ? (
         <div className="mt-2 h-8">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            initialDimension={{ width: 320, height: 180 }}
+          >
             <BarChart data={chart}>
               <Bar dataKey="value" fill={style.stroke} radius={2} />
             </BarChart>
@@ -269,7 +273,11 @@ function FeeTrendCard({ monthly }: { monthly: FinanceBoard['fee']['monthly'] }) 
       <p className="mb-2 text-xs text-slate-500">Successful payments recorded in each month.</p>
       {hasMoney ? (
         <div className="h-52">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            initialDimension={{ width: 320, height: 180 }}
+          >
             <BarChart data={monthly}>
               <XAxis dataKey="label" tick={{ fontSize: 12 }} />
               <YAxis
@@ -306,7 +314,11 @@ function ProgrammeCard({
       ) : (
         <div className="mt-2 flex items-center gap-3">
           <div className="relative h-40 w-40 shrink-0">
-            <ResponsiveContainer>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              initialDimension={{ width: 160, height: 160 }}
+            >
               <PieChart>
                 <Pie
                   data={slices}
