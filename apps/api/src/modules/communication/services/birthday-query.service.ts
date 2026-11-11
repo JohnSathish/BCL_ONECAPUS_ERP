@@ -92,7 +92,7 @@ export class BirthdayQueryService {
         s.program_version_id AS "programVersionId",
         s.department_id AS "departmentId",
         s.primary_shift_id AS "primaryShiftId",
-        d.name AS "departmentName",
+        d.department_name AS "departmentName",
         p.name AS "programName"
       FROM academic.student_profiles sp
       INNER JOIN academic.students s ON s.id = sp.student_id
@@ -124,7 +124,7 @@ export class BirthdayQueryService {
         sp.mobile AS mobile,
         sp.photo_url AS "photoUrl",
         sp.department_id AS "departmentId",
-        d.name AS "departmentName"
+        d.department_name AS "departmentName"
       FROM academic.staff_profiles sp
       LEFT JOIN core.departments d ON d.id = sp.department_id
       WHERE sp.tenant_id = ${tenantId}::uuid

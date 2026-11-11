@@ -1042,7 +1042,7 @@ export class BirthdayWishesService {
     const searchSql = this.searchSql(search, [
       'sp.full_name',
       's.roll_number',
-      'd.name',
+      'd.department_name',
       'sp.mobile_number',
       'sp.email',
     ]);
@@ -1052,7 +1052,7 @@ export class BirthdayWishesService {
         s.user_id AS "userId",
         sp.full_name AS "fullName",
         s.roll_number AS code,
-        d.name AS department,
+        d.department_name AS department,
         p.name AS programme,
         sas.current_semester_sequence AS semester,
         sp.date_of_birth AS "dateOfBirth",
@@ -1088,7 +1088,7 @@ export class BirthdayWishesService {
     const searchSql = this.searchSql(search, [
       'sp.full_name',
       'sp.employee_code',
-      'd.name',
+      'd.department_name',
       'sp.mobile',
       'sp.email',
     ]);
@@ -1104,7 +1104,7 @@ export class BirthdayWishesService {
         sp.portal_user_id AS "userId",
         sp.full_name AS "fullName",
         sp.employee_code AS code,
-        d.name AS department,
+        d.department_name AS department,
         NULL AS programme,
         NULL::int AS semester,
         sp.date_of_birth AS "dateOfBirth",
@@ -1140,7 +1140,7 @@ export class BirthdayWishesService {
           s.user_id AS "userId",
           sp.full_name AS "fullName",
           s.roll_number AS code,
-          d.name AS department,
+          d.department_name AS department,
           p.name AS programme,
           sas.current_semester_sequence AS semester,
           sp.date_of_birth AS "dateOfBirth",
@@ -1167,7 +1167,7 @@ export class BirthdayWishesService {
         sp.portal_user_id AS "userId",
         sp.full_name AS "fullName",
         sp.employee_code AS code,
-        d.name AS department,
+        d.department_name AS department,
         NULL AS programme,
         NULL::int AS semester,
         sp.date_of_birth AS "dateOfBirth",

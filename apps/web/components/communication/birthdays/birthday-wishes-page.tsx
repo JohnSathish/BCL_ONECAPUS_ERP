@@ -441,6 +441,7 @@ export function BirthdayWishesPage() {
           <PeopleTable
             rows={rows}
             loading={people.isLoading}
+            error={people.isError}
             audience={audience}
             selected={selected}
             allSelected={allSelected}
@@ -662,6 +663,7 @@ export function BirthdayWishesPage() {
 function PeopleTable({
   rows,
   loading,
+  error,
   audience,
   selected,
   allSelected,
@@ -671,6 +673,7 @@ function PeopleTable({
 }: {
   rows: BirthdayPerson[];
   loading: boolean;
+  error?: boolean;
   audience: BirthdayAudience;
   selected: string[];
   allSelected: boolean;
@@ -775,7 +778,9 @@ function PeopleTable({
           {!rows.length && !loading ? (
             <tr>
               <td colSpan={9} className="px-3 py-8 text-center text-slate-500">
-                No birthdays match these filters.
+                {error
+                  ? 'Birthdays could not be loaded. Refresh the page.'
+                  : 'No birthdays match these filters.'}
               </td>
             </tr>
           ) : null}
