@@ -336,7 +336,7 @@ export function LibraryCatalogueWorkspace() {
           label="Total Books (Copies)"
           value={num(summary.data?.copies)}
           hint="Physical copies"
-          tone="bg-blue-50 text-blue-700"
+          tone="bg-gradient-to-br from-[#2563EB] to-[#1D4ED8]"
           href="/admin/library/collection-reports?report=total-copies"
         />
         <Card
@@ -344,7 +344,7 @@ export function LibraryCatalogueWorkspace() {
           label="Unique Titles"
           value={num(summary.data?.titles)}
           hint="Bibliographic records"
-          tone="bg-emerald-50 text-emerald-700"
+          tone="bg-gradient-to-br from-[#16A34A] to-[#15803D]"
           href="/admin/library/collection-reports?report=total-titles"
         />
         <Card
@@ -352,21 +352,21 @@ export function LibraryCatalogueWorkspace() {
           label="Authors"
           value={num(summary.data?.authors)}
           hint="Distinct primary authors"
-          tone="bg-violet-50 text-violet-700"
+          tone="bg-gradient-to-br from-[#7C3AED] to-[#6D28D9]"
         />
         <Card
           icon={BookOpen}
           label="Subjects / Categories"
           value={num(summary.data?.categories)}
           hint="Configured categories"
-          tone="bg-amber-50 text-amber-800"
+          tone="bg-gradient-to-br from-[#F97316] to-[#EA580C]"
         />
         <Card
           icon={Library}
           label="Departments"
           value={num(summary.data?.departments)}
           hint="Departments with titles"
-          tone="bg-rose-50 text-rose-700"
+          tone="bg-gradient-to-br from-[#0891B2] to-[#0E7490]"
           href="/admin/library/collection-reports?report=department-summary"
         />
       </div>
@@ -940,20 +940,29 @@ function Card({
   href?: string;
 }) {
   const body = (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', tone)}>
-          <Icon className="h-5 w-5" />
+    <div
+      className={cn(
+        'relative overflow-hidden rounded-[18px] p-4 text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)]',
+        tone,
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-medium text-white/90">{label}</p>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15">
+          <Icon className="h-5 w-5 text-white" />
         </span>
-        <div>
-          <p className="text-sm text-slate-500">{label}</p>
-          <p className="text-2xl font-semibold">{value}</p>
-          <p className="text-xs text-slate-400">{hint}</p>
-        </div>
       </div>
+      <p className="mt-3 text-2xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-1 text-xs text-white/80">{hint}</p>
     </div>
   );
-  return href ? <Link href={href}>{body}</Link> : body;
+  return href ? (
+    <Link href={href} className="block transition hover:-translate-y-0.5 hover:brightness-110">
+      {body}
+    </Link>
+  ) : (
+    body
+  );
 }
 
 function Select({
