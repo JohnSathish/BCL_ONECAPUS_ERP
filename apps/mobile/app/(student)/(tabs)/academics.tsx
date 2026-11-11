@@ -648,7 +648,7 @@ function DownloadChip({
       onPress={onPress}
     >
       <Text style={styles.downloadChipText}>{label}</Text>
-      <Text style={styles.downloadChipAction}>{available ? 'Download' : 'Soon'}</Text>
+      <Text style={styles.downloadChipAction}>{available ? 'Download' : 'Coming soon'}</Text>
     </Pressable>
   );
 }
@@ -971,15 +971,28 @@ const styles = StyleSheet.create({
   journeyDetail: { paddingHorizontal: 42, paddingBottom: 12, gap: 4 },
   downloadRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   downloadChip: {
+    width: '48%',
     flexGrow: 1,
-    minWidth: '30%',
     backgroundColor: studentTheme.primary,
     borderRadius: 14,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
     alignItems: 'center',
   },
   downloadChipDisabled: { backgroundColor: '#94a3b8' },
-  downloadChipText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  downloadChipAction: { color: '#dbeafe', fontSize: 11, marginTop: 4 },
+  downloadChipText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+  },
+  downloadChipAction: {
+    color: '#dbeafe',
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+  },
   link: { color: studentTheme.primaryLight, fontWeight: '700', marginTop: 6, fontSize: 13 },
 });

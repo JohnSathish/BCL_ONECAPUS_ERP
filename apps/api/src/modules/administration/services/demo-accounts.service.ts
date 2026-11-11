@@ -8,6 +8,7 @@ import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import type { JwtUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../database/prisma.service';
+import { demoStudentBirthdayDate } from './canonical-demo-login';
 import {
   COLLEGE_IOS_BUNDLE_ID,
   FcmPushService,
@@ -321,6 +322,7 @@ export class DemoAccountsService {
             studentId: student.id,
             fullName: input.displayName,
             email,
+            dateOfBirth: demoStudentBirthdayDate(),
             studentStatus: 'DEMO',
             admissionStatus: 'DEMO',
           },

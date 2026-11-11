@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { istCalendar } from '../../communication/domain/birthday-calendar';
 import type { PrismaService } from '../../../database/prisma.service';
 
 const DEMO = 'DEMO';
@@ -22,6 +23,12 @@ export const CANONICAL_DEMO_LOGINS = [
 type CanonicalDemoLogin = (typeof CANONICAL_DEMO_LOGINS)[number];
 
 const log = new Logger('CanonicalDemoLogin');
+
+/** Today's calendar date in India, stored as a date-only value. */
+export function demoStudentBirthdayDate(now = new Date()): Date {
+  const today = istCalendar(now);
+  return new Date(Date.UTC(today.year, today.month - 1, today.day));
+}
 
 export function matchCanonicalDemoLogin(
   loginId: string,
@@ -96,6 +103,9 @@ export async function ensureCanonicalDemoLogin(
         },
       });
     }
+    if (match.kind === 'STUDENT') {
+      await syncDemoStudentBirthday(prisma, tenantId, existing.id);
+    }
     return true;
   } catch (error) {
     log.warn(
@@ -154,6 +164,7 @@ async function createCanonicalDemo(
           studentId: student.id,
           fullName: match.displayName,
           email,
+          dateOfBirth: demoStudentBirthdayDate(),
           studentStatus: 'DEMO',
           admissionStatus: 'DEMO',
         },
@@ -175,5 +186,42 @@ async function createCanonicalDemo(
         showOnWebsite: false,
       },
     });
+  });
+}
+
+/**
+ * Keep the published demo student's birthday on today's date and clear the
+ * once-per-day card acknowledgement so the wishes card can be checked again.
+ */
+export async function syncDemoStudentBirthday(
+  prisma: PrismaService,
+  tenantId: string,
+  userId: string,
+) {
+  const student = await prisma.student.findFirst({
+    where: { tenantId, userId, deletedAt: null, accountType: DEMO },
+    select: { id: true, masterProfile: { select: { id: true } } },
+  });
+  if (!student) return;
+  const dateOfBirth = demoStudentBirthdayDate();
+  if (student.masterProfile) {
+    await prisma.studentProfile.update({
+      where: { studentId: student.id },
+      data: { dateOfBirth },
+    });
+  } else {
+    await prisma.studentProfile.create({
+      data: {
+        tenantId,
+        studentId: student.id,
+        fullName: 'Demo Student',
+        dateOfBirth,
+        studentStatus: 'DEMO',
+        admissionStatus: 'DEMO',
+      },
+    });
+  }
+  await prisma.birthdayPopupAck.deleteMany({
+    where: { tenantId, userId, userType: 'STUDENT' },
   });
 }

@@ -42,7 +42,10 @@ import {
   resolveSchoolPortalUserId,
   schoolLoginCompacts,
 } from '../school-sis/school-sis-login-lookup';
-import { ensureCanonicalDemoLogin } from '../administration/services/canonical-demo-login';
+import {
+  ensureCanonicalDemoLogin,
+  syncDemoStudentBirthday,
+} from '../administration/services/canonical-demo-login';
 
 type ShiftScope = {
   shiftIds: string[];
@@ -1162,6 +1165,13 @@ export class AuthService {
       });
       await this.auditErpLoginFailure(tenant.id, user.id, 'bad_password', ip);
       throw new UnauthorizedException(failure.message);
+    }
+
+    const demoStudentLogin =
+      trimmed.trim().toUpperCase() === 'DEMO-STUDENT' ||
+      trimmed.trim().toLowerCase() === 'demo-student@demo.onecampus.invalid';
+    if (demoStudentLogin) {
+      await syncDemoStudentBirthday(this.prisma, tenant.id, user.id);
     }
 
     const erpAccount = await this.prisma.erpUserAccount.findUnique({

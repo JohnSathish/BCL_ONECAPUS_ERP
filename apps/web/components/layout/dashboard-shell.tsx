@@ -12,6 +12,7 @@ import {
 import { LicenseAlertBanner } from '@/components/licensing/license-alert-banner';
 import { LicenseWriteBlockedBanner } from '@/components/licensing/license-write-blocked-banner';
 import { StaffMobileBottomNav } from '@/components/staff-portal/layout/staff-mobile-bottom-nav';
+import { StudentBirthdayCardHost } from '@/components/student-portal/birthday-card';
 import { StudentMobileBottomNav } from '@/components/student-portal/layout/student-mobile-bottom-nav';
 import { ROLE_NAV } from '@/config/navigation';
 import { useDashboardUiStore } from '@/store/dashboard-ui-store';
@@ -92,6 +93,7 @@ export function DashboardShell({
 
         {role === 'staff' ? <StaffMobileBottomNav /> : null}
         {role === 'student' ? <StudentMobileBottomNav /> : null}
+        {role === 'student' ? <StudentBirthdayCardHost /> : null}
       </div>
     </motion.div>
   );
