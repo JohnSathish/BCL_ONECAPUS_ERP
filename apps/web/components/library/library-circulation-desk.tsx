@@ -594,7 +594,7 @@ export function LibraryCirculationDesk() {
         <Stat
           href="/admin/library/catalogue"
           icon={Library}
-          tone="bg-blue-50 text-blue-600"
+          tone="bg-gradient-to-br from-[#2563EB] to-[#1D4ED8]"
           label="Total Books"
           value={stats?.totalCopies}
           hint="Physical copies in library"
@@ -602,14 +602,14 @@ export function LibraryCirculationDesk() {
         <Stat
           href="/admin/library/members"
           icon={Users}
-          tone="bg-emerald-50 text-emerald-600"
+          tone="bg-gradient-to-br from-[#16A34A] to-[#15803D]"
           label="Total Members"
           value={stats?.totalMembers}
           hint="Students and staff on record"
         />
         <Stat
           icon={BookOpen}
-          tone="bg-violet-50 text-violet-600"
+          tone="bg-gradient-to-br from-[#7C3AED] to-[#6D28D9]"
           label="Issued Today"
           value={stats?.issuedToday}
           change={dayChange(stats?.issuedToday, stats?.issuedYesterday)}
@@ -617,25 +617,33 @@ export function LibraryCirculationDesk() {
         />
         <Stat
           icon={RotateCcw}
-          tone="bg-orange-50 text-orange-600"
+          tone="bg-gradient-to-br from-[#F97316] to-[#EA580C]"
           label="Returned Today"
           value={stats?.returnedToday}
           change={dayChange(stats?.returnedToday, stats?.returnedYesterday)}
           hint="Books returned today"
         />
-        <button type="button" className="text-left" onClick={() => setShowOverdue((open) => !open)}>
+        <button
+          type="button"
+          className="block h-full w-full text-left"
+          onClick={() => setShowOverdue((open) => !open)}
+        >
           <Stat
             icon={AlertTriangle}
-            tone="bg-rose-50 text-rose-600"
+            tone="bg-gradient-to-br from-[#EF4444] to-[#DC2626]"
             label="Overdue Books"
             value={stats?.overdueLoans}
             hint="Books not yet returned"
           />
         </button>
-        <button type="button" className="text-left" onClick={() => setShowDueWeek((open) => !open)}>
+        <button
+          type="button"
+          className="block h-full w-full text-left"
+          onClick={() => setShowDueWeek((open) => !open)}
+        >
           <Stat
             icon={Calendar}
-            tone="bg-cyan-50 text-cyan-600"
+            tone="bg-gradient-to-br from-[#0891B2] to-[#0E7490]"
             label="Due This Week"
             value={stats?.dueThisWeek}
             hint="Books due in the next 7 days"
@@ -1552,28 +1560,36 @@ function Stat({
   href?: string;
 }) {
   const body = (
-    <div className="flex h-full items-start justify-between gap-2 rounded-[16px] bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5">
+    <div
+      className={`flex h-full items-start justify-between gap-2 overflow-hidden rounded-[18px] p-4 text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)] transition hover:brightness-110 ${tone}`}
+    >
       <div className="min-w-0">
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+        <p className="text-xs font-medium text-white/90">{label}</p>
+        <p className="mt-1 text-2xl font-semibold tracking-tight">
           {value == null ? '—' : value.toLocaleString('en-IN')}
           {change ? (
             <span
-              className={change.up ? 'ml-1 text-xs text-emerald-600' : 'ml-1 text-xs text-rose-600'}
+              className="ml-1 text-xs font-medium text-white/90"
               title="Compared with yesterday"
             >
               {change.text}
             </span>
           ) : null}
         </p>
-        <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p>
+        <p className="mt-0.5 text-[11px] text-white/80">{hint}</p>
       </div>
-      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tone}`}>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
         <Icon className="h-4 w-4" />
       </span>
     </div>
   );
-  return href ? <Link href={href}>{body}</Link> : body;
+  return href ? (
+    <Link href={href} className="block h-full">
+      {body}
+    </Link>
+  ) : (
+    body
+  );
 }
 
 function eligibilityOf(member: LibraryMemberSummary, blocked?: string | null) {

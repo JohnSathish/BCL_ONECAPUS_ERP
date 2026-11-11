@@ -266,14 +266,20 @@ export function LibraryVisitsWorkspace() {
           value={stats?.totalToday}
           hint={delta(stats?.totalDeltaPct ?? null)}
           hintLabel="Compared to yesterday"
-          tone="bg-blue-50 text-blue-700"
+          tone="bg-gradient-to-br from-[#2563EB] to-[#1D4ED8]"
         />
         <Summary
           icon={GraduationCap}
           label="Student Visits"
           value={stats?.students}
-          hint={stats?.studentSharePct != null ? `${stats.studentSharePct}% of total` : undefined}
-          tone="bg-emerald-50 text-emerald-700"
+          hint={
+            stats?.studentSharePct != null
+              ? `${stats.studentSharePct}% of total`
+              : stats
+                ? '0% of total'
+                : undefined
+          }
+          tone="bg-gradient-to-br from-[#16A34A] to-[#15803D]"
         />
         <Summary
           icon={Users}
@@ -284,14 +290,20 @@ export function LibraryVisitsWorkspace() {
               ? `${stats.staffSharePct}% of total`
               : 'Faculty and non-teaching'
           }
-          tone="bg-sky-50 text-sky-700"
+          tone="bg-gradient-to-br from-[#0891B2] to-[#0E7490]"
         />
         <Summary
           icon={Users}
           label="Other Visitors"
           value={stats?.visitors}
-          hint={stats?.visitorSharePct != null ? `${stats.visitorSharePct}% of total` : undefined}
-          tone="bg-violet-50 text-violet-700"
+          hint={
+            stats?.visitorSharePct != null
+              ? `${stats.visitorSharePct}% of total`
+              : stats
+                ? '0% of total'
+                : undefined
+          }
+          tone="bg-gradient-to-br from-[#7C3AED] to-[#6D28D9]"
         />
         <Summary
           icon={Clock}
@@ -313,7 +325,7 @@ export function LibraryVisitsWorkspace() {
           hintLabel={
             stats?.averageDeltaPct != null ? 'Compared with the previous period' : undefined
           }
-          tone="bg-amber-50 text-amber-700"
+          tone="bg-gradient-to-br from-[#F97316] to-[#EA580C]"
         />
       </div>
 
@@ -684,24 +696,23 @@ function Summary({
   tone: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', tone)}>
-          <Icon className="h-5 w-5" />
+    <div
+      className={cn(
+        'relative overflow-hidden rounded-[18px] p-4 text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)]',
+        tone,
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-medium text-white/90">{label}</p>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15">
+          <Icon className="h-5 w-5 text-white" />
         </span>
-        <div>
-          <p className="text-sm text-slate-500">{label}</p>
-          <p className="text-2xl font-semibold text-slate-900">
-            {value == null
-              ? '—'
-              : typeof value === 'number'
-                ? value.toLocaleString('en-IN')
-                : value}
-          </p>
-        </div>
       </div>
-      {hint ? <p className="mt-2 text-xs text-emerald-700">{hint}</p> : null}
-      {hintLabel ? <p className="text-xs text-slate-400">{hintLabel}</p> : null}
+      <p className="mt-3 text-2xl font-semibold tracking-tight">
+        {value == null ? '—' : typeof value === 'number' ? value.toLocaleString('en-IN') : value}
+      </p>
+      {hint ? <p className="mt-1 text-xs text-white/90">{hint}</p> : null}
+      {hintLabel ? <p className="text-xs text-white/75">{hintLabel}</p> : null}
     </div>
   );
 }

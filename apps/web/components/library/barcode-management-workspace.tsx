@@ -438,7 +438,7 @@ export function BarcodeManagementWorkspace() {
           label="Print Confirmed"
           hint="Browser print dialog closed"
           value={summary.data?.confirmedLabels}
-          tone="green"
+          tone="teal"
           icon={<CheckCircle2 className="h-4 w-4" />}
           active={filters.printStatus === 'CONFIRMED'}
           onClick={() => applyStatus('CONFIRMED')}
@@ -1338,33 +1338,32 @@ function Stat({
   label: string;
   hint: string;
   value?: number;
-  tone: 'blue' | 'green' | 'violet' | 'amber' | 'rose';
+  tone: 'blue' | 'green' | 'teal' | 'violet' | 'amber' | 'rose';
   icon: ReactNode;
   active: boolean;
   onClick: () => void;
 }) {
   const tones = {
-    blue: 'bg-blue-50 text-blue-600',
-    green: 'bg-emerald-50 text-emerald-600',
-    violet: 'bg-violet-50 text-violet-600',
-    amber: 'bg-amber-50 text-amber-600',
-    rose: 'bg-rose-50 text-rose-600',
+    blue: 'bg-gradient-to-br from-[#2563EB] to-[#1D4ED8]',
+    green: 'bg-gradient-to-br from-[#16A34A] to-[#15803D]',
+    teal: 'bg-gradient-to-br from-[#0891B2] to-[#0E7490]',
+    violet: 'bg-gradient-to-br from-[#7C3AED] to-[#6D28D9]',
+    amber: 'bg-gradient-to-br from-[#F97316] to-[#EA580C]',
+    rose: 'bg-gradient-to-br from-[#EF4444] to-[#DC2626]',
   };
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-2xl border bg-white p-4 text-left shadow-sm ${active ? 'ring-2 ring-blue-500' : ''}`}
+      className={`relative overflow-hidden rounded-[18px] p-4 text-left text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)] transition hover:brightness-110 ${tones[tone]} ${active ? 'ring-2 ring-white ring-offset-2' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-medium text-slate-500">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-            {value ?? '…'}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">{hint}</p>
+          <p className="text-xs font-medium text-white/90">{label}</p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight">{value ?? '…'}</p>
+          <p className="mt-1 text-xs text-white/80">{hint}</p>
         </div>
-        <span className={`rounded-xl p-2 ${tones[tone]}`}>{icon}</span>
+        <span className="rounded-xl bg-white/15 p-2 text-white">{icon}</span>
       </div>
     </button>
   );
