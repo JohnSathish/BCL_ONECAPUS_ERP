@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import type { JwtUser } from '../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { WorkingDayEngineService } from '../academic-calendar/working-day-engine.service';
-import { resolveStudentFullName } from './attendance-display.util';
+import {
+  attendanceEnrollmentNumber,
+  attendanceRollNumber,
+  resolveStudentFullName,
+} from './attendance-display.util';
+import { loadAttendanceStudents } from './attendance-student-lookup';
 import { AttendancePolicyService } from './attendance-policy.service';
 import type { AttendanceReportQueryDto } from './dto/student-attendance.dto';
 import {
@@ -140,20 +145,7 @@ export class StudentAttendanceHubService {
       ),
     ] as string[];
     const [students, faculty, courses, tenant, year] = await Promise.all([
-      studentIds.length
-        ? this.prisma.student.findMany({
-            where: { id: { in: studentIds } },
-            select: {
-              id: true,
-              rollNumber: true,
-              enrollmentNumber: true,
-              masterProfile: {
-                select: { fullName: true, mobileNumber: true, email: true },
-              },
-              user: { select: { displayName: true } },
-            },
-          })
-        : [],
+      loadAttendanceStudents(this.prisma, tenantId, studentIds),
       facultyIds.length
         ? this.prisma.staffProfile.findMany({
             where: { id: { in: facultyIds } },
@@ -216,7 +208,7 @@ export class StudentAttendanceHubService {
       includeContact: Boolean(query.departmentId) || type === 'shortage',
       sessions: classified,
       blockedDates: blocked,
-      students: new Map(students.map((row) => [row.id, row])),
+      students,
       faculty: new Map(faculty.map((row) => [row.id, row.fullName])),
       courses: new Map(courses.map((row) => [row.id, row])),
       query,
@@ -266,8 +258,8 @@ export class StudentAttendanceHubService {
     const student = bundle.students.get(studentId);
     return {
       studentId,
-      rollNumber: student?.rollNumber ?? null,
-      enrollmentNumber: student?.enrollmentNumber ?? null,
+      rollNumber: attendanceRollNumber(student),
+      enrollmentNumber: attendanceEnrollmentNumber(student),
       fullName: resolveStudentFullName(student),
       mobile: bundle.includeContact
         ? (student?.masterProfile?.mobileNumber ?? null)
@@ -300,8 +292,13 @@ export class StudentAttendanceHubService {
           continue;
         if (entry.status === 'P') present += 1;
         if (entry.status === 'A') absent += 1;
+        const course = session.courseId
+          ? bundle.courses.get(session.courseId)
+          : null;
         rows.push({
           ...this.studentName(bundle, entry.studentId),
+          departmentName: course?.department?.name ?? null,
+          semesterNo: session.semesterNo ?? null,
           subject: this.courseLabel(bundle, session),
           subjectName: this.courseLabel(bundle, session),
           status: entry.status,

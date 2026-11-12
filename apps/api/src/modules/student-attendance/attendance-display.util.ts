@@ -44,25 +44,81 @@ export function majorMinorCategory(
   return null;
 }
 
-/** Profile name, then the login display name. Blank profile text must not hide the login name. */
+function cleanName(value?: string | null) {
+  const text = value?.trim() ?? '';
+  if (!text || text.toLowerCase() === 'student') return '';
+  return text;
+}
+
+/** A portal username is often the roll. An email address is not a roll. */
+export function attendanceRollNumber(
+  student?: {
+    rollNumber?: string | null;
+    universityRollNumber?: string | null;
+    user?: { username?: string | null } | null;
+  } | null,
+) {
+  const username = student?.user?.username?.trim() ?? '';
+  return (
+    student?.rollNumber?.trim() ||
+    student?.universityRollNumber?.trim() ||
+    (username && !username.includes('@') ? username : '') ||
+    null
+  );
+}
+
+export function attendanceEnrollmentNumber(
+  student?: {
+    enrollmentNumber?: string | null;
+    universityRegistrationNumber?: string | null;
+    admissionNumber?: string | null;
+  } | null,
+) {
+  return (
+    student?.enrollmentNumber?.trim() ||
+    student?.universityRegistrationNumber?.trim() ||
+    student?.admissionNumber?.trim() ||
+    null
+  );
+}
+
+/** Profile name, then the login name, then roll or enrollment. */
 export function resolveStudentFullName(
   student?: {
     masterProfile?: { fullName?: string | null } | null;
-    user?: { displayName?: string | null } | null;
+    user?: { displayName?: string | null; username?: string | null } | null;
     enrollmentNumber?: string | null;
     rollNumber?: string | null;
+    universityRollNumber?: string | null;
+    universityRegistrationNumber?: string | null;
+    admissionNumber?: string | null;
   } | null,
 ) {
-  const profile = student?.masterProfile?.fullName?.trim();
+  const profile = cleanName(student?.masterProfile?.fullName);
   if (profile) return profile;
-  const display = student?.user?.displayName?.trim();
+  const display = cleanName(student?.user?.displayName);
   if (display) return display;
   return (
-    student?.rollNumber?.trim() ||
-    student?.enrollmentNumber?.trim() ||
+    attendanceRollNumber(student) ||
+    attendanceEnrollmentNumber(student) ||
     'Student'
   );
 }
+
+/** Fields a report needs. Do not load the full profile (address JSON can fail the request). */
+export const attendanceStudentSelect = {
+  id: true,
+  userId: true,
+  rollNumber: true,
+  enrollmentNumber: true,
+  admissionNumber: true,
+  universityRollNumber: true,
+  universityRegistrationNumber: true,
+  masterProfile: {
+    select: { fullName: true, mobileNumber: true, email: true },
+  },
+  user: { select: { displayName: true, username: true, email: true } },
+} as const;
 
 /** Fields the attendance roll needs. Do not load the full profile (address JSON can fail the request). */
 export const rosterStudentSelect = {

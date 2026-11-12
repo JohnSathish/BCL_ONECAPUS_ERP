@@ -1,12 +1,12 @@
 'use client';
 
 import { DashboardShell } from '@/components/layout/dashboard-shell';
-import { AttendanceReportsWorkspace } from '@/components/student-attendance/attendance-reports-workspace';
+import { MonthWiseAttendanceReport } from '@/components/student-attendance/month-wise-attendance-report';
 
 export default function CumulativeAttendanceReportPage() {
   return (
     <DashboardShell role="admin" title="Cumulative Attendance">
-      <AttendanceReportsWorkspace kind="cumulative" />
+      <MonthWiseAttendanceReport />
     </DashboardShell>
   );
 }

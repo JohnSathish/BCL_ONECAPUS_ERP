@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -8,6 +9,8 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -238,4 +241,39 @@ export class AttendanceReportQueryDto extends AttendanceSessionQueryDto {
   @IsOptional()
   @IsIn(['json', 'xlsx', 'csv', 'pdf'])
   format?: 'json' | 'xlsx' | 'csv' | 'pdf';
+
+  @IsOptional()
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
+  fromMonth?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
+  toMonth?: string;
+
+  @IsOptional()
+  @IsUUID()
+  programId?: string;
+
+  @IsOptional()
+  @IsIn(['policy', 'period', 'day'])
+  attendanceType?: 'policy' | 'period' | 'day';
+
+  /** When set, the workspace shift header does not limit the report. */
+  @IsOptional()
+  @IsIn(['true', '1'])
+  allShifts?: string;
+}
+
+export class MonthWiseExportDto extends AttendanceReportQueryDto {
+  /** Students currently visible after the on-screen filters. Omit to export every generated row. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8000)
+  @IsUUID('all', { each: true })
+  studentIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  attendanceFilter?: string;
 }

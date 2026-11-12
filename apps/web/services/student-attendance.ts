@@ -259,6 +259,90 @@ export async function updateAttendancePolicy(payload: Partial<AttendancePolicy>)
   return data;
 }
 
+export type MonthWiseCell = {
+  key: string;
+  label: string;
+  conducted: number;
+  attended: number;
+  absent: number;
+  leave: number;
+  duty: number;
+  percentage: number | null;
+  display: string;
+  tone: 'red' | 'light-red' | 'orange' | 'green' | 'muted';
+};
+
+export type MonthWiseAttendanceReport = {
+  institutionName: string;
+  academicYear?: string | null;
+  programme?: string | null;
+  department?: string | null;
+  semester?: string | null;
+  section?: string | null;
+  subject?: string | null;
+  shift?: string | null;
+  from: string;
+  to: string;
+  monthRange: string;
+  generatedAt: string;
+  calculation: string;
+  truncated?: boolean;
+  months: Array<{ key: string; label: string; conducted: number }>;
+  summary: { students: number; conductedClasses: number };
+  rows: Array<{
+    studentId: string;
+    fullName: string;
+    rollNumber?: string | null;
+    enrollmentNumber?: string | null;
+    departmentName?: string | null;
+    programmeName?: string | null;
+    semesterNo?: number | null;
+    months: MonthWiseCell[];
+    overall: MonthWiseCell;
+    overallDisplay: string;
+    overallPercentage: number | null;
+  }>;
+};
+
+export async function fetchMonthWiseAttendanceOptions() {
+  const { data } = await api.get<{ sections: Array<{ id: string; label: string }> }>(
+    '/v1/student-attendance/reports/month-wise/options',
+  );
+  return data;
+}
+
+export async function fetchMonthWiseAttendanceReport(
+  params: Record<string, string | number | undefined>,
+) {
+  const { data } = await api.get<MonthWiseAttendanceReport>(
+    '/v1/student-attendance/reports/month-wise',
+    { params },
+  );
+  return data;
+}
+
+export async function exportMonthWiseAttendance(body: {
+  format: 'xlsx' | 'pdf';
+  studentIds?: string[];
+  attendanceFilter?: string;
+  academicYearId?: string;
+  programId?: string;
+  departmentId?: string;
+  semesterNo?: number;
+  offeringSectionId?: string;
+  courseId?: string;
+  shiftId?: string;
+  allShifts?: string;
+  fromMonth?: string;
+  toMonth?: string;
+  attendanceType?: string;
+}) {
+  const { data } = await api.post('/v1/student-attendance/reports/month-wise/export', body, {
+    responseType: 'blob',
+  });
+  return data as Blob;
+}
+
 export async function exportStudentAttendanceReport(
   type: string,
   params: Record<string, string | number | undefined>,

@@ -25,6 +25,7 @@ import {
   AttendanceCorrectionDto,
   AttendanceEligibilityQueryDto,
   AttendanceReportQueryDto,
+  MonthWiseExportDto,
   AttendanceSessionQueryDto,
   CreateExtraAttendanceSessionDto,
   GenerateAttendanceSessionsDto,
@@ -196,6 +197,28 @@ export class StudentAttendanceController {
     @Body() query: AttendanceEligibilityQueryDto,
   ) {
     return this.service.eligibility(user, query);
+  }
+
+  @Get('reports/month-wise/options')
+  @RequireAnyPermission('student-attendance:view', 'student-attendance:reports')
+  monthWiseOptions(@CurrentUser() user: JwtUser) {
+    return this.service.monthWiseOptions(user.tid);
+  }
+
+  @Post('reports/month-wise/export')
+  @RequireAnyPermission('student-attendance:view', 'student-attendance:reports')
+  async monthWiseExport(
+    @CurrentUser() user: JwtUser,
+    @Body() body: MonthWiseExportDto,
+  ) {
+    const payload = await this.service.monthWiseExport(user.tid, body, user);
+    return new StreamableFile(payload.buffer, {
+      type:
+        body.format === 'pdf'
+          ? 'application/pdf'
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: `attachment; filename="${payload.filename}"`,
+    });
   }
 
   @Get('reports/:type')

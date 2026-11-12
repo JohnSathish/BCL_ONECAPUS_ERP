@@ -11,6 +11,7 @@ import {
   AttendanceCorrectionDto,
   AttendanceEligibilityQueryDto,
   AttendanceReportQueryDto,
+  MonthWiseExportDto,
   AttendanceSessionQueryDto,
   CreateExtraAttendanceSessionDto,
   GenerateAttendanceSessionsDto,
@@ -25,11 +26,14 @@ import {
   majorMinorCategory,
   majorMinorCategorySetWhere,
   registrationLineCategoryWhere,
+  attendanceEnrollmentNumber,
+  attendanceRollNumber,
   resolveAttendanceDisplayTitle,
   resolveStudentFullName,
   rosterStudentSelect,
 } from './attendance-display.util';
 import { compareAttendanceRoll } from './attendance-roll-order.util';
+import { loadAttendanceStudents } from './attendance-student-lookup';
 import {
   dateKeyToUtcMidnight,
   getZonedDateKey,
@@ -37,6 +41,7 @@ import {
 } from '../../common/utils/time-greeting';
 import { AttendancePolicyService } from './attendance-policy.service';
 import { StudentAttendanceHubService } from './student-attendance-hub.service';
+import { MonthWiseAttendanceService } from './month-wise-attendance.service';
 import {
   dayTemplateShouldRun,
   sessionMarkingAllowed,
@@ -78,6 +83,7 @@ export class StudentAttendanceService {
     private readonly attendancePolicy: AttendancePolicyService,
     private readonly workingDays: WorkingDayEngineService,
     private readonly attendanceHub: StudentAttendanceHubService,
+    private readonly monthWise: MonthWiseAttendanceService,
   ) {}
 
   async dashboard(tenantId: string) {
@@ -1190,6 +1196,27 @@ export class StudentAttendanceService {
     return snapshots;
   }
 
+  monthWiseOptions(tenantId: string) {
+    return this.monthWise.options(tenantId);
+  }
+
+  async monthWiseExport(
+    tenantId: string,
+    body: MonthWiseExportDto,
+    user: JwtUser,
+  ) {
+    if (body.format !== 'xlsx' && body.format !== 'pdf') {
+      throw new BadRequestException('Choose an Excel or PDF export.');
+    }
+    const scoped = await this.attendanceHub.scopedQuery(user, body);
+    return this.monthWise.exportReport(tenantId, {
+      ...scoped,
+      format: body.format,
+      studentIds: body.studentIds,
+      attendanceFilter: body.attendanceFilter,
+    });
+  }
+
   async reports(
     tenantId: string,
     type: string,
@@ -1199,6 +1226,9 @@ export class StudentAttendanceService {
     const scoped = user
       ? await this.attendanceHub.scopedQuery(user, query)
       : query;
+    if (type === 'month-wise') {
+      return this.monthWise.report(tenantId, scoped);
+    }
     const format = scoped.format ?? 'json';
     const hubTypes = new Set([
       'daily',
@@ -2795,19 +2825,11 @@ export class StudentAttendanceService {
     ].filter((id): id is string =>
       query.studentId ? id === query.studentId : Boolean(id),
     );
-    const students = studentIds.length
-      ? await this.prisma.student.findMany({
-          where: { tenantId, id: { in: studentIds } },
-          select: {
-            id: true,
-            rollNumber: true,
-            enrollmentNumber: true,
-            masterProfile: { select: { fullName: true } },
-            user: { select: { displayName: true } },
-          },
-        })
-      : [];
-    const studentMap = new Map(students.map((row) => [row.id, row]));
+    const studentMap = await loadAttendanceStudents(
+      this.prisma,
+      tenantId,
+      studentIds,
+    );
 
     type Group = {
       key: string;
@@ -2930,8 +2952,8 @@ export class StudentAttendanceService {
         }
         return {
           studentId,
-          rollNumber: student?.rollNumber ?? null,
-          enrollmentNumber: student?.enrollmentNumber ?? null,
+          rollNumber: attendanceRollNumber(student),
+          enrollmentNumber: attendanceEnrollmentNumber(student),
           fullName: resolveStudentFullName(student),
           semesterNo: context?.semesterNo ?? null,
           classLabel: context?.classLabel || null,

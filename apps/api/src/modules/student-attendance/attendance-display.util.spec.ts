@@ -29,4 +29,15 @@ describe('resolveStudentFullName', () => {
       }),
     ).toBe('BA24-003');
   });
+
+  it('ignores a placeholder profile name and uses the login roll', () => {
+    expect(
+      resolveStudentFullName({
+        masterProfile: { fullName: 'Student' },
+        user: { displayName: 'Student', username: 'ECO-014' },
+        rollNumber: null,
+        enrollmentNumber: null,
+      }),
+    ).toBe('ECO-014');
+  });
 });

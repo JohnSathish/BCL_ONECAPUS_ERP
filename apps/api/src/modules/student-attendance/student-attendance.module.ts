@@ -6,6 +6,7 @@ import { AttendancePolicyService } from './attendance-policy.service';
 import { StudentAttendanceSchedulerService } from './student-attendance-scheduler.service';
 import { StudentAttendanceController } from './student-attendance.controller';
 import { StudentAttendanceHubService } from './student-attendance-hub.service';
+import { MonthWiseAttendanceService } from './month-wise-attendance.service';
 import { StudentAttendanceService } from './student-attendance.service';
 
 @Module({
@@ -18,6 +19,7 @@ import { StudentAttendanceService } from './student-attendance.service';
   providers: [
     StudentAttendanceService,
     StudentAttendanceHubService,
+    MonthWiseAttendanceService,
     AttendancePolicyService,
     StudentAttendanceSchedulerService,
   ],
