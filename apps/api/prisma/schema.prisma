@@ -10795,6 +10795,89 @@ model LibraryMemberSyncRun {
   @@schema("library")
 }
 
+/// One library clearance card per student, academic year, examination name and semester.
+/// Examination name is stored as text. This table does not reference examination records.
+model LibraryClearanceCard {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  cardNumber         String    @map("card_number")
+  verifyToken        String    @map("verify_token")
+  studentId          String    @map("student_id") @db.Uuid
+  academicYear       String    @map("academic_year")
+  academicYearKey    String    @map("academic_year_key")
+  examinationName    String    @map("examination_name")
+  examinationKey     String    @map("examination_key")
+  semester           Int
+  semesterLabel      String    @map("semester_label")
+  status             String    @default("PENDING")
+  booksReturned      String    @map("books_returned")
+  duesStatus         String    @map("dues_status")
+  lostDamagedStatus  String    @map("lost_damaged_status")
+  accountStatus      String    @map("account_status")
+  remarks            String?   @db.Text
+  librarianName      String?   @map("librarian_name")
+  clearedOn          DateTime? @map("cleared_on") @db.Date
+  studentName        String    @map("student_name")
+  rollNumber         String?   @map("roll_number")
+  registrationNumber String?   @map("registration_number")
+  programme          String?
+  department         String?
+  departmentId       String?   @map("department_id") @db.Uuid
+  programId          String?   @map("program_id") @db.Uuid
+  mobileNumber       String?   @map("mobile_number")
+  academicSession    String?   @map("academic_session")
+  activeLoans        Int       @default(0) @map("active_loans")
+  outstandingDues    Decimal   @default(0) @map("outstanding_dues") @db.Decimal(12, 2)
+  openIncidents      Int       @default(0) @map("open_incidents")
+  membershipBlocked  Boolean   @default(false) @map("membership_blocked")
+  createdById        String?   @map("created_by_id") @db.Uuid
+  updatedById        String?   @map("updated_by_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  events LibraryClearanceEvent[]
+
+  @@unique([tenantId, cardNumber])
+  @@unique([tenantId, studentId, academicYearKey, examinationKey, semester], map: "library_clearance_cards_context_key")
+  @@index([tenantId, status], map: "library_clearance_cards_status_idx")
+  @@index([tenantId, academicYearKey, examinationKey, semester], map: "library_clearance_cards_lookup_idx")
+  @@index([tenantId, studentId], map: "library_clearance_cards_student_idx")
+  @@index([tenantId, departmentId], map: "library_clearance_cards_department_idx")
+  @@map("library_clearance_cards")
+  @@schema("library")
+}
+
+model LibraryClearanceEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  cardId    String   @map("card_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String
+  before    Json?
+  after     Json?
+  note      String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  card LibraryClearanceCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, cardId, createdAt], map: "library_clearance_events_card_idx")
+  @@map("library_clearance_events")
+  @@schema("library")
+}
+
+model LibraryClearanceSequence {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  yearCode  String   @map("year_code")
+  lastValue Int      @default(0) @map("last_value")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, yearCode])
+  @@map("library_clearance_sequences")
+  @@schema("library")
+}
+
 model LibraryDigitalAsset {
   id              String    @id @default(uuid()) @db.Uuid
   tenantId        String    @map("tenant_id") @db.Uuid

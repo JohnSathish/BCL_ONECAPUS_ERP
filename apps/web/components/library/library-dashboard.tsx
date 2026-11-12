@@ -10,6 +10,7 @@ import {
   Bookmark,
   CalendarClock,
   Info,
+  BadgeCheck,
   Library,
   Monitor,
   Plus,
@@ -235,6 +236,14 @@ export function LibraryDashboard() {
           icon: Plus,
           title: 'Add Member',
           tone: 'from-amber-50 to-amber-100 text-amber-700',
+        }
+      : null,
+    canRead
+      ? {
+          href: '/admin/library/clearance',
+          icon: BadgeCheck,
+          title: 'Clearance Card',
+          tone: 'from-slate-50 to-slate-100 text-slate-700',
         }
       : null,
     canBarcode

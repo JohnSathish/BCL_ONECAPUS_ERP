@@ -9,6 +9,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { StorageModule } from '../../shared/storage/storage.module';
 import { AcademicCalendarModule } from '../academic-calendar/academic-calendar.module';
 import { LibraryController } from './library.controller';
+import { LibraryClearanceController } from './library-clearance.controller';
 import { LibraryOpacController } from './library-opac.controller';
 import { KohaImportController } from './koha/koha-import.controller';
 import { KohaImportService } from './koha/koha-import.service';
@@ -34,6 +35,7 @@ import { LibraryCatalogueService } from './services/library-catalogue.service';
 import { LibraryCopyIncidentsService } from './services/library-copy-incidents.service';
 
 import { LibraryCirculationService } from './services/library-circulation.service';
+import { LibraryClearanceService } from './services/library-clearance.service';
 
 import { LibraryDigitalAssetsService } from './services/library-digital-assets.service';
 
@@ -87,6 +89,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
   ],
   controllers: [
     LibraryController,
+    LibraryClearanceController,
     LibraryOpacController,
     KohaImportController,
     LibraryCatalogueReportsController,
@@ -126,6 +129,7 @@ import { ResearchRepositoryService } from './services/research-repository.servic
     LibraryFinesService,
 
     LibraryCirculationService,
+    LibraryClearanceService,
     LibraryCirculationLedgerService,
     LibraryCirculationReportsService,
 

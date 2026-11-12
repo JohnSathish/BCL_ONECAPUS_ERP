@@ -1659,6 +1659,11 @@ export const ADMIN_NAV: NavGroup[] = [
             permissions: ['library:reports', 'library:manage'],
           },
           {
+            label: 'Library Clearance Card',
+            href: '/admin/library/clearance',
+            permissions: ['library:read', 'library:circulate', 'library:manage', 'library:reports'],
+          },
+          {
             label: 'Collection Reports',
             href: '/admin/library/collection-reports',
             permissions: ['library:reports', 'library:manage', 'library:read'],
