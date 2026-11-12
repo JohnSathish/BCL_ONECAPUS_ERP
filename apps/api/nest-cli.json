@@ -16,6 +16,10 @@
       {
         "include": "modules/school-sis/assets/**/*",
         "watchAssets": true
+      },
+      {
+        "include": "modules/library/assets/**/*",
+        "watchAssets": true
       }
     ]
   }

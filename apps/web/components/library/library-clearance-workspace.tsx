@@ -845,7 +845,7 @@ export function LibraryClearanceWorkspace() {
           {student ? (
             <dl className="grid gap-2 text-sm sm:grid-cols-2">
               <Field label="Roll no." value={student.rollNumber} />
-              <Field label="Registration no." value={student.registrationNumber} />
+              <Field label="NEHU Roll No." value={student.registrationNumber} />
               <Field label="Programme" value={student.programme} />
               <Field label="Department" value={student.department} />
               <Field

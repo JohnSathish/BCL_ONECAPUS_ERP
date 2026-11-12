@@ -79,7 +79,7 @@ function ticket(card: ClearanceCardPrintModel) {
     <div class="block">
       ${line('Name', card.studentName)}
       ${line('Roll No.', card.rollNumber)}
-      ${line('Reg. No.', card.registrationNumber)}
+      ${line('NEHU Roll No.', card.registrationNumber)}
       ${line('Programme', card.programme)}
       ${line('Department', card.department)}
       ${line('Semester', card.semesterLabel)}

@@ -112,6 +112,9 @@ describe('library clearance rules', () => {
     expect(cleared).toContain('returned all borrowed library books');
     expect(cleared).toContain('LCC/2026-27/03458');
     expect(cleared).toContain('Official');
+    expect(cleared).toContain('NEHU Roll No.');
+    expect(cleared).toContain('25034578');
+    expect(cleared).not.toContain('Reg. No.');
 
     const pending = renderClearanceCardsHtml({
       layout: 'pair',

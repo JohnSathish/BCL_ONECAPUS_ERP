@@ -5,6 +5,7 @@ const assetDirs = [
   'src/modules/proposals/assets',
   'src/modules/school-admissions/assets',
   'src/modules/school-sis/assets',
+  'src/modules/library/assets',
 ];
 
 for (const source of assetDirs) {

@@ -8,11 +8,12 @@ import {
 import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import QRCode from 'qrcode';
 import puppeteer from 'puppeteer';
 
 import { PrismaService } from '../../../database/prisma.service';
+import { resolvePublicUploadFsPath } from '../../../common/uploads/upload-paths';
 import {
   renderClearanceCardsHtml,
   type ClearanceCardPrintModel,
@@ -685,6 +686,10 @@ export class LibraryClearanceService {
       portalSubtitle: branding?.portalSubtitle,
     });
     const logoDataUri = await this.logoDataUri(branding?.logoUrl ?? null);
+    const nehuRolls = await this.nehuRollNumbers(
+      tenantId,
+      cards.map((card) => card.studentId),
+    );
     const models = await Promise.all(
       ids.map(async (id) => {
         const card = byId.get(id)!;
@@ -707,7 +712,8 @@ export class LibraryClearanceService {
           semesterLabel: card.semesterLabel,
           studentName: card.studentName,
           rollNumber: card.rollNumber ?? '',
-          registrationNumber: card.registrationNumber ?? '',
+          registrationNumber:
+            nehuRolls.get(card.studentId) || card.registrationNumber || '',
           programme: card.programme ?? '',
           department: card.department ?? '',
           academicSession: card.academicSession ?? '',
@@ -1047,7 +1053,10 @@ export class LibraryClearanceService {
       studentName:
         student.masterProfile?.fullName?.trim() || student.enrollmentNumber,
       rollNumber: student.rollNumber?.trim() || student.enrollmentNumber,
-      registrationNumber: student.universityRegistrationNumber?.trim() || null,
+      registrationNumber:
+        student.universityRollNumber?.trim() ||
+        student.admissionNumber?.trim() ||
+        null,
       programme: student.programVersion?.program?.name ?? null,
       department: student.department?.name ?? null,
       departmentId: student.departmentId,
@@ -1200,36 +1209,105 @@ export class LibraryClearanceService {
     );
   }
 
-  private async logoDataUri(logoUrl: string | null) {
-    const paths: string[] = [];
-    if (logoUrl) {
-      const uploads = logoUrl.match(/\/uploads\/[^?#]+/);
-      if (uploads?.[0]) {
-        paths.push(join(process.cwd(), uploads[0].replace(/^\//, '')));
-        paths.push(
-          join(process.cwd(), 'apps/api', uploads[0].replace(/^\//, '')),
-        );
-      }
-    }
-    paths.push(
-      join(process.cwd(), 'apps/web/public/branding/college-logo.png'),
-      join(process.cwd(), '../web/public/branding/college-logo.png'),
-      join(process.cwd(), 'public/branding/college-logo.png'),
+  private async nehuRollNumbers(tenantId: string, studentIds: string[]) {
+    const ids = [...new Set(studentIds)];
+    if (!ids.length) return new Map<string, string>();
+    const students = await this.prisma.student.findMany({
+      where: { tenantId, id: { in: ids } },
+      select: { id: true, universityRollNumber: true, admissionNumber: true },
+    });
+    return new Map(
+      students.map((student) => [
+        student.id,
+        student.universityRollNumber?.trim() ||
+          student.admissionNumber?.trim() ||
+          '',
+      ]),
     );
+  }
+
+  private async logoDataUri(logoUrl: string | null) {
+    const paths = collegeLogoCandidates(logoUrl);
     for (const path of paths) {
       try {
         const buf = await readFile(path);
-        const mime =
-          path.endsWith('.jpg') || path.endsWith('.jpeg')
-            ? 'image/jpeg'
-            : path.endsWith('.webp')
-              ? 'image/webp'
-              : 'image/png';
-        return `data:${mime};base64,${buf.toString('base64')}`;
+        return imageDataUri(path, buf);
       } catch {
         // The next candidate may exist when the API is started from another folder.
       }
     }
-    return null;
+    const remote = await readRemoteLogo(logoUrl);
+    return remote;
   }
+}
+
+const LOGO_RELATIVE_PATHS = [
+  'apps/web/public/branding/college-logo.png',
+  'apps/college-web/public/images/college-logo.png',
+  'apps/api/src/modules/library/assets/college-logo.png',
+  'src/modules/library/assets/college-logo.png',
+  'modules/library/assets/college-logo.png',
+];
+
+function collegeLogoCandidates(logoUrl: string | null) {
+  const paths: string[] = [join(__dirname, '../assets/college-logo.png')];
+  if (logoUrl && !/^https?:\/\//i.test(logoUrl)) {
+    try {
+      paths.push(resolvePublicUploadFsPath(logoUrl));
+    } catch {
+      // A branding URL that is not an upload path still has the packaged logo.
+    }
+  }
+  for (const root of directoryRoots()) {
+    for (const relative of LOGO_RELATIVE_PATHS) {
+      paths.push(join(root, relative));
+    }
+  }
+  return [...new Set(paths)];
+}
+
+function directoryRoots() {
+  const roots: string[] = [];
+  for (const start of [process.cwd(), __dirname]) {
+    let cursor = start;
+    for (let depth = 0; depth < 8; depth += 1) {
+      roots.push(cursor);
+      const parent = dirname(cursor);
+      if (parent === cursor) break;
+      cursor = parent;
+    }
+  }
+  return roots;
+}
+
+function imageDataUri(path: string, buf: Buffer) {
+  const mime =
+    path.endsWith('.jpg') || path.endsWith('.jpeg')
+      ? 'image/jpeg'
+      : path.endsWith('.webp')
+        ? 'image/webp'
+        : 'image/png';
+  return `data:${mime};base64,${buf.toString('base64')}`;
+}
+
+async function readRemoteLogo(logoUrl: string | null) {
+  const urls = [
+    logoUrl && /^https?:\/\//i.test(logoUrl) ? logoUrl : '',
+    'https://erp.donboscocollege.ac.in/branding/college-logo.png',
+    'https://donboscocollege.ac.in/images/college-logo.png',
+  ].filter(Boolean);
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      if (!response.ok) continue;
+      const buf = Buffer.from(await response.arrayBuffer());
+      if (buf.length < 8) continue;
+      const mime = response.headers.get('content-type') || 'image/png';
+      if (!mime.startsWith('image/')) continue;
+      return `data:${mime};base64,${buf.toString('base64')}`;
+    } catch {
+      // The packaged file is preferred. A public copy is only a fallback.
+    }
+  }
+  return null;
 }
